@@ -12,6 +12,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import org.jetbrains.annotations.NotNull;
+import org.lwjgl.glfw.GLFW;
 
 public class addBackpackButton extends Button {
 
@@ -22,13 +23,27 @@ public class addBackpackButton extends Button {
         super(x, y, width, height,
                 Component.literal("+ 添加背包"),
                 button -> {
+                    // 保存当前鼠标位置
+                    Minecraft mc = Minecraft.getInstance();
+                    long window = mc.getWindow().getWindow();
+                    double[] mouseX = new double[1];
+                    double[] mouseY = new double[1];
+                    GLFW.glfwGetCursorPos(window, mouseX, mouseY);
+
                     // 发送添加背包请求到服务端
                     PacketHandler.sendToServer(new AddBackpackPacket());
+
                     // 刷新界面
-                    if (Minecraft.getInstance().screen != null) {
-                        Minecraft.getInstance().screen.onClose();
-                        Minecraft.getInstance().execute(() -> {
-                            Minecraft.getInstance().setScreen(new BackpackMenuScreen());
+                    if (mc.screen != null) {
+                        mc.screen.onClose();
+                        mc.execute(() -> {
+                            BackpackMenuScreen newScreen = new BackpackMenuScreen();
+                            mc.setScreen(newScreen);
+
+                            // 恢复鼠标位置
+                            mc.execute(() -> {
+                                GLFW.glfwSetCursorPos(window, mouseX[0], mouseY[0]);
+                            });
                         });
                     }
                 },

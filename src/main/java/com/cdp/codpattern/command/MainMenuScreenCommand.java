@@ -1,6 +1,6 @@
 package com.cdp.codpattern.command;
 
-import com.cdp.codpattern.client.gui.screen.MainMenuScreen;
+import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
@@ -30,7 +30,7 @@ public class MainMenuScreenCommand {
                                         Minecraft.getInstance().execute(() -> {
                                             Minecraft.getInstance().player.playNotifySound(SoundEvents.COW_HURT , SoundSource.PLAYERS , 1f , 1f);
                                             // 每次打开时创建新实例
-                                           Minecraft.getInstance().setScreen(new MainMenuScreen());
+                                           Minecraft.getInstance().setScreen(new BackpackMenuScreen());
                                             context.getSource().sendSuccess(() -> {
                                             if (Minecraft.getInstance().screen != null) {
                                                 return Component.literal("screen height:\n" + Minecraft.getInstance().screen.height);
