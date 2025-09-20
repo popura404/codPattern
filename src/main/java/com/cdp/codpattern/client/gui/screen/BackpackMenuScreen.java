@@ -105,6 +105,7 @@ public class BackpackMenuScreen extends Screen {
         if (currentSecondButtonId != null && secondButtonMap.containsKey(currentSecondButtonId)) {
             SecodnButton secondButton = secondButtonMap.get(currentSecondButtonId);
             removeWidget(secondButton);
+            //TODO: xi xi
             secondButtonMap.remove(currentSecondButtonId);
             currentSecondButtonId = null;
         }
