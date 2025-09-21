@@ -167,7 +167,7 @@ public class BackpackMenuScreen extends Screen {
             int X, Y;
             if (buttonPosition <= 5) {
                 X = UNIT_LENGTH * 8 + ((buttonPosition - 1) * UNIT_LENGTH * 21);
-                Y = UNIT_LENGTH * 20;
+                Y = UNIT_LENGTH * 22;
             } else {
                 X = UNIT_LENGTH * 8 + ((buttonPosition - 6) * UNIT_LENGTH * 21);
                 Y = UNIT_LENGTH * 13;
