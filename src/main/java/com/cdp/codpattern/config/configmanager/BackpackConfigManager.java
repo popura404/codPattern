@@ -15,7 +15,7 @@ import java.nio.file.Path;
 public class BackpackConfigManager {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path CONFIG_PATH = FMLPaths.CONFIGDIR.get().resolve("examplemod/backpacks.json");
+    private static final Path CONFIG_PATH = FMLPaths.CONFIGDIR.get().resolve("codpattern/backpacks.json");
     private static BagSelectConfig config;
 
     /**

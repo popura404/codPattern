@@ -44,8 +44,6 @@ public class CodPattern
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new CommandRegistration());
         MinecraftForge.EVENT_BUS.register(new MainMenuScreenCommand());
-
-        context.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
 
     private void setup(final FMLCommonSetupEvent event) {
