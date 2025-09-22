@@ -24,7 +24,7 @@ public class CodPattern
     public CodPattern(FMLJavaModLoadingContext context)
     {
         FMLJavaModLoadingContext.get().getModEventBus().addListener(this::setup);
-        FMLJavaModLoadingContext.get().getModEventBus().addListener(this::clientSetup);
+        //FMLJavaModLoadingContext.get().getModEventBus().addListener(this::clientSetup);
 
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new CommandRegistration());
@@ -36,10 +36,6 @@ public class CodPattern
         BackpackConfigManager.load();
         // 注册网络包
         PacketHandler.register();
-    }
-
-    private void clientSetup(final FMLClientSetupEvent event) {
-        // 客户端初始化（如果需要注册按键绑定等）
     }
 
     @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
