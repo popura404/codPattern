@@ -2,6 +2,7 @@ package com.cdp.codpattern.network.handler;
 
 import com.cdp.codpattern.network.AddBackpackPacket;
 import com.cdp.codpattern.network.SelectBackpackPacket;
+import com.cdp.codpattern.network.UpdateWeaponPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkDirection;
@@ -12,7 +13,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
 public class PacketHandler {
     private static final String PROTOCOL_VERSION = "1";
     public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation("examplemod", "main"),
+            new ResourceLocation("codpattern", "main"),
             () -> PROTOCOL_VERSION,
             PROTOCOL_VERSION::equals,
             PROTOCOL_VERSION::equals
@@ -40,6 +41,13 @@ public class PacketHandler {
                 .encoder(AddBackpackPacket::encode)
                 .consumerMainThread(AddBackpackPacket::handle)
                 .add();
+
+        // 注册更新武器的数据包
+        INSTANCE.messageBuilder(UpdateWeaponPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(UpdateWeaponPacket::decode)
+                .encoder(UpdateWeaponPacket::encode)
+                .consumerMainThread(UpdateWeaponPacket::handle)
+                .add();
     }
 
     /**
@@ -50,9 +58,10 @@ public class PacketHandler {
     }
 
     /**
-     * 发送数据包到指定玩家
+     * 发送数据包到玩家
      */
     public static <MSG> void sendToPlayer(MSG message, ServerPlayer player) {
         INSTANCE.send(PacketDistributor.PLAYER.with(() -> player), message);
     }
 }
+

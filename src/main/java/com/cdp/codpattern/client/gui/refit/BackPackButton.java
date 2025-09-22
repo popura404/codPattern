@@ -1,6 +1,6 @@
 package com.cdp.codpattern.client.gui.refit;
 
-import com.cdp.codpattern.config.server.BagSelectConfig;
+import com.cdp.codpattern.config.server.BagSelectionConfig;
 import com.cdp.codpattern.network.handler.PacketHandler;
 import com.cdp.codpattern.network.SelectBackpackPacket;
 import net.minecraft.client.Minecraft;
@@ -21,7 +21,7 @@ public class BackPackButton extends Button {
 
     private final Integer BAGSERIAL;
     int focusedtimes = 0;
-    private final BagSelectConfig.Backpack backpack;
+    private final BagSelectionConfig.Backpack backpack;
     private final boolean isCurrentlySelected;
 
     /**
@@ -34,7 +34,7 @@ public class BackPackButton extends Button {
     /**
      * 增强构造函数 - 支持背包数据和选中状态
      */
-    public BackPackButton(int x, int y, int width, int height, int bagserial, BagSelectConfig.Backpack backpack, boolean isSelected) {
+    public BackPackButton(int x, int y, int width, int height, int bagserial, BagSelectionConfig.Backpack backpack, boolean isSelected) {
         super(x, y, width, height, Component.literal("choose your bag"), button -> {
             // 发送选择背包的数据包到服务端
             PacketHandler.sendToServer(new SelectBackpackPacket(bagserial));
@@ -65,10 +65,10 @@ public class BackPackButton extends Button {
         tooltipLines.add(Component.literal("§7----------------"));
 
         // 显示背包内的物品
-        for (Map.Entry<String, BagSelectConfig.Backpack.ItemData> entry :
+        for (Map.Entry<String, BagSelectionConfig.Backpack.ItemData> entry :
                 backpack.getItem_MAP().entrySet()) {
             String type = entry.getKey();
-            BagSelectConfig.Backpack.ItemData item = entry.getValue();
+            BagSelectionConfig.Backpack.ItemData item = entry.getValue();
 
             String typeLabel = type.equals("primary") ? "§c主武器" : "§9副武器";
             String itemName = item.getItem().replace("minecraft:", "");
@@ -180,7 +180,7 @@ public class BackPackButton extends Button {
         return BAGSERIAL;
     }
 
-    public BagSelectConfig.Backpack getBackpack() {
+    public BagSelectionConfig.Backpack getBackpack() {
         return backpack;
     }
 }

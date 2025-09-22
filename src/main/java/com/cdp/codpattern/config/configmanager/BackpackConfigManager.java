@@ -1,6 +1,6 @@
 package com.cdp.codpattern.config.configmanager;
 
-import com.cdp.codpattern.config.server.BagSelectConfig;
+import com.cdp.codpattern.config.server.BagSelectionConfig;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.minecraftforge.fml.loading.FMLPaths;
@@ -16,7 +16,7 @@ public class BackpackConfigManager {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path CONFIG_PATH = FMLPaths.CONFIGDIR.get().resolve("codpattern/backpacks.json");
-    private static BagSelectConfig config;
+    private static BagSelectionConfig config;
 
     /**
      * 加载配置文件
@@ -25,16 +25,16 @@ public class BackpackConfigManager {
         try {
             if (Files.exists(CONFIG_PATH)) {
                 try (Reader reader = Files.newBufferedReader(CONFIG_PATH)) {
-                    config = GSON.fromJson(reader, BagSelectConfig.class);
+                    config = GSON.fromJson(reader, BagSelectionConfig.class);
                 }
             } else {
                 // 创建新的配置
-                config = new BagSelectConfig();
+                config = new BagSelectionConfig();
                 save();
             }
         } catch (IOException e) {
             e.printStackTrace();
-            config = new BagSelectConfig();
+            config = new BagSelectionConfig();
         }
     }
 
@@ -55,7 +55,7 @@ public class BackpackConfigManager {
     /**
      * 获取配置实例
      */
-    public static BagSelectConfig getConfig() {
+    public static BagSelectionConfig getConfig() {
         if (config == null) {
             load();
         }
@@ -69,15 +69,15 @@ public class BackpackConfigManager {
      */
     public static int addCustomBackpack(String uuid) {
 
-        BagSelectConfig.PlayerBackpackData playerData = getConfig().getOrCreatePlayerData(uuid);
+        BagSelectionConfig.PlayerBackpackData playerData = getConfig().getOrCreatePlayerData(uuid);
         int id = playerData.getNextAvailableId();
 
         // 创建新背包
-        BagSelectConfig.Backpack newBackpack = new BagSelectConfig.Backpack("自定义背包 #" + id);
+        BagSelectionConfig.Backpack newBackpack = new BagSelectionConfig.Backpack("自定义背包 #" + id);
         newBackpack.setItem_MAP("primary",
-                new BagSelectConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"swpu:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}"));
+                new BagSelectionConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"swpu:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}"));
         newBackpack.setItem_MAP("secondary",
-                new BagSelectConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"swpu:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}"));
+                new BagSelectionConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"swpu:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}"));
 
         // 添加到玩家数据
         if (playerData.addBackpack(id,newBackpack)) {

@@ -37,3 +37,10 @@ description='''${mod_description}'''
     ordering="NONE"
     side="BOTH"
 
+[[dependencies."${mod_id}"]]
+modId="tacz"
+mandatory=true
+versionRange="[1.1.6,)"
+ordering="NONE"
+side="BOTH"
+

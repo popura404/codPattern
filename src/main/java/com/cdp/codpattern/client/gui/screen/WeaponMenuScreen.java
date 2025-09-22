@@ -1,7 +1,7 @@
 package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
-import com.cdp.codpattern.config.server.BagSelectConfig;
+import com.cdp.codpattern.config.server.BagSelectionConfig;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.client.resource.GunDisplayInstance;
@@ -21,11 +21,11 @@ public class WeaponMenuScreen extends Screen {
 
     private static int UNIT_LENGTH = 0;
     private final Integer BAGSERIAL;
-    private BagSelectConfig.Backpack backpack;
+    private BagSelectionConfig.Backpack backpack;
     private ResourceLocation primaryhudTexture;
     private ResourceLocation secondaryhudTexture;
 
-    public WeaponMenuScreen(BagSelectConfig.Backpack backpack, Integer BAGSERIAL) {
+    public WeaponMenuScreen(BagSelectionConfig.Backpack backpack, Integer BAGSERIAL) {
         super(Component.literal("WeaponMenuScreen"));
         this.BAGSERIAL = BAGSERIAL;
         this.backpack = backpack;
@@ -62,9 +62,6 @@ public class WeaponMenuScreen extends Screen {
 
         //IGun primaryitemstackItemgunIdIGun = (IGun) primaryitemstack.getItem();
         //IGun secondaryitemstackItemgunIdIGun = (IGun) secondaryitemstack.getItem();
-
-
-
     }
 
     public void render(@NotNull GuiGraphics pGuiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
@@ -78,11 +75,10 @@ public class WeaponMenuScreen extends Screen {
     }
 
     public void addWeaponButtonandTexture(){
-
         int buttonWidth = 24 * UNIT_LENGTH;
         int buttonHeight = 12 * UNIT_LENGTH;
 
-        // 主武器按钮
+        // 主武器按钮 - 点击打开WeaponScreen选择主武器
         addRenderableWidget(new FlatColorButton(
                 6 * UNIT_LENGTH,
                 this.height - 18 * UNIT_LENGTH,
@@ -91,10 +87,16 @@ public class WeaponMenuScreen extends Screen {
                 this.BAGSERIAL,
                 this.backpack,
                 this.primaryhudTexture,
-                this.UNIT_LENGTH
+                this.UNIT_LENGTH,
+                button -> {
+                    // 打开WeaponScreen，传入true表示选择主武器
+                    Minecraft.getInstance().setScreen(
+                            new WeaponScreen(this, this.backpack, this.BAGSERIAL, true)
+                    );
+                }
         ));
 
-        // 副武器按钮
+        // 副武器按钮 - 点击打开WeaponScreen选择副武器
         addRenderableWidget(new FlatColorButton(
                 32 * UNIT_LENGTH,
                 this.height - 18 * UNIT_LENGTH,
@@ -103,9 +105,16 @@ public class WeaponMenuScreen extends Screen {
                 this.BAGSERIAL,
                 this.backpack,
                 this.secondaryhudTexture,
-                this.UNIT_LENGTH
+                this.UNIT_LENGTH,
+                button -> {
+                    // 打开WeaponScreen，传入false表示选择副武器
+                    Minecraft.getInstance().setScreen(
+                            new WeaponScreen(this, this.backpack, this.BAGSERIAL, false)
+                    );
+                }
         ));
     }
+
 
     @Override
     public boolean isPauseScreen() {
@@ -140,7 +149,7 @@ public class WeaponMenuScreen extends Screen {
         return BAGSERIAL;
     }
 
-    public BagSelectConfig.Backpack getBackpack() {
+    public BagSelectionConfig.Backpack getBackpack() {
         return backpack;
     }
 

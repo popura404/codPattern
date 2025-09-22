@@ -1,7 +1,7 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.screen.WeaponMenuScreen;
-import com.cdp.codpattern.config.server.BagSelectConfig;
+import com.cdp.codpattern.config.server.BagSelectionConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -14,9 +14,9 @@ public class SecodnButton extends Button {
 
     private final Integer BAGSERIAL;
     int focusedtimes = 0;
-    private final BagSelectConfig.Backpack backpack;
+    private final BagSelectionConfig.Backpack backpack;
 
-    protected SecodnButton(int pX, int pY, int pWidth, int pHeight, Component pMessage, int bagserial, BagSelectConfig.Backpack backpack) {
+    protected SecodnButton(int pX, int pY, int pWidth, int pHeight, Component pMessage, int bagserial, BagSelectionConfig.Backpack backpack) {
         super(pX, pY, pWidth, pHeight, pMessage, button -> {
             Minecraft.getInstance().execute(() -> Minecraft.getInstance().setScreen(new WeaponMenuScreen(backpack, bagserial)));
         }, DEFAULT_NARRATION);

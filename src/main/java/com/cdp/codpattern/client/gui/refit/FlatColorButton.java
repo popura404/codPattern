@@ -1,6 +1,6 @@
 package com.cdp.codpattern.client.gui.refit;
 
-import com.cdp.codpattern.config.server.BagSelectConfig;
+import com.cdp.codpattern.config.server.BagSelectionConfig;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -20,16 +20,20 @@ public class FlatColorButton extends Button {
     private boolean isPhotoButton = false;
     private ResourceLocation resourceLocation;
     private Integer BAGSERIAL;
-    private BagSelectConfig.Backpack backpack;
+    private BagSelectionConfig.Backpack backpack;
     private int UNIT_LENGTH;
 
+    // 普通按钮构造函数
     public FlatColorButton(int x, int y, int width, int height, @Nullable Button.OnPress pOnPress) {
         super(x, y, width, height, Component.literal("choose your bag"), pOnPress, DEFAULT_NARRATION);
     }
 
+    // 带贴图的按钮构造函数 - 修改为接受OnPress参数
     public FlatColorButton(int pX, int pY, int pWidth, int pHeight, Integer bagserial,
-                           BagSelectConfig.Backpack backpack, ResourceLocation resourceLocation, int UNIT_LENGTH){
-        super(pX, pY, pWidth, pHeight, Component.literal("choose ur weapon"), button -> {}, DEFAULT_NARRATION);
+                           BagSelectionConfig.Backpack backpack, ResourceLocation resourceLocation,
+                           int UNIT_LENGTH, @Nullable Button.OnPress onPress){
+        super(pX, pY, pWidth, pHeight, Component.literal("choose ur weapon"),
+                onPress != null ? onPress : button -> {}, DEFAULT_NARRATION);
         this.isPhotoButton = true;
         this.resourceLocation = resourceLocation;
         this.BAGSERIAL = bagserial;
@@ -114,7 +118,7 @@ public class FlatColorButton extends Button {
 
         // 居中贴图
         int textureX = this.getX() + 3 * UNIT_LENGTH;
-        int textureY = this.getY() + 3 *  UNIT_LENGTH;
+        int textureY = this.getY() + 3 * UNIT_LENGTH;
 
         // 设置颜色和透明度（悬停时高亮）
         if (isHovered) {
@@ -131,7 +135,7 @@ public class FlatColorButton extends Button {
                 textureX, textureY,                    // 屏幕位置
                 0, 0,                                   // UV起始坐标
                 textureRenderWidth, textureRenderHeight, // 渲染尺寸
-                textureRenderWidth, textureRenderHeight          // 纹理文件实际尺寸
+                textureRenderWidth, textureRenderHeight  // 纹理文件实际尺寸
         );
 
         // 重置颜色
@@ -176,8 +180,16 @@ public class FlatColorButton extends Button {
         });
     }
 
+    // Getters
     public ResourceLocation getResourceLocation() {
         return resourceLocation;
     }
-}
 
+    public Integer getBAGSERIAL() {
+        return BAGSERIAL;
+    }
+
+    public BagSelectionConfig.Backpack getBackpack() {
+        return backpack;
+    }
+}
