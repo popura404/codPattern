@@ -75,9 +75,9 @@ public class BackpackConfigManager {
         // 创建新背包
         BagSelectionConfig.Backpack newBackpack = new BagSelectionConfig.Backpack("自定义背包 #" + id);
         newBackpack.setItem_MAP("primary",
-                new BagSelectionConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"swpu:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}"));
+                new BagSelectionConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}"));
         newBackpack.setItem_MAP("secondary",
-                new BagSelectionConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"swpu:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}"));
+                new BagSelectionConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}"));
 
         // 添加到玩家数据
         if (playerData.addBackpack(id,newBackpack)) {

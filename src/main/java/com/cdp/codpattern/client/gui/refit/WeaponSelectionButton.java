@@ -1,14 +1,9 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.tacz.guns.api.item.IGun;
-import com.tacz.guns.client.resource.ClientAssetsManager;
-import com.tacz.guns.client.resource.pojo.PackInfo;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
@@ -86,6 +81,8 @@ public class WeaponSelectionButton extends Button {
                     textureWidth, textureHeight,
                     textureWidth, textureHeight
             );
+
+            graphics.drawString(Minecraft.getInstance().font, weapon.getHoverName(), this.getX() + 2 , this.getY() + this.height - UNIT_LENGTH ,0xFFFFFFFF);
 
             RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
         } else {
