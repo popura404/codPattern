@@ -1,46 +1,61 @@
 
-Source installation information for modders
--------------------------------------------
-This code follows the Minecraft Forge installation methodology. It will apply
-some small patches to the vanilla MCP source code, giving you and it access 
-to some of the data and functions you need to build a successful mod.
+📦 简介
+一个基于 Minecraft TACZ 武器背包系统模组，允许玩家自定义背包配置，在复活时自动获得预设装备，并支持灵活的武器修改系统。
+✨ 主要功能
+🎒 背包选择系统
+玩家可以预先选择自定义背包配置
+复活时自动发放所选背包中的物品
+支持多套背包预设方案切换
+背包内容实时保存，断线重连后依然有效
 
-Note also that the patches are built against "un-renamed" MCP source code (aka
-SRG Names) - this means that you will not be able to read them directly against
-normal code.
 
-Setup Process:
-==============================
+🔧 武器修改
+背包内置武器改装系统
+支持修改武器属性（伤害、射速、弹容量等）
+可添加武器配件和升级模块
+每个背包可独立配置武器参数
 
-Step 1: Open your command-line and browse to the folder where you extracted the zip file.
+⚙️ 配置
+##配置文件位于服务端 config/codpattern/
 
-Step 2: You're left with a choice.
-If you prefer to use Eclipse:
-1. Run the following command: `./gradlew genEclipseRuns`
-2. Open Eclipse, Import > Existing Gradle Project > Select Folder 
-   or run `gradlew eclipse` to generate the project.
+<通过 config 文件控制武器发放范围>
+"distributeToTaggedPlayersOnly"
+支持两种发放模式：
+标签模式：仅向具有 cdpplayer 标签的玩家发放
+全体模式：向所有客户端玩家发放武器
 
-If you prefer to use IntelliJ:
-1. Open IDEA, and import project.
-2. Select your build.gradle file and have it import.
-3. Run the following command: `./gradlew genIntellijRuns`
-4. Refresh the Gradle Project in IDEA if required.
+<控制主副武器检索范围>
+"primaryWeaponTabs": []
+"secondaryWeaponTabs": []
 
-If at any point you are missing libraries in your IDE, or you've run into problems you can 
-run `gradlew --refresh-dependencies` to refresh the local cache. `gradlew clean` to reset everything 
-(this does not affect your code) and then start the process again.
+<背包存储系统>
+。。。。。。。。。。。。。。。。。。
 
-Mapping Names:
-=============================
-By default, the MDK is configured to use the official mapping names from Mojang for methods and fields 
-in the Minecraft codebase. These names are covered by a specific license. All modders should be aware of this
-license, if you do not agree with it you can change your mapping names to other crowdsourced names in your 
-build.gradle. For the latest license text, refer to the mapping file itself, or the reference copy here:
-https://github.com/MinecraftForge/MCPConfig/blob/master/Mojang.md
+🔄 兼容性
+Minecraft版本: 1.20.1+
+Forge版本: 47.0.0+
+依赖前置: tacz1.1.6+
 
-Additional Resources: 
-=========================
-Community Documentation: https://docs.minecraftforge.net/en/1.20.1/gettingstarted/
-LexManos' Install Video: https://youtu.be/8VEdtQLuLO0
-Forge Forums: https://forums.minecraftforge.net/
-Forge Discord: https://discord.minecraftforge.net/
+### 目前暂时不支持 LR
+
+⚠️ 注意事项
+配置文件默认向
+
+🐛 问题反馈
+如遇到问题，请在 Issues 页面提交
+
+📝 更新日志
+v0.1.1
+
+初始版本发布
+实现背包选择系统
+添加武器局内修改功能
+支持配置文件控制发放范围
+
+📜 许可证
+本项目采用 GPLv3 许可证 - 详见 LICENSE 文件
+
+
+
+作者: popura404
+联系方式: gzyoung2330351551@163.com
