@@ -26,6 +26,7 @@ public class WeaponFilterConfig {
         config.primaryWeaponTabs.add("smg");
         config.primaryWeaponTabs.add("mg");
         config.secondaryWeaponTabs.add("pistol");
+        config.secondaryWeaponTabs.add("rpg");
         return config;
     }
 
