@@ -16,7 +16,7 @@ import javax.annotation.Nullable;
 /**
 *  屎山有点多，这个被废弃了，重写一个
 */
-
+@Deprecated
 public class flatButton extends Button {
 
     private int focusedtime = 0;
