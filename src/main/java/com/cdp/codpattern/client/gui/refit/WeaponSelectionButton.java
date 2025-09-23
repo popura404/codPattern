@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.tacz.guns.api.item.IGun;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -54,7 +55,8 @@ public class WeaponSelectionButton extends Button {
 
 
 //TODO:枪包名显示
-        //ResourceLocation gunId = igun.getGunId(weapon);
+
+        //ResourceLocation gunId = iGun.getGunId(stack);
         //PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
         //Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC);
 

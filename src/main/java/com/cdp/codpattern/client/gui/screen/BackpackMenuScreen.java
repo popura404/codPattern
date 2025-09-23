@@ -29,7 +29,7 @@ public class BackpackMenuScreen extends Screen {
     private Map<Integer, SecodnButton> secondButtonMap = new HashMap<>();
     private Integer currentSecondButtonId = null;
     private int hideDelay = 0;
-    private static final int MAX_HIDE_DELAY = 10; // 延迟10个tick（约0.5秒）
+    private static final int MAX_HIDE_DELAY = 10; // 延迟10个tick（0.5s）
 
     public BackpackMenuScreen() {
         super(Component.literal("Select your bag"));
@@ -63,7 +63,7 @@ public class BackpackMenuScreen extends Screen {
             }
         }
 
-        // 处理SecondButton的显示逻辑
+        // 处理SecondButton显示逻辑
         if (isHoveringAnyButton && hoveredButtonId != null) {
             hideDelay = 0; // 重置延迟
 

@@ -28,7 +28,7 @@ public class FlatColorButton extends Button {
         super(x, y, width, height, Component.literal("choose your bag"), pOnPress, DEFAULT_NARRATION);
     }
 
-    // 带贴图的按钮构造函数 - 修改为接受OnPress参数
+    // 带贴图的按钮构造函数
     public FlatColorButton(int pX, int pY, int pWidth, int pHeight, Integer bagserial,
                            BagSelectionConfig.Backpack backpack, ResourceLocation resourceLocation,
                            int UNIT_LENGTH, @Nullable Button.OnPress onPress){

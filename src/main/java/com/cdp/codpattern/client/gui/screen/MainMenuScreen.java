@@ -7,6 +7,10 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * 已废弃
+ */
+@Deprecated
 public class MainMenuScreen extends Screen {
 
     private static int UNIT_LENGTH = 0;

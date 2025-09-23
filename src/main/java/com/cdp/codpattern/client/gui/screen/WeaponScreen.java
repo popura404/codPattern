@@ -366,7 +366,7 @@ public class WeaponScreen extends Screen {
             case "shotgun": return "霰弹枪";
             case "smg": return "冲锋枪";
             case "mg": return "机枪";
-            case "rpg": return "RPG";
+            case "rpg": return "发射器";
             default: return tabName.toUpperCase();
         }
     }
