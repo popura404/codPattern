@@ -23,7 +23,6 @@ public class CommandRegistration {
                                     Player player = context.getSource().getPlayer();
                                     if (player != null) {
                                         Component message = Component.literal("访问我们的网站");
-
                                         player.sendSystemMessage(message);
                                     }
                                     return 1;

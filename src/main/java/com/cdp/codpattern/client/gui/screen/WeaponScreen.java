@@ -335,7 +335,7 @@ public class WeaponScreen extends Screen {
                 0xFFFFFF
         );
 
-        String categoryInfo = getTabDisplayName(currentTab);
+        String categoryInfo = getTabDisplayName(currentTab).getString();
         graphics.drawCenteredString(
                 this.font,
                 Component.literal(categoryInfo),
@@ -347,7 +347,7 @@ public class WeaponScreen extends Screen {
         //if (maxScroll > 0) {
         //    int totalPages = maxScroll + 1;
         //    int currentPage = scrollOffset + 1;
-        //    String scrollInfo = String.format("页面 %d / %d", currentPage, totalPages);
+        //    String scrollInfo = String.format(" %d / %d", currentPage, totalPages);
         //    graphics.drawCenteredString(
         //            this.font,
         //            Component.literal(scrollInfo),
@@ -358,16 +358,16 @@ public class WeaponScreen extends Screen {
         //}
     }
 
-    private String getTabDisplayName(String tabName) {
+    private Component getTabDisplayName(String tabName) {
         switch(tabName) {
-            case "pistol": return "手枪";
-            case "rifle": return "步枪";
-            case "sniper": return "狙击枪";
-            case "shotgun": return "霰弹枪";
-            case "smg": return "冲锋枪";
-            case "mg": return "机枪";
-            case "rpg": return "发射器";
-            default: return tabName.toUpperCase();
+            case "pistol": return Component.translatable("tacz.type.pistol.name");
+            case "rifle": return Component.translatable("tacz.type.rifle.name");
+            case "sniper": return Component.translatable("tacz.type.sniper.name");
+            case "shotgun": return Component.translatable("tacz.type.shotgun.name");
+            case "smg": return Component.translatable("tacz.type.smg.name");
+            case "mg": return Component.translatable("tacz.type.mg.name");
+            case "rpg": return Component.translatable("tacz.type.rpg.name");
+            default: return Component.literal(tabName.toUpperCase());
         }
     }
 
@@ -401,7 +401,7 @@ public class WeaponScreen extends Screen {
 
         public TabButton(int x, int y, int width, int height, String tabName, OnPress onPress) {
             super(x, y, width, height,
-                    Component.literal(getTabDisplayName(tabName)),
+                    getTabDisplayName(tabName),
                     onPress, DEFAULT_NARRATION);
             this.tabName = tabName;
         }
