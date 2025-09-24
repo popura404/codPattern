@@ -119,7 +119,7 @@ public class BackpackMenuScreen extends Screen {
         super.init();
         this.SCREEN_HEIGHT = this.height;
         this.SCREEN_WIDTH = this.width;
-        UNIT_LENGTH = SCREEN_WIDTH / 120;
+        UNIT_LENGTH = (int) (this.width / 120f);
         loadPlayerData();
         addSelectBagButton();
         addNewBackpackButton();

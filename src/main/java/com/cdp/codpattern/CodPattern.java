@@ -21,7 +21,7 @@ public class CodPattern
     public static final String MODID = "codpattern";
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    public CodPattern(FMLJavaModLoadingContext context)
+    public CodPattern()
     {
         FMLJavaModLoadingContext.get().getModEventBus().addListener(this::setup);
         //FMLJavaModLoadingContext.get().getModEventBus().addListener(this::clientSetup);

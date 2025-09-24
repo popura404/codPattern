@@ -1,7 +1,12 @@
 package com.cdp.codpattern.client.gui.refit;
 
-import com.cdp.codpattern.config.server.BagSelectionConfig;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.tacz.guns.api.TimelessAPI;
+import com.tacz.guns.api.item.IGun;
+import com.tacz.guns.client.resource.ClientAssetsManager;
+import com.tacz.guns.client.resource.GunDisplayInstance;
+import com.tacz.guns.client.resource.pojo.PackInfo;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -10,6 +15,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
@@ -18,10 +24,14 @@ public class FlatColorButton extends Button {
 
     private int focusedtime = 0;
     private boolean isPhotoButton = false;
-    private ResourceLocation resourceLocation;
     private Integer BAGSERIAL;
-    private BagSelectionConfig.Backpack backpack;
     private int UNIT_LENGTH;
+
+    private ItemStack weapon;
+    private Component weaponName;
+    private Component weaponPackinfo;
+    private ResourceLocation Teaxture;
+
 
     // 普通按钮
     public FlatColorButton(int x, int y, int width, int height, @Nullable Button.OnPress pOnPress) {
@@ -30,18 +40,18 @@ public class FlatColorButton extends Button {
 
     // 带贴图的按钮
     public FlatColorButton(int pX, int pY, int pWidth, int pHeight, Integer bagserial,
-                           BagSelectionConfig.Backpack backpack, ResourceLocation resourceLocation,
+                           ItemStack itemStack,
                            int UNIT_LENGTH, @Nullable Button.OnPress onPress){
         super(pX, pY, pWidth, pHeight, Component.literal("choose ur weapon"), onPress != null ? onPress : button -> {}, DEFAULT_NARRATION);
         this.isPhotoButton = true;
-        this.resourceLocation = resourceLocation;
         this.BAGSERIAL = bagserial;
-        this.backpack = backpack;
         this.UNIT_LENGTH = UNIT_LENGTH;
+        this.weapon = itemStack;
     }
 
     @Override
     public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float pPartialTick) {
+        getInfo();
         // 播放悬停音效
         if(this.isHoveredOrFocused() && focusedtime == 0){
             Minecraft.getInstance().execute(() -> {
@@ -69,8 +79,17 @@ public class FlatColorButton extends Button {
             renderOnHoveredOrFocused(graphics);
         }
 
+        //渲染包名（如果有）
+        if (!(weaponPackinfo == null)){
+            graphics.drawString(Minecraft.getInstance().font , this.weaponPackinfo , this.getX() + 2 , this.getY() + 2 ,0xDDFFFFFF);
+        }
+        //渲染枪名（如果有）
+        if (!(weaponName == null)){
+            graphics.drawString(Minecraft.getInstance().font, this.weaponName, this.getX() + UNIT_LENGTH , this.getY() + this.height - UNIT_LENGTH ,0xDDFFFFFF);
+        }
+
         // 渲染贴图（支持悬停高亮）
-        if(isPhotoButton && resourceLocation != null) {
+        if(isPhotoButton && Teaxture != null) {
             renderTexture(graphics, isHoveredOrFocused());
         }
     }
@@ -85,7 +104,7 @@ public class FlatColorButton extends Button {
     }
 
     protected void renderTexture(GuiGraphics graphics, boolean isHovered){
-        if (resourceLocation == null) return;
+        if (Teaxture == null) return;
 
         // 计算贴图daxiao
         int textureRenderWidth = 18 * UNIT_LENGTH;
@@ -105,7 +124,7 @@ public class FlatColorButton extends Button {
         }
 
         // 渲染贴图
-        graphics.blit(resourceLocation, textureX, textureY,0 , 0 , textureRenderWidth, textureRenderHeight, textureRenderWidth, textureRenderHeight);
+        graphics.blit(Teaxture, textureX, textureY,0 , 0 , textureRenderWidth, textureRenderHeight, textureRenderWidth, textureRenderHeight);
 
         // 重置颜色
         RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -133,16 +152,27 @@ public class FlatColorButton extends Button {
         });
     }
 
+    private void getInfo(){
+        if(weapon == null){
+            return;
+        }
+        //图片处理
+        TimelessAPI.getGunDisplay(weapon).ifPresent(display -> this.Teaxture = display.getHUDTexture());
+        //包名处理
+        IGun iGun = (IGun) weapon.getItem();
+        ResourceLocation gunId = iGun.getGunId(weapon);
+        PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
+        this.weaponPackinfo = Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLACK).withStyle(ChatFormatting.ITALIC);
+        //枪名处理
+        this.weaponName = weapon.getHoverName();
+    }
+
     // Getters
     public ResourceLocation getResourceLocation() {
-        return resourceLocation;
+        return Teaxture;
     }
 
     public Integer getBAGSERIAL() {
         return BAGSERIAL;
-    }
-
-    public BagSelectionConfig.Backpack getBackpack() {
-        return backpack;
     }
 }

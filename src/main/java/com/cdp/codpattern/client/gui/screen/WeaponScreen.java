@@ -30,7 +30,7 @@ public class WeaponScreen extends Screen {
 
     public int SCREEN_HEIGHT = 0;
     public int SCREEN_WIDTH = 0;
-    private static int UNIT_LENGTH = 0;
+    private int UNIT_LENGTH = 0;
     private final Integer BAGSERIAL;
     private final BagSelectionConfig.Backpack backpack;
     private final boolean isPrimary;
@@ -63,7 +63,7 @@ public class WeaponScreen extends Screen {
         super.init();
         SCREEN_WIDTH = this.width;
         SCREEN_HEIGHT = this.height;
-        UNIT_LENGTH = SCREEN_WIDTH / 120;
+        UNIT_LENGTH = (int) (this.width / 120f);
 
         loadWeaponTabs();
         createTabButtons();
@@ -93,7 +93,7 @@ public class WeaponScreen extends Screen {
     }
 
     private List<ItemStack> getItemsFromTab(String tabName) {
-        GunTabType gunTabType = null;
+        GunTabType gunTabType;
 
         switch(tabName) {
             case "pistol": gunTabType = GunTabType.PISTOL; break;
@@ -112,7 +112,7 @@ public class WeaponScreen extends Screen {
     private void createTabButtons() {
         int tabWidth = 5 * UNIT_LENGTH;
         int tabHeight = (int) (1.5f * UNIT_LENGTH);
-        int tabSpacing = 1 * UNIT_LENGTH;
+        int tabSpacing = UNIT_LENGTH;
         int totalTabsWidth = weaponsByTab.size() * (tabWidth + tabSpacing) - tabSpacing;
         int startX = 6 * UNIT_LENGTH;    //(this.width - totalTabsWidth) / 2;
         int startY = SCREEN_HEIGHT - 18 * UNIT_LENGTH;
@@ -359,16 +359,16 @@ public class WeaponScreen extends Screen {
     }
 
     private Component getTabDisplayName(String tabName) {
-        switch(tabName) {
-            case "pistol": return Component.translatable("tacz.type.pistol.name");
-            case "rifle": return Component.translatable("tacz.type.rifle.name");
-            case "sniper": return Component.translatable("tacz.type.sniper.name");
-            case "shotgun": return Component.translatable("tacz.type.shotgun.name");
-            case "smg": return Component.translatable("tacz.type.smg.name");
-            case "mg": return Component.translatable("tacz.type.mg.name");
-            case "rpg": return Component.translatable("tacz.type.rpg.name");
-            default: return Component.literal(tabName.toUpperCase());
-        }
+        return switch (tabName) {
+            case "pistol" -> Component.translatable("tacz.type.pistol.name");
+            case "rifle" -> Component.translatable("tacz.type.rifle.name");
+            case "sniper" -> Component.translatable("tacz.type.sniper.name");
+            case "shotgun" -> Component.translatable("tacz.type.shotgun.name");
+            case "smg" -> Component.translatable("tacz.type.smg.name");
+            case "mg" -> Component.translatable("tacz.type.mg.name");
+            case "rpg" -> Component.translatable("tacz.type.rpg.name");
+            default -> Component.literal(tabName.toUpperCase());
+        };
     }
 
     @Override
@@ -407,7 +407,7 @@ public class WeaponScreen extends Screen {
         }
 
         @Override
-        public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
             if (selected) {
                 graphics.fillGradient(
                         this.getX(), this.getY(),
