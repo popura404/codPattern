@@ -17,6 +17,7 @@ public class WeaponFilterConfig {
     private List<String> primaryWeaponTabs = new ArrayList<>();
     private List<String> secondaryWeaponTabs = new ArrayList<>();
     private boolean distributeToTaggedPlayersOnly = false;
+    private Integer ammunitionPerMagazineMultiple = 3;
 
     public static WeaponFilterConfig createDefault() {
         WeaponFilterConfig config = new WeaponFilterConfig();
@@ -69,5 +70,9 @@ public class WeaponFilterConfig {
     public void setDistributeToTaggedPlayersOnly(boolean value) {
         this.distributeToTaggedPlayersOnly = value;
         save(this);
+    }
+
+    public Integer getAmmunitionPerMagazineMultiple() {
+        return ammunitionPerMagazineMultiple;
     }
 }

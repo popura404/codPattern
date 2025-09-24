@@ -79,18 +79,18 @@ public class FlatColorButton extends Button {
             renderOnHoveredOrFocused(graphics);
         }
 
+        // 渲染贴图（支持悬停高亮）
+        if(isPhotoButton && Teaxture != null) {
+            renderTexture(graphics, isHoveredOrFocused());
+        }
+
         //渲染包名（如果有）
         if (!(weaponPackinfo == null)){
             graphics.drawString(Minecraft.getInstance().font , this.weaponPackinfo , this.getX() + 2 , this.getY() + 2 ,0xDDFFFFFF);
         }
         //渲染枪名（如果有）
         if (!(weaponName == null)){
-            graphics.drawString(Minecraft.getInstance().font, this.weaponName, this.getX() + UNIT_LENGTH , this.getY() + this.height - UNIT_LENGTH ,0xDDFFFFFF);
-        }
-
-        // 渲染贴图（支持悬停高亮）
-        if(isPhotoButton && Teaxture != null) {
-            renderTexture(graphics, isHoveredOrFocused());
+            graphics.drawString(Minecraft.getInstance().font, this.weaponName, this.getX() + 2 , this.getY() + this.height - UNIT_LENGTH ,0xDDFFFFFF);
         }
     }
 
@@ -162,7 +162,7 @@ public class FlatColorButton extends Button {
         IGun iGun = (IGun) weapon.getItem();
         ResourceLocation gunId = iGun.getGunId(weapon);
         PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
-        this.weaponPackinfo = Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLACK).withStyle(ChatFormatting.ITALIC);
+        this.weaponPackinfo = Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC);
         //枪名处理
         this.weaponName = weapon.getHoverName();
     }
