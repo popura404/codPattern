@@ -37,12 +37,6 @@ public class WeaponSelectionButton extends Button {
             graphics.fillGradient(this.getX(), this.getY(), this.getX() + this.width, this.getY() + 1, 0xD0145200, 0xD0145200);
         }
 
-        //显示枪包名  <  关键代码》》Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC);  >
-        IGun iGun = (IGun) weapon.getItem();
-        ResourceLocation gunId = iGun.getGunId(weapon);
-        PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
-        graphics.drawString(Minecraft.getInstance().font , Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLACK).withStyle(ChatFormatting.ITALIC) , this.getX() + 2 , this.getY() + 2 ,0xDDFFFFFF);
-
         if (texture != null) {
             RenderSystem.setShaderColor(
                     isHoveredOrFocused() ? 1.25f : 0.85f,
@@ -64,9 +58,6 @@ public class WeaponSelectionButton extends Button {
                     textureWidth, textureHeight
             );
 
-            //显示枪命
-            graphics.drawString(Minecraft.getInstance().font, weapon.getHoverName(), this.getX() + 2 , this.getY() + this.height - UNIT_LENGTH ,0xDDFFFFFF);
-
             RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
         } else {
             graphics.renderItem(weapon, this.getX() + this.width / 2 - 8, this.getY() + this.height / 2 - 8);
@@ -75,5 +66,14 @@ public class WeaponSelectionButton extends Button {
         if (isHoveredOrFocused() && Minecraft.getInstance().screen != null) {
             graphics.renderTooltip(Minecraft.getInstance().font, weapon.getHoverName(), mouseX, mouseY);
         }
+
+        //显示枪命
+        graphics.drawString(Minecraft.getInstance().font, weapon.getHoverName(), this.getX() + 2 , this.getY() + this.height - UNIT_LENGTH ,0xDDFFFFFF);
+
+        //显示枪包名  <  关键代码》》Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC);  >
+        IGun iGun = (IGun) weapon.getItem();
+        ResourceLocation gunId = iGun.getGunId(weapon);
+        PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
+        graphics.drawString(Minecraft.getInstance().font , Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC) , this.getX() + 2 , this.getY() + 2 ,0xDDFFFFFF);
     }
 }
