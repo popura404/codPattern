@@ -46,7 +46,7 @@ public class SelectBackpackPacket {
 
                 // 验证背包ID是否有效
                 if (playerData.getBackpacks_MAP().containsKey(packet.backpackId)) {
-                    // 安全地修改选中的背包
+                    // 修改选中的背包
                     playerData.setSelectedBackpack(packet.backpackId);
 
                     // 保存配置
