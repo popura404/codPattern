@@ -1,8 +1,6 @@
 package com.cdp.codpattern.network.handler;
 
-import com.cdp.codpattern.network.AddBackpackPacket;
-import com.cdp.codpattern.network.SelectBackpackPacket;
-import com.cdp.codpattern.network.UpdateWeaponPacket;
+import com.cdp.codpattern.network.*;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkDirection;
@@ -47,6 +45,20 @@ public class PacketHandler {
                 .decoder(UpdateWeaponPacket::decode)
                 .encoder(UpdateWeaponPacket::encode)
                 .consumerMainThread(UpdateWeaponPacket::handle)
+                .add();
+
+        // 注册配置同步数据包（服务端到客户端）
+        INSTANCE.messageBuilder(SyncBackpackConfigPacket.class, id(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncBackpackConfigPacket::decode)
+                .encoder(SyncBackpackConfigPacket::encode)
+                .consumerMainThread(SyncBackpackConfigPacket::handle)
+                .add();
+
+        // 请求配置（客户端到服务端）
+        INSTANCE.messageBuilder(RequestConfigPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(RequestConfigPacket::decode)
+                .encoder(RequestConfigPacket::encode)
+                .consumerMainThread(RequestConfigPacket::handle)
                 .add();
     }
 

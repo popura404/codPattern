@@ -11,54 +11,44 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 public class SelectBackpackPacket {
-    private final int backpackId;
+    public int backpackId;
 
     public SelectBackpackPacket(int backpackId) {
         this.backpackId = backpackId;
     }
 
-    /**
-     * 编码数据包
-     */
-    public static void encode(SelectBackpackPacket packet, FriendlyByteBuf buffer) {
-        buffer.writeInt(packet.backpackId);
+    public SelectBackpackPacket(FriendlyByteBuf buf) {
+        this.backpackId = buf.readInt();
     }
 
-    /**
-     * 解码数据包
-     */
-    public static SelectBackpackPacket decode(FriendlyByteBuf buffer) {
-        return new SelectBackpackPacket(buffer.readInt());
+    public void encode(FriendlyByteBuf buf) {
+        buf.writeInt(backpackId);
     }
 
-    /**
-     * 处理数据包 - 在服务端执行
-     */
-    public static void handle(SelectBackpackPacket packet, Supplier<NetworkEvent.Context> ctx) {
+    public static SelectBackpackPacket decode(FriendlyByteBuf buf) {
+        return new SelectBackpackPacket(buf);
+    }
+
+    public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
                 String uuid = player.getUUID().toString();
-
-                // 获取玩家数据
                 BagSelectionConfig.PlayerBackpackData playerData =
                         BackpackConfigManager.getConfig().getOrCreatePlayerData(uuid);
 
-                // 验证背包ID是否有效
-                if (playerData.getBackpacks_MAP().containsKey(packet.backpackId)) {
-                    // 修改选中的背包
-                    playerData.setSelectedBackpack(packet.backpackId);
-
-                    // 保存配置
+                // 检查背包是否存在
+                if (playerData.getBackpacks_MAP().containsKey(backpackId)) {
+                    // 更新选中的背包
+                    playerData.setSelectedBackpack(backpackId);
                     BackpackConfigManager.save();
 
                     // 获取背包名称
-                    String backpackName = playerData.getBackpacks_MAP()
-                            .get(packet.backpackId).getName();
+                    String backpackName = playerData.getBackpacks_MAP().get(backpackId).getName();
 
-                    // 发送ActionBar提示
+                    // 发送ActionBar提示（保留你的代码）
                     player.connection.send(new ClientboundSetActionBarTextPacket(
-                            Component.literal("已选择背包 # " + packet.backpackId +
+                            Component.literal("已选择背包 # " + backpackId +
                                             " [" + backpackName + "] 在下次重生时获得")
                                     .withStyle(style -> style
                                             .withColor(0xFFFFFF)  // 白色
@@ -68,7 +58,8 @@ public class SelectBackpackPacket {
                 } else {
                     // 背包ID无效，发送错误提示
                     player.connection.send(new ClientboundSetActionBarTextPacket(
-                            Component.literal("§c无效的背包ID: " + packet.backpackId + "  ##前往服务端config检查背包完整性或询问管理员")
+                            Component.literal("§c无效的背包ID: " + backpackId +
+                                    "  ##前往服务端config检查背包完整性或询问管理员")
                     ));
                 }
             }

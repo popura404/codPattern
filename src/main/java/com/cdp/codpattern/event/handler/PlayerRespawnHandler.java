@@ -3,6 +3,8 @@ package com.cdp.codpattern.event.handler;
 import com.cdp.codpattern.config.configmanager.BackpackConfigManager;
 import com.cdp.codpattern.config.server.BagSelectionConfig;
 import com.cdp.codpattern.config.server.WeaponFilterConfig;
+import com.cdp.codpattern.network.SyncBackpackConfigPacket;
+import com.cdp.codpattern.network.handler.PacketHandler;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.network.chat.Component;
@@ -37,6 +39,10 @@ public class PlayerRespawnHandler {
             BagSelectionConfig.PlayerBackpackData playerData =
                     BackpackConfigManager.getConfig().getOrCreatePlayerData(uuid);
 
+            // 同步配置到客户端
+            PacketHandler.sendToPlayer(new SyncBackpackConfigPacket(uuid, playerData), player);
+
+            // 检查是否为默认背包配置
             if (playerData.getBackpackCount() == 3) {
                 boolean isDefault = true;
                 for (int i = 1; i <= 3; i++) {
