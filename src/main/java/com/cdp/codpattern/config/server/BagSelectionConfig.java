@@ -38,7 +38,7 @@ public class BagSelectionConfig {
         public int getNextAvailableId() {
             // 从1开始遍历到10
             for (int i = 1; i <= 10; i++) {
-                // 如果当前key不存在，说明找到了空缺位置
+                // key不存在 = 找到空缺位置
                 if (!backpacks_MAP.containsKey(i)) {
                     return i;  // 返回这个空缺的位置
                 }
@@ -46,7 +46,6 @@ public class BagSelectionConfig {
             // 如果1-10都已占用，返回0
             return 0;
         }
-
     }
 
     public static class Backpack {

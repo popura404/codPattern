@@ -3,8 +3,6 @@ package com.cdp.codpattern.client.gui.screen;
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.config.server.BagSelectionConfig;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import com.tacz.guns.api.TimelessAPI;
-import com.tacz.guns.client.resource.GunDisplayInstance;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -19,11 +17,12 @@ import org.jetbrains.annotations.NotNull;
 
 public class WeaponMenuScreen extends Screen {
 
-    private static int UNIT_LENGTH = 0;
+    private int UNIT_LENGTH = 0;
     private final Integer BAGSERIAL;
     private BagSelectionConfig.Backpack backpack;
-    private ResourceLocation primaryhudTexture;
-    private ResourceLocation secondaryhudTexture;
+
+    private ItemStack primaryItemStack;
+    private ItemStack secondaryItemStack;
 
     public WeaponMenuScreen(BagSelectionConfig.Backpack backpack, Integer BAGSERIAL) {
         super(Component.literal("WeaponMenuScreen"));
@@ -33,16 +32,15 @@ public class WeaponMenuScreen extends Screen {
 
     public void init() {
         super.init();
-        int SCREEN_WIDTH = this.width;
-        UNIT_LENGTH = SCREEN_WIDTH / 120;
+        UNIT_LENGTH = (int) (this.width / 120f);
         try {
-            Weapon();
+            TextureandPackInfo();
         } catch (CommandSyntaxException ignored) {
         }
         addWeaponButtonandTexture();
     }
 
-    public void Weapon() throws CommandSyntaxException {
+    public void TextureandPackInfo() throws CommandSyntaxException {
         //这段处理传入的主副武器
         ItemStack primaryitemstack = new ItemStack(BuiltInRegistries.ITEM.get(new ResourceLocation(backpack.getItem_MAP().get("primary").getItem())), backpack.getItem_MAP().get("primary").getCount());
         ItemStack secondaryitemstack = new ItemStack(BuiltInRegistries.ITEM.get(new ResourceLocation(backpack.getItem_MAP().get("secondary").getItem())), backpack.getItem_MAP().get("secondary").getCount());
@@ -50,18 +48,9 @@ public class WeaponMenuScreen extends Screen {
         primaryitemstack.setTag(TagParser.parseTag(backpack.getItem_MAP().get("primary").getNbt()));
         secondaryitemstack.setTag(TagParser.parseTag(backpack.getItem_MAP().get("secondary").getNbt()));
 
-        GunDisplayInstance primarydisplay = TimelessAPI.getGunDisplay(primaryitemstack).orElse(null);
-        GunDisplayInstance secondarydisplay = TimelessAPI.getGunDisplay(secondaryitemstack).orElse(null);
-
-        if (primarydisplay != null) {
-            this.primaryhudTexture = primarydisplay.getHUDTexture();
-        }
-        if (secondarydisplay != null) {
-            this.secondaryhudTexture = secondarydisplay.getHUDTexture();
-        }
-
-        //IGun primaryitemstackItemgunIdIGun = (IGun) primaryitemstack.getItem();
-        //IGun secondaryitemstackItemgunIdIGun = (IGun) secondaryitemstack.getItem();
+        this.primaryItemStack = primaryitemstack;
+        this.secondaryItemStack = secondaryitemstack;
+        //能跑就行
     }
 
     public void render(@NotNull GuiGraphics pGuiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
@@ -85,8 +74,7 @@ public class WeaponMenuScreen extends Screen {
                 buttonWidth,
                 buttonHeight,
                 this.BAGSERIAL,
-                this.backpack,
-                this.primaryhudTexture,
+                this.primaryItemStack,
                 this.UNIT_LENGTH,
                 button -> {
                     // 打开WeaponScreen，传入true表示选择主武器
@@ -103,8 +91,7 @@ public class WeaponMenuScreen extends Screen {
                 buttonWidth,
                 buttonHeight,
                 this.BAGSERIAL,
-                this.backpack,
-                this.secondaryhudTexture,
+                this.secondaryItemStack,
                 this.UNIT_LENGTH,
                 button -> {
                     // 打开WeaponScreen，传入false表示选择副武器
@@ -151,17 +138,5 @@ public class WeaponMenuScreen extends Screen {
 
     public BagSelectionConfig.Backpack getBackpack() {
         return backpack;
-    }
-
-    public static int getUnitLength() {
-        return UNIT_LENGTH;
-    }
-
-    public ResourceLocation getPrimaryhudTexture() {
-        return primaryhudTexture;
-    }
-
-    public ResourceLocation getSecondaryhudTexture() {
-        return secondaryhudTexture;
     }
 }
