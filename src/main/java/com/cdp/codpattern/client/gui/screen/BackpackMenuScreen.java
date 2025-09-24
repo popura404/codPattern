@@ -5,6 +5,8 @@ import com.cdp.codpattern.client.gui.refit.SecodnButton;
 import com.cdp.codpattern.client.gui.refit.addBackpackButton;
 import com.cdp.codpattern.config.configmanager.BackpackConfigManager;
 import com.cdp.codpattern.config.server.BagSelectionConfig;
+import com.cdp.codpattern.network.RequestConfigPacket;
+import com.cdp.codpattern.network.handler.PacketHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -117,9 +119,13 @@ public class BackpackMenuScreen extends Screen {
 
     public void init() {
         super.init();
+
+        // 向服务端请求配置
+        PacketHandler.sendToServer(new RequestConfigPacket());
+
         this.SCREEN_HEIGHT = this.height;
         this.SCREEN_WIDTH = this.width;
-        UNIT_LENGTH = (int) (this.width / 120f);
+        UNIT_LENGTH = (int) (this.width / 120.f);
         loadPlayerData();
         addSelectBagButton();
         addNewBackpackButton();

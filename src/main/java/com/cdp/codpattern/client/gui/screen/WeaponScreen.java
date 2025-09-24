@@ -307,7 +307,7 @@ public class WeaponScreen extends Screen {
                 new BagSelectionConfig.Backpack.ItemData(itemId, 1, nbt);
         backpack.getItem_MAP().put(key, itemData);
 
-        // 用PacketHandler发数据包
+        // 发数据包
         PacketHandler.sendToServer(
                 new UpdateWeaponPacket(BAGSERIAL, key, itemId, nbt));
 
