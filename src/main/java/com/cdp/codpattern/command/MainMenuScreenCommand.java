@@ -20,7 +20,7 @@ public class MainMenuScreenCommand {
                         .then(Commands.literal("screen")
                                 .executes(context -> {
                                     if (context.getSource().getEntity() instanceof ServerPlayer player) {
-                                        // 发送网络包给客户端打开GUI
+                                        // 发送网络包给C打开GUI
                                         PacketHandler.sendToPlayer(new OpenBackpackScreenPacket(), player);
                                         return 1;
                                     } else {

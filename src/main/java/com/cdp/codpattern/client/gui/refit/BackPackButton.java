@@ -114,12 +114,12 @@ public class BackPackButton extends Button {
             renderOnHoveredOrFocused(graphics);
         }
 
-        // 如果是当前选中的背包，渲染高亮边框
+        // 如果是选中的背包，渲染高亮边框
         if (isCurrentlySelected) {
             renderSelectedHighlight(graphics);
         }
 
-        // 渲染背包名称和编号
+        // 渲染背包名称编号
         if (backpack != null) {
             renderBackpackInfo(graphics);
         }
@@ -131,13 +131,13 @@ public class BackPackButton extends Button {
     protected void renderSelectedHighlight(GuiGraphics graphics) {
         int borderWidth = 1;
         int color = 0xEEEED700; // 金色
-        // 上边框
+        // 上
         graphics.fill(this.getX() - borderWidth, this.getY() - borderWidth, this.getX() + this.width + borderWidth, this.getY(), color);
-        // 下边框
+        // 下
         graphics.fill(this.getX() - borderWidth, this.getY() + this.height, this.getX() + this.width + borderWidth, this.getY() + this.height + borderWidth, color);
-        // 左边框
+        // 左
         graphics.fill(this.getX() - borderWidth, this.getY(), this.getX(), this.getY() + this.height, color);
-        // 右边框
+        // 右
         graphics.fill(this.getX() + this.width, this.getY(), this.getX() + this.width + borderWidth, this.getY() + this.height, color);
     }
 

@@ -23,14 +23,14 @@ public class addBackpackButton extends Button {
         super(x, y, width, height,
                 Component.literal("+ 添加背包"),
                 button -> {
-                    // 保存当前鼠标位置
+                    // 保存鼠标位置
                     Minecraft mc = Minecraft.getInstance();
                     long window = mc.getWindow().getWindow();
                     double[] mouseX = new double[1];
                     double[] mouseY = new double[1];
                     GLFW.glfwGetCursorPos(window, mouseX, mouseY);
 
-                    // 发送添加背包请求到服务端
+                    // 发送添加背包请求到S
                     PacketHandler.sendToServer(new AddBackpackPacket());
 
                     // 刷新界面
@@ -54,7 +54,7 @@ public class addBackpackButton extends Button {
         // 设置提示信息
         if (currentCount >= 10) {
             this.setTooltip(Tooltip.create(Component.literal("§c已达到最大背包数量限制 (10个)")));
-            this.active = false; // 禁用按钮
+            this.active = false; // 把按钮禁用
         } else {
             this.setTooltip(Tooltip.create(Component.literal("§a点击添加新背包 §7(" + currentCount + "/10)")));
         }
@@ -90,12 +90,8 @@ public class addBackpackButton extends Button {
         }
 
         // 渲染阴影
-        graphics.fillGradient(this.getX(), this.getY(),
-                this.getX() - 6, this.getY() + this.height,
-                0xC019181A, 0xC019181A);
-        graphics.fillGradient(this.getX(), this.getY() + this.height,
-                this.getX() + this.width, this.getY() + this.height + 2,
-                0xC019181A, 0x7019181A);
+        graphics.fillGradient(this.getX(), this.getY(), this.getX() - 6, this.getY() + this.height, 0xC019181A, 0xC019181A);
+        graphics.fillGradient(this.getX(), this.getY() + this.height, this.getX() + this.width, this.getY() + this.height + 2, 0xC019181A, 0x7019181A);
 
         // 悬停效果
         if (isHoveredOrFocused() && this.active) {
@@ -118,7 +114,7 @@ public class addBackpackButton extends Button {
 
         graphics.drawString(minecraft.font, text, textX, textY, textColor, true);
 
-        // 显示当前数量
+        // 显示当前背包数量
         String countText = "(" + currentBackpackCount + "/10)";
         int countWidth = minecraft.font.width(countText);
         graphics.drawString(minecraft.font, countText,

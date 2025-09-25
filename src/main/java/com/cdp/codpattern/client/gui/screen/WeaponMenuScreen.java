@@ -32,7 +32,7 @@ public class WeaponMenuScreen extends Screen {
 
     public void init() {
         super.init();
-        UNIT_LENGTH = (int) (this.width / 120f);
+        UNIT_LENGTH = (int) ( ( ( float ) this.width ) / 120f);
         try {
             TextureandPackInfo();
         } catch (CommandSyntaxException ignored) {
@@ -67,7 +67,7 @@ public class WeaponMenuScreen extends Screen {
         int buttonWidth = 24 * UNIT_LENGTH;
         int buttonHeight = 12 * UNIT_LENGTH;
 
-        // 主武器按钮 - 点击打开WeaponScreen选择主武器
+        // 主武器按钮
         addRenderableWidget(new FlatColorButton(
                 6 * UNIT_LENGTH,
                 this.height - 18 * UNIT_LENGTH,
@@ -84,7 +84,7 @@ public class WeaponMenuScreen extends Screen {
                 }
         ));
 
-        // 副武器按钮 - 点击打开WeaponScreen选择副武器
+        // 副武器按钮
         addRenderableWidget(new FlatColorButton(
                 32 * UNIT_LENGTH,
                 this.height - 18 * UNIT_LENGTH,

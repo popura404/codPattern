@@ -63,18 +63,18 @@ public class PlayerRespawnHandler {
 
     /**
      * 分发物品逻辑厨力
-     * @param player
      */
     private static void distributeBackpackItems(ServerPlayer player) {
         // 加载武器筛选配置
         WeaponFilterConfig filterConfig = WeaponFilterConfig.load();
 
+        //不是喜欢的冒险生存创造玩家，直接不发
         if (player.isSpectator()) return;
 
-        // 检查是否仅分发给带标签的玩家
+        //不是喜欢的带标签的玩家，直接不发
         if (filterConfig.isDistributeToTaggedPlayersOnly()) {
             if (!player.getTags().contains("cdpplayer")) {
-                return; // 不分发物品
+                return;
             }
         }
 
@@ -108,8 +108,7 @@ public class PlayerRespawnHandler {
                             IGun iGun = (IGun) stack.getItem();
                             int BackpackDummyAmmoAmount = iGun.getCurrentAmmoCount(stack) * filterConfig.getAmmunitionPerMagazineMultiple();
                             iGun.setDummyAmmoAmount(stack , BackpackDummyAmmoAmount);
-                        } catch (Exception e) {
-                            // NBT解析失败，忽略
+                        } catch (Exception ignored) {
                         }
                     }
 
