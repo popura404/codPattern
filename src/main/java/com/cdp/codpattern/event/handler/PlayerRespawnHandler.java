@@ -1,7 +1,7 @@
 package com.cdp.codpattern.event.handler;
 
 import com.cdp.codpattern.config.configmanager.BackpackConfigManager;
-import com.cdp.codpattern.config.server.BagSelectionConfig;
+import com.cdp.codpattern.config.server.BackpackSelectionConfig;
 import com.cdp.codpattern.config.server.WeaponFilterConfig;
 import com.cdp.codpattern.network.SyncBackpackConfigPacket;
 import com.cdp.codpattern.network.handler.PacketHandler;
@@ -36,7 +36,7 @@ public class PlayerRespawnHandler {
             ServerPlayer player = (ServerPlayer) event.getEntity();
             String uuid = player.getUUID().toString();
 
-            BagSelectionConfig.PlayerBackpackData playerData =
+            BackpackSelectionConfig.PlayerBackpackData playerData =
                     BackpackConfigManager.getConfig().getOrCreatePlayerData(uuid);
 
             // 同步配置到客户端
@@ -46,7 +46,7 @@ public class PlayerRespawnHandler {
             if (playerData.getBackpackCount() == 3) {
                 boolean isDefault = true;
                 for (int i = 1; i <= 3; i++) {
-                    BagSelectionConfig.Backpack backpack = playerData.getBackpacks_MAP().get(i);
+                    BackpackSelectionConfig.Backpack backpack = playerData.getBackpacks_MAP().get(i);
                     if (backpack == null || !backpack.getName().equals("自定义背包" + i)) {
                         isDefault = false;
                         break;
@@ -76,20 +76,20 @@ public class PlayerRespawnHandler {
         }
 
         String uuid = player.getUUID().toString();
-        BagSelectionConfig.PlayerBackpackData playerData =
+        BackpackSelectionConfig.PlayerBackpackData playerData =
                 BackpackConfigManager.getConfig().getOrCreatePlayerData(uuid);
 
         int selectedId = playerData.getSelectedBackpack();
-        BagSelectionConfig.Backpack backpack = playerData.getBackpacks_MAP().get(selectedId);
+        BackpackSelectionConfig.Backpack backpack = playerData.getBackpacks_MAP().get(selectedId);
 
         if (backpack != null) {
             player.getInventory().clearContent();
 
-            for (Map.Entry<String, BagSelectionConfig.Backpack.ItemData> entry :
+            for (Map.Entry<String, BackpackSelectionConfig.Backpack.ItemData> entry :
                     backpack.getItem_MAP().entrySet()) {
 
                 String weaponType = entry.getKey();
-                BagSelectionConfig.Backpack.ItemData itemData = entry.getValue();
+                BackpackSelectionConfig.Backpack.ItemData itemData = entry.getValue();
 
                 ResourceLocation itemId = new ResourceLocation(itemData.getItem());
                 Item item = BuiltInRegistries.ITEM.get(itemId);

@@ -1,6 +1,6 @@
 package com.cdp.codpattern.client.gui.refit;
 
-import com.cdp.codpattern.config.server.BagSelectionConfig;
+import com.cdp.codpattern.config.server.BackpackSelectionConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -23,14 +23,14 @@ public class flatButton extends Button {
     private boolean isPhotoButton = false;
     private ResourceLocation resourceLocation;
     private Integer BAGSERIAL;
-    private BagSelectionConfig.Backpack backpack;
+    private BackpackSelectionConfig.Backpack backpack;
     private int UNIT_LENGTH;
 
     public flatButton(int x , int y , int width , int height , @Nullable Button.OnPress pOnPress) {
         super(x, y, width, height, Component.literal("choose your bag"), pOnPress, DEFAULT_NARRATION);
     }
     //TODO:修改构造函数
-    public flatButton(int pX, int pY, int pWidth, int pHeight, Integer bagserial, BagSelectionConfig.Backpack backpack , ResourceLocation resourceLocation , int UNIT_LENGTH){
+    public flatButton(int pX, int pY, int pWidth, int pHeight, Integer bagserial, BackpackSelectionConfig.Backpack backpack , ResourceLocation resourceLocation , int UNIT_LENGTH){
         super(pX, pY, pWidth, pHeight, Component.literal("choose ur weapon"), button -> {}, DEFAULT_NARRATION);
         this.isPhotoButton = true;
         this.resourceLocation = resourceLocation;

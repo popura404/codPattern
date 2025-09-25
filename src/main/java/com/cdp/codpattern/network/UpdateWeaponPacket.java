@@ -1,7 +1,7 @@
 package com.cdp.codpattern.network;
 
 import com.cdp.codpattern.config.configmanager.BackpackConfigManager;
-import com.cdp.codpattern.config.server.BagSelectionConfig;
+import com.cdp.codpattern.config.server.BackpackSelectionConfig;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
@@ -43,15 +43,15 @@ public class UpdateWeaponPacket {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
                 String uuid = player.getUUID().toString();
-                BagSelectionConfig.PlayerBackpackData playerData =
+                BackpackSelectionConfig.PlayerBackpackData playerData =
                         BackpackConfigManager.getConfig().getOrCreatePlayerData(uuid);
 
-                BagSelectionConfig.Backpack backpack =
+                BackpackSelectionConfig.Backpack backpack =
                         playerData.getBackpacks_MAP().get(packet.backpackId);
 
                 if (backpack != null) {
                     backpack.getItem_MAP().put(packet.weaponSlot,
-                            new BagSelectionConfig.Backpack.ItemData(
+                            new BackpackSelectionConfig.Backpack.ItemData(
                                     packet.itemId, 1, packet.nbt));
                     BackpackConfigManager.save();
                 }

@@ -4,7 +4,7 @@ import com.cdp.codpattern.client.gui.refit.BackPackButton;
 import com.cdp.codpattern.client.gui.refit.SecodnButton;
 import com.cdp.codpattern.client.gui.refit.addBackpackButton;
 import com.cdp.codpattern.config.configmanager.BackpackConfigManager;
-import com.cdp.codpattern.config.server.BagSelectionConfig;
+import com.cdp.codpattern.config.server.BackpackSelectionConfig;
 import com.cdp.codpattern.network.RequestConfigPacket;
 import com.cdp.codpattern.network.handler.PacketHandler;
 import net.minecraft.client.Minecraft;
@@ -23,7 +23,7 @@ public class BackpackMenuScreen extends Screen {
     public int SCREEN_HEIGHT = 0;
     public int SCREEN_WIDTH = 0;
     public int UNIT_LENGTH = 0;
-    private BagSelectionConfig.PlayerBackpackData playerData;
+    private BackpackSelectionConfig.PlayerBackpackData playerData;
     private int currentSelectedId;
     private Map<Integer,BackPackButton> buttonMap = new HashMap<>();
 
@@ -142,13 +142,13 @@ public class BackpackMenuScreen extends Screen {
     private void addSelectBagButton() {
         if (playerData == null) return;
 
-        Map<Integer, BagSelectionConfig.Backpack> backpacks = playerData.getBackpacks_MAP();
+        Map<Integer, BackpackSelectionConfig.Backpack> backpacks = playerData.getBackpacks_MAP();
         int backpackCount = Math.min(backpacks.size(), 10);
         int buttonIndex = 0;
-        for (Map.Entry<Integer, BagSelectionConfig.Backpack> entry : backpacks.entrySet()) {
+        for (Map.Entry<Integer, BackpackSelectionConfig.Backpack> entry : backpacks.entrySet()) {
             if (buttonIndex >= 10) break;
             int backpackId = entry.getKey();
-            BagSelectionConfig.Backpack backpack = entry.getValue();
+            BackpackSelectionConfig.Backpack backpack = entry.getValue();
             buttonIndex++;
             int X, Y;
             if (buttonIndex <= 5) {
