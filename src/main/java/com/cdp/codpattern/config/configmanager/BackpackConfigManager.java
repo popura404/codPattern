@@ -1,6 +1,6 @@
 package com.cdp.codpattern.config.configmanager;
 
-import com.cdp.codpattern.config.server.BagSelectionConfig;
+import com.cdp.codpattern.config.server.BackpackSelectionConfig;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.minecraft.client.Minecraft;
@@ -18,10 +18,10 @@ import java.nio.file.Path;
 public class BackpackConfigManager {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path CONFIG_PATH = FMLPaths.CONFIGDIR.get().resolve("codpattern/backpacks.json");
-    private static BagSelectionConfig config;
+    private static BackpackSelectionConfig config;
 
     // 客户端缓存的配置（仅纯客户端使用）
-    private static BagSelectionConfig clientConfig;
+    private static BackpackSelectionConfig clientConfig;
 
     /**
      * 判断是否应该使用服务端配置
@@ -60,16 +60,16 @@ public class BackpackConfigManager {
             try {
                 if (Files.exists(CONFIG_PATH)) {
                     try (Reader reader = Files.newBufferedReader(CONFIG_PATH)) {
-                        config = GSON.fromJson(reader, BagSelectionConfig.class);
+                        config = GSON.fromJson(reader, BackpackSelectionConfig.class);
                     }
                 } else {
                     // 创建新的配置
-                    config = new BagSelectionConfig();
+                    config = new BackpackSelectionConfig();
                     save();
                 }
             } catch (IOException e) {
                 e.printStackTrace();
-                config = new BagSelectionConfig();
+                config = new BackpackSelectionConfig();
             }
         }
     }
@@ -94,7 +94,7 @@ public class BackpackConfigManager {
     /**
      * 获取配置实例
      */
-    public static BagSelectionConfig getConfig() {
+    public static BackpackSelectionConfig getConfig() {
         // 服务端或单人游戏使用本地配置
         if (shouldUseServerConfig()) {
             if (config == null) {
@@ -105,7 +105,7 @@ public class BackpackConfigManager {
 
         // 纯客户端（连接到远程服务器）使用同步的配置
         if (clientConfig == null) {
-            clientConfig = new BagSelectionConfig();
+            clientConfig = new BackpackSelectionConfig();
         }
         return clientConfig;
     }
@@ -114,7 +114,7 @@ public class BackpackConfigManager {
      * 客户端设置从服务端同步的配置（仅用于连接远程服务器时）
      */
     @OnlyIn(Dist.CLIENT)
-    public static void setClientConfig(BagSelectionConfig syncedConfig) {
+    public static void setClientConfig(BackpackSelectionConfig syncedConfig) {
         clientConfig = syncedConfig;
     }
 
@@ -124,7 +124,7 @@ public class BackpackConfigManager {
      * @return 新背包的ID，-1表示添加失败
      */
     public static int addCustomBackpack(String uuid) {
-        BagSelectionConfig.PlayerBackpackData playerData = getConfig().getOrCreatePlayerData(uuid);
+        BackpackSelectionConfig.PlayerBackpackData playerData = getConfig().getOrCreatePlayerData(uuid);
         int id = playerData.getNextAvailableId();
 
         if (id == 0) {
@@ -132,12 +132,12 @@ public class BackpackConfigManager {
         }
 
         // 创建新背包
-        BagSelectionConfig.Backpack newBackpack = new BagSelectionConfig.Backpack("自定义背包 #" + id);
+        BackpackSelectionConfig.Backpack newBackpack = new BackpackSelectionConfig.Backpack("自定义背包 #" + id);
         newBackpack.setItem_MAP("primary",
-                new BagSelectionConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1,
+                new BackpackSelectionConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1,
                         "{GunId:\"tacz:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}"));
         newBackpack.setItem_MAP("secondary",
-                new BagSelectionConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1,
+                new BackpackSelectionConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1,
                         "{GunId:\"tacz:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}"));
 
         // 添加到玩家数据

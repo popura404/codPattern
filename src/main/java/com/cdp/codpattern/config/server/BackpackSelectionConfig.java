@@ -2,7 +2,7 @@ package com.cdp.codpattern.config.server;
 
 import java.util.*;
 
-public class BagSelectionConfig {
+public class BackpackSelectionConfig {
 
     private Map<String, PlayerBackpackData> playerData = new HashMap<>();
 

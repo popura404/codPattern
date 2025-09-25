@@ -1,7 +1,7 @@
 package com.cdp.codpattern.network;
 
 import com.cdp.codpattern.config.configmanager.BackpackConfigManager;
-import com.cdp.codpattern.config.server.BagSelectionConfig;
+import com.cdp.codpattern.config.server.BackpackSelectionConfig;
 import com.google.gson.Gson;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
@@ -13,7 +13,7 @@ public class SyncBackpackConfigPacket {
     private final String configJson;
     private static final Gson GSON = new Gson();
 
-    public SyncBackpackConfigPacket(String playerUuid, BagSelectionConfig.PlayerBackpackData playerData) {
+    public SyncBackpackConfigPacket(String playerUuid, BackpackSelectionConfig.PlayerBackpackData playerData) {
         this.playerUuid = playerUuid;
         this.configJson = GSON.toJson(playerData);
     }
@@ -35,11 +35,11 @@ public class SyncBackpackConfigPacket {
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
             // 在客户端处理
-            BagSelectionConfig.PlayerBackpackData playerData =
-                    GSON.fromJson(configJson, BagSelectionConfig.PlayerBackpackData.class);
+            BackpackSelectionConfig.PlayerBackpackData playerData =
+                    GSON.fromJson(configJson, BackpackSelectionConfig.PlayerBackpackData.class);
 
             // 更新客户端缓存
-            BagSelectionConfig clientConfig = BackpackConfigManager.getConfig();
+            BackpackSelectionConfig clientConfig = BackpackConfigManager.getConfig();
             clientConfig.getPlayerData().put(playerUuid, playerData);
             BackpackConfigManager.setClientConfig(clientConfig);
         });

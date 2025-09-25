@@ -2,7 +2,7 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.client.gui.refit.WeaponSelectionButton;
-import com.cdp.codpattern.config.server.BagSelectionConfig;
+import com.cdp.codpattern.config.server.BackpackSelectionConfig;
 import com.cdp.codpattern.config.server.WeaponFilterConfig;
 import com.cdp.codpattern.network.RequestWeaponFilterPacket;
 import com.cdp.codpattern.network.UpdateWeaponPacket;
@@ -33,7 +33,7 @@ public class WeaponScreen extends Screen {
     public int SCREEN_WIDTH = 0;
     private int UNIT_LENGTH = 0;
     private final Integer BAGSERIAL;
-    private final BagSelectionConfig.Backpack backpack;
+    private final BackpackSelectionConfig.Backpack backpack;
     private final boolean isPrimary;
     private final WeaponMenuScreen parentScreen;
 
@@ -50,7 +50,7 @@ public class WeaponScreen extends Screen {
     private static final int BUTTON_SIZE = 20;
     private static final int BUTTON_SPACING = 2;
 
-    public WeaponScreen(WeaponMenuScreen parent, BagSelectionConfig.Backpack backpack,
+    public WeaponScreen(WeaponMenuScreen parent, BackpackSelectionConfig.Backpack backpack,
                         Integer bagSerial, boolean isPrimary) {
         super(Component.literal("WeaponScreen"));
         this.parentScreen = parent;
@@ -308,8 +308,8 @@ public class WeaponScreen extends Screen {
         String itemId = weapon.getItem().builtInRegistryHolder().key().location().toString();
         String nbt = weapon.hasTag() ? weapon.getTag().toString() : "";
 
-        BagSelectionConfig.Backpack.ItemData itemData =
-                new BagSelectionConfig.Backpack.ItemData(itemId, 1, nbt);
+        BackpackSelectionConfig.Backpack.ItemData itemData =
+                new BackpackSelectionConfig.Backpack.ItemData(itemId, 1, nbt);
         backpack.getItem_MAP().put(key, itemData);
 
         // 发数据包

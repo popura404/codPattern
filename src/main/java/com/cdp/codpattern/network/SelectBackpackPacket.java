@@ -1,7 +1,7 @@
 package com.cdp.codpattern.network;
 
 import com.cdp.codpattern.config.configmanager.BackpackConfigManager;
-import com.cdp.codpattern.config.server.BagSelectionConfig;
+import com.cdp.codpattern.config.server.BackpackSelectionConfig;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetActionBarTextPacket;
@@ -34,7 +34,7 @@ public class SelectBackpackPacket {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
                 String uuid = player.getUUID().toString();
-                BagSelectionConfig.PlayerBackpackData playerData =
+                BackpackSelectionConfig.PlayerBackpackData playerData =
                         BackpackConfigManager.getConfig().getOrCreatePlayerData(uuid);
 
                 // 检查背包是否存在
