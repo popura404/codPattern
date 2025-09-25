@@ -20,6 +20,8 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
 import com.cdp.codpattern.network.handler.PacketHandler;
+import net.minecraftforge.fml.event.lifecycle.FMLConstructModEvent;
+import net.minecraftforge.fml.loading.targets.FMLClientLaunchHandler;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -68,7 +70,7 @@ public class WeaponScreen extends Screen {
 
         SCREEN_WIDTH = this.width;
         SCREEN_HEIGHT = this.height;
-        UNIT_LENGTH = (int) (this.width / 120f);
+        UNIT_LENGTH = (int) ( ( ( float ) this.width ) / 120f);
 
         loadWeaponTabs();
         createTabButtons();
@@ -322,8 +324,8 @@ public class WeaponScreen extends Screen {
                     SoundSource.PLAYERS, 0.5f, 1f
             );
         }
-
         Minecraft.getInstance().setScreen(parentScreen);
+
     }
 
     @Override

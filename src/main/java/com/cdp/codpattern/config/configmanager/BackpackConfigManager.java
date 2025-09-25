@@ -20,19 +20,19 @@ public class BackpackConfigManager {
     private static final Path CONFIG_PATH = FMLPaths.CONFIGDIR.get().resolve("codpattern/backpacks.json");
     private static BackpackSelectionConfig config;
 
-    // 客户端缓存的配置（仅纯客户端使用）
+    // 客户端缓存的配置
     private static BackpackSelectionConfig clientConfig;
 
     /**
      * 判断是否应该使用服务端配置
      */
     private static boolean shouldUseServerConfig() {
-        // 专用服务器环境
+        // 服务器环境
         if (FMLEnvironment.dist == Dist.DEDICATED_SERVER) {
             return true;
         }
 
-        // 单人游戏或本地局域网服务器（集成服务器）
+        // 单人或主机是本地局域网服务器
         // 在这种情况下，配置文件应该被创建和保存
         if (FMLEnvironment.dist == Dist.CLIENT) {
             // 如果是单人游戏或局域网主机，使用本地配置
@@ -43,8 +43,7 @@ public class BackpackConfigManager {
                         Minecraft.getInstance().isLocalServer()) {
                     return true;
                 }
-            } catch (Exception e) {
-                // 在服务端线程调用时可能抛异常，忽略
+            } catch (Exception ignored) {
             }
         }
 
@@ -95,7 +94,7 @@ public class BackpackConfigManager {
      * 获取配置实例
      */
     public static BackpackSelectionConfig getConfig() {
-        // 服务端或单人游戏使用本地配置
+        // 服务端或单人就加载本地配置
         if (shouldUseServerConfig()) {
             if (config == null) {
                 load();
@@ -131,7 +130,7 @@ public class BackpackConfigManager {
             return -1; // 背包已满
         }
 
-        // 创建新背包
+        // 创建背包
         BackpackSelectionConfig.Backpack newBackpack = new BackpackSelectionConfig.Backpack("自定义背包 #" + id);
         newBackpack.setItem_MAP("primary",
                 new BackpackSelectionConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1,

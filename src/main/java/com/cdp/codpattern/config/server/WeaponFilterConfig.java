@@ -20,7 +20,7 @@ public class WeaponFilterConfig {
 
     // 服务端配置实例
     private static WeaponFilterConfig serverInstance;
-    // 客户端缓存实例（从服务端同步）
+    // 客户端缓存实例
     private static WeaponFilterConfig clientInstance;
 
     private List<String> primaryWeaponTabs = new ArrayList<>();
@@ -53,12 +53,12 @@ public class WeaponFilterConfig {
             }
         }
 
-        // 客户端（连接远程服务器）使用缓存
+        // 纯客户端使用缓存
         if (!isServerEnvironment) {
             return clientInstance != null ? clientInstance : createDefault();
         }
 
-        // 服务端/单人游戏从文件加载
+        // 服务端或者单人从文件加载
         if (serverInstance != null) {
             return serverInstance;
         }
@@ -95,7 +95,6 @@ public class WeaponFilterConfig {
         clientInstance = config;
     }
 
-    // Getter方法保持不变
     public List<String> getPrimaryWeaponTabs() {
         return primaryWeaponTabs;
     }
