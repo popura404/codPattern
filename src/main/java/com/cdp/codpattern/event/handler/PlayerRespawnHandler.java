@@ -5,6 +5,7 @@ import com.cdp.codpattern.config.server.BackpackSelectionConfig;
 import com.cdp.codpattern.config.server.WeaponFilterConfig;
 import com.cdp.codpattern.network.SyncBackpackConfigPacket;
 import com.cdp.codpattern.network.handler.PacketHandler;
+import com.tacz.guns.api.item.IGun;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.network.chat.Component;
@@ -68,6 +69,8 @@ public class PlayerRespawnHandler {
         // 加载武器筛选配置
         WeaponFilterConfig filterConfig = WeaponFilterConfig.load();
 
+        if (player.isSpectator()) return;
+
         // 检查是否仅分发给带标签的玩家
         if (filterConfig.isDistributeToTaggedPlayersOnly()) {
             if (!player.getTags().contains("cdpplayer")) {
@@ -99,7 +102,12 @@ public class PlayerRespawnHandler {
 
                     if (itemData.getNbt() != null && !itemData.getNbt().isEmpty()) {
                         try {
+                            //处理物品nbt
                             stack.setTag(TagParser.parseTag(itemData.getNbt()));
+                            //分配子弹
+                            IGun iGun = (IGun) stack.getItem();
+                            int BackpackDummyAmmoAmount = iGun.getCurrentAmmoCount(stack) * filterConfig.getAmmunitionPerMagazineMultiple();
+                            iGun.setDummyAmmoAmount(stack , BackpackDummyAmmoAmount);
                         } catch (Exception e) {
                             // NBT解析失败，忽略
                         }
