@@ -4,6 +4,7 @@ import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.client.gui.refit.WeaponSelectionButton;
 import com.cdp.codpattern.config.server.BagSelectionConfig;
 import com.cdp.codpattern.config.server.WeaponFilterConfig;
+import com.cdp.codpattern.network.RequestWeaponFilterPacket;
 import com.cdp.codpattern.network.UpdateWeaponPacket;
 import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.api.item.GunTabType;
@@ -61,6 +62,10 @@ public class WeaponScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+
+        // 请求服务端的武器过滤配置
+        PacketHandler.sendToServer(new RequestWeaponFilterPacket());
+
         SCREEN_WIDTH = this.width;
         SCREEN_HEIGHT = this.height;
         UNIT_LENGTH = (int) (this.width / 120f);
