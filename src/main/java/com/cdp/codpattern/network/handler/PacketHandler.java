@@ -75,6 +75,12 @@ public class PacketHandler {
                 .consumerMainThread(SyncWeaponFilterPacket::handle)
                 .add();
 
+        // 打开背包界面 (S2C)
+        INSTANCE.messageBuilder(OpenBackpackScreenPacket.class, id(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(OpenBackpackScreenPacket::decode)
+                .encoder(OpenBackpackScreenPacket::encode)
+                .consumerMainThread(OpenBackpackScreenPacket::handle)
+                .add();
     }
 
     /**

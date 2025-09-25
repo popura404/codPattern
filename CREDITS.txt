@@ -1,4 +1,4 @@
-Minecraft Forge: Credits/Thank You
+Minecraft Forge: Credits/Thank You-
 
 Forge is a set of tools and modifications to the Minecraft base game code to assist 
 mod developers in creating new and exciting content. It has been in development for 

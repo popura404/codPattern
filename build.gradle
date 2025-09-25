@@ -125,7 +125,7 @@ minecraft {
 }
 
 mixin {
-    // 如果你只是要让 tacz 的 mixin 生效，写它自己的 refmap 和 config
+    // 让 tacz 的 mixin 生效，使用它自己的 refmap 和 config
     add sourceSets.main, "tacz.refmap.json"
     config "tacz.mixins.json"
 }
