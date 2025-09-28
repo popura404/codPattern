@@ -20,8 +20,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
 import com.cdp.codpattern.network.handler.PacketHandler;
-import net.minecraftforge.fml.event.lifecycle.FMLConstructModEvent;
-import net.minecraftforge.fml.loading.targets.FMLClientLaunchHandler;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;

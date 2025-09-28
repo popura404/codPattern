@@ -48,13 +48,6 @@ public class SecodnButton extends Button {
             focusedtimes = 0;
         }
 
-        // 渲染基础按钮背景
-        //graphics.fillGradient(this.getX(), this.getY(), this.getX() + this.width, this.getY() + this.height, 0xDA5C565C, 0xCF524D52);
-
-        // 渲染阴影
-        //graphics.fillGradient(this.getX(), this.getY(), this.getX() - 6, this.getY() + this.height, 0xC019181A, 0xC019181A);
-        //graphics.fillGradient(this.getX(), this.getY() + this.height, this.getX() + this.width, this.getY() + this.height + 2, 0xC019181A, 0x7019181A);
-
         // 悬停效果
         if (isHoveredOrFocused()) {
             renderOnHoveredOrFocused(graphics);

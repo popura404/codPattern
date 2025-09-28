@@ -3,17 +3,28 @@ package com.cdp.codpattern.client.gui.refit;
 import com.cdp.codpattern.config.server.BackpackSelectionConfig;
 import com.cdp.codpattern.network.handler.PacketHandler;
 import com.cdp.codpattern.network.SelectBackpackPacket;
+import com.tacz.guns.api.TimelessAPI;
+import com.tacz.guns.api.item.IGun;
+import com.tacz.guns.client.resource.ClientAssetsManager;
+import com.tacz.guns.client.resource.pojo.PackInfo;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.sounds.SoundManager;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.TagParser;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,6 +34,23 @@ public class BackPackButton extends Button {
     int focusedtimes = 0;
     private final BackpackSelectionConfig.Backpack backpack;
     private final boolean isCurrentlySelected;
+
+    // 武器信息缓存
+    private Map<String, WeaponInfo> weaponInfoCache = new HashMap<>();
+
+    public static class WeaponInfo {
+        public ResourceLocation texture;
+        public Component weaponName;
+        public Component packName;
+        public ItemStack itemStack;
+
+        public WeaponInfo(ResourceLocation texture, Component weaponName, Component packName, ItemStack itemStack) {
+            this.texture = texture;
+            this.weaponName = weaponName;
+            this.packName = packName;
+            this.itemStack = itemStack;
+        }
+    }
 
     /**
      * 构造函数兼容性
@@ -48,10 +76,97 @@ public class BackPackButton extends Button {
         this.backpack = backpack;
         this.isCurrentlySelected = isSelected;
 
-        // 设置悬停提示
+        // 初始化武器信息
         if (backpack != null) {
+            initWeaponInfo();
             this.setTooltip(createBackpackTooltip());
         }
+    }
+
+    /**
+     * 初始化武器信息
+     */
+    private void initWeaponInfo() {
+        if (backpack == null || backpack.getItem_MAP() == null) return;
+
+        for (Map.Entry<String, BackpackSelectionConfig.Backpack.ItemData> entry : backpack.getItem_MAP().entrySet()) {
+            String type = entry.getKey();
+            BackpackSelectionConfig.Backpack.ItemData itemData = entry.getValue();
+
+            try {
+                // 创建ItemStack
+                ItemStack weaponStack = new ItemStack(ForgeRegistries.ITEMS.getValue(new ResourceLocation(itemData.getItem())));
+
+                // 设置NBT数据
+                if (itemData.getNbt() != null && !itemData.getNbt().isEmpty()) {
+                    try {
+                        CompoundTag tag = TagParser.parseTag(itemData.getNbt());
+                        weaponStack.setTag(tag);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                weaponStack.setCount(itemData.getCount());
+
+                // 获取武器信息
+                if (weaponStack.getItem() instanceof IGun) {
+                    WeaponInfo info = extractWeaponInfo(weaponStack);
+                    if (info != null) {
+                        weaponInfoCache.put(type, info);
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * 从ItemStack提取武器信息
+     */
+    private WeaponInfo extractWeaponInfo(ItemStack weapon) {
+        if (weapon == null || weapon.isEmpty()) return null;
+
+        try {
+            // 获取贴图
+            ResourceLocation texture = null;
+            TimelessAPI.getGunDisplay(weapon).ifPresent(display -> {
+                // 这里需要使用一个临时变量来处理lambda中的赋值
+            });
+            // 使用另一种方式获取贴图
+            var displayOpt = TimelessAPI.getGunDisplay(weapon);
+            if (displayOpt.isPresent()) {
+                texture = displayOpt.get().getHUDTexture();
+            }
+
+            // 获取枪包名
+            Component packName = null;
+            if (weapon.getItem() instanceof IGun iGun) {
+                ResourceLocation gunId = iGun.getGunId(weapon);
+                PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
+                if (packInfoObject != null) {
+                    packName = Component.translatable(packInfoObject.getName())
+                            .withStyle(ChatFormatting.BLUE)
+                            .withStyle(ChatFormatting.ITALIC);
+                }
+            }
+
+            // 获取武器名
+            Component weaponName = weapon.getHoverName();
+
+            return new WeaponInfo(texture, weaponName, packName, weapon);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * 获取武器信息用于外部渲染
+     */
+    public Map<String, WeaponInfo> getWeaponInfoCache() {
+        return weaponInfoCache;
     }
 
     /**

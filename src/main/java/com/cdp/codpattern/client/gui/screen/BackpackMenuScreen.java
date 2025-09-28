@@ -7,6 +7,7 @@ import com.cdp.codpattern.config.configmanager.BackpackConfigManager;
 import com.cdp.codpattern.config.server.BackpackSelectionConfig;
 import com.cdp.codpattern.network.RequestConfigPacket;
 import com.cdp.codpattern.network.handler.PacketHandler;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -33,6 +34,12 @@ public class BackpackMenuScreen extends Screen {
     private int hideDelay = 0;
     private static final int MAX_HIDE_DELAY = 10; // 延迟10个tick（0.5s）
 
+    // 武器信息显示相关
+    private BackPackButton currentHoveredButton = null;
+    private Map<String, BackPackButton.WeaponInfo> currentWeaponInfo = null;
+    private int weaponDisplayX = 0;
+    private int weaponDisplayY = 0;
+
     public BackpackMenuScreen() {
         super(Component.literal("Select your bag"));
     }
@@ -42,9 +49,13 @@ public class BackpackMenuScreen extends Screen {
         this.renderBackground(pGuiGraphics);
         super.render(pGuiGraphics, pMouseX, pMouseY, pPartialTick);
 
+        // 渲染武器信息
+        renderWeaponDisplay(pGuiGraphics, pMouseX, pMouseY);
+
         // 检查悬停状态
         boolean isHoveringAnyButton = false;
         Integer hoveredButtonId = null;
+        BackPackButton hoveredButton = null;
 
         // 是否悬停在BackPackButton上
         for (Map.Entry<Integer,BackPackButton> entry : buttonMap.entrySet()){
@@ -52,8 +63,15 @@ public class BackpackMenuScreen extends Screen {
             if(button.isHoveredOrFocused()){
                 isHoveringAnyButton = true;
                 hoveredButtonId = entry.getKey();
+                hoveredButton = button;
                 break;
             }
+        }
+
+        // 更新当前悬停的按钮和武器信息
+        if (hoveredButton != null && hoveredButton != currentHoveredButton) {
+            currentHoveredButton = hoveredButton;
+            currentWeaponInfo = hoveredButton.getWeaponInfoCache();
         }
 
         // 是否悬停在自己SecondButton上
@@ -87,6 +105,107 @@ public class BackpackMenuScreen extends Screen {
     }
 
     /**
+     * 渲染武器显示区域
+     */
+    private void renderWeaponDisplay(GuiGraphics graphics, int mouseX, int mouseY) {
+        if (currentWeaponInfo == null || currentWeaponInfo.isEmpty() || currentHoveredButton == null) return;
+
+        int weaponDisplayX = UNIT_LENGTH * 8;
+        int weaponDisplayY = SCREEN_HEIGHT - UNIT_LENGTH * 22 - UNIT_LENGTH * 4 - UNIT_LENGTH * 12;
+
+        // 确保不超出屏幕顶部边界
+        if (weaponDisplayY < 10) {
+            weaponDisplayY = 10;
+        }
+
+        // 背景面板
+        graphics.fillGradient(weaponDisplayX - 10, weaponDisplayY - 10,
+                weaponDisplayX + UNIT_LENGTH * 40 + 10,
+                weaponDisplayY + UNIT_LENGTH * 12 + 10,
+                0x46202020, 0x2A101010);
+
+        // 边框
+        graphics.fill(weaponDisplayX - 11, weaponDisplayY - 11,
+                weaponDisplayX + UNIT_LENGTH * 40 + 11, weaponDisplayY - 10, 0x46145200);
+        graphics.fill(weaponDisplayX - 11, weaponDisplayY + UNIT_LENGTH * 12 + 10,
+                weaponDisplayX + UNIT_LENGTH * 40 + 11, weaponDisplayY + UNIT_LENGTH * 12 + 11, 0x2A145200);
+        graphics.fill(weaponDisplayX - 11, weaponDisplayY - 10,
+                weaponDisplayX - 10, weaponDisplayY + UNIT_LENGTH * 12 + 10, 0x38145200);
+        graphics.fill(weaponDisplayX + UNIT_LENGTH * 40 + 10, weaponDisplayY - 10,
+                weaponDisplayX + UNIT_LENGTH * 40 + 11, weaponDisplayY + UNIT_LENGTH * 12 + 10, 0x38145200);
+
+        // 渲染标题
+        String title = "§e§l" + currentHoveredButton.getBackpack().getName() + " §7(#" + currentHoveredButton.getBAGSERIAL() + ")";
+        graphics.drawString(Minecraft.getInstance().font, title,
+                weaponDisplayX + 5, weaponDisplayY, 0xFFFFFF, true);
+
+        // 分割线
+        int dividerX = weaponDisplayX + UNIT_LENGTH * 20 - 1;
+        graphics.fillGradient(dividerX, weaponDisplayY + UNIT_LENGTH * 2,
+                dividerX + 2, weaponDisplayY + UNIT_LENGTH * 11,
+                0x40808080, 0x20404040);
+
+        // 渲染武器信息
+        for (Map.Entry<String, BackPackButton.WeaponInfo> entry : currentWeaponInfo.entrySet()) {
+            String type = entry.getKey();
+            BackPackButton.WeaponInfo info = entry.getValue();
+
+            // 计算武器区域位置
+            int offsetX;
+            if (type.equals("primary")) {
+                offsetX = 0;
+            } else {
+                offsetX = UNIT_LENGTH * 20;
+            }
+
+            int weaponX = weaponDisplayX + offsetX;
+            int weaponY = weaponDisplayY + UNIT_LENGTH * 2;
+
+            // 渲染武器区域背景
+            graphics.fillGradient(weaponX, weaponY,
+                    weaponX + UNIT_LENGTH * 18,
+                    weaponY + UNIT_LENGTH * 9,
+                    0x20303030, 0x1C202020);  // 相应调整内部区域透明度
+
+            // 渲染武器类型标签
+            String typeLabel = type.equals("primary") ? "§c主武器" : "§9副武器";
+            graphics.drawString(Minecraft.getInstance().font, typeLabel,
+                    weaponX + 2, weaponY + 2, 0xFFFFFF, true);
+
+            // 渲染武器贴图 - 修改为与FlatColorButton相同的大小和位置
+            if (info.texture != null) {
+                RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
+
+                // 使用与FlatColorButton相同的贴图尺寸
+                int textureWidth = UNIT_LENGTH * 18;
+                int textureHeight = UNIT_LENGTH * 6;
+
+                // 贴图位置居中
+                int textureX = weaponX + UNIT_LENGTH * 0;  // 左对齐
+                int textureY = weaponY + UNIT_LENGTH * 2;  // 给标签留空间
+
+                graphics.blit(info.texture, textureX, textureY,
+                        0, 0, textureWidth, textureHeight,
+                        textureWidth, textureHeight);
+            }
+
+            // 渲染枪包名
+            if (info.packName != null) {
+                graphics.drawString(Minecraft.getInstance().font, info.packName,
+                        weaponX + 2, weaponY + UNIT_LENGTH * 7, 0xDDFFFFFF);
+            }
+
+            // 渲染武器名
+            if (info.weaponName != null) {
+                graphics.drawString(Minecraft.getInstance().font, info.weaponName,
+                        weaponX + 2, weaponY + UNIT_LENGTH * 8, 0xDDFFFFFF);
+            }
+        }
+    }
+
+
+
+    /**
      * 添加SecondButton
      */
     private void addSecondButton(Integer buttonId) {
@@ -106,7 +225,6 @@ public class BackpackMenuScreen extends Screen {
         if (currentSecondButtonId != null && secondButtonMap.containsKey(currentSecondButtonId)) {
             SecodnButton secondButton = secondButtonMap.get(currentSecondButtonId);
             removeWidget(secondButton);
-            //TODO: xi xi
             secondButtonMap.remove(currentSecondButtonId);
             currentSecondButtonId = null;
         }
@@ -143,7 +261,6 @@ public class BackpackMenuScreen extends Screen {
         if (playerData == null) return;
 
         Map<Integer, BackpackSelectionConfig.Backpack> backpacks = playerData.getBackpacks_MAP();
-        int backpackCount = Math.min(backpacks.size(), 10);
         int buttonIndex = 0;
         for (Map.Entry<Integer, BackpackSelectionConfig.Backpack> entry : backpacks.entrySet()) {
             if (buttonIndex >= 10) break;
@@ -186,6 +303,9 @@ public class BackpackMenuScreen extends Screen {
     public void onClose() {
         // 清理SecondButton
         removeCurrentSecondButton();
+        // 清理武器信息
+        currentHoveredButton = null;
+        currentWeaponInfo = null;
         super.onClose();
     }
 
