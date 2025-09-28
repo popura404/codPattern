@@ -67,7 +67,7 @@ public class WeaponSelectionButton extends Button {
             graphics.renderTooltip(Minecraft.getInstance().font, weapon.getHoverName(), mouseX, mouseY);
         }
 
-        //显示枪命
+        //显示枪名
         graphics.drawString(Minecraft.getInstance().font, weapon.getHoverName(), this.getX() + 2 , this.getY() + this.height - UNIT_LENGTH ,0xDDFFFFFF);
 
         //显示枪包名  <  关键代码》》Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC);  >
