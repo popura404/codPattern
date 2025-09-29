@@ -105,7 +105,7 @@ public class FlatColorButton extends Button {
     protected void renderTexture(GuiGraphics graphics, boolean isHovered){
         if (Teaxture == null) return;
 
-        // 计算贴图daxiao
+        // 设定贴图大小
         int textureRenderWidth = 18 * UNIT_LENGTH;
         int textureRenderHeight = 6 * UNIT_LENGTH;
 

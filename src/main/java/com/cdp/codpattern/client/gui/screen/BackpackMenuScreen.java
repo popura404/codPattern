@@ -110,7 +110,7 @@ public class BackpackMenuScreen extends Screen {
     private void renderWeaponDisplay(GuiGraphics graphics, int mouseX, int mouseY) {
         if (currentWeaponInfo == null || currentWeaponInfo.isEmpty() || currentHoveredButton == null) return;
 
-        int weaponDisplayX = UNIT_LENGTH * 8;
+        int weaponDisplayX = UNIT_LENGTH * 6;
         int weaponDisplayY = SCREEN_HEIGHT - UNIT_LENGTH * 22 - UNIT_LENGTH * 4 - UNIT_LENGTH * 12;
 
         // 确保不超出屏幕顶部边界
@@ -119,20 +119,20 @@ public class BackpackMenuScreen extends Screen {
         }
 
         // 背景面板
-        graphics.fillGradient(weaponDisplayX - 10, weaponDisplayY - 10,
-                weaponDisplayX + UNIT_LENGTH * 40 + 10,
+        graphics.fillGradient(weaponDisplayX, weaponDisplayY - 10, //微调,
+                this.width - weaponDisplayX,
                 weaponDisplayY + UNIT_LENGTH * 12 + 10,
-                0x46202020, 0x2A101010);
+                0x05999988, 0x20AAAAAA);
 
         // 边框
-        graphics.fill(weaponDisplayX - 11, weaponDisplayY - 11,
-                weaponDisplayX + UNIT_LENGTH * 40 + 11, weaponDisplayY - 10, 0x46145200);
-        graphics.fill(weaponDisplayX - 11, weaponDisplayY + UNIT_LENGTH * 12 + 10,
-                weaponDisplayX + UNIT_LENGTH * 40 + 11, weaponDisplayY + UNIT_LENGTH * 12 + 11, 0x2A145200);
-        graphics.fill(weaponDisplayX - 11, weaponDisplayY - 10,
-                weaponDisplayX - 10, weaponDisplayY + UNIT_LENGTH * 12 + 10, 0x38145200);
-        graphics.fill(weaponDisplayX + UNIT_LENGTH * 40 + 10, weaponDisplayY - 10,
-                weaponDisplayX + UNIT_LENGTH * 40 + 11, weaponDisplayY + UNIT_LENGTH * 12 + 10, 0x38145200);
+        graphics.fill(weaponDisplayX, weaponDisplayY - UNIT_LENGTH,
+                this.width - weaponDisplayX, weaponDisplayY + UNIT_LENGTH, 0x46AAAAAA);
+        graphics.fill(weaponDisplayX, weaponDisplayY + UNIT_LENGTH * 12 + 10,
+                this.width - weaponDisplayX, weaponDisplayY + UNIT_LENGTH * 12 + 11, 0x2AAAAAAA);
+        graphics.fill(weaponDisplayX, weaponDisplayY - 10,
+                weaponDisplayX, weaponDisplayY + UNIT_LENGTH * 12 + 10, 0x38AAAAAA);
+        graphics.fill(this.width - weaponDisplayX, weaponDisplayY - 10,
+                this.width - weaponDisplayX, weaponDisplayY + UNIT_LENGTH * 12 + 10, 0x38AAAAAA);
 
         // 渲染标题
         String title = "§e§l" + currentHoveredButton.getBackpack().getName() + " §7(#" + currentHoveredButton.getBAGSERIAL() + ")";
@@ -140,7 +140,7 @@ public class BackpackMenuScreen extends Screen {
                 weaponDisplayX + 5, weaponDisplayY, 0xFFFFFF, true);
 
         // 分割线
-        int dividerX = weaponDisplayX + UNIT_LENGTH * 20 - 1;
+        int dividerX = weaponDisplayX + UNIT_LENGTH * 25 - 1;
         graphics.fillGradient(dividerX, weaponDisplayY + UNIT_LENGTH * 2,
                 dividerX + 2, weaponDisplayY + UNIT_LENGTH * 11,
                 0x40808080, 0x20404040);
@@ -153,19 +153,19 @@ public class BackpackMenuScreen extends Screen {
             // 计算武器区域位置
             int offsetX;
             if (type.equals("primary")) {
-                offsetX = 0;
+                offsetX = UNIT_LENGTH * 3;
             } else {
-                offsetX = UNIT_LENGTH * 20;
+                offsetX = UNIT_LENGTH * 29;
             }
 
             int weaponX = weaponDisplayX + offsetX;
             int weaponY = weaponDisplayY + UNIT_LENGTH * 2;
 
             // 渲染武器区域背景
-            graphics.fillGradient(weaponX, weaponY,
-                    weaponX + UNIT_LENGTH * 18,
-                    weaponY + UNIT_LENGTH * 9,
-                    0x20303030, 0x1C202020);  // 相应调整内部区域透明度
+            //graphics.fillGradient(weaponX, weaponY,
+            //        weaponX + UNIT_LENGTH * 18,
+            //        weaponY + UNIT_LENGTH * 9,
+            //        0x20303030, 0x1C202020);  // 相应调整内部区域透明度
 
             // 渲染武器类型标签
             String typeLabel = type.equals("primary") ? "§c主武器" : "§9副武器";
@@ -232,7 +232,7 @@ public class BackpackMenuScreen extends Screen {
 
     @Override
     public void renderBackground(@NotNull GuiGraphics pGuiGraphics) {
-        pGuiGraphics.fillGradient(0, 0, this.width, this.height, 0x90202020, 0xC0000000);
+        pGuiGraphics.fillGradient(0, 0, this.width, this.height, 0xA0202020, 0xD0000000);
     }
 
     public void init() {
