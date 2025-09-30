@@ -23,10 +23,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class BackPackButton extends Button {
 
@@ -95,7 +92,7 @@ public class BackPackButton extends Button {
 
             try {
                 // 创建ItemStack
-                ItemStack weaponStack = new ItemStack(ForgeRegistries.ITEMS.getValue(new ResourceLocation(itemData.getItem())));
+                ItemStack weaponStack = new ItemStack(Objects.requireNonNull(ForgeRegistries.ITEMS.getValue(new ResourceLocation(itemData.getItem()))));
 
                 // 设置NBT数据
                 if (itemData.getNbt() != null && !itemData.getNbt().isEmpty()) {

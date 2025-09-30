@@ -12,11 +12,15 @@ import net.minecraftforge.fml.loading.FMLPaths;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class BackpackConfigManager {
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Gson GSON = new GsonBuilder()
+            .setPrettyPrinting()
+            .excludeFieldsWithModifiers(Modifier.TRANSIENT)
+            .create();
     private static final Path CONFIG_PATH = FMLPaths.CONFIGDIR.get().resolve("codpattern/backpacks.json");
     private static BackpackSelectionConfig config;
 
@@ -132,12 +136,8 @@ public class BackpackConfigManager {
 
         // 创建背包
         BackpackSelectionConfig.Backpack newBackpack = new BackpackSelectionConfig.Backpack("自定义背包 #" + id);
-        newBackpack.setItem_MAP("primary",
-                new BackpackSelectionConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1,
-                        "{GunId:\"tacz:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}"));
-        newBackpack.setItem_MAP("secondary",
-                new BackpackSelectionConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1,
-                        "{GunId:\"tacz:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}"));
+        newBackpack.setItem_MAP("primary", BackpackSelectionConfig.getItemDataADDP());
+        newBackpack.setItem_MAP("secondary", BackpackSelectionConfig.getItemDataADDS());
 
         // 添加到玩家数据
         if (playerData.addBackpack(id, newBackpack)) {
