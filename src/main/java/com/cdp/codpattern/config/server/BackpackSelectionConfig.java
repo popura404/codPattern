@@ -4,6 +4,22 @@ import java.util.*;
 
 public class BackpackSelectionConfig {
 
+    //默认预制背包........................................
+    private Backpack.ItemData itemDataP1 = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:hk_g3\",GunCurrentAmmoCount:20,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
+    private Backpack.ItemData itemDataS1 = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:glock_17\",GunCurrentAmmoCount:17,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
+
+    private Backpack.ItemData itemDataP2 = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:ak47\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
+    private Backpack.ItemData itemDataS2 = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:deagle\",GunCurrentAmmoCount:7,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
+
+    private Backpack.ItemData itemDataP3 = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
+    private Backpack.ItemData itemDataS3 = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
+    //..................................................
+
+    //添加背包时默认......................................
+    private static Backpack.ItemData itemDataADDP = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
+    private static Backpack.ItemData itemDataADDS = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
+    //.................................................
+
     private Map<String, PlayerBackpackData> playerData = new HashMap<>();
 
     public static class PlayerBackpackData {
@@ -106,28 +122,22 @@ public class BackpackSelectionConfig {
             // 创建三个默认背包
             //tacz:modern_kinetic_gun{HasBulletInBarrel: 1b, GunFireMode: "SEMI", GunId: "tacz:ai_awp", AttachmentSCOPE: {id: "tacz:attachment", Count: 1b, tag: {AttachmentId: "tacz:scope_elcan_4x"}}, GunCurrentAmmoCount: 5}
 
-            // 背包1 - 突击背包
+            // 背包1
             Backpack backpack1 = new Backpack("自定义背包1");
-            backpack1.setItem_MAP("primary",
-                    new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:hk_g3\",GunCurrentAmmoCount:20,GunFireMode: \"AUTO\",HasBulletInBarrel:1}"));
-            backpack1.setItem_MAP("secondary",
-                    new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:glock_17\",GunCurrentAmmoCount:17,GunFireMode: \"SEMI\",HasBulletInBarrel:1}"));
+            backpack1.setItem_MAP("primary", itemDataP1);
+            backpack1.setItem_MAP("secondary", itemDataS1);
             newData.getBackpacks_MAP().put(1, backpack1);
 
-            // 背包2 - 防御背包
+            // 背包2
             Backpack backpack2 = new Backpack("自定义背包2");
-            backpack2.setItem_MAP("primary",
-                    new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:ak47\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}"));
-            backpack2.setItem_MAP("secondary",
-                    new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}"));
+            backpack2.setItem_MAP("primary", itemDataP2);
+            backpack2.setItem_MAP("secondary", itemDataS2);
             newData.getBackpacks_MAP().put(2, backpack2);
 
-            // 背包3 - 探索背包
+            // 背包3
             Backpack backpack3 = new Backpack("自定义背包3");
-            backpack3.setItem_MAP("primary",
-                    new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}"));
-            backpack3.setItem_MAP("secondary",
-                    new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:deagle\",GunCurrentAmmoCount:7,GunFireMode: \"SEMI\",HasBulletInBarrel:1}"));
+            backpack3.setItem_MAP("primary", itemDataP3);
+            backpack3.setItem_MAP("secondary", itemDataS3);
             newData.getBackpacks_MAP().put(3, backpack3);
 
             // 默认选择背包1
@@ -142,5 +152,13 @@ public class BackpackSelectionConfig {
      */
     public Map<String, PlayerBackpackData> getPlayerData() {
         return playerData;
+    }
+
+    public static Backpack.ItemData getItemDataADDS() {
+        return itemDataADDS;
+    }
+
+    public static Backpack.ItemData getItemDataADDP() {
+        return itemDataADDP;
     }
 }
