@@ -1,0 +1,99 @@
+name: Pull Request Build
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened]
+
+env:
+  JAVA_VERSION: 17
+
+jobs:
+  pr-build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Run code checks
+      run: ./gradlew codeCheck --no-daemon
+
+    - name: Build mod
+      run: ./gradlew devBuild --no-daemon
+
+    - name: Upload PR build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: pr-build-${{ github.event.number }}
+        path: |
+          build/libs/*.jar
+        retention-days: 7
+
+    - name: Comment PR with build status
+      uses: actions/github-script@v7
+      if: always()
+      with:
+        script: |
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const botComment = comments.find(comment =>
+            comment.user.type === 'Bot' &&
+            comment.body.includes('Build Status')
+          );
+
+          const status = '${{ job.status }}';
+          const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+          const body = `## 🔨 Build Status
+
+          **Status**: ${status === 'success' ? '✅ Build Successful' : '❌ Build Failed'}
+          **Run**: [View Details](${runUrl})
+          **Commit**: ${context.sha.substring(0, 7)}
+
+          ${status === 'success' ?
+            '✨ Your PR build completed successfully! The mod JAR is available in the workflow artifacts.' :
+            '⚠️ The build failed. Please check the build logs for details.'
+          }
+          `;
+
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: body
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+          }

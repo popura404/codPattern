@@ -1,0 +1,252 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  JAVA_VERSION: 17
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      artifact-path: ${{ steps.build.outputs.artifact-path }}
+      sources-path: ${{ steps.build.outputs.sources-path }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Extract version
+      id: version
+      run: |
+        if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+        else
+          VERSION=$(grep 'mod_version=' gradle.properties | cut -d'=' -f2)
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+
+    - name: Build with Gradle
+      id: build
+      run: |
+        ./gradlew clean releaseBuild sourcesJar --no-daemon
+
+        # 查找生成的JAR文件
+        MAIN_JAR=$(find build/libs -name "*.jar" -not -name "*-sources.jar" | head -1)
+        SOURCES_JAR=$(find build/libs -name "*-sources.jar" | head -1)
+
+        echo "artifact-path=$MAIN_JAR" >> $GITHUB_OUTPUT
+        echo "sources-path=$SOURCES_JAR" >> $GITHUB_OUTPUT
+
+        echo "Main JAR: $MAIN_JAR"
+        echo "Sources JAR: $SOURCES_JAR"
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: mod-jars-${{ steps.version.outputs.version }}
+        path: |
+          build/libs/*.jar
+        retention-days: 30
+
+    - name: Upload build reports
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: build-reports
+        path: |
+          build/reports/
+          build/test-results/
+        retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: mod-jars-${{ needs.build.outputs.version }}
+        path: ./artifacts
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: COD Pattern v${{ needs.build.outputs.version }}
+        body: |
+          ## COD Pattern v${{ needs.build.outputs.version }}
+
+          ### 📦 Downloads
+          - **Main Mod**: Download the main `.jar` file below
+          - **Sources**: Download the `-sources.jar` file for source code
+
+          ### 🔧 Installation
+          1. Download the main JAR file
+          2. Place it in your `mods` folder
+          3. Make sure you have the required dependencies installed
+
+          ### 📋 Requirements
+          - Minecraft 1.20.1
+          - Minecraft Forge 47.4.0+
+          - Timeless and Classics Zero (TACZ)
+
+          ### 🐛 Bug Reports
+          If you find any issues, please report them on our [Issues page](https://github.com/${{ github.repository }}/issues).
+
+          ---
+          *Built with commit ${{ github.sha }}*
+        draft: false
+        prerelease: false
+
+    - name: Upload Main JAR to Release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./artifacts/codpattern-${{ needs.build.outputs.version }}.jar
+        asset_name: codpattern-${{ needs.build.outputs.version }}.jar
+        asset_content_type: application/java-archive
+
+    - name: Upload Sources JAR to Release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./artifacts/codpattern-${{ needs.build.outputs.version }}-sources.jar
+        asset_name: codpattern-${{ needs.build.outputs.version }}-sources.jar
+        asset_content_type: application/java-archive
+
+  pre-release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || (github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/'))
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: mod-jars-${{ needs.build.outputs.version }}
+        path: ./artifacts
+
+    - name: Generate pre-release tag
+      id: tag
+      run: |
+        if [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+          TAG="dev-$(date +'%Y%m%d')-$(echo ${{ github.sha }} | cut -c1-7)"
+          PRERELEASE=true
+          TITLE="Development Build"
+        else
+          TAG="snapshot-$(date +'%Y%m%d')-$(echo ${{ github.sha }} | cut -c1-7)"
+          PRERELEASE=true
+          TITLE="Snapshot Build"
+        fi
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+        echo "title=$TITLE" >> $GITHUB_OUTPUT
+
+    - name: Delete existing pre-release
+      run: |
+        # 删除已存在的pre-release（如果有的话）
+        gh release delete ${{ steps.tag.outputs.tag }} -y --cleanup-tag || true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create Pre-Release
+      id: create_prerelease
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.tag }}
+        release_name: ${{ steps.tag.outputs.title }} - v${{ needs.build.outputs.version }}
+        body: |
+          ## ${{ steps.tag.outputs.title }} - v${{ needs.build.outputs.version }}
+
+          ⚠️ **This is a pre-release build and may contain bugs!**
+
+          ### 📦 Downloads
+          - **Main Mod**: Download the main `.jar` file below
+          - **Sources**: Download the `-sources.jar` file for source code
+
+          ### 📝 Build Information
+          - **Branch**: ${{ github.ref_name }}
+          - **Commit**: ${{ github.sha }}
+          - **Build Date**: $(date +'%Y-%m-%d %H:%M:%S UTC')
+
+          ### 🔧 Installation
+          1. Download the main JAR file
+          2. Place it in your `mods` folder
+          3. Make sure you have the required dependencies installed
+
+          ### 📋 Requirements
+          - Minecraft 1.20.1
+          - Minecraft Forge 47.4.0+
+          - Timeless and Classics Zero (TACZ)
+
+          ### 🐛 Testing & Feedback
+          This is a development/snapshot build. Please test and report any issues on our [Issues page](https://github.com/${{ github.repository }}/issues).
+        draft: false
+        prerelease: ${{ steps.tag.outputs.prerelease }}
+
+    - name: Upload Main JAR to Pre-Release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_prerelease.outputs.upload_url }}
+        asset_path: ./artifacts/codpattern-${{ needs.build.outputs.version }}.jar
+        asset_name: codpattern-${{ needs.build.outputs.version }}-${{ steps.tag.outputs.tag }}.jar
+        asset_content_type: application/java-archive
+
+    - name: Upload Sources JAR to Pre-Release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_prerelease.outputs.upload_url }}
+        asset_path: ./artifacts/codpattern-${{ needs.build.outputs.version }}-sources.jar
+        asset_name: codpattern-${{ needs.build.outputs.version }}-sources-${{ steps.tag.outputs.tag }}.jar
+        asset_content_type: application/java-archive
