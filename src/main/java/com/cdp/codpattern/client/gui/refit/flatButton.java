@@ -14,7 +14,7 @@ import org.jetbrains.annotations.NotNull;
 import javax.annotation.Nullable;
 
 /**
-*  屎山有点多，这个被废弃了，重写一个
+*  于 0.1.1b 版本被废弃
 */
 @Deprecated
 public class flatButton extends Button {

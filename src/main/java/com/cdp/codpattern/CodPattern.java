@@ -2,6 +2,7 @@ package com.cdp.codpattern;
 
 import com.cdp.codpattern.command.CommandRegistration;
 import com.cdp.codpattern.command.MainMenuScreenCommand;
+import com.cdp.codpattern.command.distributeBackpackItemsCommand;
 import com.cdp.codpattern.config.configmanager.BackpackConfigManager;
 import com.cdp.codpattern.network.handler.PacketHandler;
 import net.minecraftforge.common.MinecraftForge;
@@ -21,6 +22,7 @@ public class CodPattern
         MinecraftForge.EVENT_BUS.register(new CommandRegistration());
 
         MinecraftForge.EVENT_BUS.register(new MainMenuScreenCommand());
+        MinecraftForge.EVENT_BUS.register(new distributeBackpackItemsCommand());
 
         MinecraftForge.EVENT_BUS.addListener(this::onServerStarting);
     }

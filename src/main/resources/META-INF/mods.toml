@@ -41,6 +41,13 @@ description='''${mod_description}'''
 modId="tacz"
 mandatory=true
 versionRange="[1.1.6,)"
-ordering="NONE"
+ordering="AFTER"
 side="BOTH"
+
+#[[dependencies."${mod_id}"]]
+#modId="lrtactical"
+#mandatory=true
+#versionRange="[0.3.0,)"
+#ordering="AFTER"
+#side="BOTH"
 
