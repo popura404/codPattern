@@ -1,6 +1,6 @@
 package com.cdp.codpattern.network;
 
-import com.cdp.codpattern.config.configmanager.BackpackConfigManager;
+import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -33,9 +33,6 @@ public class AddBackpackPacket {
                     player.sendSystemMessage(Component.literal(
                             "§a成功添加新背包 #" + newId
                     ));
-
-                    // 如果需要，可以在这里同步配置到客户端
-                    // 对于单人游戏，这不是必需的
                 } else {
                     player.sendSystemMessage(Component.literal(
                             "§c无法添加新背包，已达到上限或发生错误"

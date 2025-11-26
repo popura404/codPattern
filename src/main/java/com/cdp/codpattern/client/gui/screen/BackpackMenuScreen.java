@@ -3,9 +3,9 @@ package com.cdp.codpattern.client.gui.screen;
 import com.cdp.codpattern.client.gui.refit.BackPackButton;
 import com.cdp.codpattern.client.gui.refit.SecodnButton;
 import com.cdp.codpattern.client.gui.refit.addBackpackButton;
-import com.cdp.codpattern.config.configmanager.BackpackConfigManager;
-import com.cdp.codpattern.config.server.BackpackSelectionConfig;
-import com.cdp.codpattern.network.RequestConfigPacket;
+import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
+import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
+import com.cdp.codpattern.network.RequestBackpackConfigPacket;
 import com.cdp.codpattern.network.handler.PacketHandler;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
@@ -24,7 +24,7 @@ public class BackpackMenuScreen extends Screen {
     public int SCREEN_HEIGHT = 0;
     public int SCREEN_WIDTH = 0;
     public int UNIT_LENGTH = 0;
-    private BackpackSelectionConfig.PlayerBackpackData playerData;
+    private BackpackConfig.PlayerBackpackData playerData;
     private int currentSelectedId;
     private Map<Integer,BackPackButton> buttonMap = new HashMap<>();
 
@@ -239,7 +239,7 @@ public class BackpackMenuScreen extends Screen {
         super.init();
 
         // 向服务端请求配置
-        PacketHandler.sendToServer(new RequestConfigPacket());
+        PacketHandler.sendToServer(new RequestBackpackConfigPacket());
 
         this.SCREEN_HEIGHT = this.height;
         this.SCREEN_WIDTH = this.width;
@@ -260,12 +260,12 @@ public class BackpackMenuScreen extends Screen {
     private void addSelectBagButton() {
         if (playerData == null) return;
 
-        Map<Integer, BackpackSelectionConfig.Backpack> backpacks = playerData.getBackpacks_MAP();
+        Map<Integer, BackpackConfig.Backpack> backpacks = playerData.getBackpacks_MAP();
         int buttonIndex = 0;
-        for (Map.Entry<Integer, BackpackSelectionConfig.Backpack> entry : backpacks.entrySet()) {
+        for (Map.Entry<Integer, BackpackConfig.Backpack> entry : backpacks.entrySet()) {
             if (buttonIndex >= 10) break;
             int backpackId = entry.getKey();
-            BackpackSelectionConfig.Backpack backpack = entry.getValue();
+            BackpackConfig.Backpack backpack = entry.getValue();
             buttonIndex++;
             int X, Y;
             if (buttonIndex <= 5) {

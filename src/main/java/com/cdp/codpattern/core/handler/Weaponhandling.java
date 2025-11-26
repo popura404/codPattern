@@ -1,8 +1,8 @@
-package com.cdp.codpattern.core;
+package com.cdp.codpattern.core.handler;
 
-import com.cdp.codpattern.config.configmanager.BackpackConfigManager;
-import com.cdp.codpattern.config.server.BackpackSelectionConfig;
-import com.cdp.codpattern.config.server.WeaponFilterConfig;
+import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
+import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
+import com.cdp.codpattern.config.WeaponFilterConfig.WeaponFilterConfig;
 import com.tacz.guns.api.item.IGun;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.TagParser;
@@ -18,37 +18,37 @@ import java.util.Map;
 public class Weaponhandling {
 
     /**
-     * 分发物品逻辑厨力
+     * 分发物品逻辑处理
      */
     public static void distributeBackpackItems(ServerPlayer player) {
         // 加载武器筛选配置
-        WeaponFilterConfig filterConfig = WeaponFilterConfig.load();
+        //WeaponFilterConfig filterConfig = WeaponFilterConfig.LoadorCreate();
 
         //不是喜欢的冒险生存创造玩家，直接不发
         if (player.isSpectator()) return;
 
         //不是喜欢的带标签的玩家，直接不发
-        if (filterConfig.isDistributeToTaggedPlayersOnly()) {
+        if (WeaponFilterConfig.getWeaponFilterConfig().isDistributeToTaggedPlayersOnly()) {
             if (!player.getTags().contains("cdpplayer")) {
                 return;
             }
         }
 
         String uuid = player.getUUID().toString();
-        BackpackSelectionConfig.PlayerBackpackData playerData =
+        BackpackConfig.PlayerBackpackData playerData =
                 BackpackConfigManager.getConfig().getOrCreatePlayerData(uuid);
 
         int selectedId = playerData.getSelectedBackpack();
-        BackpackSelectionConfig.Backpack backpack = playerData.getBackpacks_MAP().get(selectedId);
+        BackpackConfig.Backpack backpack = playerData.getBackpacks_MAP().get(selectedId);
 
         if (backpack != null) {
             player.getInventory().clearContent();
 
-            for (Map.Entry<String, BackpackSelectionConfig.Backpack.ItemData> entry :
+            for (Map.Entry<String, BackpackConfig.Backpack.ItemData> entry :
                     backpack.getItem_MAP().entrySet()) {
 
                 String weaponType = entry.getKey();
-                BackpackSelectionConfig.Backpack.ItemData itemData = entry.getValue();
+                BackpackConfig.Backpack.ItemData itemData = entry.getValue();
 
                 ResourceLocation itemId = new ResourceLocation(itemData.getItem());
                 Item item = BuiltInRegistries.ITEM.get(itemId);
@@ -62,7 +62,7 @@ public class Weaponhandling {
                             stack.setTag(TagParser.parseTag(itemData.getNbt()));
                             //分配子弹
                             IGun iGun = (IGun) stack.getItem();
-                            int BackpackDummyAmmoAmount = iGun.getCurrentAmmoCount(stack) * filterConfig.getAmmunitionPerMagazineMultiple();
+                            int BackpackDummyAmmoAmount = iGun.getCurrentAmmoCount(stack) * WeaponFilterConfig.getWeaponFilterConfig().getAmmunitionPerMagazineMultiple();
                             iGun.setDummyAmmoAmount(stack , BackpackDummyAmmoAmount);
                         } catch (Exception ignored) {
                         }

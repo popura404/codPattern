@@ -1,24 +1,10 @@
-package com.cdp.codpattern.config.server;
+package com.cdp.codpattern.config.BackPackConfig;
 
 import java.util.*;
 
-public class BackpackSelectionConfig {
+import static com.cdp.codpattern.config.WeaponFilterConfig.WeaponFilterConfig.*;
 
-    //默认预制背包........................................
-    private Backpack.ItemData itemDataP1 = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:hk_g3\",GunCurrentAmmoCount:20,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
-    private Backpack.ItemData itemDataS1 = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:glock_17\",GunCurrentAmmoCount:17,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
-
-    private Backpack.ItemData itemDataP2 = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:ak47\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
-    private Backpack.ItemData itemDataS2 = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:deagle\",GunCurrentAmmoCount:7,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
-
-    private Backpack.ItemData itemDataP3 = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
-    private Backpack.ItemData itemDataS3 = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
-    //..................................................
-
-    //添加背包时默认......................................
-    private static Backpack.ItemData itemDataADDP = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
-    private static Backpack.ItemData itemDataADDS = new Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
-    //.................................................
+public class BackpackConfig {
 
     private Map<String, PlayerBackpackData> playerData = new HashMap<>();
 
@@ -118,9 +104,6 @@ public class BackpackSelectionConfig {
     public PlayerBackpackData getOrCreatePlayerData(String uuid) {
         return playerData.computeIfAbsent(uuid, k -> {
             PlayerBackpackData newData = new PlayerBackpackData();
-
-            // 创建三个默认背包
-            //tacz:modern_kinetic_gun{HasBulletInBarrel: 1b, GunFireMode: "SEMI", GunId: "tacz:ai_awp", AttachmentSCOPE: {id: "tacz:attachment", Count: 1b, tag: {AttachmentId: "tacz:scope_elcan_4x"}}, GunCurrentAmmoCount: 5}
 
             // 背包1
             Backpack backpack1 = new Backpack("自定义背包1");

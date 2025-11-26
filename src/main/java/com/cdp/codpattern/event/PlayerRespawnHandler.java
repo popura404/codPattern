@@ -1,6 +1,6 @@
-package com.cdp.codpattern.event.handler;
+package com.cdp.codpattern.event;
 
-import com.cdp.codpattern.core.Weaponhandling;
+import com.cdp.codpattern.core.handler.Weaponhandling;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;

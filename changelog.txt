@@ -90,10 +90,10 @@
  - 47.2.29 Fix Crowdin (#9929)
  - 47.2.28 Optimise capabilities a tad, backport of #9886 (#9911)
  - 47.2.27 Add helper method to `OnDatapackSyncEvent`, backport of #9901 (#9919)
- - 47.2.26 Add CPU usage config option to early window, hide by default, backport of #9866 (#9915)
+ - 47.2.26 Add CPU usage weaponFilterConfig option to early window, hide by default, backport of #9866 (#9915)
  - 47.2.25 Fix slightly offset mods screen link positioning, backport of #9860 (#9861)
            Co-authored-by: Dennis C <11262040+XFactHD@users.noreply.github.com>
- - 47.2.24 Make common config screen registration tasks easier, backport of #9884 (#9912)
+ - 47.2.24 Make common weaponFilterConfig screen registration tasks easier, backport of #9884 (#9912)
  - 47.2.23 Add Leaves method to ModelProvider.java (#9889)
  - 47.2.22 [1.20.1] Bump CoreMods and ASM (#9897)
            - CoreMods 5.1.2 -> 5.1.6
@@ -145,7 +145,7 @@
            Kept newly added methods for binary compatibility but deprecated them all for removal.
            The entire pose/eye/size system needs to be reevaluated and address some of Mojang's changes.
            However this should fix any bugs that pulling that PR may of caused.
- - 47.1.39 Add a config option to restore the calculate all normals behavior in case some setups require old broken behavior. (#9670)
+ - 47.1.39 Add a weaponFilterConfig option to restore the calculate all normals behavior in case some setups require old broken behavior. (#9670)
  - 47.1.38 Fix rounding errors on models with 45 degree normals by favoring one Direction (#9669)
            Should fix flickering issues when breaking custom models and having our vanilla solution disabled.
  - 47.1.37 Moved ForgeHooksClient.onCreativeModeTabBuildContents to ForgeHooks to fix #9662
@@ -214,7 +214,7 @@
  - 47.0.34 [HotFix]: Somehow not caught by CI, but there was an issue in the SpawnUtils to handle.
  - 47.0.33 Remove amount from FluidStack hashCode to fix the equal/hashCode java contract (#9602)
  - 47.0.32 Add example usage for configs to the MDK (#9596)
-           Demonstrates proper usage of different config value types, validation, transformation/parsing, load/reload handling and direct field access.
+           Demonstrates proper usage of different weaponFilterConfig value types, validation, transformation/parsing, load/reload handling and direct field access.
  - 47.0.31 Demonstrate configureEach in run configs (#9594)
  - 47.0.30 Reduce verbosity of prepareRuns doc in MDK (#9593)
  - 47.0.29 Lazily configure MDK tasks, improve IDE support (#9592)
@@ -227,7 +227,7 @@
  - 47.0.22 Fix SpriteCoordinateExpander not working with chained methods (MC-263524) (#9564)
  - 47.0.21 Expose EntityRendererProvider.Context to AddLayers event (#9562)
  - 47.0.20 [1.20] Add events for checking spawn conditions (SpawnPlacementCheck and PositionCheck) (#9469)
- - 47.0.19 Another tweak to the early display. We start a timer process while we create the window, in case it hangs. Also add a skip version config, to try and help in cases where the driver is stupid. (#9595)
+ - 47.0.19 Another tweak to the early display. We start a timer process while we create the window, in case it hangs. Also add a skip version weaponFilterConfig, to try and help in cases where the driver is stupid. (#9595)
  - 47.0.18 Auto generate names for modded loot pools. Fixes #9589 (#9591)
  - 47.0.17 More tweaks to the mod loading callbacks to make loading bars work better (#9585)
  - 47.0.16 Reimplement LootPool name patches and hooks (#9573)
@@ -272,7 +272,7 @@
            - The pack format is now 15 for both resource packs and data packs
            - `ScreenUtils` was deprecated in favor of a `GuiGraphics` extension
            - Forge and the MDK were updated to Gradle 8 and FG6
-           - The Forge common config file was removed (it only contained the deprecated old fields for resource caching, which was removed in 1.19.3)
+           - The Forge common weaponFilterConfig file was removed (it only contained the deprecated old fields for resource caching, which was removed in 1.19.3)
            - Registry dummy entries were removed
            - `RemappingVertexPipeline` was fixed to forward the `endVertex()` call
            - Forge tool tags were removed in favor of vanilla ones
@@ -445,7 +445,7 @@
  - 44.0.31 [1.19.3] Fix `retrieveRegistryLookup` attempting to get the registry lookup from a `HolderGetter` (#9225)
  - 44.0.30 [1.19.3] Add ability to datagen forge specific values in pack.mcmeta (#9221)
            Co-authored-by: sciwhiz12 <sciwhiz12@gmail.com>
- - 44.0.29 Add block atlas config to register forge:white texture (#9187)
+ - 44.0.29 Add block atlas weaponFilterConfig to register forge:white texture (#9187)
  - 44.0.28 Fix ExtendedButton not being highlighted when focused (#9144)
  - 44.0.27 Separate checkAndFix from the check* tasks. (#9213)
  - 44.0.26 Fix forge resources overriding vanilla ones (#9222)
@@ -690,7 +690,7 @@
             * Default render type domain to "minecraft" in model datagens
  - 41.0.89  Fixed multipart block models not using the new model driven render type system. (#8844)
  - 41.0.88  Update to the latest JarJar to fix a collision issue where multiple jars could provide an exact match. (#8847)
- - 41.0.87  Add FML config to disable DFU optimizations client-side. (#8842)
+ - 41.0.87  Add FML weaponFilterConfig to disable DFU optimizations client-side. (#8842)
             * Add client-side command line argument to disable DFU optimizations.
             * Switch to using FMLConfig value instead.
  - 41.0.86  [1.19] Fixed broken BufferBuilder.putBulkData(ByteBuffer) added by Forge (#8819)
@@ -771,7 +771,7 @@
             * Include configurability and handle patch cleanup.
             * Document and comment the cache manager.
             * Make thread selection configurable.
-            * Implement a configurable loading mechanic that falls back to default behaviour when the config is not bound yet.
+            * Implement a configurable loading mechanic that falls back to default behaviour when the weaponFilterConfig is not bound yet.
             * Use boolean supplier and fix wildcard import.
             * Clean up the VPR since this is more elegant.
             * Clean up the VPR since this is more elegant.
@@ -896,7 +896,7 @@
  - 41.0.63  Implement full support for IPv6 (#8742)
  - 41.0.62  Fix certain user-configured options being overwritten incorrectly due to validators. (#8780)
  - 41.0.61  Allow safely registering RenderType predicates at any time (#8685)
- - 41.0.60  Fix crash after loading error due to fluid texture gathering and config lookup (#8802)
+ - 41.0.60  Fix crash after loading error due to fluid texture gathering and weaponFilterConfig lookup (#8802)
  - 41.0.59  Remove the configuration option for handling empty tags in ingredients. (#8799)
             Now empty tags are considered broken in all states.
  - 41.0.58  Fix MC-105317 Structure blocks do not rotate entities correctly when loading (#8792)
@@ -905,7 +905,7 @@
  - 41.0.55  Add getter for correct BiomeSpecialEffectsBuilder to BiomeInfo$Builder (#8781)
  - 41.0.54  Fix BlockToolModificationEvent missing cancelable annotation (#8778)
  - 41.0.53  Fix ticking chunk tickets from forge's chunk manager not causing chunks to fully tick (#8775)
- - 41.0.52  Fix default audio device config loading string comparison issue (#8767)
+ - 41.0.52  Fix default audio device weaponFilterConfig loading string comparison issue (#8767)
  - 41.0.51  Fix missed vanilla method overrides in ForgeRegistry (#8766)
  - 41.0.50  Add MinecraftServer reference to ServerTickEvent (#8765)
  - 41.0.49  Fix TagsProviders for datapack registries not recognizing existing files (#8761)
@@ -933,19 +933,19 @@
  - 41.0.38  Fix SP-Devtime world loading crash due to missing server configs (#8757)
  - 41.0.37  Remove ForgeWorldPreset and related code (#8756)
             Vanilla has a working replacement.
- - 41.0.36  Change ConfigValue#get() to throw if called before config loaded  (#8236)
+ - 41.0.36  Change ConfigValue#get() to throw if called before weaponFilterConfig loaded  (#8236)
             This prevents silent issues where a mod gets the value of the setting
             before configs are loaded, which means the default value is always
             returned.
-            As there may be situations where the getting the config setting before
+            As there may be situations where the getting the weaponFilterConfig setting before
             configs are loaded is needed, and it is not preferable to hardcode the
             default value, the original behavior is made available through #getRaw.
             Implements and closes #7716
             * Remove getRaw() method
             This is effectively replaced with the expression `spec.isLoaded() ?
             configValue.get() : configValue.getDefault()`.
-            * Remove forceSystemNanoTime config setting
-            As implemented, it never had any effect as any place where the config
+            * Remove forceSystemNanoTime weaponFilterConfig setting
+            As implemented, it never had any effect as any place where the weaponFilterConfig
             value would be queried happens before the configs are loaded.
  - 41.0.35  Fix EnumArgument to use enum names for suggestions (#8728)
             Previously, the suggestions used the string representation of the enum

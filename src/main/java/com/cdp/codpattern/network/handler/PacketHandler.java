@@ -55,10 +55,10 @@ public class PacketHandler {
                 .add();
 
         // 请求配置（C2S）
-        INSTANCE.messageBuilder(RequestConfigPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
-                .decoder(RequestConfigPacket::decode)
-                .encoder(RequestConfigPacket::encode)
-                .consumerMainThread(RequestConfigPacket::handle)
+        INSTANCE.messageBuilder(RequestBackpackConfigPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(RequestBackpackConfigPacket::decode)
+                .encoder(RequestBackpackConfigPacket::encode)
+                .consumerMainThread(RequestBackpackConfigPacket::handle)
                 .add();
 
         // 请求武器过滤配置（C2S）

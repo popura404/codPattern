@@ -2,9 +2,8 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.client.gui.refit.WeaponSelectionButton;
-import com.cdp.codpattern.config.server.BackpackSelectionConfig;
-import com.cdp.codpattern.config.server.WeaponFilterConfig;
-import com.cdp.codpattern.network.RequestWeaponFilterPacket;
+import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
+import com.cdp.codpattern.config.WeaponFilterConfig.WeaponFilterConfig;
 import com.cdp.codpattern.network.UpdateWeaponPacket;
 import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.api.item.GunTabType;
@@ -33,7 +32,7 @@ public class WeaponScreen extends Screen {
     public int SCREEN_WIDTH = 0;
     private int UNIT_LENGTH = 0;
     private final Integer BAGSERIAL;
-    private final BackpackSelectionConfig.Backpack backpack;
+    private final BackpackConfig.Backpack backpack;
     private final boolean isPrimary;
     private final WeaponMenuScreen parentScreen;
 
@@ -50,7 +49,7 @@ public class WeaponScreen extends Screen {
     private static final int BUTTON_SIZE = 20;
     private static final int BUTTON_SPACING = 2;
 
-    public WeaponScreen(WeaponMenuScreen parent, BackpackSelectionConfig.Backpack backpack,
+    public WeaponScreen(WeaponMenuScreen parent, BackpackConfig.Backpack backpack,
                         Integer bagSerial, boolean isPrimary) {
         super(Component.literal("WeaponScreen"));
         this.parentScreen = parent;
@@ -62,10 +61,6 @@ public class WeaponScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-
-        // 请求服务端的武器过滤配置
-        PacketHandler.sendToServer(new RequestWeaponFilterPacket());
-
         SCREEN_WIDTH = this.width;
         SCREEN_HEIGHT = this.height;
         UNIT_LENGTH = (int) ( ( ( float ) this.width ) / 120f);
@@ -84,10 +79,7 @@ public class WeaponScreen extends Screen {
     }
 
     private void loadWeaponTabs() {
-        WeaponFilterConfig config = WeaponFilterConfig.load();
-        List<String> tabNames = isPrimary ?
-                config.getPrimaryWeaponTabs() :
-                config.getSecondaryWeaponTabs();
+        List<String> tabNames = isPrimary ? WeaponFilterConfig.getCLIENTweaponFilterConfig().getPrimaryWeaponTabs() : WeaponFilterConfig.getCLIENTweaponFilterConfig().getSecondaryWeaponTabs();
 
         for (String tabName : tabNames) {
             List<ItemStack> items = getItemsFromTab(tabName);
@@ -308,8 +300,8 @@ public class WeaponScreen extends Screen {
         String itemId = weapon.getItem().builtInRegistryHolder().key().location().toString();
         String nbt = weapon.hasTag() ? weapon.getTag().toString() : "";
 
-        BackpackSelectionConfig.Backpack.ItemData itemData =
-                new BackpackSelectionConfig.Backpack.ItemData(itemId, 1, nbt);
+        BackpackConfig.Backpack.ItemData itemData =
+                new BackpackConfig.Backpack.ItemData(itemId, 1, nbt);
         backpack.getItem_MAP().put(key, itemData);
 
         // 发数据包
@@ -348,19 +340,6 @@ public class WeaponScreen extends Screen {
                 17 * UNIT_LENGTH,
                 0xFFFF55
         );
-
-        //if (maxScroll > 0) {
-        //    int totalPages = maxScroll + 1;
-        //    int currentPage = scrollOffset + 1;
-        //    String scrollInfo = String.format(" %d / %d", currentPage, totalPages);
-        //    graphics.drawCenteredString(
-        //            this.font,
-        //            Component.literal(scrollInfo),
-        //            this.width / 2,
-        //            this.height - 20 * UNIT_LENGTH,
-        //            0xAAAAAA
-        //    );
-        //}
     }
 
     private Component getTabDisplayName(String tabName) {

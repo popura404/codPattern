@@ -1,7 +1,7 @@
 package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
-import com.cdp.codpattern.config.server.BackpackSelectionConfig;
+import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -19,12 +19,12 @@ public class WeaponMenuScreen extends Screen {
 
     private int UNIT_LENGTH = 0;
     private final Integer BAGSERIAL;
-    private BackpackSelectionConfig.Backpack backpack;
+    private BackpackConfig.Backpack backpack;
 
     private ItemStack primaryItemStack;
     private ItemStack secondaryItemStack;
 
-    public WeaponMenuScreen(BackpackSelectionConfig.Backpack backpack, Integer BAGSERIAL) {
+    public WeaponMenuScreen(BackpackConfig.Backpack backpack, Integer BAGSERIAL) {
         super(Component.literal("WeaponMenuScreen"));
         this.BAGSERIAL = BAGSERIAL;
         this.backpack = backpack;
@@ -136,7 +136,7 @@ public class WeaponMenuScreen extends Screen {
         return BAGSERIAL;
     }
 
-    public BackpackSelectionConfig.Backpack getBackpack() {
+    public BackpackConfig.Backpack getBackpack() {
         return backpack;
     }
 }

@@ -1,6 +1,6 @@
 package com.cdp.codpattern.network;
 
-import com.cdp.codpattern.config.server.WeaponFilterConfig;
+import com.cdp.codpattern.config.WeaponFilterConfig.WeaponFilterConfig;
 import com.google.gson.Gson;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
@@ -29,11 +29,9 @@ public class SyncWeaponFilterPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            // 客户端接收并缓存配置
-            if (ctx.get().getDirection().getReceptionSide().isClient()) {
+            // 客户端缓存
                 WeaponFilterConfig config = GSON.fromJson(configJson, WeaponFilterConfig.class);
-                WeaponFilterConfig.setClientInstance(config);
-            }
+                WeaponFilterConfig.setCLIENTweaponFilterConfig(config);
         });
         ctx.get().setPacketHandled(true);
     }

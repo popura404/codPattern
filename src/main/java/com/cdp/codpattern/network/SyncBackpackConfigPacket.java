@@ -1,30 +1,27 @@
 package com.cdp.codpattern.network;
 
-import com.cdp.codpattern.config.configmanager.BackpackConfigManager;
-import com.cdp.codpattern.config.server.BackpackSelectionConfig;
+import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
+import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
 import com.google.gson.Gson;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
-
+//s2c
 public class SyncBackpackConfigPacket {
-    private final String playerUuid;
+
     private final String configJson;
     private static final Gson GSON = new Gson();
 
-    public SyncBackpackConfigPacket(String playerUuid, BackpackSelectionConfig.PlayerBackpackData playerData) {
-        this.playerUuid = playerUuid;
+    public SyncBackpackConfigPacket(BackpackConfig.PlayerBackpackData playerData) {
         this.configJson = GSON.toJson(playerData);
     }
 
     public SyncBackpackConfigPacket(FriendlyByteBuf buf) {
-        this.playerUuid = buf.readUtf();
         this.configJson = buf.readUtf();
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeUtf(playerUuid);
         buf.writeUtf(configJson);
     }
 
@@ -34,14 +31,9 @@ public class SyncBackpackConfigPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            // 在客户端处理
-            BackpackSelectionConfig.PlayerBackpackData playerData =
-                    GSON.fromJson(configJson, BackpackSelectionConfig.PlayerBackpackData.class);
-
-            // 更新客户端缓存
-            BackpackSelectionConfig clientConfig = BackpackConfigManager.getConfig();
-            clientConfig.getPlayerData().put(playerUuid, playerData);
-            BackpackConfigManager.setClientConfig(clientConfig);
+            // 客户端缓存
+            BackpackConfig.PlayerBackpackData playerData = GSON.fromJson(configJson, BackpackConfig.PlayerBackpackData.class);
+            BackpackConfigManager.setCLIENTplayerBackpackData(playerData);
         });
         ctx.get().setPacketHandled(true);
     }

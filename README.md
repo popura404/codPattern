@@ -21,7 +21,7 @@ COD Pattern 是一个基于 Minecraft 模组《永恒枪械工坊：零》（Tim
 
 ## 配置
 
-配置文件位于服务器端的 `config/codpattern/` 目录下。
+配置文件位于服务器端的 `weaponFilterConfig/codpattern/` 目录下。
 
 *   **`distributeToTaggedPlayersOnly`**
     此选项用于控制装备的发放范围，支持两种模式：
@@ -54,14 +54,14 @@ COD Pattern 是一个基于 Minecraft 模组《永恒枪械工坊：零》（Tim
 
 ## 可能会实现的功能
 
-*   （可能）连杀奖励
 *   游戏内配件的实时更改与保存
+*   适配fpsmatch，实现完整游戏流程
 
 ## 更新日志
 
-### v0.2.0b
+### v0.2.5r
 
-*   添加了即时分发背包的命令，优化代码结构
+*   请参阅CHANGES.md
 
 ## 许可证
 

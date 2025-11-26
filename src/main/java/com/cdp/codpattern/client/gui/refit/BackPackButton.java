@@ -1,6 +1,6 @@
 package com.cdp.codpattern.client.gui.refit;
 
-import com.cdp.codpattern.config.server.BackpackSelectionConfig;
+import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
 import com.cdp.codpattern.network.handler.PacketHandler;
 import com.cdp.codpattern.network.SelectBackpackPacket;
 import com.tacz.guns.api.TimelessAPI;
@@ -29,7 +29,7 @@ public class BackPackButton extends Button {
 
     private final Integer BAGSERIAL;
     int focusedtimes = 0;
-    private final BackpackSelectionConfig.Backpack backpack;
+    private final BackpackConfig.Backpack backpack;
     private final boolean isCurrentlySelected;
 
     // 武器信息缓存
@@ -59,7 +59,7 @@ public class BackPackButton extends Button {
     /**
      * 增强构造函数 - 支持背包数据和选中状态
      */
-    public BackPackButton(int x, int y, int width, int height, int bagserial, BackpackSelectionConfig.Backpack backpack, boolean isSelected) {
+    public BackPackButton(int x, int y, int width, int height, int bagserial, BackpackConfig.Backpack backpack, boolean isSelected) {
         super(x, y, width, height, Component.literal("choose your bag"), button -> {
             // 发送选择背包的数据包到服务端
             PacketHandler.sendToServer(new SelectBackpackPacket(bagserial));
@@ -86,9 +86,9 @@ public class BackPackButton extends Button {
     private void initWeaponInfo() {
         if (backpack == null || backpack.getItem_MAP() == null) return;
 
-        for (Map.Entry<String, BackpackSelectionConfig.Backpack.ItemData> entry : backpack.getItem_MAP().entrySet()) {
+        for (Map.Entry<String, BackpackConfig.Backpack.ItemData> entry : backpack.getItem_MAP().entrySet()) {
             String type = entry.getKey();
-            BackpackSelectionConfig.Backpack.ItemData itemData = entry.getValue();
+            BackpackConfig.Backpack.ItemData itemData = entry.getValue();
 
             try {
                 // 创建ItemStack
@@ -177,10 +177,10 @@ public class BackPackButton extends Button {
         tooltipLines.add(Component.literal("§7----------------"));
 
         // 显示背包内的物品
-        for (Map.Entry<String, BackpackSelectionConfig.Backpack.ItemData> entry :
+        for (Map.Entry<String, BackpackConfig.Backpack.ItemData> entry :
                 backpack.getItem_MAP().entrySet()) {
             String type = entry.getKey();
-            BackpackSelectionConfig.Backpack.ItemData item = entry.getValue();
+            BackpackConfig.Backpack.ItemData item = entry.getValue();
 
             String typeLabel = type.equals("primary") ? "§c主武器" : "§9副武器";
             String itemName = item.getItem().replace("minecraft:", "");
@@ -292,7 +292,7 @@ public class BackPackButton extends Button {
         return BAGSERIAL;
     }
 
-    public BackpackSelectionConfig.Backpack getBackpack() {
+    public BackpackConfig.Backpack getBackpack() {
         return backpack;
     }
 }

@@ -12,9 +12,7 @@ public class OpenBackpackScreenPacket {
 
     public OpenBackpackScreenPacket() {}
 
-    public static void encode(OpenBackpackScreenPacket packet, FriendlyByteBuf buffer) {
-        // 无需编码数据
-    }
+    public static void encode(OpenBackpackScreenPacket packet, FriendlyByteBuf buffer) {}
 
     public static OpenBackpackScreenPacket decode(FriendlyByteBuf buffer) {
         return new OpenBackpackScreenPacket();
