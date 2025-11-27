@@ -33,9 +33,7 @@ public class UpdateWeaponfilterConfigCommand {
                 Commands.literal("cdp")
                         .then(Commands.literal("update")
                                 .requires(source -> source.hasPermission(2))
-                                .executes(context -> {
-                                    return executeUpdate(context.getSource());
-                                })
+                                .executes(context -> executeUpdate(context.getSource()))
                         )
         );
     }
@@ -50,7 +48,7 @@ public class UpdateWeaponfilterConfigCommand {
         Path filterPath = ConfigPath.SERVERFLITER.getPath(server);
 
         // 过滤配置统一加载
-        WeaponFilterConfig config = WeaponFilterConfig.LoadorCreate(filterPath);
+        WeaponFilterConfig fliterconfig = WeaponFilterConfig.LoadorCreate(filterPath);
 
         int successCount = 0;
 
@@ -61,7 +59,7 @@ public class UpdateWeaponfilterConfigCommand {
 
                 // 同步到客户端
                 PacketHandler.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), player);
-                PacketHandler.sendToPlayer(new SyncWeaponFilterPacket(config), player);
+                PacketHandler.sendToPlayer(new SyncWeaponFilterPacket(fliterconfig), player);
 
                 successCount++;
             } catch (Exception e) {

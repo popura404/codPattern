@@ -2,6 +2,7 @@ package com.cdp.codpattern.config.BackPackConfig;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -15,6 +16,7 @@ public class BackpackConfigManager {
             .setPrettyPrinting()
             .excludeFieldsWithModifiers(Modifier.TRANSIENT)
             .create();
+
     private static Path CONFIG_PATH;
 
     private static BackpackConfig config;
@@ -31,6 +33,7 @@ public class BackpackConfigManager {
      * 加载全局配置文件，用于服务端
      */
     public static BackpackConfig LoadorCreate(Path path){
+        CONFIG_PATH = path;
             try {
                 if (Files.exists(path)) {
                     try (Reader reader = Files.newBufferedReader(path)) {
@@ -50,6 +53,7 @@ public class BackpackConfigManager {
      * 加载个人配置文件，减小发包量，增加安全性，用于服务端
      */
     public static BackpackConfig.PlayerBackpackData LoadorCreatePlayer(String uuid , Path path){
+        CONFIG_PATH = path;
         try {
             if (Files.exists(path)) {
                 try (Reader reader = Files.newBufferedReader(path)) {
@@ -61,13 +65,20 @@ public class BackpackConfigManager {
                 save();
             }
         } catch (IOException ignored) {}
-        return config.getOrCreatePlayerData(uuid);
+
+        var playerData = config.getOrCreatePlayerData(uuid);
+        save();
+        return playerData;
     }
 
     /**
      * 保存配置到文件
      */
     public static void save() {
+        if (CONFIG_PATH == null) {
+            System.err.println("[BackpackConfigManager] CONFIG_PATH is null, skip save()");
+            return;
+        }
             try {
                 Files.createDirectories(CONFIG_PATH.getParent());
                 try (Writer writer = Files.newBufferedWriter(CONFIG_PATH)) {
@@ -99,7 +110,6 @@ public class BackpackConfigManager {
             save();
             return id;
         }
-
         return -1;
     }
 

@@ -50,7 +50,7 @@ public class BackPackButton extends Button {
     }
 
     /**
-     * 构造函数兼容性
+     * 放这里纯无聊的，没啥用，别看了
      */
     public BackPackButton(int x, int y, int width, int height, int bagserial) {
         this(x, y, width, height, bagserial, null, false);

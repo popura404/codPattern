@@ -28,22 +28,6 @@ public class WeaponFilterConfig {
     //默认弹匣携带倍数
     private Integer ammunitionPerMagazineMultiple = 3;
 
-    //默认预制背包........................................
-    public static BackpackConfig.Backpack.ItemData itemDataP1 = new BackpackConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:hk_g3\",GunCurrentAmmoCount:20,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
-    public static BackpackConfig.Backpack.ItemData itemDataS1 = new BackpackConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:glock_17\",GunCurrentAmmoCount:17,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
-
-    public static BackpackConfig.Backpack.ItemData itemDataP2 = new BackpackConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:ak47\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
-    public static BackpackConfig.Backpack.ItemData itemDataS2 = new BackpackConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:deagle\",GunCurrentAmmoCount:7,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
-
-    public static BackpackConfig.Backpack.ItemData itemDataP3 = new BackpackConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
-    public static BackpackConfig.Backpack.ItemData itemDataS3 = new BackpackConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
-    //..................................................
-
-    //添加背包时默认......................................
-    public static BackpackConfig.Backpack.ItemData itemDataADDP = new BackpackConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
-    public static BackpackConfig.Backpack.ItemData itemDataADDS = new BackpackConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
-    //.................................................
-
     private static WeaponFilterConfig createDefault(Path path) {
         WeaponFilterConfig config = new WeaponFilterConfig();
         config.primaryWeaponTabs.add("rifle");

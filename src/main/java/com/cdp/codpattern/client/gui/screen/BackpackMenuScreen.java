@@ -1,12 +1,10 @@
 package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.client.gui.refit.BackPackButton;
-import com.cdp.codpattern.client.gui.refit.SecodnButton;
-import com.cdp.codpattern.client.gui.refit.addBackpackButton;
+import com.cdp.codpattern.client.gui.refit.DowntabButton;
+import com.cdp.codpattern.client.gui.refit.NewBackpackButton;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
-import com.cdp.codpattern.network.RequestBackpackConfigPacket;
-import com.cdp.codpattern.network.handler.PacketHandler;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -29,7 +27,7 @@ public class BackpackMenuScreen extends Screen {
     private Map<Integer,BackPackButton> buttonMap = new HashMap<>();
 
     // SecondButton管理
-    private Map<Integer, SecodnButton> secondButtonMap = new HashMap<>();
+    private Map<Integer, DowntabButton> secondButtonMap = new HashMap<>();
     private Integer currentSecondButtonId = null;
     private int hideDelay = 0;
     private static final int MAX_HIDE_DELAY = 10; // 延迟10个tick（0.5s）
@@ -42,6 +40,17 @@ public class BackpackMenuScreen extends Screen {
 
     public BackpackMenuScreen() {
         super(Component.literal("Select your bag"));
+    }
+
+    public void init() {
+        super.init();
+
+        this.SCREEN_HEIGHT = this.height;
+        this.SCREEN_WIDTH = this.width;
+        UNIT_LENGTH = (int) ((float)this.width / 120.f);
+        loadPlayerData();
+        addSelectBagButton();
+        addNewBackpackButton();
     }
 
     @Override
@@ -57,7 +66,7 @@ public class BackpackMenuScreen extends Screen {
         Integer hoveredButtonId = null;
         BackPackButton hoveredButton = null;
 
-        // 是否悬停在BackPackButton上
+        // 悬停在BackPackButton上的效果
         for (Map.Entry<Integer,BackPackButton> entry : buttonMap.entrySet()){
             BackPackButton button = entry.getValue();
             if(button.isHoveredOrFocused()){
@@ -68,7 +77,7 @@ public class BackpackMenuScreen extends Screen {
             }
         }
 
-        // 更新当前悬停的按钮和武器信息
+        // 更新当前悬停的按钮包含的武器信息
         if (hoveredButton != null && hoveredButton != currentHoveredButton) {
             currentHoveredButton = hoveredButton;
             currentWeaponInfo = hoveredButton.getWeaponInfoCache();
@@ -76,7 +85,7 @@ public class BackpackMenuScreen extends Screen {
 
         // 是否悬停在自己SecondButton上
         if (currentSecondButtonId != null && secondButtonMap.containsKey(currentSecondButtonId)) {
-            SecodnButton secondButton = secondButtonMap.get(currentSecondButtonId);
+            DowntabButton secondButton = secondButtonMap.get(currentSecondButtonId);
             if (secondButton.isHoveredOrFocused()) {
                 isHoveringAnyButton = true;
                 hoveredButtonId = currentSecondButtonId;
@@ -191,19 +200,15 @@ public class BackpackMenuScreen extends Screen {
 
             // 渲染枪包名
             if (info.packName != null) {
-                graphics.drawString(Minecraft.getInstance().font, info.packName,
-                        weaponX + 2, weaponY + UNIT_LENGTH * 7, 0xDDFFFFFF);
+                graphics.drawString(Minecraft.getInstance().font, info.packName, weaponX + 2, weaponY + UNIT_LENGTH * 7, 0xDDFFFFFF);
             }
 
             // 渲染武器名
             if (info.weaponName != null) {
-                graphics.drawString(Minecraft.getInstance().font, info.weaponName,
-                        weaponX + 2, weaponY + UNIT_LENGTH * 8, 0xDDFFFFFF);
+                graphics.drawString(Minecraft.getInstance().font, info.weaponName, weaponX + 2, weaponY + UNIT_LENGTH * 8, 0xDDFFFFFF);
             }
         }
     }
-
-
 
     /**
      * 添加SecondButton
@@ -211,7 +216,7 @@ public class BackpackMenuScreen extends Screen {
     private void addSecondButton(Integer buttonId) {
         if (buttonMap.containsKey(buttonId)) {
             BackPackButton backPackButton = buttonMap.get(buttonId);
-            SecodnButton secondButton = new SecodnButton(backPackButton);
+            DowntabButton secondButton = new DowntabButton(backPackButton);
             secondButtonMap.put(buttonId, secondButton);
             addRenderableWidget(secondButton);
             currentSecondButtonId = buttonId;
@@ -219,11 +224,11 @@ public class BackpackMenuScreen extends Screen {
     }
 
     /**
-     * 移除当前的SecondButton
+     * 移除SecondButton
      */
     private void removeCurrentSecondButton() {
         if (currentSecondButtonId != null && secondButtonMap.containsKey(currentSecondButtonId)) {
-            SecodnButton secondButton = secondButtonMap.get(currentSecondButtonId);
+            DowntabButton secondButton = secondButtonMap.get(currentSecondButtonId);
             removeWidget(secondButton);
             secondButtonMap.remove(currentSecondButtonId);
             currentSecondButtonId = null;
@@ -233,20 +238,6 @@ public class BackpackMenuScreen extends Screen {
     @Override
     public void renderBackground(@NotNull GuiGraphics pGuiGraphics) {
         pGuiGraphics.fillGradient(0, 0, this.width, this.height, 0xA0202020, 0xD0000000);
-    }
-
-    public void init() {
-        super.init();
-
-        // 向服务端请求配置
-        PacketHandler.sendToServer(new RequestBackpackConfigPacket());
-
-        this.SCREEN_HEIGHT = this.height;
-        this.SCREEN_WIDTH = this.width;
-        UNIT_LENGTH = (int) (this.width / 120.f);
-        loadPlayerData();
-        addSelectBagButton();
-        addNewBackpackButton();
     }
 
     private void loadPlayerData() {
@@ -294,7 +285,7 @@ public class BackpackMenuScreen extends Screen {
                 X = UNIT_LENGTH * 8 + ((buttonPosition - 6) * UNIT_LENGTH * 21);
                 Y = UNIT_LENGTH * 13;
             }
-            addBackpackButton addButton = new addBackpackButton(X, SCREEN_HEIGHT - Y, UNIT_LENGTH * 20, UNIT_LENGTH * 5, backpackCount);
+            NewBackpackButton addButton = new NewBackpackButton(X, SCREEN_HEIGHT - Y, UNIT_LENGTH * 20, UNIT_LENGTH * 5, backpackCount);
             addRenderableWidget(addButton);
         }
     }

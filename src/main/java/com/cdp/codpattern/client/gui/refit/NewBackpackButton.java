@@ -14,12 +14,15 @@ import net.minecraft.sounds.SoundSource;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
 
-public class addBackpackButton extends Button {
+/**
+ * 用于添加新的背包的按钮
+ */
+public class NewBackpackButton extends Button {
 
     private int focusedTimes = 0;
     private final int currentBackpackCount;
 
-    public addBackpackButton(int x, int y, int width, int height, int currentCount) {
+    public NewBackpackButton(int x, int y, int width, int height, int currentCount) {
         super(x, y, width, height,
                 Component.literal("+ 添加背包"),
                 button -> {

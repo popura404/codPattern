@@ -10,13 +10,16 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import org.jetbrains.annotations.NotNull;
 
-public class SecodnButton extends Button {
+/**
+ * 用于更改选中的背包配置，搭配BackPackButton
+ */
+public class DowntabButton extends Button {
 
     private final Integer BAGSERIAL;
     int focusedtimes = 0;
     private final BackpackConfig.Backpack backpack;
 
-    protected SecodnButton(int pX, int pY, int pWidth, int pHeight, Component pMessage, int bagserial, BackpackConfig.Backpack backpack) {
+    protected DowntabButton(int pX, int pY, int pWidth, int pHeight, Component pMessage, int bagserial, BackpackConfig.Backpack backpack) {
         super(pX, pY, pWidth, pHeight, pMessage, button -> {
             Minecraft.getInstance().execute(() -> Minecraft.getInstance().setScreen(new WeaponMenuScreen(backpack, bagserial)));
         }, DEFAULT_NARRATION);
@@ -24,7 +27,7 @@ public class SecodnButton extends Button {
         this.backpack = backpack;
     }
 
-    public SecodnButton(BackPackButton button){
+    public DowntabButton(BackPackButton button){
         super(button.getX() , button.getY() + button.getHeight() , button.getWidth() , button.getHeight()/3 + 6, Component.literal("change ur backpack") ,pbutton -> {
             Minecraft.getInstance().execute(() -> Minecraft.getInstance().setScreen(new WeaponMenuScreen(button.getBackpack(), button.getBAGSERIAL())));
         } , DEFAULT_NARRATION);
