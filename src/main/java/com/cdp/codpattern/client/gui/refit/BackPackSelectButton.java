@@ -25,9 +25,10 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
-public class BackPackButton extends Button {
+public class BackPackSelectButton extends Button {
 
     private final Integer BAGSERIAL;
+    //悬停计时器
     int focusedtimes = 0;
     private final BackpackConfig.Backpack backpack;
     private final boolean isCurrentlySelected;
@@ -52,14 +53,14 @@ public class BackPackButton extends Button {
     /**
      * 放这里纯无聊的，没啥用，别看了
      */
-    public BackPackButton(int x, int y, int width, int height, int bagserial) {
+    public BackPackSelectButton(int x, int y, int width, int height, int bagserial) {
         this(x, y, width, height, bagserial, null, false);
     }
 
     /**
      * 增强构造函数 - 支持背包数据和选中状态
      */
-    public BackPackButton(int x, int y, int width, int height, int bagserial, BackpackConfig.Backpack backpack, boolean isSelected) {
+    public BackPackSelectButton(int x, int y, int width, int height, int bagserial, BackpackConfig.Backpack backpack, boolean isSelected) {
         super(x, y, width, height, Component.literal("choose your bag"), button -> {
             // 发送选择背包的数据包到服务端
             PacketHandler.sendToServer(new SelectBackpackPacket(bagserial));

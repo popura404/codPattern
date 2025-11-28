@@ -1,6 +1,6 @@
 package com.cdp.codpattern.client.gui.screen;
 
-import com.cdp.codpattern.client.gui.refit.BackPackButton;
+import com.cdp.codpattern.client.gui.refit.BackPackSelectButton;
 import com.cdp.codpattern.client.gui.refit.DowntabButton;
 import com.cdp.codpattern.client.gui.refit.NewBackpackButton;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
@@ -24,7 +24,7 @@ public class BackpackMenuScreen extends Screen {
     public int UNIT_LENGTH = 0;
     private BackpackConfig.PlayerBackpackData playerData;
     private int currentSelectedId;
-    private Map<Integer,BackPackButton> buttonMap = new HashMap<>();
+    private Map<Integer, BackPackSelectButton> buttonMap = new HashMap<>();
 
     // SecondButton管理
     private Map<Integer, DowntabButton> secondButtonMap = new HashMap<>();
@@ -33,8 +33,8 @@ public class BackpackMenuScreen extends Screen {
     private static final int MAX_HIDE_DELAY = 10; // 延迟10个tick（0.5s）
 
     // 武器信息显示相关
-    private BackPackButton currentHoveredButton = null;
-    private Map<String, BackPackButton.WeaponInfo> currentWeaponInfo = null;
+    private BackPackSelectButton currentHoveredButton = null;
+    private Map<String, BackPackSelectButton.WeaponInfo> currentWeaponInfo = null;
     private int weaponDisplayX = 0;
     private int weaponDisplayY = 0;
 
@@ -64,11 +64,11 @@ public class BackpackMenuScreen extends Screen {
         // 检查悬停状态
         boolean isHoveringAnyButton = false;
         Integer hoveredButtonId = null;
-        BackPackButton hoveredButton = null;
+        BackPackSelectButton hoveredButton = null;
 
         // 悬停在BackPackButton上的效果
-        for (Map.Entry<Integer,BackPackButton> entry : buttonMap.entrySet()){
-            BackPackButton button = entry.getValue();
+        for (Map.Entry<Integer, BackPackSelectButton> entry : buttonMap.entrySet()){
+            BackPackSelectButton button = entry.getValue();
             if(button.isHoveredOrFocused()){
                 isHoveringAnyButton = true;
                 hoveredButtonId = entry.getKey();
@@ -155,9 +155,9 @@ public class BackpackMenuScreen extends Screen {
                 0x40808080, 0x20404040);
 
         // 渲染武器信息
-        for (Map.Entry<String, BackPackButton.WeaponInfo> entry : currentWeaponInfo.entrySet()) {
+        for (Map.Entry<String, BackPackSelectButton.WeaponInfo> entry : currentWeaponInfo.entrySet()) {
             String type = entry.getKey();
-            BackPackButton.WeaponInfo info = entry.getValue();
+            BackPackSelectButton.WeaponInfo info = entry.getValue();
 
             // 计算武器区域位置
             int offsetX;
@@ -215,8 +215,8 @@ public class BackpackMenuScreen extends Screen {
      */
     private void addSecondButton(Integer buttonId) {
         if (buttonMap.containsKey(buttonId)) {
-            BackPackButton backPackButton = buttonMap.get(buttonId);
-            DowntabButton secondButton = new DowntabButton(backPackButton);
+            BackPackSelectButton backPackSelectButton = buttonMap.get(buttonId);
+            DowntabButton secondButton = new DowntabButton(backPackSelectButton);
             secondButtonMap.put(buttonId, secondButton);
             addRenderableWidget(secondButton);
             currentSecondButtonId = buttonId;
@@ -266,7 +266,7 @@ public class BackpackMenuScreen extends Screen {
                 X = UNIT_LENGTH * 8 + ((buttonIndex - 6) * UNIT_LENGTH * 21);
                 Y = UNIT_LENGTH * 13;
             }
-            BackPackButton button = new BackPackButton(X, SCREEN_HEIGHT - Y, UNIT_LENGTH * 20, UNIT_LENGTH * 5, backpackId, backpack, backpackId == currentSelectedId);
+            BackPackSelectButton button = new BackPackSelectButton(X, SCREEN_HEIGHT - Y, UNIT_LENGTH * 20, UNIT_LENGTH * 5, backpackId, backpack, backpackId == currentSelectedId);
             buttonMap.put(backpackId,button);
             addRenderableWidget(button);
         }

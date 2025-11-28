@@ -27,7 +27,7 @@ public class DowntabButton extends Button {
         this.backpack = backpack;
     }
 
-    public DowntabButton(BackPackButton button){
+    public DowntabButton(BackPackSelectButton button){
         super(button.getX() , button.getY() + button.getHeight() , button.getWidth() , button.getHeight()/3 + 6, Component.literal("change ur backpack") ,pbutton -> {
             Minecraft.getInstance().execute(() -> Minecraft.getInstance().setScreen(new WeaponMenuScreen(button.getBackpack(), button.getBAGSERIAL())));
         } , DEFAULT_NARRATION);
