@@ -5,6 +5,8 @@ import com.cdp.codpattern.client.gui.refit.DowntabButton;
 import com.cdp.codpattern.client.gui.refit.NewBackpackButton;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
+import com.cdp.codpattern.network.RequestBackpackConfigPacket;
+import com.cdp.codpattern.network.handler.PacketHandler;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -181,7 +183,7 @@ public class BackpackMenuScreen extends Screen {
             graphics.drawString(Minecraft.getInstance().font, typeLabel,
                     weaponX + 2, weaponY + 2, 0xFFFFFF, true);
 
-            // 渲染武器贴图 - 修改为与FlatColorButton相同的大小和位置
+            // 渲染武器贴图
             if (info.texture != null) {
                 RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -242,9 +244,12 @@ public class BackpackMenuScreen extends Screen {
 
     private void loadPlayerData() {
         if (Minecraft.getInstance().player != null) {
-            String uuid = Minecraft.getInstance().player.getUUID().toString();
-            playerData = BackpackConfigManager.getConfig().getOrCreatePlayerData(uuid);
-            currentSelectedId = playerData.getSelectedBackpack();
+            //String uuid = Minecraft.getInstance().player.getUUID().toString();
+            PacketHandler.sendToServer(new RequestBackpackConfigPacket());
+            playerData = BackpackConfigManager.getCLIENTplayerBackpackData();
+            if (playerData != null) {
+                currentSelectedId = playerData.getSelectedBackpack();
+            }
         }
     }
 
@@ -322,6 +327,26 @@ public class BackpackMenuScreen extends Screen {
         }
         return true;
     }
+
+
+    public void reloadFromPlayerData() {
+        this.playerData = BackpackConfigManager.getCLIENTplayerBackpackData();
+        if (this.playerData == null) {
+            // 没有数据就清空界面上的按钮
+            this.buttonMap.clear();
+            this.secondButtonMap.clear();
+            this.clearWidgets();
+            return;
+        }
+        this.currentSelectedId = playerData.getSelectedBackpack();
+        this.buttonMap.clear();
+        this.secondButtonMap.clear();
+        this.clearWidgets();
+        // 更新按钮
+        addSelectBagButton();
+        addNewBackpackButton();
+    }
+
 
     public void ESCto() {
         Minecraft.getInstance().execute(() -> {

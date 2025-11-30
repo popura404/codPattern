@@ -128,6 +128,7 @@ public class WeaponMenuScreen extends Screen {
 
     public void ESCto() {
         Minecraft.getInstance().execute(() -> {
+            this.onClose();
             Minecraft.getInstance().setScreen(new BackpackMenuScreen());
         });
     }

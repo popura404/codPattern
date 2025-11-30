@@ -48,13 +48,13 @@ public class BackpackConfig {
         }
 
         /**
-         * 获取下一个可用的ID（1-10范围内）
+         * 获取添加背包可用ID
          * @return 第一个可用的空缺ID，如果1-10都已占用则返回11
          */
         public int getNextAvailableId() {
             // 从1开始遍历到10
             for (int i = 1; i <= 10; i++) {
-                // key不存在 = 找到空缺位置
+                // 找不到key说明背包是空的
                 if (!backpacks_MAP.containsKey(i)) {
                     return i;  // 返回这个空缺的位置
                 }

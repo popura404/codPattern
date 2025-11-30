@@ -94,8 +94,8 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     implementation fg.deobf("curse.maven:timeless-and-classics-zero-1028108:6654541-sources-6654543")
     //implementation files('libs/lrtactical-1.20.1-0.3.0-1010-091821.jar')
-    runtimeOnly fg.deobf("curse.maven:embeddium-908741:5175031")
-    runtimeOnly fg.deobf("curse.maven:oculus-581495:5299671")
+    //runtimeOnly fg.deobf("curse.maven:embeddium-908741:5175031")
+    //runtimeOnly fg.deobf("curse.maven:oculus-581495:5299671")
     //annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 

@@ -1,6 +1,8 @@
 package com.cdp.codpattern.network;
 
+import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
+import com.cdp.codpattern.network.handler.PacketHandler;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -20,26 +22,27 @@ public class AddBackpackPacket {
         return new AddBackpackPacket();
     }
 
+    // AddBackpackPacket.java
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
-                String uuid = player.getUUID().toString();
+                String uuid = player.getStringUUID();
 
                 // 添加新背包
                 int newId = BackpackConfigManager.addCustomBackpack(uuid);
 
                 if (newId != -1) {
-                    player.sendSystemMessage(Component.literal(
-                            "§a成功添加新背包 #" + newId
-                    ));
+                    player.sendSystemMessage(Component.literal("§a成功添加新背包 #" + newId));
+
+                    BackpackConfig.PlayerBackpackData playerData = BackpackConfigManager.getConfig().getOrCreatePlayerData(uuid);
+                    PacketHandler.sendToPlayer(new SyncBackpackConfigPacket(playerData) , player);
                 } else {
-                    player.sendSystemMessage(Component.literal(
-                            "§c无法添加新背包，已达到上限或发生错误"
-                    ));
+                    player.sendSystemMessage(Component.literal("§c无法添加新背包，已达到上限或发生错误"));
                 }
             }
         });
         ctx.get().setPacketHandled(true);
     }
+
 }

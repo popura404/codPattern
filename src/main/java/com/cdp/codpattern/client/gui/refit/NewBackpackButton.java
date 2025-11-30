@@ -1,6 +1,5 @@
 package com.cdp.codpattern.client.gui.refit;
 
-import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
 import com.cdp.codpattern.network.handler.PacketHandler;
 import com.cdp.codpattern.network.AddBackpackPacket;
 import net.minecraft.client.Minecraft;
@@ -12,7 +11,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import org.jetbrains.annotations.NotNull;
-import org.lwjgl.glfw.GLFW;
 
 /**
  * 用于添加新的背包的按钮
@@ -26,29 +24,22 @@ public class NewBackpackButton extends Button {
         super(x, y, width, height,
                 Component.literal("+ 添加背包"),
                 button -> {
-                    // 保存鼠标位置
-                    Minecraft mc = Minecraft.getInstance();
-                    long window = mc.getWindow().getWindow();
-                    double[] mouseX = new double[1];
-                    double[] mouseY = new double[1];
-                    GLFW.glfwGetCursorPos(window, mouseX, mouseY);
-
-                    // 发送添加背包请求到S
+                    // 发送添加背包请求到S，与服务端同步
                     PacketHandler.sendToServer(new AddBackpackPacket());
+                    // 11.29 : 防止因为服务端同步回客户端速度远远小于客户端本地刷新速度导致的无效刷新，故在提前在客户端也同步一份
+                    // 11.30 : 我草我忘了客户端只同步playerdata了，这样做要不然就是只有旧数据或者是客户端空指针异常
+                    // 11.30 : 之前写了什么屎山啊我草
 
-                    // 刷新界面
-                    if (mc.screen != null) {
-                        mc.screen.onClose();
-                        mc.execute(() -> {
-                            BackpackMenuScreen newScreen = new BackpackMenuScreen();
-                            mc.setScreen(newScreen);
-
-                            // 恢复鼠标位置
-                            mc.execute(() -> {
-                                GLFW.glfwSetCursorPos(window, mouseX[0], mouseY[0]);
-                            });
-                        });
-                    }
+                    // 音效
+                    Minecraft mc = Minecraft.getInstance();
+                    mc.execute(() -> {
+                        if (mc.player != null) {
+                            mc.player.playNotifySound(
+                                    SoundEvents.BAMBOO_WOOD_BUTTON_CLICK_ON,
+                                    SoundSource.PLAYERS, 1f, 1f
+                            );
+                        }
+                    });
                 },
                 DEFAULT_NARRATION);
 
@@ -142,13 +133,7 @@ public class NewBackpackButton extends Button {
     @Override
     public void playDownSound(@NotNull SoundManager pHandler) {
         if (this.active) {
-            Minecraft.getInstance().execute(() -> {
-                if (Minecraft.getInstance().player != null) {
-                    Minecraft.getInstance().player.playNotifySound(
-                            SoundEvents.ANVIL_USE,
-                            SoundSource.PLAYERS, 0.5f, 1.5f);
-                }
-            });
+            Minecraft.getInstance().execute(() -> {if (Minecraft.getInstance().player != null) Minecraft.getInstance().player.playNotifySound(SoundEvents.ANVIL_USE, SoundSource.PLAYERS, 0.5f, 1.5f);});
         }
     }
 }

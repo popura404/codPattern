@@ -46,12 +46,11 @@ public class SelectBackpackPacket {
                     // 获取背包名称
                     String backpackName = playerData.getBackpacks_MAP().get(backpackId).getName();
 
-                    // 发送ActionBar提示（保留你的代码）
+                    // 发送提示
                     player.connection.send(new ClientboundSetActionBarTextPacket(
-                            Component.literal("已选择背包 # " + backpackId +
-                                            " [" + backpackName + "] 在下次重生时获得")
+                            Component.literal("已选择背包 # " + backpackId + " [" + backpackName + "] 在下次重生时获得")
                                     .withStyle(style -> style
-                                            .withColor(0xFFFFFF)  // 白色
+                                            .withColor(0xDDDDDD)
                                             .withBold(true)
                                             .withItalic(false))
                     ));

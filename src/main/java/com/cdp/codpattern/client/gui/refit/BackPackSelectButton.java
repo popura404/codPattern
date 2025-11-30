@@ -130,7 +130,6 @@ public class BackPackSelectButton extends Button {
             // 获取贴图
             ResourceLocation texture = null;
             TimelessAPI.getGunDisplay(weapon).ifPresent(display -> {
-                // 这里需要使用一个临时变量来处理lambda中的赋值
             });
             // 使用另一种方式获取贴图
             var displayOpt = TimelessAPI.getGunDisplay(weapon);

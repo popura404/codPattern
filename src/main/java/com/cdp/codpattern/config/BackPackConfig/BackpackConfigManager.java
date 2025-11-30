@@ -50,7 +50,7 @@ public class BackpackConfigManager {
     }
 
     /**
-     * 加载个人配置文件，减小发包量，增加安全性，用于服务端
+     * 加载个人配置文件，减小发包量，增加安全性，用于服务端向客户端
      */
     public static BackpackConfig.PlayerBackpackData LoadorCreatePlayer(String uuid , Path path){
         CONFIG_PATH = path;
@@ -76,7 +76,7 @@ public class BackpackConfigManager {
      */
     public static void save() {
         if (CONFIG_PATH == null) {
-            System.err.println("[BackpackConfigManager] CONFIG_PATH is null, skip save()");
+            System.err.println("[BackpackConfigManager] CONFIG_PATH is null");
             return;
         }
             try {

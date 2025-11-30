@@ -67,7 +67,7 @@ public class UpdateWeaponfilterConfigCommand {
             }
         }
 
-        // 对管理员反馈
+        // 对执行者反馈
         int finalSuccessCount1 = successCount;
         source.sendSuccess(() -> Component.literal("已同步 " + finalSuccessCount1 + " 名玩家的配置"), true);
 

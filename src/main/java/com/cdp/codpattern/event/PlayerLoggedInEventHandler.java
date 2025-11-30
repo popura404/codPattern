@@ -21,6 +21,9 @@ public class PlayerLoggedInEventHandler {
 
     @SubscribeEvent
     public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity().level().isClientSide){
+            return;
+        }
 
         Player player = event.getEntity();
         MinecraftServer server = player.getServer();
