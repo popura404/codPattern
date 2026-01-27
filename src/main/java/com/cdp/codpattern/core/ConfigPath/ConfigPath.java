@@ -9,7 +9,8 @@ import java.nio.file.Path;
 public enum ConfigPath {
 
     SERVERBACKPACK("serverconfig/codpattern/backpackconfig"),
-    SERVERFLITER("serverconfig/codpattern/filterconfig");
+    SERVERFLITER("serverconfig/codpattern/filterconfig"),
+    SERVER_ATTACHMENT_PRESET("serverconfig/codpattern/attachment_preset");
 
     private final String path;
 

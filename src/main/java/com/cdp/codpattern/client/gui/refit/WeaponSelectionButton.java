@@ -71,9 +71,14 @@ public class WeaponSelectionButton extends Button {
         graphics.drawString(Minecraft.getInstance().font, weapon.getHoverName(), this.getX() + 2 , this.getY() + this.height - UNIT_LENGTH ,0xDDFFFFFF);
 
         //显示枪包名  <  关键代码》》Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC);  >
-        IGun iGun = (IGun) weapon.getItem();
-        ResourceLocation gunId = iGun.getGunId(weapon);
-        PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
-        graphics.drawString(Minecraft.getInstance().font , Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC) , this.getX() + 2 , this.getY() + 2 ,0xDDFFFFFF);
+        if (weapon.getItem() instanceof IGun iGun) {
+            ResourceLocation gunId = iGun.getGunId(weapon);
+            if (gunId != null) {
+                PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
+                if (packInfoObject != null && packInfoObject.getName() != null) {
+                    graphics.drawString(Minecraft.getInstance().font , Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC) , this.getX() + 2 , this.getY() + 2 ,0xDDFFFFFF);
+                }
+            }
+        }
     }
 }

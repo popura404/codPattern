@@ -40,6 +40,27 @@ public class PacketHandler {
                 .consumerMainThread(AddBackpackPacket::handle)
                 .add();
 
+        // 重命名背包 (C2S)
+        INSTANCE.messageBuilder(RenameBackpackPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(RenameBackpackPacket::decode)
+                .encoder(RenameBackpackPacket::encode)
+                .consumerMainThread(RenameBackpackPacket::handle)
+                .add();
+
+        // 删除背包 (C2S)
+        INSTANCE.messageBuilder(DeleteBackpackPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(DeleteBackpackPacket::decode)
+                .encoder(DeleteBackpackPacket::encode)
+                .consumerMainThread(DeleteBackpackPacket::handle)
+                .add();
+
+        // 复制背包 (C2S)
+        INSTANCE.messageBuilder(CloneBackpackPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(CloneBackpackPacket::decode)
+                .encoder(CloneBackpackPacket::encode)
+                .consumerMainThread(CloneBackpackPacket::handle)
+                .add();
+
         // 注册更新武器的数据包(C2S)
         INSTANCE.messageBuilder(UpdateWeaponPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
                 .decoder(UpdateWeaponPacket::decode)
@@ -81,6 +102,27 @@ public class PacketHandler {
                 .encoder(OpenBackpackScreenPacket::encode)
                 .consumerMainThread(OpenBackpackScreenPacket::handle)
                 .add();
+
+        // 请求配件预设 (C2S)
+        INSTANCE.messageBuilder(RequestAttachmentPresetPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(RequestAttachmentPresetPacket::decode)
+                .encoder(RequestAttachmentPresetPacket::encode)
+                .consumerMainThread(RequestAttachmentPresetPacket::handle)
+                .add();
+
+        // 同步配件预设 (S2C)
+        INSTANCE.messageBuilder(SyncAttachmentPresetPacket.class, id(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncAttachmentPresetPacket::decode)
+                .encoder(SyncAttachmentPresetPacket::encode)
+                .consumerMainThread(SyncAttachmentPresetPacket::handle)
+                .add();
+
+        // 保存配件预设 (C2S)
+        INSTANCE.messageBuilder(SaveAttachmentPresetPacket.class, id(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(SaveAttachmentPresetPacket::decode)
+                .encoder(SaveAttachmentPresetPacket::encode)
+                .consumerMainThread(SaveAttachmentPresetPacket::handle)
+                .add();
     }
 
     /**
@@ -97,4 +139,3 @@ public class PacketHandler {
         INSTANCE.send(PacketDistributor.PLAYER.with(() -> player), message);
     }
 }
-

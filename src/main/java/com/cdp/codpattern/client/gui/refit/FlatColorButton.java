@@ -1,5 +1,6 @@
 package com.cdp.codpattern.client.gui.refit;
 
+import com.cdp.codpattern.client.gui.CodTheme;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.api.item.IGun;
@@ -19,6 +20,9 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 
+/**
+ * 扁平化颜色按钮 - COD MWII 2022 风格
+ */
 public class FlatColorButton extends Button {
 
     private int focusedtime = 0;
@@ -30,6 +34,7 @@ public class FlatColorButton extends Button {
     private Component weaponName;
     private Component weaponPackinfo;
     private ResourceLocation Teaxture;
+    private ItemStack lastWeaponSnapshot = ItemStack.EMPTY;
 
 
     // 普通按钮
@@ -50,14 +55,14 @@ public class FlatColorButton extends Button {
 
     @Override
     public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float pPartialTick) {
-        getInfo();
+        ensureInfoCached();
         // 播放悬停音效
         if(this.isHoveredOrFocused() && focusedtime == 0){
             Minecraft.getInstance().execute(() -> {
                 if (Minecraft.getInstance().player != null) {
                     Minecraft.getInstance().player.playNotifySound(
                             SoundEvents.BAMBOO_WOOD_BUTTON_CLICK_ON,
-                            SoundSource.PLAYERS, 1f, 1f
+                            SoundSource.PLAYERS, 0.5f, 1.2f
                     );
                 }
             });
@@ -66,12 +71,19 @@ public class FlatColorButton extends Button {
             focusedtime = 0;
         }
 
-        // 渲染按钮背景
-        graphics.fillGradient(this.getX(), this.getY(), this.getX() + this.width, this.getY() + this.height, 0xDA5C565C, 0xED292729);
+        // 渲染按钮背景 - MWII 深色风格
+        graphics.fillGradient(this.getX(), this.getY(),
+                this.getX() + this.width, this.getY() + this.height,
+                CodTheme.CARD_BG_TOP, CodTheme.CARD_BG_BOTTOM);
 
-        // 渲染边框阴影
-        graphics.fillGradient(this.getX(), this.getY(), this.getX() - 6, this.getY() + this.height, 0xC019181A, 0xC019181A);
-        graphics.fillGradient(this.getX(), this.getY() + this.height, this.getX() + this.width, this.getY() + this.height + 2, 0xC019181A, 0x7019181A);
+        // 渲染左侧阴影
+        graphics.fill(this.getX() - 3, this.getY(),
+                this.getX(), this.getY() + this.height,
+                CodTheme.SHADOW);
+        // 渲染底部阴影
+        graphics.fillGradient(this.getX(), this.getY() + this.height,
+                this.getX() + this.width, this.getY() + this.height + 2,
+                CodTheme.SHADOW, 0x40000000);
 
         // 悬停效果
         if (isHoveredOrFocused()) {
@@ -83,23 +95,33 @@ public class FlatColorButton extends Button {
             renderTexture(graphics, isHoveredOrFocused());
         }
 
-        //渲染包名（如果有）
-        if (!(weaponPackinfo == null)){
-            graphics.drawString(Minecraft.getInstance().font , this.weaponPackinfo , this.getX() + 2 , this.getY() + 2 ,0xDDFFFFFF);
+        // 渲染包名（如果有）
+        if (weaponPackinfo != null){
+            graphics.drawString(Minecraft.getInstance().font, this.weaponPackinfo,
+                    this.getX() + 4, this.getY() + 4, CodTheme.TEXT_PRIMARY);
         }
-        //渲染枪名（如果有）
-        if (!(weaponName == null)){
-            graphics.drawString(Minecraft.getInstance().font, this.weaponName, this.getX() + 2 , this.getY() + this.height - UNIT_LENGTH ,0xDDFFFFFF);
+        // 渲染枪名（如果有）
+        if (weaponName != null){
+            graphics.drawString(Minecraft.getInstance().font, this.weaponName,
+                    this.getX() + 4, this.getY() + this.height - UNIT_LENGTH - 2, CodTheme.TEXT_PRIMARY);
         }
     }
 
     protected void renderOnHoveredOrFocused(GuiGraphics graphics){
-        // 悬停时的背景效果
-        graphics.fillGradient(this.getX(), this.getY(), this.getX() + this.width, this.getY() + this.height, 0xD0141A14, 0xD02A2F2A);
+        // 悬停时的背景效果 - MWII 暗绿色
+        graphics.fillGradient(this.getX(), this.getY(),
+                this.getX() + this.width, this.getY() + this.height,
+                CodTheme.HOVER_BG_TOP, CodTheme.HOVER_BG_BOTTOM);
 
-        // 顶部和底部高亮边框
-        graphics.fillGradient(this.getX(), this.getY(), this.getX() + this.width, this.getY() + 1, 0xD0145200, 0xD0145200);
-        graphics.fillGradient(this.getX(), this.getY() + this.height - 1, this.getX() + this.width, this.getY() + this.height + this.height/8, 0xD0145200, 0xD0145200);
+        // 顶部荧光绿边框
+        graphics.fill(this.getX(), this.getY() - 1,
+                this.getX() + this.width, this.getY(),
+                CodTheme.HOVER_BORDER);
+
+        // 底部荧光绿边框
+        graphics.fill(this.getX(), this.getY() + this.height,
+                this.getX() + this.width, this.getY() + this.height + 2,
+                CodTheme.HOVER_BORDER_SEMI);
     }
 
     protected void renderTexture(GuiGraphics graphics, boolean isHovered){
@@ -115,11 +137,9 @@ public class FlatColorButton extends Button {
 
         // 设置颜色和透明度（悬停时高亮）
         if (isHovered) {
-            // 悬停时：更亮的效果
-            RenderSystem.setShaderColor(1.25f, 1.25f, 1.25f, 1.0f);
+            RenderSystem.setShaderColor(1.15f, 1.15f, 1.15f, 1.0f);
         } else {
-            // 正常状态
-            RenderSystem.setShaderColor(0.85f, 0.85f, 0.85f, 0.9f);
+            RenderSystem.setShaderColor(0.9f, 0.9f, 0.9f, 0.95f);
         }
 
         // 渲染贴图
@@ -127,14 +147,6 @@ public class FlatColorButton extends Button {
 
         // 重置颜色
         RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-
-        // 悬停时添加发光边框效果
-        if (isHovered) {
-            graphics.fillGradient(textureX - 8, textureY - 5, textureX + textureRenderWidth + 8, textureY - 4, 0x80FFFF00, 0x40FFFF00);
-            graphics.fillGradient(textureX - 8, textureY + textureRenderHeight - 5, textureX + textureRenderWidth + 8, textureY + textureRenderHeight + 5, 0x40FFFF00, 0x80FFFF00);
-            graphics.fillGradient(textureX - 8, textureY - 5, textureX - 7, textureY + textureRenderHeight + 5, 0x80FFFF00, 0x40FFFF00);
-            graphics.fillGradient(textureX + textureRenderWidth + 7, textureY - 5, textureX + textureRenderWidth + 8, textureY + textureRenderHeight + 5, 0x40FFFF00, 0x80FFFF00);
-        }
     }
 
     @Override
@@ -151,18 +163,36 @@ public class FlatColorButton extends Button {
         });
     }
 
-    private void getInfo(){
-        if(weapon == null){
+    private void ensureInfoCached(){
+        if (weapon == null || weapon.isEmpty()) {
+            lastWeaponSnapshot = ItemStack.EMPTY;
+            Teaxture = null;
+            weaponPackinfo = null;
+            weaponName = null;
             return;
         }
-        //图片处理
+        if (!lastWeaponSnapshot.isEmpty() && ItemStack.isSameItemSameTags(weapon, lastWeaponSnapshot)) {
+            return;
+        }
+        lastWeaponSnapshot = weapon.copy();
+
+        // 图片处理
+        Teaxture = null;
         TimelessAPI.getGunDisplay(weapon).ifPresent(display -> this.Teaxture = display.getHUDTexture());
-        //包名处理
-        IGun iGun = (IGun) weapon.getItem();
-        ResourceLocation gunId = iGun.getGunId(weapon);
-        PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
-        this.weaponPackinfo = Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC);
-        //枪名处理
+
+        // 包名处理
+        weaponPackinfo = null;
+        if (weapon.getItem() instanceof IGun iGun) {
+            ResourceLocation gunId = iGun.getGunId(weapon);
+            PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
+            if (packInfoObject != null && packInfoObject.getName() != null) {
+                this.weaponPackinfo = Component.translatable(packInfoObject.getName())
+                        .withStyle(ChatFormatting.BLUE)
+                        .withStyle(ChatFormatting.ITALIC);
+            }
+        }
+
+        // 枪名处理
         this.weaponName = weapon.getHoverName();
     }
 

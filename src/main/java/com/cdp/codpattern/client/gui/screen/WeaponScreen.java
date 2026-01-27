@@ -79,7 +79,11 @@ public class WeaponScreen extends Screen {
     }
 
     private void loadWeaponTabs() {
-        List<String> tabNames = isPrimary ? WeaponFilterConfig.getCLIENTweaponFilterConfig().getPrimaryWeaponTabs() : WeaponFilterConfig.getCLIENTweaponFilterConfig().getSecondaryWeaponTabs();
+        WeaponFilterConfig filterConfig = WeaponFilterConfig.getCLIENTweaponFilterConfig();
+        if (filterConfig == null) {
+            return;
+        }
+        List<String> tabNames = isPrimary ? filterConfig.getPrimaryWeaponTabs() : filterConfig.getSecondaryWeaponTabs();
 
         for (String tabName : tabNames) {
             List<ItemStack> items = getItemsFromTab(tabName);
@@ -444,4 +448,3 @@ public class WeaponScreen extends Screen {
         }
     }
 }
-

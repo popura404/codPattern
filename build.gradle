@@ -86,16 +86,20 @@ repositories {
             includeGroup "curse.maven"
         }
     }
-
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+    }
     flatDir { dirs 'libs' }
 }
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     implementation fg.deobf("curse.maven:timeless-and-classics-zero-1028108:6654541-sources-6654543")
-    //implementation files('libs/lrtactical-1.20.1-0.3.0-1010-091821.jar')
-    //runtimeOnly fg.deobf("curse.maven:embeddium-908741:5175031")
-    //runtimeOnly fg.deobf("curse.maven:oculus-581495:5299671")
+    implementation fg.deobf("maven.modrinth:lr-tactical:0.3.0")
+    implementation fg.deobf("maven.modrinth:cloth-config:11.1.136+forge")
+    runtimeOnly fg.deobf("curse.maven:embeddium-908741:5175031")
+    runtimeOnly fg.deobf("curse.maven:oculus-581495:5299671")
     //annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
@@ -145,4 +149,81 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+tasks.register('dumpSrcJava') {
+    group = 'documentation'
+    description = 'Dump all Java sources under src into src_dump.txt'
+    def outputFile = file('src_dump.txt')
+    def javaSources = fileTree('src') {
+        include '**/*.java'
+    }
+    inputs.files(javaSources)
+    outputs.file(outputFile)
+
+    doLast {
+        def files = javaSources.files.toList().sort { it.path }
+        outputFile.text = ''
+        files.each { f ->
+            def relPath = project.projectDir.toPath().relativize(f.toPath()).toString()
+            def content = f.getText('UTF-8')
+            outputFile << "// --- ${relPath} ---\n"
+            outputFile << content
+            if (!content.endsWith('\n')) {
+                outputFile << '\n'
+            }
+            outputFile << '\n'
+        }
+        println "Wrote ${files.size()} files to ${outputFile}"
+    }
+}
+
+def normalizeModsDir(Object rawValue) {
+    if (rawValue == null) {
+        return null
+    }
+    def raw = rawValue.toString().trim()
+    if (raw.isEmpty()) {
+        return null
+    }
+    def winMatcher = (raw =~ /^([A-Za-z]):[\\/](.*)$/)
+    if (winMatcher.matches()) {
+        def drive = winMatcher[0][1].toLowerCase()
+        def rest = winMatcher[0][2].replace('\\', '/')
+        return "/mnt/${drive}/${rest}"
+    }
+    return raw
+}
+
+tasks.register('buildAndCopyToMods') {
+    group = 'distribution'
+    description = 'Builds and copies the reobfuscated jar into a Minecraft mods directory.'
+    dependsOn 'build'
+
+    doLast {
+        def rawModsDir = project.findProperty('modsDir') ?: System.getenv('MODS_DIR')
+        def modsDirPath = normalizeModsDir(rawModsDir)
+        if (modsDirPath == null) {
+            throw new GradleException("modsDir not set. Example: ./gradlew buildAndCopyToMods -PmodsDir=/mnt/c/Users/<you>/Desktop/.minecraft/versions/1.20.1-Forge_47.4.0/mods")
+        }
+
+        def modsDir = file(modsDirPath)
+        if (!modsDir.exists()) {
+            throw new GradleException("modsDir does not exist: ${modsDir}")
+        }
+
+        def jarFile = tasks.named('jar', Jar).get().archiveFile.get().asFile
+        if (!jarFile.exists()) {
+            throw new GradleException("Built jar not found: ${jarFile}")
+        }
+
+        delete fileTree(modsDir) {
+            include "${mod_id}*.jar"
+        }
+        copy {
+            from jarFile
+            into modsDir
+        }
+        println "Copied ${jarFile.name} -> ${modsDir}"
+    }
 }

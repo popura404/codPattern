@@ -20,6 +20,20 @@ build
 # other
 eclipse
 run
+run-data
+logs
+crash-reports
+src/generated/resources
+src_dump.txt
+mcmodsrepo
 
 # Files from Forge MDK
 forge*changelog.txt
+
+# editors/OS
+.vscode
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+hs_err_pid*

@@ -3,6 +3,7 @@ package com.cdp.codpattern.core.handler;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
 import com.cdp.codpattern.config.WeaponFilterConfig.WeaponFilterConfig;
+import com.mojang.logging.LogUtils;
 import com.tacz.guns.api.item.IGun;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.TagParser;
@@ -12,10 +13,12 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import org.slf4j.Logger;
 
 import java.util.Map;
 
 public class Weaponhandling {
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     /**
      * 分发物品逻辑处理
@@ -23,12 +26,17 @@ public class Weaponhandling {
     public static void distributeBackpackItems(ServerPlayer player) {
         // 加载武器筛选配置
         //WeaponFilterConfig filterConfig = WeaponFilterConfig.LoadorCreate();
+        WeaponFilterConfig filterConfig = WeaponFilterConfig.getWeaponFilterConfig();
+        if (filterConfig == null) {
+            LOGGER.warn("WeaponFilterConfig is null. Skip distributing items for player {}", player.getGameProfile().getName());
+            return;
+        }
 
         //不是喜欢的冒险生存创造玩家，直接不发
         if (player.isSpectator()) return;
 
         //不是喜欢的带标签的玩家，直接不发
-        if (WeaponFilterConfig.getWeaponFilterConfig().isDistributeToTaggedPlayersOnly()) {
+        if (filterConfig.isDistributeToTaggedPlayersOnly()) {
             if (!player.getTags().contains("cdpplayer")) {
                 return;
             }
@@ -49,8 +57,18 @@ public class Weaponhandling {
 
                 String weaponType = entry.getKey();
                 BackpackConfig.Backpack.ItemData itemData = entry.getValue();
+                if (itemData == null) {
+                    LOGGER.warn("ItemData is null for weaponType={} player={}", weaponType, player.getGameProfile().getName());
+                    continue;
+                }
 
-                ResourceLocation itemId = new ResourceLocation(itemData.getItem());
+                ResourceLocation itemId;
+                try {
+                    itemId = new ResourceLocation(itemData.getItem());
+                } catch (Exception e) {
+                    LOGGER.warn("Invalid item id {} for player {}", itemData.getItem(), player.getGameProfile().getName(), e);
+                    continue;
+                }
                 Item item = BuiltInRegistries.ITEM.get(itemId);
 
                 if (item != Items.AIR) {
@@ -60,12 +78,14 @@ public class Weaponhandling {
                         try {
                             //处理物品nbt
                             stack.setTag(TagParser.parseTag(itemData.getNbt()));
-                            //分配子弹
-                            IGun iGun = (IGun) stack.getItem();
-                            int BackpackDummyAmmoAmount = iGun.getCurrentAmmoCount(stack) * WeaponFilterConfig.getWeaponFilterConfig().getAmmunitionPerMagazineMultiple();
-                            iGun.setDummyAmmoAmount(stack , BackpackDummyAmmoAmount);
-                        } catch (Exception ignored) {
+                        } catch (Exception e) {
+                            LOGGER.warn("Failed to parse NBT for item {} (player={})", itemId, player.getGameProfile().getName(), e);
                         }
+                    }
+
+                    if (stack.getItem() instanceof IGun iGun) {
+                        int BackpackDummyAmmoAmount = iGun.getCurrentAmmoCount(stack) * filterConfig.getAmmunitionPerMagazineMultiple();
+                        iGun.setDummyAmmoAmount(stack , BackpackDummyAmmoAmount);
                     }
 
                     if ("primary".equals(weaponType)) {

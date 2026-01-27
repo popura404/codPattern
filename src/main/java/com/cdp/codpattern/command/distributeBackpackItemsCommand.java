@@ -32,11 +32,8 @@ public class distributeBackpackItemsCommand {
                                 .requires(source -> source.hasPermission(2))
                                 .executes(commandcontext -> {
                                     List<ServerPlayer> list = getAllOnlinePlayers();
-                                    try {
-                                        for (ServerPlayer player : list){
-                                            Weaponhandling.distributeBackpackItems(player);
-                                        }
-                                    } catch (Exception ignored) {
+                                    for (ServerPlayer player : list){
+                                        Weaponhandling.distributeBackpackItems(player);
                                     }
                                    return 1;
                                 })
@@ -57,9 +54,11 @@ public class distributeBackpackItemsCommand {
     }
 
     private static int distributeGunsplayer(CommandSourceStack pSource ,Collection<ServerPlayer> pTargets) {
-        //我不知道为什么要写这个if，但是不写，他就运行不了
-        if(pTargets == null) pSource.sendFailure(Component.literal("何意味"));
-        for(ServerPlayer serverplayer : pTargets){
+        if (pTargets == null) {
+            pSource.sendFailure(Component.literal("目标玩家为空"));
+            return 0;
+        }
+        for (ServerPlayer serverplayer : pTargets) {
             Weaponhandling.distributeBackpackItems(serverplayer);
         }
         return 1;
