@@ -37,7 +37,8 @@ public class WeaponScreen extends Screen {
     private int UNIT_LENGTH = 0;
     private final Integer BAGSERIAL;
     private final BackpackConfig.Backpack backpack;
-    private final boolean isPrimary;
+    /** 槽位类型: "primary" | "secondary" | "tactical" | "lethal" */
+    private final String slotType;
     private final WeaponMenuScreen parentScreen;
 
     private final Map<String, List<ItemStack>> weaponsByTab = new LinkedHashMap<>();
@@ -54,12 +55,12 @@ public class WeaponScreen extends Screen {
     private static final int BUTTON_SPACING = 2;
 
     public WeaponScreen(WeaponMenuScreen parent, BackpackConfig.Backpack backpack,
-                        Integer bagSerial, boolean isPrimary) {
+                        Integer bagSerial, String slotType) {
         super(Component.literal("WeaponScreen"));
         this.parentScreen = parent;
         this.BAGSERIAL = bagSerial;
         this.backpack = backpack;
-        this.isPrimary = isPrimary;
+        this.slotType = slotType != null ? slotType : "primary";
     }
 
     @Override
@@ -83,13 +84,23 @@ public class WeaponScreen extends Screen {
     }
 
     private void loadWeaponTabs() {
+        // 战术/杀伤投掷物只显示投掷物列表
+        if ("tactical".equals(slotType) || "lethal".equals(slotType)) {
+            List<ItemStack> throwables = getItemsFromTab("throwable");
+            if (!throwables.isEmpty()) {
+                weaponsByTab.put("throwable", throwables);
+            }
+            return;
+        }
+
         WeaponFilterConfig filterConfig = WeaponFilterConfig.getCLIENTweaponFilterConfig();
         if (filterConfig == null) {
             return;
         }
-        List<String> tabNames = isPrimary ? filterConfig.getPrimaryWeaponTabs() : filterConfig.getSecondaryWeaponTabs();
+        List<String> tabNames = "primary".equals(slotType)
+                ? filterConfig.getPrimaryWeaponTabs()
+                : filterConfig.getSecondaryWeaponTabs();
 
-        //获取tacz物品或lrtac
         for (String tabName : tabNames) {
             List<ItemStack> items = getItemsFromTab(tabName);
             if (!items.isEmpty()) {
@@ -306,7 +317,7 @@ public class WeaponScreen extends Screen {
     }
 
     private void onWeaponSelected(ItemStack weapon) {
-        String key = isPrimary ? "primary" : "secondary";
+        String key = slotType;
         String itemId = weapon.getItem().builtInRegistryHolder().key().location().toString();
         String nbt = weapon.hasTag() ? weapon.getTag().toString() : "";
 
@@ -333,7 +344,13 @@ public class WeaponScreen extends Screen {
         renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
 
-        String title = isPrimary ? "选择主武器" : "选择副武器";
+        String title = switch (slotType) {
+            case "primary" -> "选择主武器";
+            case "secondary" -> "选择副武器";
+            case "tactical" -> "选择投掷物 1";
+            case "lethal" -> "选择投掷物 2";
+            default -> "选择武器";
+        };
         graphics.drawCenteredString(
                 this.font,
                 Component.literal(title),
@@ -362,6 +379,7 @@ public class WeaponScreen extends Screen {
             case "mg" -> Component.translatable("tacz.type.mg.name");
             case "rpg" -> Component.translatable("tacz.type.rpg.name");
             case "melee" -> Component.translatable("lrtactical.type.melee.name");
+            case "throwable" -> Component.literal("投掷物");
             default -> Component.literal(tabName.toUpperCase());
         };
     }

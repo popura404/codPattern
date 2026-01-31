@@ -20,6 +20,8 @@ public class BackpackConfig {
     //添加背包时默认......................................
     public static BackpackConfig.Backpack.ItemData itemDataADDP = new BackpackConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
     public static BackpackConfig.Backpack.ItemData itemDataADDS = new BackpackConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
+    public static BackpackConfig.Backpack.ItemData itemDataTactical = new BackpackConfig.Backpack.ItemData("lrtactical:throwable", 1, "{ThrowableId:\"lrtactical:m67\"}");
+    public static BackpackConfig.Backpack.ItemData itemDataLethal = new BackpackConfig.Backpack.ItemData("lrtactical:throwable", 1, "{ThrowableId:\"lrtactical:smoke_grenade\"}");
     //.................................................
 
     public static class PlayerBackpackData {
@@ -75,11 +77,10 @@ public class BackpackConfig {
         public void setName(String name) { this.name = name;}
 
         /**
-         * 设置物品，限制最多2个（主武器和副武器）
+         * 设置物品，限制最多4个（主武器、副武器、战术投掷物、杀伤投掷物）
          */
         public void setItem_MAP(String key, ItemData itemData){
-            if(this.item_MAP.size() >= 2) {
-                // 已达到物品数量上限
+            if(this.item_MAP.size() >= 4 && !this.item_MAP.containsKey(key)) {
                 return;
             }
             this.item_MAP.put(key, itemData);
@@ -123,18 +124,24 @@ public class BackpackConfig {
             Backpack backpack1 = new Backpack("自定义背包1");
             backpack1.setItem_MAP("primary", itemDataP1);
             backpack1.setItem_MAP("secondary", itemDataS1);
+            backpack1.setItem_MAP("tactical", itemDataTactical);
+            backpack1.setItem_MAP("lethal", itemDataLethal);
             newData.getBackpacks_MAP().put(1, backpack1);
 
             // 背包2
             Backpack backpack2 = new Backpack("自定义背包2");
             backpack2.setItem_MAP("primary", itemDataP2);
             backpack2.setItem_MAP("secondary", itemDataS2);
+            backpack2.setItem_MAP("tactical", itemDataTactical);
+            backpack2.setItem_MAP("lethal", itemDataLethal);
             newData.getBackpacks_MAP().put(2, backpack2);
 
             // 背包3
             Backpack backpack3 = new Backpack("自定义背包3");
             backpack3.setItem_MAP("primary", itemDataP3);
             backpack3.setItem_MAP("secondary", itemDataS3);
+            backpack3.setItem_MAP("tactical", itemDataTactical);
+            backpack3.setItem_MAP("lethal", itemDataLethal);
             newData.getBackpacks_MAP().put(3, backpack3);
 
             // 默认选择背包1
@@ -157,5 +164,13 @@ public class BackpackConfig {
 
     public static Backpack.ItemData getItemDataADDP() {
         return itemDataADDP;
+    }
+
+    public static Backpack.ItemData getItemDataTactical() {
+        return itemDataTactical;
+    }
+
+    public static Backpack.ItemData getItemDataLethal() {
+        return itemDataLethal;
     }
 }

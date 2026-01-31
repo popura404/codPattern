@@ -24,8 +24,11 @@ public class WeaponFilterConfig {
     private List<String> secondaryWeaponTabs = new ArrayList<>();
     private boolean distributeToTaggedPlayersOnly = false;
 
+    /** 是否启用投掷物：禁用时不发放投掷物，背包界面投掷物槽半透明显示。null 或旧配置无此键时视为 true */
+    private Boolean throwablesEnabled = true;
+
     //默认弹匣携带倍数
-    private Integer ammunitionPerMagazineMultiple = 3;
+    private Integer ammunitionPerMagazineMultiple = 6;
 
     private static WeaponFilterConfig createDefault(Path path) {
         WeaponFilterConfig config = new WeaponFilterConfig();
@@ -36,6 +39,7 @@ public class WeaponFilterConfig {
         config.primaryWeaponTabs.add("mg");
         config.secondaryWeaponTabs.add("pistol");
         config.secondaryWeaponTabs.add("rpg");
+        config.secondaryWeaponTabs.add("melee");
         CONFIG_PATH = path;
         return config;
     }
@@ -105,5 +109,14 @@ public class WeaponFilterConfig {
 
     public Integer getAmmunitionPerMagazineMultiple() {
         return ammunitionPerMagazineMultiple;
+    }
+
+    public boolean isThrowablesEnabled() {
+        return throwablesEnabled == null || throwablesEnabled;
+    }
+
+    public void setThrowablesEnabled(boolean value) {
+        this.throwablesEnabled = value;
+        save(this);
     }
 }

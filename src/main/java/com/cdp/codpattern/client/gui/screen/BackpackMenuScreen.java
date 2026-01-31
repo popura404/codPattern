@@ -7,6 +7,7 @@ import com.cdp.codpattern.client.gui.refit.BackpackContextMenu;
 import com.cdp.codpattern.client.gui.refit.NewBackpackButton;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
+import com.cdp.codpattern.config.WeaponFilterConfig.WeaponFilterConfig;
 import com.cdp.codpattern.network.CloneBackpackPacket;
 import com.cdp.codpattern.network.DeleteBackpackPacket;
 import com.cdp.codpattern.network.RequestBackpackConfigPacket;
@@ -190,12 +191,18 @@ public class BackpackMenuScreen extends Screen {
         // 右边线
         graphics.fill(panelRight - 1, grayBarTop, panelRight, panelBottom, 0x38AAAAAA);
 
-        // 中间分割线
-        int dividerX = weaponDisplayX + UNIT_LENGTH * 25 - 1;//weaponDisplayX + (panelRight - weaponDisplayX) / 2;
+        // 四列：主武器 | 副武器 | 投掷物 1 | 投掷物 2（主武器与副武器等宽，投掷物紧凑不平摊到右边）
+        int dividerX = weaponDisplayX + UNIT_LENGTH * 25 - 1;  // 主武器列宽
+        int secondaryColumnWidth = UNIT_LENGTH * 25;            // 副武器列宽与主武器一致
+        int throwableColumnWidth = UNIT_LENGTH * 8;            // 投掷物列紧凑
+        int dividerSecTac = dividerX + secondaryColumnWidth;   // 副武器 | 投掷物 1
+        int dividerTacLeth = dividerSecTac + throwableColumnWidth; // 投掷物 1 | 投掷物 2
 
-        // 武器内容
+        // 武器内容区域（四列各自独立 X，投掷物不占满右侧）
         int primaryWeaponX = weaponDisplayX + panelPadding + 4;
         int secondaryWeaponX = dividerX + panelPadding;
+        int tacticalWeaponX = dividerSecTac + panelPadding;
+        int lethalWeaponX = dividerTacLeth + panelPadding;
 
         // 背包名称
         String displayName = currentHoveredButton.getDisplayNameRaw();
@@ -203,49 +210,97 @@ public class BackpackMenuScreen extends Screen {
         int titleY = grayBarTop + (grayBarBottom - grayBarTop - mc.font.lineHeight) / 2;
         graphics.drawString(mc.font, title, primaryWeaponX, titleY, 0xFFFFFF, true);
 
-        // 中间分割线
+        // 分割线（主|副、副|投1、投1|投2）
         graphics.fillGradient(dividerX, weaponDisplayY + UNIT_LENGTH,
                 dividerX + 1, panelBottom - UNIT_LENGTH,
                 0x40808080, 0x20404040);
+        graphics.fillGradient(dividerSecTac, weaponDisplayY + UNIT_LENGTH,
+                dividerSecTac + 1, panelBottom - UNIT_LENGTH,
+                0x40808080, 0x20404040);
+        graphics.fillGradient(dividerTacLeth, weaponDisplayY + UNIT_LENGTH,
+                dividerTacLeth + 1, panelBottom - UNIT_LENGTH,
+                0x40808080, 0x20404040);
 
-        // 渲染武器信息
+        // 投掷物是否启用（禁用时投掷物槽半透明）
+        WeaponFilterConfig filterConfig = WeaponFilterConfig.getCLIENTweaponFilterConfig();
+        boolean throwablesEnabled = filterConfig == null || filterConfig.isThrowablesEnabled();
+
+        // 渲染武器信息（主武器、副武器、战术、杀伤）
         for (Map.Entry<String, BackPackSelectButton.WeaponInfo> entry : currentWeaponInfo.entrySet()) {
             String type = entry.getKey();
             BackPackSelectButton.WeaponInfo info = entry.getValue();
 
-            // 计算武器区域位置
-            int weaponX = type.equals("primary") ? primaryWeaponX : secondaryWeaponX;
+            int weaponX = switch (type) {
+                case "primary" -> primaryWeaponX;
+                case "secondary" -> secondaryWeaponX;
+                case "tactical" -> tacticalWeaponX;
+                case "lethal" -> lethalWeaponX;
+                default -> primaryWeaponX;
+            };
             int weaponY = weaponDisplayY + UNIT_LENGTH + 2;
 
-            // 渲染武器类型标签
-            String typeLabel = type.equals("primary") ? "§c主武器" : "§9副武器";
+            boolean isThrowableSlot = "tactical".equals(type) || "lethal".equals(type);
+            boolean drawThrowableDimmed = isThrowableSlot && !throwablesEnabled;
+
+            String typeLabel = switch (type) {
+                case "primary" -> "§c主武器";
+                case "secondary" -> "§9副武器";
+                case "tactical" -> "§b投掷物 1";
+                case "lethal" -> "§6投掷物 2";
+                default -> type;
+            };
             graphics.drawString(mc.font, typeLabel, weaponX, weaponY, 0xFFFFFF, true);
 
-            // 渲染武器贴图
-            if (info.texture != null) {
-                RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
+            if (drawThrowableDimmed) {
+                RenderSystem.enableBlend();
+                RenderSystem.setShaderColor(1f, 1f, 1f, 0.22f);
+            }
+            float scale = isThrowableSlot ? 2f : 3f;
+            int slotContentHeight = isThrowableSlot ? UNIT_LENGTH * 5 : UNIT_LENGTH * 7;
+            // 副武器、投掷物1、投掷物2 三栏物品名同一基线（红横线对齐）
+            int nameY = weaponY + mc.font.lineHeight + (isThrowableSlot ? UNIT_LENGTH * 7 : slotContentHeight) + 2;
 
+            if (info.texture != null && !isThrowableSlot) {
+                RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
                 int textureWidth = UNIT_LENGTH * 18;
                 int textureHeight = UNIT_LENGTH * 6;
-
                 int textureX = weaponX;
                 int textureY = weaponY + mc.font.lineHeight + 2;
-
                 graphics.blit(info.texture, textureX, textureY,
                         0, 0, textureWidth, textureHeight,
                         textureWidth, textureHeight);
+            } else if (info.itemStack != null && !info.itemStack.isEmpty()) {
+                int itemSize = (int) (16 * scale);
+                int maxSlotWidth = isThrowableSlot ? (throwableColumnWidth - panelPadding * 2) : (UNIT_LENGTH * 18);
+                int itemX = weaponX + Math.max(0, (maxSlotWidth - itemSize) / 2);
+                int itemY;
+                if (isThrowableSlot) {
+                    int contentTop = weaponY + mc.font.lineHeight + 2;
+                    int contentBottom = nameY - 2;
+                    int contentHeight = Math.max(1, contentBottom - contentTop);
+                    itemY = contentTop + (contentHeight - itemSize) / 2;
+                } else {
+                    itemY = weaponY + mc.font.lineHeight + 2;
+                }
+
+                graphics.pose().pushPose();
+                graphics.pose().translate(itemX, itemY, 0);
+                graphics.pose().scale(scale, scale, 1);
+                graphics.renderItem(info.itemStack, 0, 0);
+                graphics.pose().popPose();
             }
 
-            // 渲染武器名
             if (info.weaponName != null) {
-                int nameY = weaponY + mc.font.lineHeight + UNIT_LENGTH * 7 + 4;
                 graphics.drawString(mc.font, info.weaponName, weaponX, nameY, 0xFFFFFFFF, false);
             }
-
-            // 渲染枪包名
-            if (info.packName != null) {
+            if (info.packName != null && !isThrowableSlot) {
                 int packY = weaponY + mc.font.lineHeight * 2 + UNIT_LENGTH * 7 + 6;
                 graphics.drawString(mc.font, info.packName, weaponX, packY, 0xAAFFFFFF, false);
+            }
+
+            if (drawThrowableDimmed) {
+                RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+                RenderSystem.disableBlend();
             }
         }
     }

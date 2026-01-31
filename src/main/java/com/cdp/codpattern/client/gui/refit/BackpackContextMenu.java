@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * COD MWII 风格的右键上下文菜单
+ * 右键上下文菜单
  * 用于背包卡片的 重命名/复制/删除 操作
  */
 public class BackpackContextMenu implements Renderable, GuiEventListener, NarratableEntry {

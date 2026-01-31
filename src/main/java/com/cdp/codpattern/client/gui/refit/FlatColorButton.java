@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.compatibility.lrtactical.api.APIextension;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.api.item.IGun;
@@ -35,6 +36,8 @@ public class FlatColorButton extends Button {
     private Component weaponPackinfo;
     private ResourceLocation Teaxture;
     private ItemStack lastWeaponSnapshot = ItemStack.EMPTY;
+    /** 为 true 时不渲染蓝色包名（用于投掷物槽位） */
+    private boolean hidePackName = false;
 
 
     // 普通按钮
@@ -91,12 +94,17 @@ public class FlatColorButton extends Button {
         }
 
         // 渲染贴图（支持悬停高亮）
-        if(isPhotoButton && Teaxture != null) {
-            renderTexture(graphics, isHoveredOrFocused());
+        if (isPhotoButton && weapon != null && !weapon.isEmpty()) {
+            if (Teaxture != null) {
+                renderTexture(graphics, isHoveredOrFocused());
+            } else {
+                // LR Tactical 近战武器等无 TaCZ HUD 贴图的物品 - 使用物品图标渲染
+                renderItemFallback(graphics, isHoveredOrFocused());
+            }
         }
 
-        // 渲染包名（如果有）
-        if (weaponPackinfo != null){
+        // 渲染包名（如果有，投掷物槽位不显示）
+        if (weaponPackinfo != null && !hidePackName) {
             graphics.drawString(Minecraft.getInstance().font, this.weaponPackinfo,
                     this.getX() + 4, this.getY() + 4, CodTheme.TEXT_PRIMARY);
         }
@@ -122,6 +130,30 @@ public class FlatColorButton extends Button {
         graphics.fill(this.getX(), this.getY() + this.height,
                 this.getX() + this.width, this.getY() + this.height + 2,
                 CodTheme.HOVER_BORDER_SEMI);
+    }
+
+    /** 无 TaCZ 贴图时的物品图标回退渲染（近战武器、投掷物等） */
+    protected void renderItemFallback(GuiGraphics graphics, boolean isHovered) {
+        if (weapon == null || weapon.isEmpty()) return;
+
+        float scale = 3f;
+        int itemSize = (int) (16 * scale);
+        int x = this.getX() + (this.width - itemSize) / 2;
+        int y = this.getY() + 3 * UNIT_LENGTH;
+
+        if (isHovered) {
+            RenderSystem.setShaderColor(1.15f, 1.15f, 1.15f, 1.0f);
+        } else {
+            RenderSystem.setShaderColor(0.9f, 0.9f, 0.9f, 0.95f);
+        }
+
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 0);
+        graphics.pose().scale(scale, scale, 1);
+        graphics.renderItem(weapon, 0, 0);
+        graphics.pose().popPose();
+
+        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
     }
 
     protected void renderTexture(GuiGraphics graphics, boolean isHovered){
@@ -190,10 +222,17 @@ public class FlatColorButton extends Button {
                         .withStyle(ChatFormatting.BLUE)
                         .withStyle(ChatFormatting.ITALIC);
             }
+        } else {
+            this.weaponPackinfo = APIextension.getLrItemPackName(weapon);
         }
 
         // 枪名处理
         this.weaponName = weapon.getHoverName();
+    }
+
+    /** 投掷物槽位不显示蓝色包名时设为 true */
+    public void setHidePackName(boolean hide) {
+        this.hidePackName = hide;
     }
 
     // Getters

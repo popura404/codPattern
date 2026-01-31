@@ -4,6 +4,7 @@ import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.refit.AttachmentConfigButton;
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
+import com.tacz.guns.api.item.IGun;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
@@ -25,7 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * 武器配置菜单 - COD2022 风格
+ * 武器配置菜单
  */
 public class WeaponMenuScreen extends Screen {
 
@@ -37,14 +38,21 @@ public class WeaponMenuScreen extends Screen {
 
     private ItemStack primaryItemStack;
     private ItemStack secondaryItemStack;
+    private ItemStack tacticalItemStack;
+    private ItemStack lethalItemStack;
     private FlatColorButton primaryButton;
     private FlatColorButton secondaryButton;
+    private FlatColorButton tacticalButton;
+    private FlatColorButton lethalButton;
     private int buttonWidth = 0;
+    private int throwableButtonWidth = 0;
     private int buttonHeight = 0;
     private int configButtonHeight = 0;
     private int configButtonY = 0;
     private int primaryX = 0;
     private int secondaryX = 0;
+    private int tacticalX = 0;
+    private int lethalX = 0;
 
     private final Map<String, AttachmentConfigButton> attachmentButtonMap = new HashMap<>();
     private String currentAttachmentSlot = null;
@@ -67,6 +75,8 @@ public class WeaponMenuScreen extends Screen {
     public void TextureandPackInfo() {
         this.primaryItemStack = buildItemStack(backpack.getItem_MAP().get("primary"));
         this.secondaryItemStack = buildItemStack(backpack.getItem_MAP().get("secondary"));
+        this.tacticalItemStack = buildItemStack(backpack.getItem_MAP().get("tactical"));
+        this.lethalItemStack = buildItemStack(backpack.getItem_MAP().get("lethal"));
     }
 
     private ItemStack buildItemStack(BackpackConfig.Backpack.ItemData itemData) {
@@ -97,6 +107,14 @@ public class WeaponMenuScreen extends Screen {
 
         // 渲染标题
         renderTitle(pGuiGraphics);
+
+        // 渲染投掷物槽位标签（左对齐，与主武器/副武器标签风格一致）
+        if (tacticalButton != null) {
+            pGuiGraphics.drawString(Minecraft.getInstance().font, "投掷物 1", tacticalButton.getX(), tacticalButton.getY() - 12, CodTheme.TEXT_SECONDARY, false);
+        }
+        if (lethalButton != null) {
+            pGuiGraphics.drawString(Minecraft.getInstance().font, "投掷物 2", lethalButton.getX(), lethalButton.getY() - 12, CodTheme.TEXT_SECONDARY, false);
+        }
 
         // 渲染底部操作提示条
         renderBottomHintBar(pGuiGraphics);
@@ -183,7 +201,7 @@ public class WeaponMenuScreen extends Screen {
                 this.UNIT_LENGTH,
                 button -> {
                     Minecraft.getInstance().setScreen(
-                            new WeaponScreen(this, this.backpack, this.BAGSERIAL, true)
+                            new WeaponScreen(this, this.backpack, this.BAGSERIAL, "primary")
                     );
                 }
         ) {
@@ -213,7 +231,7 @@ public class WeaponMenuScreen extends Screen {
                 this.UNIT_LENGTH,
                 button -> {
                     Minecraft.getInstance().setScreen(
-                            new WeaponScreen(this, this.backpack, this.BAGSERIAL, false)
+                            new WeaponScreen(this, this.backpack, this.BAGSERIAL, "secondary")
                     );
                 }
         ) {
@@ -226,14 +244,71 @@ public class WeaponMenuScreen extends Screen {
             }
         };
         addRenderableWidget(secondaryButton);
+
+        // 投掷物 1、投掷物 2 紧挨副武器，排布紧凑（参考 COD 配装栏）
+        throwableButtonWidth = 8 * UNIT_LENGTH;
+        tacticalX = 57 * UNIT_LENGTH;
+        int tacticalY = this.height - 18 * UNIT_LENGTH;
+        tacticalButton = new FlatColorButton(
+                tacticalX,
+                tacticalY,
+                throwableButtonWidth,
+                buttonHeight,
+                this.BAGSERIAL,
+                this.tacticalItemStack,
+                this.UNIT_LENGTH,
+                button -> {
+                    Minecraft.getInstance().setScreen(
+                            new WeaponScreen(this, this.backpack, this.BAGSERIAL, "tactical")
+                    );
+                }
+        ) {
+            @Override
+            protected void renderOnHoveredOrFocused(GuiGraphics graphics) {
+                graphics.fillGradient(this.getX(), this.getY(),
+                        this.getX() + this.width, this.getY() + this.height,
+                        CodTheme.HOVER_BG_TOP, CodTheme.HOVER_BG_BOTTOM);
+                renderGoldBorder(graphics, this.getX(), this.getY(), this.width, this.height);
+            }
+        };
+        tacticalButton.setHidePackName(true);  // 投掷物不显示蓝色包名
+        addRenderableWidget(tacticalButton);
+
+        // 投掷物 2
+        lethalX = (57 + 8 + 1) * UNIT_LENGTH;
+        int lethalY = this.height - 18 * UNIT_LENGTH;
+        lethalButton = new FlatColorButton(
+                lethalX,
+                lethalY,
+                throwableButtonWidth,
+                buttonHeight,
+                this.BAGSERIAL,
+                this.lethalItemStack,
+                this.UNIT_LENGTH,
+                button -> {
+                    Minecraft.getInstance().setScreen(
+                            new WeaponScreen(this, this.backpack, this.BAGSERIAL, "lethal")
+                    );
+                }
+        ) {
+            @Override
+            protected void renderOnHoveredOrFocused(GuiGraphics graphics) {
+                graphics.fillGradient(this.getX(), this.getY(),
+                        this.getX() + this.width, this.getY() + this.height,
+                        CodTheme.HOVER_BG_TOP, CodTheme.HOVER_BG_BOTTOM);
+                renderGoldBorder(graphics, this.getX(), this.getY(), this.width, this.height);
+            }
+        };
+        lethalButton.setHidePackName(true);  // 投掷物不显示蓝色包名
+        addRenderableWidget(lethalButton);
     }
 
     private void handleAttachmentButtonHover() {
         String hoveredSlot = null;
 
-        if (primaryButton != null && primaryButton.isHoveredOrFocused()) {
+        if (primaryButton != null && primaryButton.isHoveredOrFocused() && supportsAttachmentConfig(primaryItemStack)) {
             hoveredSlot = "primary";
-        } else if (secondaryButton != null && secondaryButton.isHoveredOrFocused()) {
+        } else if (secondaryButton != null && secondaryButton.isHoveredOrFocused() && supportsAttachmentConfig(secondaryItemStack)) {
             hoveredSlot = "secondary";
         }
 
@@ -259,6 +334,11 @@ public class WeaponMenuScreen extends Screen {
                 }
             }
         }
+    }
+
+    /** 仅 TaCZ 枪械支持配件改装，LR Tactical 近战/投掷物等不支持 */
+    private boolean supportsAttachmentConfig(ItemStack stack) {
+        return stack != null && !stack.isEmpty() && stack.getItem() instanceof IGun;
     }
 
     private void addAttachmentButton(String slot) {

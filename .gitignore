@@ -17,6 +17,10 @@ out
 build
 .gradle
 
+# external dependency sources (decompiled, local only)
+libs-extracted
+libs-src
+
 # other
 eclipse
 run

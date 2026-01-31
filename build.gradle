@@ -5,6 +5,7 @@ buildscript {
     }
     dependencies {
         classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
+        classpath 'org.benf:cfr:0.152'  // Java decompiler for extractDependencySources
     }
 }
 
@@ -149,6 +150,62 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+// 提取依赖到 libs-extracted，便于 Agent 和 IDE 访问
+// 运行: gradlew extractDependencyLibs
+// 若需源码：用 CFR/JD-GUI 反编译 libs-extracted 中的 JAR 到 libs-src/
+tasks.register('extractDependencyLibs', Copy) {
+    group = 'documentation'
+    description = 'Copy TaCZ, LR Tactical, Cloth Config JARs to libs-extracted/ for reference. Decompile to libs-src/ for agent source access.'
+    from configurations.compileClasspath
+    into layout.projectDirectory.dir('libs-extracted')
+    include { f ->
+        def name = f.name.toLowerCase()
+        name.contains('timeless-and-classics') || name.contains('tacz') ||
+        name.contains('lr-tactical') || name.contains('lrtactical') ||
+        name.contains('cloth-config')
+    }
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    doLast {
+        println "Extracted to libs-extracted/. For decompiled sources: use CFR (https://www.benf.org/other/cfr/) or JD-GUI, output to libs-src/"
+    }
+}
+
+// 解压+反编译依赖到 libs-src（含 assets、data 等资源 + Java 源码）
+// 运行: gradlew decompileDependencies
+tasks.register('decompileDependencies') {
+    group = 'documentation'
+    description = 'Extract full JAR (assets, data, etc.) and decompile .class to .java in libs-src/'
+    dependsOn extractDependencyLibs
+    def libsExtracted = file("${layout.projectDirectory}/libs-extracted")
+    def libsSrc = file("${layout.projectDirectory}/libs-src")
+    inputs.files(fileTree(libsExtracted) { include '*.jar' })
+    outputs.dir(libsSrc)
+
+    doLast {
+        libsSrc.mkdirs()
+        fileTree(libsExtracted) { include '*.jar' }.each { jar ->
+            def outDir = new File(libsSrc, jar.name.replaceAll(/\.jar$/, ''))
+            outDir.mkdirs()
+
+            // 1. 完整解压 JAR（assets、data、META-INF、.class 等）
+            project.copy {
+                from project.zipTree(jar)
+                into outDir
+                duplicatesStrategy = DuplicatesStrategy.INCLUDE
+            }
+            println "Extracted ${jar.name} (assets, data, etc.) -> ${outDir}"
+
+            // 2. CFR 反编译 .class -> .java
+            project.javaexec {
+                mainClass = 'org.benf.cfr.reader.Main'
+                classpath = buildscript.configurations.classpath
+                args jar.absolutePath, '--outputdir', outDir.absolutePath, '--silent', 'true'
+            }
+            println "Decompiled .class -> .java for ${jar.name}"
+        }
+    }
 }
 
 tasks.register('dumpSrcJava') {

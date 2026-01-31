@@ -88,6 +88,13 @@ public class Weaponhandling {
                         player.getInventory().setItem(0, stack);
                     } else if ("secondary".equals(weaponType)) {
                         player.getInventory().setItem(1, stack);
+                    } else if (("tactical".equals(weaponType) || "lethal".equals(weaponType))
+                            && filterConfig.isThrowablesEnabled()) {
+                        if ("tactical".equals(weaponType)) {
+                            player.getInventory().setItem(2, stack);
+                        } else {
+                            player.getInventory().setItem(3, stack);
+                        }
                     }
                 }
             }

@@ -104,6 +104,8 @@ public class BackpackConfigManager {
         BackpackConfig.Backpack newBackpack = new BackpackConfig.Backpack("自定义背包 #" + id);
         newBackpack.setItem_MAP("primary", BackpackConfig.getItemDataADDP());
         newBackpack.setItem_MAP("secondary", BackpackConfig.getItemDataADDS());
+        newBackpack.setItem_MAP("tactical", BackpackConfig.getItemDataTactical());
+        newBackpack.setItem_MAP("lethal", BackpackConfig.getItemDataLethal());
 
         // 添加到玩家数据
         if (playerData.addBackpack(id, newBackpack)) {

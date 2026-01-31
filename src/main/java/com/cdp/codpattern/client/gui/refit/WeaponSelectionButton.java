@@ -1,5 +1,6 @@
 package com.cdp.codpattern.client.gui.refit;
 
+import com.cdp.codpattern.compatibility.lrtactical.api.APIextension;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.tacz.guns.api.item.IGun;
 import com.tacz.guns.client.resource.ClientAssetsManager;
@@ -60,7 +61,16 @@ public class WeaponSelectionButton extends Button {
 
             RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
         } else {
-            graphics.renderItem(weapon, this.getX() + this.width / 2 - 8, this.getY() + this.height / 2 - 8);
+            // 近战武器等无 HUD 贴图的物品 - 放大渲染以匹配枪械贴图的视觉大小
+            float scale = 3f;
+            int itemSize = (int) (16 * scale);
+            int x = this.getX() + (this.width - itemSize) / 2;
+            int y = this.getY() + (this.height / 4);
+            graphics.pose().pushPose();
+            graphics.pose().translate(x, y, 0);
+            graphics.pose().scale(scale, scale, 1);
+            graphics.renderItem(weapon, 0, 0);
+            graphics.pose().popPose();
         }
 
         if (isHoveredOrFocused() && Minecraft.getInstance().screen != null) {
@@ -70,15 +80,21 @@ public class WeaponSelectionButton extends Button {
         //显示枪名
         graphics.drawString(Minecraft.getInstance().font, weapon.getHoverName(), this.getX() + 2 , this.getY() + this.height - UNIT_LENGTH ,0xDDFFFFFF);
 
-        //显示枪包名  <  关键代码》》Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC);  >
+        //显示枪包名 / LR Tactical 包名
+        Component packName = null;
         if (weapon.getItem() instanceof IGun iGun) {
             ResourceLocation gunId = iGun.getGunId(weapon);
             if (gunId != null) {
                 PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
                 if (packInfoObject != null && packInfoObject.getName() != null) {
-                    graphics.drawString(Minecraft.getInstance().font , Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC) , this.getX() + 2 , this.getY() + 2 ,0xDDFFFFFF);
+                    packName = Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC);
                 }
             }
+        } else {
+            packName = APIextension.getLrItemPackName(weapon);
+        }
+        if (packName != null) {
+            graphics.drawString(Minecraft.getInstance().font, packName, this.getX() + 2, this.getY() + 2, 0xDDFFFFFF);
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.compatibility.lrtactical.api.APIextension;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
 import com.cdp.codpattern.network.handler.PacketHandler;
 import com.cdp.codpattern.network.SelectBackpackPacket;
@@ -97,11 +98,11 @@ public class BackPackSelectButton extends Button {
 
                 weaponStack.setCount(itemData.getCount());
 
-                if (weaponStack.getItem() instanceof IGun) {
-                    WeaponInfo info = extractWeaponInfo(weaponStack);
-                    if (info != null) {
-                        weaponInfoCache.put(type, info);
-                    }
+                WeaponInfo info = weaponStack.getItem() instanceof IGun
+                        ? extractWeaponInfo(weaponStack)
+                        : extractItemInfo(weaponStack);
+                if (info != null) {
+                    weaponInfoCache.put(type, info);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -133,6 +134,20 @@ public class BackPackSelectButton extends Button {
             Component weaponName = weapon.getHoverName();
 
             return new WeaponInfo(texture, weaponName, packName, weapon);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /** 非 TaCZ 枪械物品（近战、投掷物等）的信息提取 */
+    private WeaponInfo extractItemInfo(ItemStack item) {
+        if (item == null || item.isEmpty()) return null;
+
+        try {
+            Component weaponName = item.getHoverName();
+            Component packName = APIextension.getLrItemPackName(item);
+            return new WeaponInfo(null, weaponName, packName, item);
         } catch (Exception e) {
             e.printStackTrace();
             return null;
