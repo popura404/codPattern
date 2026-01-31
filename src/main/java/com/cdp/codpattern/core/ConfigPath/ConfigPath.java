@@ -12,12 +12,11 @@ public enum ConfigPath {
     SERVERFLITER("serverconfig/codpattern/filterconfig"),
     SERVER_ATTACHMENT_PRESET("serverconfig/codpattern/attachment_preset");
 
-    private final String path;
 
+    private final String path;
     ConfigPath(String path){
         this.path = path;
     }
-
     public Path getPath(MinecraftServer server){
         return server.getWorldPath(LevelResource.ROOT).resolve(path);
     }

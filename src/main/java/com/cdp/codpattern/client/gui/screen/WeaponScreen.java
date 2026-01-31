@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.client.gui.refit.WeaponSelectionButton;
+import com.cdp.codpattern.compatibility.lrtactical.api.APIextension;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
 import com.cdp.codpattern.config.WeaponFilterConfig.WeaponFilterConfig;
 import com.cdp.codpattern.network.UpdateWeaponPacket;
@@ -20,11 +21,14 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
 import com.cdp.codpattern.network.handler.PacketHandler;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import static me.xjqsh.lrtactical.init.ModItems.MELEE_TAB;
 
 public class WeaponScreen extends Screen {
 
@@ -85,6 +89,7 @@ public class WeaponScreen extends Screen {
         }
         List<String> tabNames = isPrimary ? filterConfig.getPrimaryWeaponTabs() : filterConfig.getSecondaryWeaponTabs();
 
+        //获取tacz物品或lrtac
         for (String tabName : tabNames) {
             List<ItemStack> items = getItemsFromTab(tabName);
             if (!items.isEmpty()) {
@@ -104,9 +109,10 @@ public class WeaponScreen extends Screen {
             case "smg": gunTabType = GunTabType.SMG; break;
             case "mg": gunTabType = GunTabType.MG; break;
             case "rpg": gunTabType = GunTabType.RPG; break;
+            case "melee": return APIextension.fillLRItemCategory(true);
+            case "throwable": return APIextension.fillLRItemCategory(false);
             default: return new ArrayList<>();
         }
-
         return AbstractGunItem.fillItemCategory(gunTabType);
     }
 
@@ -355,6 +361,7 @@ public class WeaponScreen extends Screen {
             case "smg" -> Component.translatable("tacz.type.smg.name");
             case "mg" -> Component.translatable("tacz.type.mg.name");
             case "rpg" -> Component.translatable("tacz.type.rpg.name");
+            case "melee" -> Component.translatable("lrtactical.type.melee.name");
             default -> Component.literal(tabName.toUpperCase());
         };
     }

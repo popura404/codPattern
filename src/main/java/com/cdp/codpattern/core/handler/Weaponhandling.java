@@ -36,11 +36,7 @@ public class Weaponhandling {
         if (player.isSpectator()) return;
 
         //不是喜欢的带标签的玩家，直接不发
-        if (filterConfig.isDistributeToTaggedPlayersOnly()) {
-            if (!player.getTags().contains("cdpplayer")) {
-                return;
-            }
-        }
+        if (filterConfig.isDistributeToTaggedPlayersOnly() && !player.getTags().contains("cdpplayer")) return;
 
         String uuid = player.getUUID().toString();
         BackpackConfig.PlayerBackpackData playerData =

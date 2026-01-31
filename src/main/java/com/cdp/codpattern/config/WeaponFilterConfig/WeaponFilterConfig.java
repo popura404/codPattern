@@ -1,6 +1,5 @@
 package com.cdp.codpattern.config.WeaponFilterConfig;
 
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
