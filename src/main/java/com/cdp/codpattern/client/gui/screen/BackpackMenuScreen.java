@@ -321,7 +321,6 @@ public class BackpackMenuScreen extends Screen {
 
         List<BackpackActionButton> actions = new ArrayList<>();
 
-        // 只添加"配置"按钮，重命名/复制/删除移到右键菜单
         actions.add(new BackpackActionButton(
                 baseX,
                 baseY,
@@ -552,7 +551,7 @@ public class BackpackMenuScreen extends Screen {
                 });
                 return true;
             }
-            // 否则关闭整个界面
+            // 否则关闭所有界面
             Minecraft.getInstance().execute(() -> {
                 if (Minecraft.getInstance().player != null) {
                     Minecraft.getInstance().player.playNotifySound(
