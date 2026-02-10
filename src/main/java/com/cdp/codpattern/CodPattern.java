@@ -7,8 +7,7 @@ import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
 @Mod(CodPattern.MODID)
-public class CodPattern
-{
+public class CodPattern {
     public static final String MODID = "codpattern";
 
     public CodPattern() {
@@ -19,5 +18,18 @@ public class CodPattern
     private void setup(final FMLCommonSetupEvent event) {
         // 注册网络包
         PacketHandler.register();
+    }
+
+    @net.minecraftforge.eventbus.api.SubscribeEvent
+    public void onServerStarting(net.minecraftforge.event.server.ServerStartingEvent event) {
+        com.cdp.codpattern.config.TdmConfig.CodTdmConfig.load(event.getServer());
+    }
+
+    @SuppressWarnings("deprecation") // 保留旧命令以向后兼容，新命令请使用 /fpsm tdm
+    @net.minecraftforge.eventbus.api.SubscribeEvent
+    public void onRegisterCommands(net.minecraftforge.event.RegisterCommandsEvent event) {
+        // 旧命令 (已弃用): /codtdm create <mapName>
+        // 新命令: /fpsm tdm create <mapName> (通过 TdmFpsmCommandHandler 注册)
+        com.cdp.codpattern.command.CodTdmCommands.register(event.getDispatcher());
     }
 }

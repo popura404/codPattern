@@ -10,14 +10,16 @@ public enum ConfigPath {
 
     SERVERBACKPACK("serverconfig/codpattern/backpackconfig"),
     SERVERFLITER("serverconfig/codpattern/filterconfig"),
-    SERVER_ATTACHMENT_PRESET("serverconfig/codpattern/attachment_preset");
-
+    SERVER_ATTACHMENT_PRESET("serverconfig/codpattern/attachment_preset"),
+    SERVER_TDM_CONFIG("serverconfig/codpattern/tdmconfig");
 
     private final String path;
-    ConfigPath(String path){
+
+    ConfigPath(String path) {
         this.path = path;
     }
-    public Path getPath(MinecraftServer server){
+
+    public Path getPath(MinecraftServer server) {
         return server.getWorldPath(LevelResource.ROOT).resolve(path);
     }
 }

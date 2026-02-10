@@ -12,10 +12,15 @@ import org.slf4j.Logger;
 public class ClientModEvents {
 
     private static final Logger LOGGER = LogUtils.getLogger();
+
     @SubscribeEvent
-    public static void onClientSetup(FMLClientSetupEvent event)
-    {
+    public static void onClientSetup(FMLClientSetupEvent event) {
         LOGGER.info("HELLO FROM CLIENT SETUP");
         LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+    }
+
+    @SubscribeEvent
+    public static void registerGuiOverlays(net.minecraftforge.client.event.RegisterGuiOverlaysEvent event) {
+        event.registerAboveAll("tdm_hud", com.cdp.codpattern.client.gui.overlay.TdmHudOverlay.INSTANCE);
     }
 }

@@ -19,7 +19,7 @@ public class RenameBackpackScreen extends Screen {
     private Button confirmButton;
 
     public RenameBackpackScreen(BackpackMenuScreen parent, int backpackId, String currentName) {
-        super(Component.literal("Rename Backpack"));
+        super(Component.translatable("screen.codpattern.rename_backpack.title"));
         this.parent = parent;
         this.backpackId = backpackId;
         this.currentName = currentName == null ? "" : currentName;
@@ -32,7 +32,8 @@ public class RenameBackpackScreen extends Screen {
         int boxWidth = 200;
         int boxHeight = 20;
 
-        nameBox = new EditBox(this.font, centerX - boxWidth / 2, centerY - 20, boxWidth, boxHeight, Component.literal("背包名称"));
+        nameBox = new EditBox(this.font, centerX - boxWidth / 2, centerY - 20, boxWidth, boxHeight,
+                Component.translatable("screen.codpattern.rename_backpack.name_label"));
         nameBox.setMaxLength(32);
         nameBox.setValue(currentName);
         nameBox.setFocused(true);
@@ -40,12 +41,13 @@ public class RenameBackpackScreen extends Screen {
         addRenderableWidget(nameBox);
         setInitialFocus(nameBox);
 
-        confirmButton = Button.builder(Component.literal("确定"), btn -> submit())
+        confirmButton = Button.builder(Component.translatable("screen.codpattern.common.confirm"), btn -> submit())
                 .bounds(centerX - boxWidth / 2, centerY + 10, 98, 20)
                 .build();
         confirmButton.active = !currentName.trim().isEmpty();
 
-        Button cancelButton = Button.builder(Component.literal("取消"), btn -> onClose())
+        Button cancelButton = Button
+                .builder(Component.translatable("screen.codpattern.common.cancel"), btn -> onClose())
                 .bounds(centerX - boxWidth / 2 + 102, centerY + 10, 98, 20)
                 .build();
 
@@ -64,8 +66,11 @@ public class RenameBackpackScreen extends Screen {
     public void render(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
-        graphics.drawCenteredString(this.font, Component.literal("重命名背包 #" + backpackId), this.width / 2, this.height / 2 - 50, 0xFFFFFF);
-        graphics.drawCenteredString(this.font, Component.literal("请输入新的背包名称"), this.width / 2, this.height / 2 - 35, 0xAAAAAA);
+        graphics.drawCenteredString(this.font,
+                Component.translatable("screen.codpattern.rename_backpack.header", backpackId), this.width / 2,
+                this.height / 2 - 50, 0xFFFFFF);
+        graphics.drawCenteredString(this.font, Component.translatable("screen.codpattern.rename_backpack.prompt"),
+                this.width / 2, this.height / 2 - 35, 0xAAAAAA);
     }
 
     private void submit() {
