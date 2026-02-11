@@ -5,6 +5,9 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * 客户端TDM游戏状态管理器
  */
@@ -17,6 +20,7 @@ public class ClientTdmState {
     // 分数
     public static int team1Score = 0;
     public static int team2Score = 0;
+    public static final Map<String, Integer> teamScores = new HashMap<>();
     public static int gameTimeTicks = 0;
 
     // 倒计时（旧字段保留兼容）
@@ -77,6 +81,9 @@ public class ClientTdmState {
                 startFadeOut();
                 // 触发传送音效
                 playTeleportSound = true;
+            }
+            if (!"PLAYING".equals(phase)) {
+                clearDeathCam();
             }
             phaseFlashTicks = PHASE_FLASH_DURATION;
             triggerPhaseAnnouncement(phase);
@@ -146,12 +153,29 @@ public class ClientTdmState {
 
     // 更新分数
     public static void updateScore(int t1, int t2, int time) {
-        if (t1 != team1Score || t2 != team2Score) {
+        updateScore(new HashMap<>(), t1, t2, time);
+    }
+
+    public static void updateScore(Map<String, Integer> scores, int legacyTeam1, int legacyTeam2, int time) {
+        int oldTeam1 = team1Score;
+        int oldTeam2 = team2Score;
+
+        teamScores.clear();
+        if (scores != null && !scores.isEmpty()) {
+            teamScores.putAll(scores);
+        }
+
+        team1Score = teamScores.getOrDefault("kortac", legacyTeam1);
+        team2Score = teamScores.getOrDefault("specgru", legacyTeam2);
+
+        if (team1Score != oldTeam1 || team2Score != oldTeam2) {
             scorePulseTicks = SCORE_PULSE_DURATION;
         }
-        team1Score = t1;
-        team2Score = t2;
         gameTimeTicks = time;
+    }
+
+    public static int getTeamScore(String teamName, int fallback) {
+        return teamScores.getOrDefault(teamName, fallback);
     }
 
     public static void resetMatchState() {
@@ -159,6 +183,7 @@ public class ClientTdmState {
         remainingTimeTicks = 0;
         team1Score = 0;
         team2Score = 0;
+        teamScores.clear();
         gameTimeTicks = 0;
         countdown = 0;
         blackout = false;
@@ -176,9 +201,7 @@ public class ClientTdmState {
         announcementKey = "";
         announcementTicks = 0;
         announcementTotalTicks = 0;
-        isDead = false;
-        killerName = "";
-        deathCamTicks = 0;
+        clearDeathCam();
     }
 
     // 更新倒计时（收到黑屏数据包时调用）
@@ -202,8 +225,14 @@ public class ClientTdmState {
     // 设置死亡视角
     public static void setDeathCam(String killer, int duration) {
         isDead = true;
-        killerName = killer;
-        deathCamTicks = duration;
+        killerName = (killer == null || killer.isBlank()) ? "Unknown" : killer;
+        deathCamTicks = Math.max(0, duration);
+    }
+
+    public static void clearDeathCam() {
+        isDead = false;
+        killerName = "";
+        deathCamTicks = 0;
     }
 
     /**
@@ -293,8 +322,9 @@ public class ClientTdmState {
         }
         if (deathCamTicks > 0) {
             deathCamTicks--;
-            if (deathCamTicks == 0)
-                isDead = false;
+            if (deathCamTicks == 0) {
+                clearDeathCam();
+            }
         }
 
         // ========== 黑屏阶段 tick ==========

@@ -9,7 +9,7 @@ import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public class PacketHandler {
-        private static final String PROTOCOL_VERSION = "3";
+        private static final String PROTOCOL_VERSION = "5";
         public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
                         new ResourceLocation("codpattern", "main"),
                         () -> PROTOCOL_VERSION,
@@ -216,6 +216,14 @@ public class PacketHandler {
                                 .consumerMainThread(com.cdp.codpattern.network.tdm.DeathCamPacket::handle)
                                 .add();
 
+                // physicsmod 兼容：触发死亡实体保留（ragdoll/mob）
+                INSTANCE.messageBuilder(com.cdp.codpattern.network.tdm.PhysicsMobRetainPacket.class, id(),
+                                NetworkDirection.PLAY_TO_CLIENT)
+                                .decoder(com.cdp.codpattern.network.tdm.PhysicsMobRetainPacket::decode)
+                                .encoder(com.cdp.codpattern.network.tdm.PhysicsMobRetainPacket::encode)
+                                .consumerMainThread(com.cdp.codpattern.network.tdm.PhysicsMobRetainPacket::handle)
+                                .add();
+
                 // 游戏阶段
                 INSTANCE.messageBuilder(com.cdp.codpattern.network.tdm.GamePhasePacket.class, id(),
                                 NetworkDirection.PLAY_TO_CLIENT)
@@ -238,6 +246,38 @@ public class PacketHandler {
                                 .decoder(com.cdp.codpattern.network.tdm.ScoreUpdatePacket::decode)
                                 .encoder(com.cdp.codpattern.network.tdm.ScoreUpdatePacket::encode)
                                 .consumerMainThread(com.cdp.codpattern.network.tdm.ScoreUpdatePacket::handle)
+                                .add();
+
+                // Ready 状态切换
+                INSTANCE.messageBuilder(com.cdp.codpattern.network.tdm.SetReadyStatePacket.class, id(),
+                                NetworkDirection.PLAY_TO_SERVER)
+                                .decoder(com.cdp.codpattern.network.tdm.SetReadyStatePacket::decode)
+                                .encoder(com.cdp.codpattern.network.tdm.SetReadyStatePacket::encode)
+                                .consumerMainThread(com.cdp.codpattern.network.tdm.SetReadyStatePacket::handle)
+                                .add();
+
+                // 加入房间 ACK
+                INSTANCE.messageBuilder(com.cdp.codpattern.network.tdm.JoinRoomResultPacket.class, id(),
+                                NetworkDirection.PLAY_TO_CLIENT)
+                                .decoder(com.cdp.codpattern.network.tdm.JoinRoomResultPacket::decode)
+                                .encoder(com.cdp.codpattern.network.tdm.JoinRoomResultPacket::encode)
+                                .consumerMainThread(com.cdp.codpattern.network.tdm.JoinRoomResultPacket::handle)
+                                .add();
+
+                // 离开房间 ACK
+                INSTANCE.messageBuilder(com.cdp.codpattern.network.tdm.LeaveRoomResultPacket.class, id(),
+                                NetworkDirection.PLAY_TO_CLIENT)
+                                .decoder(com.cdp.codpattern.network.tdm.LeaveRoomResultPacket::decode)
+                                .encoder(com.cdp.codpattern.network.tdm.LeaveRoomResultPacket::encode)
+                                .consumerMainThread(com.cdp.codpattern.network.tdm.LeaveRoomResultPacket::handle)
+                                .add();
+
+                // 配装写入结果 ACK
+                INSTANCE.messageBuilder(com.cdp.codpattern.network.UpdateWeaponResultPacket.class, id(),
+                                NetworkDirection.PLAY_TO_CLIENT)
+                                .decoder(com.cdp.codpattern.network.UpdateWeaponResultPacket::decode)
+                                .encoder(com.cdp.codpattern.network.UpdateWeaponResultPacket::encode)
+                                .consumerMainThread(com.cdp.codpattern.network.UpdateWeaponResultPacket::handle)
                                 .add();
         }
 

@@ -1,10 +1,14 @@
 package com.cdp.codpattern.fpsmatch.map;
 
 import com.cdp.codpattern.config.TdmConfig.CodTdmConfig;
+import com.cdp.codpattern.core.handler.Weaponhandling;
+import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.network.handler.PacketHandler;
 import com.cdp.codpattern.network.tdm.CountdownPacket;
+import com.cdp.codpattern.network.tdm.DeathCamPacket;
 import com.cdp.codpattern.network.tdm.GamePhasePacket;
+import com.cdp.codpattern.network.tdm.PhysicsMobRetainPacket;
 import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
 import com.cdp.codpattern.network.tdm.TeamPlayerListPacket;
 import com.cdp.codpattern.network.tdm.VoteDialogPacket;
@@ -74,6 +78,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
     // ========== 玩家统计 ==========
     private final Map<UUID, Integer> playerKills = new HashMap<>();
     private final Map<UUID, Integer> playerDeaths = new HashMap<>();
+    private final Map<UUID, Boolean> readyStates = new HashMap<>();
 
     // ========== 投票系统 ==========
     private VoteSession activeVoteSession = null;
@@ -172,16 +177,8 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
 
         GamePhasePacket phasePacket = new GamePhasePacket(phase.name(), remainingTime);
 
-        // 同步分数
-        int team1Score = 0;
-        int team2Score = 0;
-        List<BaseTeam> teams = getMapTeams().getTeams();
-        if (teams.size() >= 1)
-            team1Score = teamScores.getOrDefault(teams.get(0).name, 0);
-        if (teams.size() >= 2)
-            team2Score = teamScores.getOrDefault(teams.get(1).name, 0);
-
-        ScoreUpdatePacket scorePacket = new ScoreUpdatePacket(team1Score, team2Score, gameTimeTicks);
+        // 同步分数（按队伍名）
+        ScoreUpdatePacket scorePacket = new ScoreUpdatePacket(teamScores, gameTimeTicks);
 
         // 同步玩家列表
         TeamPlayerListPacket playerListPacket = new TeamPlayerListPacket(mapName, getTeamPlayers());
@@ -194,6 +191,8 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
                 PacketHandler.sendToPlayer(playerListPacket, player);
             });
         }
+
+        CodTdmRoomManager.getInstance().markRoomListDirty();
     }
 
     @Override
@@ -249,6 +248,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         deathCamPlayers.clear();
         playerKills.clear();
         playerDeaths.clear();
+        readyStates.clear();
         clearActiveVoteSession();
 
         // 重置队伍分数
@@ -271,6 +271,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         clearTransientPlayerState(playerId);
         playerKills.remove(playerId);
         playerDeaths.remove(playerId);
+        readyStates.remove(playerId);
         removePlayerFromActiveVote(playerId);
 
         if (!teleportPlayerToMatchEndPoint(player)) {
@@ -281,6 +282,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         }
 
         PacketHandler.sendToPlayer(new GamePhasePacket(GamePhase.WAITING.name(), 0), player);
+        PacketHandler.sendToPlayer(DeathCamPacket.clear(), player);
         PacketHandler.sendToPlayer(new ScoreUpdatePacket(0, 0, 0), player);
         clearPlayerInventory(player);
         super.leave(player);
@@ -293,6 +295,28 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
     public void switchTeam(ServerPlayer player, String teamName) {
         if (phase != GamePhase.WAITING) {
             player.sendSystemMessage(Component.translatable("message.codpattern.game.team_switch_locked"));
+            return;
+        }
+        if (!getMapTeams().checkTeam(teamName)) {
+            player.sendSystemMessage(Component.literal("§c队伍不存在: " + teamName));
+            return;
+        }
+        Optional<BaseTeam> currentTeamOpt = getMapTeams().getTeamByPlayer(player);
+        if (currentTeamOpt.isEmpty()) {
+            player.sendSystemMessage(Component.literal("§c当前未加入可切换的队伍"));
+            return;
+        }
+        BaseTeam currentTeam = currentTeamOpt.get();
+        if (currentTeam.name.equals(teamName)) {
+            return;
+        }
+        if (getMapTeams().testTeamIsFull(teamName)) {
+            player.sendSystemMessage(Component.literal("§c目标队伍已满"));
+            return;
+        }
+        int maxTeamDiff = CodTdmConfig.getConfig().getMaxTeamDiff();
+        if (!canSwitchWithBalance(currentTeam.name, teamName, maxTeamDiff)) {
+            player.sendSystemMessage(Component.literal("§c切换后将超出队伍人数差限制"));
             return;
         }
         clearTransientPlayerState(player.getUUID());
@@ -338,9 +362,17 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
             case ENDED -> {
                 // 游戏结束，清空背包
                 clearAllPlayersInventory();
+                // 防止玩家停留在旁观模式（如死亡后尚未复活就结束）
+                restoreAllRoomPlayersToAdventure();
+                deathCamPlayers.clear();
+                respawnTimers.clear();
             }
             default -> {
             }
+        }
+
+        if (newPhase != GamePhase.PLAYING) {
+            clearDeathHudForAllPlayers();
         }
 
         // 同步新阶段给所有客户端
@@ -398,15 +430,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         gameTimeTicks++;
         // 每秒同步一次分数和时间 (20 ticks)
         if (gameTimeTicks % 20 == 0) {
-            int team1Score = 0;
-            int team2Score = 0;
-            List<BaseTeam> teams = getMapTeams().getTeams();
-            if (teams.size() >= 1)
-                team1Score = teamScores.getOrDefault(teams.get(0).name, 0);
-            if (teams.size() >= 2)
-                team2Score = teamScores.getOrDefault(teams.get(1).name, 0);
-
-            ScoreUpdatePacket scorePacket = new ScoreUpdatePacket(team1Score, team2Score, gameTimeTicks);
+            ScoreUpdatePacket scorePacket = new ScoreUpdatePacket(teamScores, gameTimeTicks);
             getMapTeams().getJoinedPlayers()
                     .forEach(pd -> pd.getPlayer().ifPresent(p -> PacketHandler.sendToPlayer(scorePacket, p)));
         }
@@ -419,7 +443,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         if (phaseTimer >= 100) {
             if (hasMatchEndTeleportPoint()) {
                 for (PlayerData playerData : getMapTeams().getJoinedPlayers()) {
-                    playerData.getPlayer().ifPresent(player -> teleportPlayerToMatchEndPoint(player));
+                    playerData.getPlayer().ifPresent(this::teleportPlayerToMatchEndPoint);
                 }
             } else {
                 getMapTeams().getJoinedPlayers().forEach(pd -> pd.getPlayer().ifPresent(
@@ -436,7 +460,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
      * 处理玩家击杀
      */
     public void onPlayerKill(ServerPlayer killer, ServerPlayer victim) {
-        if (phase != GamePhase.PLAYING) {
+        if (phase != GamePhase.PLAYING || killer == null || victim == null) {
             return;
         }
 
@@ -448,29 +472,17 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         getMapTeams().getTeamByPlayer(killer).ifPresent(team -> {
             teamScores.merge(team.name, 1, Integer::sum);
             // 立即同步分数
-            int team1Score = 0;
-            int team2Score = 0;
-            List<BaseTeam> teams = getMapTeams().getTeams();
-            if (teams.size() >= 1)
-                team1Score = teamScores.getOrDefault(teams.get(0).name, 0);
-            if (teams.size() >= 2)
-                team2Score = teamScores.getOrDefault(teams.get(1).name, 0);
-
-            ScoreUpdatePacket scorePacket = new ScoreUpdatePacket(team1Score, team2Score, gameTimeTicks);
+            ScoreUpdatePacket scorePacket = new ScoreUpdatePacket(teamScores, gameTimeTicks);
             getMapTeams().getJoinedPlayers()
                     .forEach(pd -> pd.getPlayer().ifPresent(p -> PacketHandler.sendToPlayer(scorePacket, p)));
         });
+        CodTdmRoomManager.getInstance().markRoomListDirty();
 
         // 取消这里的复活调用，统一由 onPlayerDead 处理
         // scheduleRespawn(victim);
     }
 
     // ========== 死亡视角系统 ==========
-
-    /**
-     * 启动死亡视角
-     */
-    // 移除 startDeathCam，合并到 onPlayerDead 处理
 
     /**
      * 更新死亡视角
@@ -539,9 +551,6 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
     /**
      * 复活玩家
      */
-    /**
-     * 复活玩家
-     */
     private void respawnPlayer(ServerPlayer player) {
         // 恢复游戏模式为冒险模式
         player.setGameMode(GameType.ADVENTURE);
@@ -561,6 +570,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         CodTdmConfig config = CodTdmConfig.getConfig();
         invinciblePlayers.add(player.getUUID());
         invincibilityTimers.put(player.getUUID(), config.getInvincibilityTicks());
+        PacketHandler.sendToPlayer(DeathCamPacket.clear(), player);
     }
 
     /**
@@ -584,8 +594,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
             return;
 
         // 获取选中的背包
-        int selectedId = playerData.getSelectedBackpack();
-        BackpackConfig.Backpack backpack = playerData.getBackpacks_MAP().get(selectedId);
+        BackpackConfig.Backpack backpack = resolveBackpack(playerData);
 
         // 获取武器过滤配置 (用于备弹倍率等)
         WeaponFilterConfig filterConfig = WeaponFilterConfig.getWeaponFilterConfig();
@@ -593,6 +602,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         int ammoMultiple = (filterConfig != null && filterConfig.getAmmunitionPerMagazineMultiple() != null)
                 ? filterConfig.getAmmunitionPerMagazineMultiple()
                 : 6;
+        ammoMultiple = Math.max(0, ammoMultiple);
         // 检查是否启用投掷物
         boolean throwablesEnabled = (filterConfig == null) || filterConfig.isThrowablesEnabled();
 
@@ -620,10 +630,15 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
             int ammoMultiple) {
         BackpackConfig.Backpack.ItemData itemData = backpack.getItem_MAP().get(key);
         if (itemData != null) {
-            ResourceLocation itemId = new ResourceLocation(itemData.getItem());
+            ResourceLocation itemId;
+            try {
+                itemId = new ResourceLocation(itemData.getItem());
+            } catch (Exception e) {
+                return;
+            }
             Item item = ForgeRegistries.ITEMS.getValue(itemId);
-            if (item != null) {
-                ItemStack stack = new ItemStack(item, itemData.getCount());
+            if (item != null && item != net.minecraft.world.item.Items.AIR) {
+                ItemStack stack = new ItemStack(item, Math.max(1, itemData.getCount()));
                 if (itemData.getNbt() != null && !itemData.getNbt().isEmpty()) {
                     try {
                         CompoundTag tag = TagParser.parseTag(itemData.getNbt());
@@ -635,9 +650,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
 
                 // 处理备用弹药 (TACZ Guns)
                 if (stack.getItem() instanceof IGun) {
-                    IGun iGun = (IGun) stack.getItem();
-                    int dummyAmmo = iGun.getCurrentAmmoCount(stack) * ammoMultiple;
-                    iGun.setDummyAmmoAmount(stack, dummyAmmo);
+                    Weaponhandling.configureGunAmmo(stack, (IGun) stack.getItem(), ammoMultiple);
                 }
 
                 player.getInventory().setItem(slot, stack);
@@ -645,21 +658,57 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         }
     }
 
+    private BackpackConfig.Backpack resolveBackpack(BackpackConfig.PlayerBackpackData playerData) {
+        if (playerData == null || playerData.getBackpacks_MAP() == null || playerData.getBackpacks_MAP().isEmpty()) {
+            return null;
+        }
+        BackpackConfig.Backpack selected = playerData.getBackpacks_MAP().get(playerData.getSelectedBackpack());
+        if (selected != null) {
+            return selected;
+        }
+        Integer fallbackId = playerData.getBackpacks_MAP().keySet().stream().min(Integer::compareTo).orElse(null);
+        if (fallbackId == null) {
+            return null;
+        }
+        playerData.setSelectedBackpack(fallbackId);
+        return playerData.getBackpacks_MAP().get(fallbackId);
+    }
+
     /**
      * 处理玩家真实死亡逻辑 (被 Kill 或 致命伤)
      */
-    public void onPlayerDead(ServerPlayer player) {
+    public void onPlayerDead(ServerPlayer player, ServerPlayer killer) {
+        Vec3 deathPos = player.position();
+        Vec3 deathVelocity = player.getDeltaMovement();
+
+        // 先广播死亡快照，给 physicsmod 触发 ragdoll/mob 保留（含死者本人）
+        PhysicsMobRetainPacket packet = new PhysicsMobRetainPacket(
+                player.getId(),
+                deathPos.x,
+                deathPos.y,
+                deathPos.z,
+                player.getYRot(),
+                player.getXRot(),
+                player.getYHeadRot(),
+                player.yBodyRot,
+                deathVelocity.x,
+                deathVelocity.y,
+                deathVelocity.z);
+        for (PlayerData playerData : getMapTeams().getJoinedPlayers()) {
+            playerData.getPlayer().ifPresent(target -> PacketHandler.sendToPlayer(packet, target));
+        }
+
         // 设置为旁观模式，避免移动和交互
         player.setGameMode(GameType.SPECTATOR);
 
         // 清空背包（防止死亡掉落，虽然已经取消了死亡事件，加上更保险）
         clearPlayerInventory(player);
 
-        // 计算死亡视角位置：身后 2 格
+        // 计算死亡视角位置：身后稍远、视角稍高
         Vec3 look = player.getLookAngle();
-        Vec3 pos = player.position();
-        // 反向 2 格，稍微抬高一点视线
-        Vec3 camPos = pos.add(look.scale(-2)).add(0, 0.5, 0);
+        Vec3 pos = deathPos;
+        // 反向 2.6 格，抬高 0.75 格
+        Vec3 camPos = pos.add(look.scale(-2.6)).add(0, 0.75, 0);
 
         // 传送玩家并使其朝向死亡点
         player.teleportTo(getServerLevel(), camPos.x, camPos.y, camPos.z, Set.of(), player.getYRot(), player.getXRot());
@@ -667,16 +716,24 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
 
         // 创建死亡视角数据，用于在 tickDeathCam 中锁定玩家位置
         CodTdmConfig config = CodTdmConfig.getConfig();
-        // 如果没有 killer，就用自己作为 killer 位置（虽然不重要，因为我们现在是固定视角看尸体）
+        int deathCamTicks = Math.max(0, config.getDeathCamTicks());
+        int respawnDelayTicks = Math.max(1, config.getRespawnDelayTicks());
+        boolean hasRealKiller = killer != null && !killer.getUUID().equals(player.getUUID());
+        UUID killerId = hasRealKiller ? killer.getUUID() : player.getUUID();
+        String killerName = hasRealKiller ? killer.getGameProfile().getName() : "Unknown";
+
+        PacketHandler.sendToPlayer(new DeathCamPacket(killerId, killerName, deathCamTicks, respawnDelayTicks), player);
+
         DeathCamData camData = new DeathCamData(
                 player.getUUID(),
-                player.getUUID(), // killer unknown in this context, use self
-                pos, // death pos
-                pos, // killer pos (unused)
-                camPos, // camera pos
-                config.getRespawnDelayTicks() // 使用复活延迟时间
-        );
-        deathCamPlayers.put(player.getUUID(), camData);
+                killerId,
+                pos,
+                pos,
+                camPos,
+                deathCamTicks);
+        if (deathCamTicks > 0) {
+            deathCamPlayers.put(player.getUUID(), camData);
+        }
 
         // 安排复活
         scheduleRespawn(player);
@@ -715,6 +772,41 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         invinciblePlayers.remove(playerId);
         invincibilityTimers.remove(playerId);
         deathCamPlayers.remove(playerId);
+    }
+
+    private boolean canSwitchWithBalance(String currentTeam, String targetTeam, int maxTeamDiff) {
+        if (maxTeamDiff < 0) {
+            return true;
+        }
+        int minPlayers = Integer.MAX_VALUE;
+        int maxPlayers = Integer.MIN_VALUE;
+        for (BaseTeam team : getMapTeams().getTeams()) {
+            int size = team.getPlayerList().size();
+            if (team.name.equals(currentTeam)) {
+                size = Math.max(0, size - 1);
+            }
+            if (team.name.equals(targetTeam)) {
+                size += 1;
+            }
+            minPlayers = Math.min(minPlayers, size);
+            maxPlayers = Math.max(maxPlayers, size);
+        }
+        if (minPlayers == Integer.MAX_VALUE || maxPlayers == Integer.MIN_VALUE) {
+            return true;
+        }
+        return (maxPlayers - minPlayers) <= maxTeamDiff;
+    }
+
+    private void restoreAllRoomPlayersToAdventure() {
+        for (PlayerData playerData : getMapTeams().getJoinedPlayers()) {
+            playerData.getPlayer().ifPresent(player -> player.setGameMode(GameType.ADVENTURE));
+        }
+        for (UUID playerId : getMapTeams().getSpecPlayers()) {
+            Player player = getServerLevel().getPlayerByUUID(playerId);
+            if (player instanceof ServerPlayer serverPlayer) {
+                serverPlayer.setGameMode(GameType.ADVENTURE);
+            }
+        }
     }
 
     private boolean teleportPlayerToMatchEndPoint(ServerPlayer player) {
@@ -811,7 +903,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
                     PlayerInfo info = new PlayerInfo(
                             playerId,
                             serverPlayer.getName().getString(),
-                            phase == GamePhase.WAITING, // isReady (在WAITING阶段显示)
+                            readyStates.getOrDefault(playerId, false),
                             playerKills.getOrDefault(playerId, 0),
                             playerDeaths.getOrDefault(playerId, 0),
                             !respawnTimers.containsKey(playerId), // isAlive
@@ -899,6 +991,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         }
 
         broadcastVoteProgress(session);
+        CodTdmRoomManager.getInstance().markRoomListDirty();
         return resolveVoteIfReady(session);
     }
 
@@ -936,6 +1029,16 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
             return false;
         }
 
+        if (type == VoteType.START) {
+            long unreadyCount = joinedPlayers.stream()
+                    .filter(joinedPlayer -> !readyStates.getOrDefault(joinedPlayer.getUUID(), false))
+                    .count();
+            if (unreadyCount > 0) {
+                initiatorPlayer.sendSystemMessage(Component.literal("§e仍有玩家未准备，无法发起开始投票。"));
+                return false;
+            }
+        }
+
         Set<UUID> voters = new HashSet<>();
         for (ServerPlayer joinedPlayer : joinedPlayers) {
             voters.add(joinedPlayer.getUUID());
@@ -956,6 +1059,8 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         for (ServerPlayer joinedPlayer : joinedPlayers) {
             PacketHandler.sendToPlayer(dialogPacket, joinedPlayer);
         }
+
+        CodTdmRoomManager.getInstance().markRoomListDirty();
 
         return true;
     }
@@ -1028,7 +1133,8 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
     private int getRequiredVotes(VoteType type, int totalPlayers) {
         CodTdmConfig config = CodTdmConfig.getConfig();
         int votePercent = type == VoteType.START ? config.getVotePercentageToStart() : config.getVotePercentageToEnd();
-        return Math.max(1, (totalPlayers * votePercent) / 100);
+        int requiredVotes = (int) Math.ceil(totalPlayers * (votePercent / 100.0));
+        return Math.max(1, Math.min(Math.max(1, totalPlayers), requiredVotes));
     }
 
     private void tickVoteSession() {
@@ -1046,6 +1152,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
                 : Component.translatable("message.codpattern.game.vote_timeout_end");
         broadcastToJoinedPlayers(timeoutMessage);
         clearActiveVoteSession();
+        CodTdmRoomManager.getInstance().markRoomListDirty();
     }
 
     private void broadcastVoteProgress(VoteSession session) {
@@ -1088,6 +1195,33 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         session.accepted.remove(playerId);
         session.rejected.remove(playerId);
         resolveVoteIfReady(session);
+        CodTdmRoomManager.getInstance().markRoomListDirty();
+    }
+
+    private void clearDeathHudForAllPlayers() {
+        getMapTeams().getJoinedPlayers().forEach(pd -> pd.getPlayer()
+                .ifPresent(p -> PacketHandler.sendToPlayer(DeathCamPacket.clear(), p)));
+    }
+
+    public void initializeReadyState(ServerPlayer player) {
+        readyStates.put(player.getUUID(), false);
+    }
+
+    public boolean setPlayerReady(ServerPlayer player, boolean ready) {
+        if (phase != GamePhase.WAITING) {
+            return false;
+        }
+        UUID playerId = player.getUUID();
+        if (!checkGameHasPlayer(playerId)) {
+            return false;
+        }
+        readyStates.put(playerId, ready);
+        syncToClient();
+        return true;
+    }
+
+    public boolean isPlayerReady(UUID playerId) {
+        return readyStates.getOrDefault(playerId, false);
     }
 
     /**

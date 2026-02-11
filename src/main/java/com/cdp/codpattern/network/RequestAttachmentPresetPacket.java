@@ -3,6 +3,7 @@ package com.cdp.codpattern.network;
 import com.cdp.codpattern.config.AttachmentPreset.AttachmentPresetManager;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
+import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
 import com.cdp.codpattern.network.handler.PacketHandler;
@@ -21,6 +22,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.network.NetworkEvent;
 import org.slf4j.Logger;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -48,6 +51,10 @@ public class RequestAttachmentPresetPacket {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player == null || player.server == null) {
+                return;
+            }
+            if (player.isSpectator()) {
+                player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c旁观模式下无法进入改装"));
                 return;
             }
             if (!"primary".equals(packet.slot) && !"secondary".equals(packet.slot)) {
@@ -82,14 +89,31 @@ public class RequestAttachmentPresetPacket {
                 AttachmentPropertyManager.postChangeEvent(player, gunStack);
             }
 
-            AttachmentEditSessionManager.startSession(player, packet.bagId, packet.slot, gunStack);
+            List<ItemStack> playerOwnedAttachments = collectPlayerOwnedAttachments(player, gunStack, iGun);
+            AttachmentEditSession session = AttachmentEditSessionManager.startSession(
+                    player, packet.bagId, packet.slot, gunStack, playerOwnedAttachments);
             String expectedGunId = iGun.getGunId(gunStack).toString();
             PacketHandler.sendToPlayer(new SyncAttachmentPresetPacket(packet.bagId, packet.slot,
                     presetPayload.orElse(""), expectedGunId), player);
-            LOGGER.info("Attachment preset request: player={} bagId={} slot={} presetLoaded={}",
-                    player.getGameProfile().getName(), packet.bagId, packet.slot, presetPayload.isPresent());
+            LOGGER.info("Attachment preset request: player={} bagId={} slot={} presetLoaded={} candidates={} truncated={}",
+                    player.getGameProfile().getName(), packet.bagId, packet.slot, presetPayload.isPresent(),
+                    session.getSandboxAttachmentCount(), session.getTruncatedAttachmentCount());
         });
         ctx.get().setPacketHandled(true);
+    }
+
+    private static List<ItemStack> collectPlayerOwnedAttachments(ServerPlayer player, ItemStack gunStack, IGun iGun) {
+        List<ItemStack> attachments = new ArrayList<>();
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            ItemStack stack = player.getInventory().getItem(i);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            if (iGun.allowAttachment(gunStack, stack)) {
+                attachments.add(stack.copy());
+            }
+        }
+        return attachments;
     }
 
     private static ItemStack buildItemStack(BackpackConfig.Backpack.ItemData itemData) {

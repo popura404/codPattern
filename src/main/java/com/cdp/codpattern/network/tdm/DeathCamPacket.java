@@ -12,26 +12,39 @@ import java.util.function.Supplier;
  * S→C: 死亡视角数据包
  */
 public class DeathCamPacket {
+    private static final UUID UNKNOWN_UUID = new UUID(0L, 0L);
     private final UUID killerUuid;
     private final String killerName;
-    private final int durationTicks;
+    private final int deathCamTicks;
+    private final int respawnDelayTicks;
+
+    public DeathCamPacket(UUID killerUuid, String killerName, int deathCamTicks, int respawnDelayTicks) {
+        this.killerUuid = killerUuid == null ? UNKNOWN_UUID : killerUuid;
+        this.killerName = killerName == null ? "" : killerName;
+        this.deathCamTicks = Math.max(0, deathCamTicks);
+        this.respawnDelayTicks = Math.max(0, respawnDelayTicks);
+    }
 
     public DeathCamPacket(UUID killerUuid, String killerName, int durationTicks) {
-        this.killerUuid = killerUuid;
-        this.killerName = killerName;
-        this.durationTicks = durationTicks;
+        this(killerUuid, killerName, durationTicks, durationTicks);
+    }
+
+    public static DeathCamPacket clear() {
+        return new DeathCamPacket(UNKNOWN_UUID, "", 0, 0);
     }
 
     public DeathCamPacket(FriendlyByteBuf buf) {
         this.killerUuid = buf.readUUID();
         this.killerName = buf.readUtf();
-        this.durationTicks = buf.readInt();
+        this.deathCamTicks = buf.readInt();
+        this.respawnDelayTicks = buf.readableBytes() >= Integer.BYTES ? buf.readInt() : this.deathCamTicks;
     }
 
     public void encode(FriendlyByteBuf buf) {
         buf.writeUUID(killerUuid);
         buf.writeUtf(killerName);
-        buf.writeInt(durationTicks);
+        buf.writeInt(deathCamTicks);
+        buf.writeInt(respawnDelayTicks);
     }
 
     public static DeathCamPacket decode(FriendlyByteBuf buf) {
@@ -41,8 +54,12 @@ public class DeathCamPacket {
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
             Minecraft.getInstance().execute(() -> {
-                // 设置死亡视角状态
-                ClientTdmState.setDeathCam(killerName, durationTicks);
+                if (respawnDelayTicks <= 0) {
+                    ClientTdmState.clearDeathCam();
+                    return;
+                }
+                // HUD 倒计时跟随复活延迟；镜头锁定由服务端 deathCamTicks 控制
+                ClientTdmState.setDeathCam(killerName, respawnDelayTicks);
             });
         });
         ctx.get().setPacketHandled(true);

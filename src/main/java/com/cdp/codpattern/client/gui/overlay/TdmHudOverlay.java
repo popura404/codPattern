@@ -41,8 +41,8 @@ public class TdmHudOverlay implements IGuiOverlay {
         }
         return !("WAITING".equals(ClientTdmState.currentPhase)
                 && ClientTdmState.remainingTimeTicks <= 0
-                && ClientTdmState.team1Score == 0
-                && ClientTdmState.team2Score == 0);
+                && getKortacScore() == 0
+                && getSpecgruScore() == 0);
     }
 
     private void renderBlackout(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
@@ -84,13 +84,15 @@ public class TdmHudOverlay implements IGuiOverlay {
         int contentY = y + 4;
         int rowWidth = panelWidth - timerWidth - 10;
         int rowHeight = 18;
-        int maxScore = Math.max(1, Math.max(ClientTdmState.team1Score, ClientTdmState.team2Score));
+        int kortacScore = getKortacScore();
+        int specgruScore = getSpecgruScore();
+        int maxScore = Math.max(1, Math.max(kortacScore, specgruScore));
         float pulseStrength = ClientTdmState.getScorePulseStrength();
 
         renderScoreRow(graphics, font, contentX, contentY, rowWidth, rowHeight, teamShort("kortac"),
-                ClientTdmState.team1Score, (float) ClientTdmState.team1Score / maxScore, 0xFFE35A5A, pulseStrength);
+                kortacScore, (float) kortacScore / maxScore, 0xFFE35A5A, pulseStrength);
         renderScoreRow(graphics, font, contentX, contentY + rowHeight + 2, rowWidth, rowHeight, teamShort("specgru"),
-                ClientTdmState.team2Score, (float) ClientTdmState.team2Score / maxScore, 0xFF66A6FF, pulseStrength);
+                specgruScore, (float) specgruScore / maxScore, 0xFF66A6FF, pulseStrength);
 
         int timerX = x + panelWidth - timerWidth - 4;
         int timerY = y + 4;
@@ -169,19 +171,12 @@ public class TdmHudOverlay implements IGuiOverlay {
             return;
         }
 
-        float wave = 0.5f + 0.5f * (float) Math.sin((ClientTdmState.remainingTimeTicks % 20) * (Math.PI / 10.0));
-        float scale = (secondsLeft <= 3 ? 3.8f : 3.2f) + wave * 0.22f;
+        float scale = secondsLeft <= 3 ? 5.7f : 4.9f;
         int color = secondsLeft <= 3 ? 0xFFFF6A4E : 0xFFFFE28A;
-        int boxSize = 112;
-        int boxX = centerX - boxSize / 2;
-        int boxY = screenHeight / 2 - 82;
-
-        graphics.fillGradient(boxX, boxY, boxX + boxSize, boxY + boxSize, 0xA3111318, 0xA31E1E24);
-        graphics.fill(boxX, boxY + boxSize - 3, boxX + boxSize, boxY + boxSize, withAlpha(color, 190));
-
-        drawScaledCenteredString(graphics, font, String.valueOf(secondsLeft), centerX, boxY + 24, color, scale);
+        int numberY = screenHeight / 2 - 72;
+        drawScaledCenteredString(graphics, font, String.valueOf(secondsLeft), centerX, numberY, color, scale);
         drawCenteredString(graphics, font, Component.translatable("hud.codpattern.tdm.countdown_hint").getString(),
-                centerX, boxY + boxSize + 6, 0xFFE4E4E4);
+                centerX, numberY + 86, 0xFFE4E4E4);
     }
 
     private void renderEndgameSplash(GuiGraphics graphics, Font font, int centerX, int screenWidth, int screenHeight) {
@@ -210,8 +205,8 @@ public class TdmHudOverlay implements IGuiOverlay {
 
         String title = buildEndResultTitle();
         String resultText = buildEndResultText();
-        String scoreLine = Component.translatable("hud.codpattern.tdm.result.scoreline", ClientTdmState.team1Score,
-                ClientTdmState.team2Score).getString();
+        String scoreLine = Component.translatable("hud.codpattern.tdm.result.scoreline", getKortacScore(),
+                getSpecgruScore()).getString();
 
         drawScaledCenteredString(graphics, font, title, centerX, y + 20, (alpha << 24) | 0x00FFFFFF, 2.05f);
         drawCenteredString(graphics, font, resultText, centerX, y + 66, (alpha << 24) | 0x00FFDDA0);
@@ -253,26 +248,26 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private String buildEndResultTitle() {
-        if (ClientTdmState.team1Score > ClientTdmState.team2Score) {
+        if (getKortacScore() > getSpecgruScore()) {
             return Component.translatable("hud.codpattern.tdm.result.kortac_win_title").getString();
         }
-        if (ClientTdmState.team2Score > ClientTdmState.team1Score) {
+        if (getSpecgruScore() > getKortacScore()) {
             return Component.translatable("hud.codpattern.tdm.result.specgru_win_title").getString();
         }
         return Component.translatable("hud.codpattern.tdm.result.draw_title").getString();
     }
 
     private String buildEndResultText() {
-        if (ClientTdmState.team1Score > ClientTdmState.team2Score) {
-            return Component.translatable("hud.codpattern.tdm.announce.kortac_win", ClientTdmState.team1Score,
-                    ClientTdmState.team2Score).getString();
+        if (getKortacScore() > getSpecgruScore()) {
+            return Component.translatable("hud.codpattern.tdm.announce.kortac_win", getKortacScore(),
+                    getSpecgruScore()).getString();
         }
-        if (ClientTdmState.team2Score > ClientTdmState.team1Score) {
-            return Component.translatable("hud.codpattern.tdm.announce.specgru_win", ClientTdmState.team2Score,
-                    ClientTdmState.team1Score).getString();
+        if (getSpecgruScore() > getKortacScore()) {
+            return Component.translatable("hud.codpattern.tdm.announce.specgru_win", getSpecgruScore(),
+                    getKortacScore()).getString();
         }
-        return Component.translatable("hud.codpattern.tdm.announce.draw", ClientTdmState.team1Score,
-                ClientTdmState.team2Score).getString();
+        return Component.translatable("hud.codpattern.tdm.announce.draw", getKortacScore(),
+                getSpecgruScore()).getString();
     }
 
     private String phaseShortText(String phase) {
@@ -308,13 +303,21 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private int endAccentColor() {
-        if (ClientTdmState.team1Score > ClientTdmState.team2Score) {
+        if (getKortacScore() > getSpecgruScore()) {
             return 0xFFE35A5A;
         }
-        if (ClientTdmState.team2Score > ClientTdmState.team1Score) {
+        if (getSpecgruScore() > getKortacScore()) {
             return 0xFF66A6FF;
         }
         return 0xFFFFD700;
+    }
+
+    private int getKortacScore() {
+        return ClientTdmState.getTeamScore("kortac", ClientTdmState.team1Score);
+    }
+
+    private int getSpecgruScore() {
+        return ClientTdmState.getTeamScore("specgru", ClientTdmState.team2Score);
     }
 
     private int withAlpha(int color, int alpha) {

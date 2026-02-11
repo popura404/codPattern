@@ -32,6 +32,9 @@ public class CodTdmConfig {
     private int minPlayersToStart = 1; // 最少1人开始(测试用途)
     private int votePercentageToStart = 60; // 60%投票开始
     private int votePercentageToEnd = 75; // 75%投票结束
+    private boolean allowJoinDuringPlaying = true; // 对局进行中是否允许加入
+    private boolean joinAsSpectatorWhenPlaying = true; // 对局中加入是否旁观
+    private int maxTeamDiff = 1; // 自动分队允许的最大人数差
 
     // Getters
     public static CodTdmConfig getConfig() {
@@ -82,6 +85,18 @@ public class CodTdmConfig {
         return votePercentageToEnd;
     }
 
+    public boolean isAllowJoinDuringPlaying() {
+        return allowJoinDuringPlaying;
+    }
+
+    public boolean isJoinAsSpectatorWhenPlaying() {
+        return joinAsSpectatorWhenPlaying;
+    }
+
+    public int getMaxTeamDiff() {
+        return maxTeamDiff;
+    }
+
     // Setters
     public void setTimeLimitSeconds(int value) {
         this.timeLimitSeconds = value;
@@ -125,6 +140,18 @@ public class CodTdmConfig {
 
     public void setVotePercentageToEnd(int value) {
         this.votePercentageToEnd = value;
+    }
+
+    public void setAllowJoinDuringPlaying(boolean value) {
+        this.allowJoinDuringPlaying = value;
+    }
+
+    public void setJoinAsSpectatorWhenPlaying(boolean value) {
+        this.joinAsSpectatorWhenPlaying = value;
+    }
+
+    public void setMaxTeamDiff(int value) {
+        this.maxTeamDiff = value;
     }
 
     /**

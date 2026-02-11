@@ -6,15 +6,12 @@ import com.cdp.codpattern.core.ConfigPath.ConfigPath;
 import com.cdp.codpattern.network.SyncBackpackConfigPacket;
 import com.cdp.codpattern.network.SyncWeaponFilterPacket;
 import com.cdp.codpattern.network.handler.PacketHandler;
-import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -22,20 +19,12 @@ import java.util.List;
 /**
  * 同步所有在线玩家config的命令，缓存到所有的客户端
  */
-@Mod.EventBusSubscriber(modid = "codpattern", bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class UpdateWeaponfilterConfigCommand {
 
-    @SubscribeEvent
-    public static void onCommandRegister(RegisterCommandsEvent event) {
-        CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
-
-        dispatcher.register(
-                Commands.literal("cdp")
-                        .then(Commands.literal("update")
-                                .requires(source -> source.hasPermission(2))
-                                .executes(context -> executeUpdate(context.getSource()))
-                        )
-        );
+    public static LiteralArgumentBuilder<CommandSourceStack> buildCommand() {
+        return Commands.literal("update")
+                .requires(source -> source.hasPermission(2))
+                .executes(context -> executeUpdate(context.getSource()));
     }
 
     private static int executeUpdate(CommandSourceStack source) {

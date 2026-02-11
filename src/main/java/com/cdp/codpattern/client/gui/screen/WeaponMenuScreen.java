@@ -162,7 +162,7 @@ public class WeaponMenuScreen extends Screen {
         int textY = barY + (barHeight - mc.font.lineHeight) / 2;
 
         // 左侧提示
-        String leftHint = "[LMB] 选择武器    [Hover] 配件配置";
+        String leftHint = "[LMB] 选择武器    [Hover] 更换配件";
         graphics.drawString(mc.font, leftHint, UNIT_LENGTH * 2, textY, CodTheme.TEXT_SECONDARY, false);
 
         // 右侧提示

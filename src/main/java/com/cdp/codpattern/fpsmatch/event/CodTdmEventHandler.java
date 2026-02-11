@@ -7,6 +7,7 @@ import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMapEvent;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.Entity;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -118,8 +119,14 @@ public class CodTdmEventHandler {
         // 取消死亡事件，防止玩家真正死亡
         event.setCanceled(true);
 
+        ServerPlayer killer = null;
+        Entity sourceEntity = event.getSource().getEntity();
+        if (sourceEntity instanceof ServerPlayer serverPlayer) {
+            killer = serverPlayer;
+        }
+
         // 调用地图的死亡处理逻辑
-        tdmMap.onPlayerDead(player);
+        tdmMap.onPlayerDead(player, killer);
 
         // 恢复玩家到满血状态（因为取消了死亡）
         player.setHealth(player.getMaxHealth());

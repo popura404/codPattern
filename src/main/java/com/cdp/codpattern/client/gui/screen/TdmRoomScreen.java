@@ -9,6 +9,7 @@ import com.cdp.codpattern.network.handler.PacketHandler;
 import com.cdp.codpattern.network.tdm.JoinRoomPacket;
 import com.cdp.codpattern.network.tdm.LeaveRoomPacket;
 import com.cdp.codpattern.network.tdm.RequestRoomListPacket;
+import com.cdp.codpattern.network.tdm.SetReadyStatePacket;
 import com.cdp.codpattern.network.tdm.SelectTeamPacket;
 import com.cdp.codpattern.network.tdm.VoteStartPacket;
 import com.cdp.codpattern.network.tdm.VoteEndPacket;
@@ -30,6 +31,11 @@ import java.util.Map;
  * 显示所有可用房间和房间内的玩家信息
  */
 public class TdmRoomScreen extends Screen {
+    private enum PendingAction {
+        NONE,
+        JOINING,
+        LEAVING
+    }
 
     // 房间列表数据 (将通过网络包更新)
     private Map<String, RoomData> rooms = new HashMap<>();
@@ -48,13 +54,22 @@ public class TdmRoomScreen extends Screen {
     private int roomItemHeight = 34;
     private List<String> roomNames = new ArrayList<>();
     private static final long LEAVE_CONFIRM_WINDOW_MS = 3000L;
+    private static final long ACTION_ACK_TIMEOUT_MS = 5000L;
+    private static final long ROOM_NOTICE_DURATION_MS = 4500L;
     private long pendingLeaveDeadlineMs = 0L;
+    private long pendingActionDeadlineMs = 0L;
+    private PendingAction pendingAction = PendingAction.NONE;
+    private String pendingRoomName = null;
+    private String roomNoticeText = "";
+    private int roomNoticeColor = CodTheme.TEXT_SECONDARY;
+    private long roomNoticeExpireAtMs = 0L;
 
     // 队伍选择按钮
     private Button kortacButton;
     private Button specgruButton;
     private Button joinButton;
     private Button leaveButton;
+    private Button readyButton;
     private Button voteStartButton;
     private Button voteEndButton;
     private int infoActionBottomY;
@@ -121,9 +136,20 @@ public class TdmRoomScreen extends Screen {
                 btn -> selectTeam(CodTdmMap.TEAM_SPECGRU),
                 0xFF66A6FF));
 
-        // 将“发起开始投票/发起结束投票”放到房间信息区
-        int voteStartY = teamButtonY + buttonHeight + spacing;
+        // Ready 按钮
+        int readyY = teamButtonY + buttonHeight + spacing;
         int voteStartWidth = Math.max(1, Math.min(180, rightPanelWidth));
+        readyButton = addRenderableWidget(new TdmRoomActionButton(
+                rightPanelX,
+                readyY,
+                voteStartWidth,
+                buttonHeight,
+                Component.literal("准备"),
+                btn -> toggleReady(),
+                0xFF6CCF8A));
+
+        // 将“发起开始投票/发起结束投票”放到房间信息区
+        int voteStartY = readyY + buttonHeight + spacing;
         voteStartButton = addRenderableWidget(new TdmRoomActionButton(
                 rightPanelX,
                 voteStartY,
@@ -203,29 +229,35 @@ public class TdmRoomScreen extends Screen {
     private void updateButtonStates() {
         boolean hasSelectedRoom = selectedRoom != null;
         boolean hasJoinedRoom = joinedRoom != null;
+        boolean hasPendingAction = pendingAction != PendingAction.NONE;
         boolean canSwitchTeam = isTeamSwitchAllowed();
         boolean canStartVote = canStartVote();
         boolean canEndVote = canEndVote();
 
         if (joinButton != null) {
-            joinButton.active = hasSelectedRoom && !hasJoinedRoom;
+            joinButton.active = hasSelectedRoom && !hasJoinedRoom && !hasPendingAction;
         }
         if (leaveButton != null) {
-            leaveButton.active = hasJoinedRoom;
+            leaveButton.active = hasJoinedRoom && !hasPendingAction;
+        }
+        if (readyButton != null) {
+            readyButton.active = hasJoinedRoom && "WAITING".equals(getCurrentRoomState()) && !hasPendingAction;
         }
         if (voteStartButton != null) {
-            voteStartButton.active = hasJoinedRoom && canStartVote;
+            voteStartButton.active = hasJoinedRoom && canStartVote && !hasPendingAction;
         }
         if (voteEndButton != null) {
-            voteEndButton.active = hasJoinedRoom && canEndVote;
+            voteEndButton.active = hasJoinedRoom && canEndVote && !hasPendingAction;
         }
         if (kortacButton != null) {
-            kortacButton.active = canSwitchTeam;
+            kortacButton.active = canSwitchTeam && !hasPendingAction;
         }
         if (specgruButton != null) {
-            specgruButton.active = canSwitchTeam;
+            specgruButton.active = canSwitchTeam && !hasPendingAction;
         }
+        updateJoinButtonLabel();
         updateLeaveButtonLabel();
+        updateReadyButtonLabel();
     }
 
     private boolean isTeamSwitchAllowed() {
@@ -279,14 +311,24 @@ public class TdmRoomScreen extends Screen {
     @Override
     public void tick() {
         super.tick();
-        if (pendingLeaveDeadlineMs <= 0L) {
-            return;
+        long now = System.currentTimeMillis();
+        if (roomNoticeExpireAtMs > 0L && now >= roomNoticeExpireAtMs) {
+            clearRoomNotice();
         }
-        if (System.currentTimeMillis() >= pendingLeaveDeadlineMs) {
-            executeLeaveRoom();
-            return;
+        if (pendingLeaveDeadlineMs > 0L) {
+            if (now >= pendingLeaveDeadlineMs) {
+                executeLeaveRoom();
+            } else {
+                updateLeaveButtonLabel();
+            }
         }
-        updateLeaveButtonLabel();
+        if (pendingAction != PendingAction.NONE && pendingActionDeadlineMs > 0L && now >= pendingActionDeadlineMs) {
+            PendingAction expiredAction = pendingAction;
+            clearPendingAction();
+            showRoomNotice(expiredAction == PendingAction.JOINING ? "加入房间请求超时" : "离开房间请求超时",
+                    CodTheme.TEXT_DANGER);
+            updateButtonStates();
+        }
     }
 
     /**
@@ -315,8 +357,6 @@ public class TdmRoomScreen extends Screen {
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.create_hint"), roomListX,
                     roomListY + 25, CodTheme.TEXT_DIM);
             graphics.drawString(mc.font, "§b/fpsm map create cdptdm <名称> <从> <到>", roomListX, roomListY + 40, CodTheme.TEXT_DIM);
-            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.command_scope_hint"), roomListX,
-                    roomListY + 55, CodTheme.SELECTED_TEXT);
             return;
         }
 
@@ -443,8 +483,23 @@ public class TdmRoomScreen extends Screen {
         updateLeaveButtonLabel();
     }
 
+    private void updateJoinButtonLabel() {
+        if (joinButton == null) {
+            return;
+        }
+        if (pendingAction == PendingAction.JOINING) {
+            joinButton.setMessage(Component.literal("加入中..."));
+            return;
+        }
+        joinButton.setMessage(Component.translatable("screen.codpattern.tdm_room.join_room"));
+    }
+
     private void updateLeaveButtonLabel() {
         if (leaveButton == null) {
+            return;
+        }
+        if (pendingAction == PendingAction.LEAVING) {
+            leaveButton.setMessage(Component.literal("离开中..."));
             return;
         }
         if (isLeavePending()) {
@@ -453,6 +508,30 @@ public class TdmRoomScreen extends Screen {
             return;
         }
         leaveButton.setMessage(Component.translatable("screen.codpattern.tdm_room.leave_room"));
+    }
+
+    private void updateReadyButtonLabel() {
+        if (readyButton == null) {
+            return;
+        }
+        boolean ready = isLocalPlayerReady();
+        readyButton.setMessage(Component.literal(ready ? "取消准备" : "准备"));
+    }
+
+    private boolean isLocalPlayerReady() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) {
+            return false;
+        }
+        java.util.UUID localPlayer = mc.player.getUUID();
+        for (List<PlayerInfo> players : teamPlayers.values()) {
+            for (PlayerInfo info : players) {
+                if (info.uuid().equals(localPlayer)) {
+                    return info.isReady();
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -540,8 +619,10 @@ public class TdmRoomScreen extends Screen {
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.leave_room_cancel_hint"),
                     panelX, panelY + panelHeight - 24, 0xFFFFD75E);
         }
-        graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.command_scope_hint"),
-                panelX, panelY + panelHeight - 12, 0xFFE0AA00);
+        if (hasRoomNotice()) {
+            int noticeY = panelY + panelHeight - (isLeavePending() ? 36 : 24);
+            graphics.drawString(mc.font, roomNoticeText, panelX, noticeY, roomNoticeColor);
+        }
     }
 
     private int withAlpha(int color, int alpha) {
@@ -619,8 +700,9 @@ public class TdmRoomScreen extends Screen {
         graphics.fill(x, y, x + 2, y + height, lifeColor);
 
         String aliveMark = player.isAlive() ? "● " : "✖ ";
+        String readyMark = player.isReady() ? "§a[R] " : "§7[ ] ";
         String kdText = formatKd(player.kills(), player.deaths());
-        String headline = aliveMark + player.name();
+        String headline = readyMark + aliveMark + player.name();
         String scoreText = "K/D " + player.kills() + "/" + player.deaths();
         String meta = Component.translatable("screen.codpattern.tdm_room.player_meta",
                 shortPlayerId(player.uuid()), kdText, Math.max(0, player.pingMs())).getString();
@@ -685,6 +767,40 @@ public class TdmRoomScreen extends Screen {
         PacketHandler.sendToServer(new RequestRoomListPacket());
     }
 
+    private void startPendingAction(PendingAction action, String roomName) {
+        pendingAction = action;
+        pendingRoomName = roomName;
+        pendingActionDeadlineMs = System.currentTimeMillis() + ACTION_ACK_TIMEOUT_MS;
+    }
+
+    private void clearPendingAction() {
+        pendingAction = PendingAction.NONE;
+        pendingRoomName = null;
+        pendingActionDeadlineMs = 0L;
+    }
+
+    private void showRoomNotice(String message, int color) {
+        showRoomNotice(message, color, ROOM_NOTICE_DURATION_MS);
+    }
+
+    private void showRoomNotice(String message, int color, long durationMs) {
+        if (message == null || message.isBlank()) {
+            return;
+        }
+        roomNoticeText = message;
+        roomNoticeColor = color;
+        roomNoticeExpireAtMs = System.currentTimeMillis() + Math.max(800L, durationMs);
+    }
+
+    private boolean hasRoomNotice() {
+        return !roomNoticeText.isBlank();
+    }
+
+    private void clearRoomNotice() {
+        roomNoticeText = "";
+        roomNoticeExpireAtMs = 0L;
+    }
+
     /**
      * 加入选中的房间
      */
@@ -692,10 +808,14 @@ public class TdmRoomScreen extends Screen {
         if (selectedRoom == null || selectedRoom.isEmpty()) {
             return;
         }
+        if (pendingAction != PendingAction.NONE) {
+            return;
+        }
         clearPendingLeave();
+        clearRoomNotice();
         // 先加入房间（不指定队伍，由后续选择决定）
         PacketHandler.sendToServer(new JoinRoomPacket(selectedRoom, null));
-        joinedRoom = selectedRoom;
+        startPendingAction(PendingAction.JOINING, selectedRoom);
         updateButtonStates();
     }
 
@@ -722,6 +842,9 @@ public class TdmRoomScreen extends Screen {
         if (joinedRoom == null) {
             return;
         }
+        if (pendingAction != PendingAction.NONE) {
+            return;
+        }
         if (isLeavePending()) {
             clearPendingLeave();
             return;
@@ -733,10 +856,18 @@ public class TdmRoomScreen extends Screen {
     private void executeLeaveRoom() {
         clearPendingLeave();
         PacketHandler.sendToServer(new LeaveRoomPacket());
-        joinedRoom = null;
-        teamPlayers.clear();
-        ClientTdmState.resetMatchState();
+        startPendingAction(PendingAction.LEAVING, joinedRoom);
         updateButtonStates();
+    }
+
+    private void toggleReady() {
+        if (joinedRoom == null || pendingAction != PendingAction.NONE) {
+            return;
+        }
+        if (!"WAITING".equals(getCurrentRoomState())) {
+            return;
+        }
+        PacketHandler.sendToServer(new SetReadyStatePacket(!isLocalPlayerReady()));
     }
 
     /**
@@ -760,6 +891,10 @@ public class TdmRoomScreen extends Screen {
      */
     public void updateRoomList(Map<String, RoomData> rooms) {
         this.rooms = rooms;
+        if (joinedRoom != null && !rooms.containsKey(joinedRoom) && pendingAction != PendingAction.JOINING) {
+            joinedRoom = null;
+            teamPlayers.clear();
+        }
         updateButtonStates();
     }
 
@@ -769,6 +904,9 @@ public class TdmRoomScreen extends Screen {
     public void updatePlayerList(String mapName, Map<String, List<PlayerInfo>> teamPlayers) {
         this.joinedRoom = mapName;
         this.teamPlayers = teamPlayers;
+        if (pendingAction == PendingAction.JOINING && mapName.equals(pendingRoomName)) {
+            clearPendingAction();
+        }
         updateButtonStates();
     }
 
@@ -778,12 +916,55 @@ public class TdmRoomScreen extends Screen {
     public void setJoinedRoom(String roomName) {
         this.joinedRoom = roomName;
         this.selectedRoom = roomName;
+        clearPendingAction();
+        updateButtonStates();
+    }
+
+    public void handleJoinResult(boolean success, String mapName, String reasonCode, String reasonMessage) {
+        if (pendingAction == PendingAction.JOINING) {
+            clearPendingAction();
+        }
+        if (success) {
+            joinedRoom = mapName;
+            selectedRoom = mapName;
+            clearRoomNotice();
+            updateButtonStates();
+            return;
+        }
+        String message = (reasonMessage == null || reasonMessage.isBlank())
+                ? "加入房间失败: " + (reasonCode == null ? "UNKNOWN" : reasonCode)
+                : "加入房间失败: " + reasonMessage;
+        showRoomNotice(message, CodTheme.TEXT_DANGER);
+        updateButtonStates();
+    }
+
+    public void handleLeaveResult(boolean success, String roomName, String reasonCode, String reasonMessage) {
+        if (pendingAction == PendingAction.LEAVING) {
+            clearPendingAction();
+        }
+        if (success) {
+            joinedRoom = null;
+            teamPlayers.clear();
+            ClientTdmState.resetMatchState();
+            showRoomNotice("已离开房间", CodTheme.TEXT_SECONDARY);
+            if (roomName != null && roomName.equals(selectedRoom)) {
+                // 保留选中，便于快速重新加入
+                selectedRoom = roomName;
+            }
+        } else {
+            String message = (reasonMessage == null || reasonMessage.isBlank())
+                    ? "离开房间失败: " + (reasonCode == null ? "UNKNOWN" : reasonCode)
+                    : "离开房间失败: " + reasonMessage;
+            showRoomNotice(message, CodTheme.TEXT_DANGER);
+        }
         updateButtonStates();
     }
 
     @Override
     public void onClose() {
         clearPendingLeave();
+        clearPendingAction();
+        clearRoomNotice();
         super.onClose();
     }
 

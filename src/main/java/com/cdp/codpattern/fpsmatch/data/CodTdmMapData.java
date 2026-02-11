@@ -1,6 +1,7 @@
 package com.cdp.codpattern.fpsmatch.data;
 
 import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
+import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
@@ -10,10 +11,15 @@ import com.phasetranscrystal.fpsmatch.core.data.save.FPSMDataManager;
 import com.phasetranscrystal.fpsmatch.core.data.save.SaveHolder;
 import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMSaveDataEvent;
 import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.server.ServerLifecycleHooks;
+import org.slf4j.Logger;
 
 import java.util.HashMap;
 import java.util.List;
@@ -26,6 +32,7 @@ import java.util.Optional;
  */
 @Mod.EventBusSubscriber(modid = "codpattern", bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class CodTdmMapData {
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     /**
      * 地图数据记录
@@ -78,12 +85,19 @@ public class CodTdmMapData {
      */
     private static void loadMap(MapData data) {
         try {
-            // 获取服务器世界
-            ServerLevel level = ServerLifecycleHooks.getCurrentServer()
-                    .getLevel(ServerLevel.OVERWORLD);
-
+            if (ServerLifecycleHooks.getCurrentServer() == null) {
+                LOGGER.error("Failed to load TDM map {}: server not ready", data.mapName());
+                return;
+            }
+            ResourceLocation levelId = ResourceLocation.tryParse(data.levelName());
+            if (levelId == null) {
+                LOGGER.error("Failed to load TDM map {}: invalid levelName={}", data.mapName(), data.levelName());
+                return;
+            }
+            ResourceKey<Level> levelKey = ResourceKey.create(Registries.DIMENSION, levelId);
+            ServerLevel level = ServerLifecycleHooks.getCurrentServer().getLevel(levelKey);
             if (level == null) {
-                System.err.println("Failed to load TDM map: world not available");
+                LOGGER.error("Failed to load TDM map {}: dimension {} not found", data.mapName(), data.levelName());
                 return;
             }
 
@@ -106,8 +120,7 @@ public class CodTdmMapData {
             FPSMCore.getInstance().registerMap(CodTdmMap.GAME_TYPE, map);
 
         } catch (Exception e) {
-            System.err.println("Failed to load TDM map: " + data.mapName());
-            e.printStackTrace();
+            LOGGER.error("Failed to load TDM map {}", data.mapName(), e);
         }
     }
 

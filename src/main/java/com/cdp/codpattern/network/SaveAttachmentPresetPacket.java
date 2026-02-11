@@ -61,36 +61,61 @@ public class SaveAttachmentPresetPacket {
             }
             if (session.getBagId() != packet.bagId || !session.getSlot().equals(packet.slot)) {
                 player.sendSystemMessage(Component.literal("§c配件保存失败：改装会话不匹配"));
+                AttachmentEditSessionManager.abortSession(player, "session_mismatch");
                 return;
             }
 
-            ItemStack gunStack = player.getInventory().getItem(session.getEditHotbarSlot());
-            if (!(gunStack.getItem() instanceof IGun)) {
-                player.sendSystemMessage(Component.literal("§c配件保存失败：当前槽位不是枪械"));
-                AttachmentEditSessionManager.endSession(player);
-                return;
-            }
+            boolean saved = false;
+            BackpackConfig.Backpack mutatedBackpack = null;
+            BackpackConfig.Backpack.ItemData previousItem = null;
+            try {
+                ItemStack gunStack = player.getInventory().getItem(session.getEditHotbarSlot());
+                if (!(gunStack.getItem() instanceof IGun)) {
+                    throw new IllegalStateException("当前槽位不是枪械");
+                }
 
-            String presetPayload = AttachmentPresetUtil.buildPresetFromGun(gunStack).toString();
-            AttachmentPresetManager.writePreset(player.server, player.getUUID(), packet.bagId, packet.slot, presetPayload);
+                String presetPayload = AttachmentPresetUtil.buildPresetFromGun(gunStack).toString();
+                String itemId = gunStack.getItem().builtInRegistryHolder().key().location().toString();
+                String nbtString = gunStack.hasTag() ? gunStack.getTag().toString() : "";
 
-            String itemId = gunStack.getItem().builtInRegistryHolder().key().location().toString();
-            String nbtString = gunStack.hasTag() ? gunStack.getTag().toString() : "";
+                String uuid = player.getUUID().toString();
+                BackpackConfig.PlayerBackpackData playerData =
+                        BackpackConfigManager.getConfig().getOrCreatePlayerData(uuid);
+                BackpackConfig.Backpack backpack = playerData.getBackpacks_MAP().get(packet.bagId);
+                if (backpack == null) {
+                    throw new IllegalStateException("目标背包不存在");
+                }
 
-            String uuid = player.getUUID().toString();
-            BackpackConfig.PlayerBackpackData playerData =
-                    BackpackConfigManager.getConfig().getOrCreatePlayerData(uuid);
-            BackpackConfig.Backpack backpack = playerData.getBackpacks_MAP().get(packet.bagId);
-            if (backpack != null) {
+                AttachmentPresetManager.writePreset(player.server, player.getUUID(), packet.bagId, packet.slot, presetPayload);
+
+                mutatedBackpack = backpack;
+                previousItem = backpack.getItem_MAP().get(packet.slot);
                 backpack.getItem_MAP().put(packet.slot,
                         new BackpackConfig.Backpack.ItemData(itemId, 1, nbtString));
                 BackpackConfigManager.save();
                 PacketHandler.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
-            }
 
-            AttachmentEditSessionManager.endSession(player);
-            LOGGER.info("Attachment preset saved: player={} bagId={} slot={} bytes={}",
-                    player.getGameProfile().getName(), packet.bagId, packet.slot, presetPayload.length());
+                saved = true;
+                LOGGER.info("Attachment preset saved: player={} bagId={} slot={} bytes={}",
+                        player.getGameProfile().getName(), packet.bagId, packet.slot, presetPayload.length());
+            } catch (Exception e) {
+                if (!saved && mutatedBackpack != null) {
+                    if (previousItem == null) {
+                        mutatedBackpack.getItem_MAP().remove(packet.slot);
+                    } else {
+                        mutatedBackpack.getItem_MAP().put(packet.slot, previousItem);
+                    }
+                }
+                LOGGER.warn("Attachment preset save failed: player={} bagId={} slot={}",
+                        player.getGameProfile().getName(), packet.bagId, packet.slot, e);
+                player.sendSystemMessage(Component.literal("§c配件保存失败，已回滚：" + e.getMessage()));
+            } finally {
+                if (saved) {
+                    AttachmentEditSessionManager.endSession(player);
+                } else {
+                    AttachmentEditSessionManager.abortSession(player, "save_failed");
+                }
+            }
         });
         ctx.get().setPacketHandled(true);
     }

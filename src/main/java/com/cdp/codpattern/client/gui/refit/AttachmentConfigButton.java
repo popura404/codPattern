@@ -69,7 +69,7 @@ public class AttachmentConfigButton extends Button {
 
     protected void renderTitle(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
-        String idText = "配件配置";
+        String idText = "更换配件";
         int textX = this.getX() + 6;
         int textY = this.getY() + (this.height - minecraft.font.lineHeight) / 2;
 

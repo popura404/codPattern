@@ -166,7 +166,8 @@ tasks.register('extractDependencyLibs', Copy) {
         def name = f.name.toLowerCase()
         name.contains('timeless-and-classics') || name.contains('tacz') ||
         name.contains('lr-tactical') || name.contains('lrtactical') ||
-        name.contains('cloth-config') || name.contains('fpsmatch')
+        name.contains('cloth-config') || name.contains('fpsmatch') ||
+        name.contains('physicsmod')
     }
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
     doLast {
