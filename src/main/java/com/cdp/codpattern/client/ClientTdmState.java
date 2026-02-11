@@ -51,6 +51,16 @@ public class ClientTdmState {
     public static boolean playCountdownTickSound = false; // 倒计时每秒的滴答音效
     public static boolean playTeleportSound = false; // 传送音效
     public static String previousPhase = "WAITING"; // 上一次的阶段，用于检测阶段切换
+    public static String pendingPhaseCue = ""; // 阶段切换提示音
+
+    // ========== HUD 动效状态 ==========
+    private static final int SCORE_PULSE_DURATION = 12;
+    private static final int PHASE_FLASH_DURATION = 20;
+    public static int scorePulseTicks = 0;
+    public static int phaseFlashTicks = 0;
+    public static String announcementKey = "";
+    public static int announcementTicks = 0;
+    public static int announcementTotalTicks = 0;
 
     // 死亡视角
     public static boolean isDead = false;
@@ -59,22 +69,86 @@ public class ClientTdmState {
 
     // 更新游戏阶段
     public static void updatePhase(String phase, int time) {
+        String oldPhase = currentPhase;
         // 检测阶段切换：进入 WARMUP 或 PLAYING 时触发渐出 + 传送音效
-        if (!phase.equals(previousPhase)) {
+        if (!phase.equals(oldPhase)) {
             if (phase.equals("WARMUP") || phase.equals("PLAYING")) {
                 // 传送完成 → 开始渐出
                 startFadeOut();
                 // 触发传送音效
                 playTeleportSound = true;
             }
+            phaseFlashTicks = PHASE_FLASH_DURATION;
+            triggerPhaseAnnouncement(phase);
+            queuePhaseCue(phase);
         }
-        previousPhase = currentPhase;
+        previousPhase = oldPhase;
         currentPhase = phase;
         remainingTimeTicks = time;
     }
 
+    private static void triggerPhaseAnnouncement(String phase) {
+        switch (phase) {
+            case "COUNTDOWN" -> showAnnouncement("hud.codpattern.tdm.announce.countdown", 52);
+            case "WARMUP" -> showAnnouncement("hud.codpattern.tdm.announce.warmup", 46);
+            case "PLAYING" -> showAnnouncement("hud.codpattern.tdm.announce.playing", 58);
+            case "ENDED" -> showAnnouncement("hud.codpattern.tdm.announce.ended", 90);
+            default -> {
+                // WAITING 或未知阶段不提示
+            }
+        }
+    }
+
+    private static void showAnnouncement(String key, int durationTicks) {
+        announcementKey = key;
+        announcementTicks = Math.max(0, durationTicks);
+        announcementTotalTicks = announcementTicks;
+    }
+
+    private static void queuePhaseCue(String phase) {
+        pendingPhaseCue = switch (phase) {
+            case "COUNTDOWN" -> "countdown";
+            case "WARMUP" -> "warmup";
+            case "PLAYING" -> "playing";
+            case "ENDED" -> "ended";
+            default -> "";
+        };
+    }
+
+    public static float getAnnouncementAlpha() {
+        if (announcementTicks <= 0 || announcementTotalTicks <= 0) {
+            return 0.0f;
+        }
+        int fadeTicks = Math.min(10, announcementTotalTicks / 3);
+        int elapsed = announcementTotalTicks - announcementTicks;
+        if (elapsed < fadeTicks) {
+            return (float) elapsed / Math.max(1, fadeTicks);
+        }
+        if (announcementTicks < fadeTicks) {
+            return (float) announcementTicks / Math.max(1, fadeTicks);
+        }
+        return 1.0f;
+    }
+
+    public static float getScorePulseStrength() {
+        if (scorePulseTicks <= 0) {
+            return 0.0f;
+        }
+        return (float) scorePulseTicks / SCORE_PULSE_DURATION;
+    }
+
+    public static float getPhaseFlashStrength() {
+        if (phaseFlashTicks <= 0) {
+            return 0.0f;
+        }
+        return (float) phaseFlashTicks / PHASE_FLASH_DURATION;
+    }
+
     // 更新分数
     public static void updateScore(int t1, int t2, int time) {
+        if (t1 != team1Score || t2 != team2Score) {
+            scorePulseTicks = SCORE_PULSE_DURATION;
+        }
         team1Score = t1;
         team2Score = t2;
         gameTimeTicks = time;
@@ -96,6 +170,12 @@ public class ClientTdmState {
         playCountdownTickSound = false;
         playTeleportSound = false;
         previousPhase = "WAITING";
+        pendingPhaseCue = "";
+        scorePulseTicks = 0;
+        phaseFlashTicks = 0;
+        announcementKey = "";
+        announcementTicks = 0;
+        announcementTotalTicks = 0;
         isDead = false;
         killerName = "";
         deathCamTicks = 0;
@@ -201,6 +281,16 @@ public class ClientTdmState {
     public static void clientTick() {
         if (remainingTimeTicks > 0)
             remainingTimeTicks--;
+        if (scorePulseTicks > 0)
+            scorePulseTicks--;
+        if (phaseFlashTicks > 0)
+            phaseFlashTicks--;
+        if (announcementTicks > 0)
+            announcementTicks--;
+        else if (!announcementKey.isEmpty()) {
+            announcementKey = "";
+            announcementTotalTicks = 0;
+        }
         if (deathCamTicks > 0) {
             deathCamTicks--;
             if (deathCamTicks == 0)
@@ -264,6 +354,24 @@ public class ClientTdmState {
                 // 普通倒计时"嘀"声
                 player.playNotifySound(SoundEvents.NOTE_BLOCK_HAT.get(), SoundSource.PLAYERS, 0.5f, 1.2f);
             }
+        }
+
+        if (!pendingPhaseCue.isEmpty()) {
+            switch (pendingPhaseCue) {
+                case "countdown" -> player.playNotifySound(SoundEvents.NOTE_BLOCK_HAT.get(), SoundSource.PLAYERS, 0.7f,
+                        0.9f);
+                case "warmup" -> player.playNotifySound(SoundEvents.NOTE_BLOCK_PLING.get(), SoundSource.PLAYERS, 0.75f,
+                        0.95f);
+                case "playing" -> player.playNotifySound(SoundEvents.NOTE_BLOCK_BELL.get(), SoundSource.PLAYERS, 0.9f,
+                        1.15f);
+                case "ended" -> {
+                    player.playNotifySound(SoundEvents.GENERIC_EXPLODE, SoundSource.PLAYERS, 0.45f, 1.3f);
+                    player.playNotifySound(SoundEvents.NOTE_BLOCK_BELL.get(), SoundSource.PLAYERS, 0.8f, 0.7f);
+                }
+                default -> {
+                }
+            }
+            pendingPhaseCue = "";
         }
 
         // 传送音效

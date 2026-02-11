@@ -63,7 +63,7 @@ public class BackpackMenuScreen extends Screen {
 
         this.SCREEN_HEIGHT = this.height;
         this.SCREEN_WIDTH = this.width;
-        UNIT_LENGTH = (int) ((float)this.width / 120.f);
+        UNIT_LENGTH = Math.max(1, (int) ((float) this.width / 120.f));
         loading = true;
 
         // 初始化右键菜单
@@ -78,6 +78,8 @@ public class BackpackMenuScreen extends Screen {
     @Override
     public void render(@NotNull GuiGraphics pGuiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
         this.renderBackground(pGuiGraphics);
+        renderHeaderBar(pGuiGraphics);
+        renderBackpackGridBackdrop(pGuiGraphics);
         super.render(pGuiGraphics, pMouseX, pMouseY, pPartialTick);
 
         // 渲染武器信息
@@ -153,6 +155,33 @@ public class BackpackMenuScreen extends Screen {
         if (contextMenu != null && contextMenu.isVisible()) {
             contextMenu.render(pGuiGraphics, pMouseX, pMouseY, pPartialTick);
         }
+    }
+
+    private void renderHeaderBar(GuiGraphics graphics) {
+        Minecraft mc = Minecraft.getInstance();
+        int titleX = UNIT_LENGTH * 6;
+        int titleY = UNIT_LENGTH * 4;
+
+        graphics.drawString(mc.font, "背包选择", titleX, titleY, CodTheme.TEXT_PRIMARY, true);
+        graphics.fill(titleX, titleY + mc.font.lineHeight + 4, this.width - titleX, titleY + mc.font.lineHeight + 5,
+                CodTheme.DIVIDER);
+
+        String hint = "[LMB] 选择背包   [RMB] 更多操作";
+        int hintWidth = mc.font.width(hint);
+        graphics.drawString(mc.font, hint, this.width - titleX - hintWidth, titleY, CodTheme.TEXT_SECONDARY, false);
+    }
+
+    private void renderBackpackGridBackdrop(GuiGraphics graphics) {
+        int panelLeft = UNIT_LENGTH * 7;
+        int panelTop = SCREEN_HEIGHT - UNIT_LENGTH * 24;
+        int panelRight = this.width - UNIT_LENGTH * 7;
+        int panelBottom = SCREEN_HEIGHT - UNIT_LENGTH * 7;
+
+        graphics.fillGradient(panelLeft, panelTop, panelRight, panelBottom, 0x2A202020, 0x3A101010);
+        graphics.fill(panelLeft, panelTop, panelRight, panelTop + 1, CodTheme.BORDER_SUBTLE);
+        graphics.fill(panelLeft, panelBottom - 1, panelRight, panelBottom, CodTheme.BORDER_SUBTLE);
+        graphics.fill(panelLeft, panelTop, panelLeft + 1, panelBottom, CodTheme.BORDER_SUBTLE);
+        graphics.fill(panelRight - 1, panelTop, panelRight, panelBottom, CodTheme.BORDER_SUBTLE);
     }
 
     /**

@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.refit.TdmRoomActionButton;
 import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.network.handler.PacketHandler;
@@ -54,6 +55,9 @@ public class TdmRoomScreen extends Screen {
     private Button specgruButton;
     private Button joinButton;
     private Button leaveButton;
+    private Button voteStartButton;
+    private Button voteEndButton;
+    private int infoActionBottomY;
 
     public TdmRoomScreen() {
         super(Component.translatable("screen.codpattern.tdm_room.title"));
@@ -89,66 +93,105 @@ public class TdmRoomScreen extends Screen {
      * 添加UI按钮
      */
     private void addButtons(int rightPanelX, int rightPanelWidth) {
-        int buttonWidth = 110;
         int buttonHeight = 20;
         int spacing = 8;
 
         // 队伍选择按钮 (在右侧面板内)
-        int teamButtonY = 90;
+        int teamButtonY = roomListY + 46;
         int teamButtonWidth = (rightPanelWidth - spacing) / 2;
-        teamButtonWidth = Math.min(teamButtonWidth, 130);
+        teamButtonWidth = Math.max(1, Math.min(teamButtonWidth, 150));
 
         // KORTAC 队伍按钮
-        kortacButton = Button.builder(
+        kortacButton = addRenderableWidget(new TdmRoomActionButton(
+                rightPanelX,
+                teamButtonY,
+                teamButtonWidth,
+                buttonHeight,
                 Component.translatable("screen.codpattern.tdm_room.join_kortac"),
-                btn -> selectTeam(CodTdmMap.TEAM_KORTAC))
-                .bounds(rightPanelX, teamButtonY, teamButtonWidth, buttonHeight).build();
-        addRenderableWidget(kortacButton);
+                btn -> selectTeam(CodTdmMap.TEAM_KORTAC),
+                0xFFE35A5A));
 
         // SPECGRU 队伍按钮
-        specgruButton = Button.builder(
+        specgruButton = addRenderableWidget(new TdmRoomActionButton(
+                rightPanelX + teamButtonWidth + spacing,
+                teamButtonY,
+                teamButtonWidth,
+                buttonHeight,
                 Component.translatable("screen.codpattern.tdm_room.join_specgru"),
-                btn -> selectTeam(CodTdmMap.TEAM_SPECGRU))
-                .bounds(rightPanelX + teamButtonWidth + spacing, teamButtonY, teamButtonWidth, buttonHeight).build();
-        addRenderableWidget(specgruButton);
+                btn -> selectTeam(CodTdmMap.TEAM_SPECGRU),
+                0xFF66A6FF));
+
+        // 将“发起开始投票/发起结束投票”放到房间信息区
+        int voteStartY = teamButtonY + buttonHeight + spacing;
+        int voteStartWidth = Math.max(1, Math.min(180, rightPanelWidth));
+        voteStartButton = addRenderableWidget(new TdmRoomActionButton(
+                rightPanelX,
+                voteStartY,
+                voteStartWidth,
+                buttonHeight,
+                Component.translatable("screen.codpattern.tdm_room.vote_start"),
+                btn -> voteStart(),
+                CodTheme.SELECTED_BORDER));
+        int voteEndY = voteStartY + buttonHeight + spacing;
+        voteEndButton = addRenderableWidget(new TdmRoomActionButton(
+                rightPanelX,
+                voteEndY,
+                voteStartWidth,
+                buttonHeight,
+                Component.translatable("screen.codpattern.tdm_room.vote_end"),
+                btn -> voteEnd(),
+                CodTheme.TEXT_DANGER));
+        infoActionBottomY = voteEndY + buttonHeight;
+
+        // 刷新按钮移动到房间列表区标题栏右侧
+        int refreshWidth = 74;
+        int refreshHeight = 18;
+        int refreshX = roomListX + roomListWidth - refreshWidth;
+        int refreshY = roomListY - 22;
+        addRenderableWidget(new TdmRoomActionButton(
+                refreshX,
+                refreshY,
+                refreshWidth,
+                refreshHeight,
+                Component.translatable("screen.codpattern.common.refresh"),
+                btn -> requestRoomList()));
 
         // 底部按钮栏
-        int bottomY = this.height - 35;
-        int totalButtons = 5;
+        int buttonWidth = 120;
+        int bottomY = this.height - 34;
+        int totalButtons = 3;
         int totalWidth = totalButtons * buttonWidth + (totalButtons - 1) * spacing;
         int startX = (this.width - totalWidth) / 2;
 
-        // 刷新按钮
-        addRenderableWidget(Button.builder(
-                Component.translatable("screen.codpattern.common.refresh"),
-                btn -> requestRoomList())
-                .bounds(startX, bottomY, buttonWidth, buttonHeight).build());
-
         // 加入房间按钮
-        joinButton = Button.builder(
+        joinButton = addRenderableWidget(new TdmRoomActionButton(
+                startX,
+                bottomY,
+                buttonWidth,
+                buttonHeight,
                 Component.translatable("screen.codpattern.tdm_room.join_room"),
-                btn -> joinSelectedRoom())
-                .bounds(startX + (buttonWidth + spacing), bottomY, buttonWidth, buttonHeight).build();
-        addRenderableWidget(joinButton);
+                btn -> joinSelectedRoom(),
+                CodTheme.HOVER_BORDER));
 
         // 离开房间按钮
-        leaveButton = Button.builder(
+        leaveButton = addRenderableWidget(new TdmRoomActionButton(
+                startX + (buttonWidth + spacing),
+                bottomY,
+                buttonWidth,
+                buttonHeight,
                 Component.translatable("screen.codpattern.tdm_room.leave_room"),
-                btn -> leaveRoom())
-                .bounds(startX + 2 * (buttonWidth + spacing), bottomY, buttonWidth, buttonHeight).build();
-        addRenderableWidget(leaveButton);
-
-        // 投票开始按钮
-        addRenderableWidget(Button.builder(
-                Component.translatable("screen.codpattern.tdm_room.vote_start"),
-                btn -> voteStart())
-                .bounds(startX + 3 * (buttonWidth + spacing), bottomY, buttonWidth, buttonHeight).build());
+                btn -> leaveRoom(),
+                CodTheme.TEXT_DANGER));
 
         // 返回按钮
-        addRenderableWidget(Button.builder(
+        addRenderableWidget(new TdmRoomActionButton(
+                startX + 2 * (buttonWidth + spacing),
+                bottomY,
+                buttonWidth,
+                buttonHeight,
                 Component.translatable("screen.codpattern.common.back"),
-                btn -> onClose())
-                .bounds(startX + 4 * (buttonWidth + spacing), bottomY, buttonWidth, buttonHeight).build());
+                btn -> onClose(),
+                0xFF9AA5B1));
 
         // 更新按钮状态
         updateButtonStates();
@@ -160,12 +203,58 @@ public class TdmRoomScreen extends Screen {
     private void updateButtonStates() {
         boolean hasSelectedRoom = selectedRoom != null;
         boolean hasJoinedRoom = joinedRoom != null;
+        boolean canSwitchTeam = isTeamSwitchAllowed();
+        boolean canStartVote = canStartVote();
+        boolean canEndVote = canEndVote();
 
-        joinButton.active = hasSelectedRoom && !hasJoinedRoom;
-        leaveButton.active = hasJoinedRoom;
-        kortacButton.active = hasJoinedRoom;
-        specgruButton.active = hasJoinedRoom;
+        if (joinButton != null) {
+            joinButton.active = hasSelectedRoom && !hasJoinedRoom;
+        }
+        if (leaveButton != null) {
+            leaveButton.active = hasJoinedRoom;
+        }
+        if (voteStartButton != null) {
+            voteStartButton.active = hasJoinedRoom && canStartVote;
+        }
+        if (voteEndButton != null) {
+            voteEndButton.active = hasJoinedRoom && canEndVote;
+        }
+        if (kortacButton != null) {
+            kortacButton.active = canSwitchTeam;
+        }
+        if (specgruButton != null) {
+            specgruButton.active = canSwitchTeam;
+        }
         updateLeaveButtonLabel();
+    }
+
+    private boolean isTeamSwitchAllowed() {
+        String state = getCurrentRoomState();
+        if (state == null) {
+            return false;
+        }
+        return "WAITING".equals(state);
+    }
+
+    private boolean canStartVote() {
+        String state = getCurrentRoomState();
+        return "WAITING".equals(state);
+    }
+
+    private boolean canEndVote() {
+        String state = getCurrentRoomState();
+        return "WARMUP".equals(state) || "PLAYING".equals(state);
+    }
+
+    private String getCurrentRoomState() {
+        if (joinedRoom == null) {
+            return null;
+        }
+        RoomData joined = rooms.get(joinedRoom);
+        if (joined != null) {
+            return joined.state;
+        }
+        return ClientTdmState.currentPhase;
     }
 
     @Override
@@ -204,22 +293,30 @@ public class TdmRoomScreen extends Screen {
      * 渲染房间列表面板
      */
     private void renderRoomListPanel(GuiGraphics graphics, Minecraft mc, int mouseX, int mouseY) {
-        // 面板背景
-        graphics.fill(roomListX - 5, roomListY - 25, roomListX + roomListWidth + 5,
-                roomListY + roomListHeight + 5, 0x80000000);
+        int panelLeft = roomListX - 5;
+        int panelTop = roomListY - 25;
+        int panelRight = roomListX + roomListWidth + 5;
+        int panelBottom = roomListY + roomListHeight + 5;
+
+        // 面板背景与边框
+        graphics.fillGradient(panelLeft, panelTop, panelRight, panelBottom, CodTheme.PANEL_BG, 0xCC101010);
+        graphics.fill(panelLeft, panelTop, panelRight, panelTop + 1, CodTheme.BORDER_SUBTLE);
+        graphics.fill(panelLeft, panelBottom - 1, panelRight, panelBottom, CodTheme.BORDER_SUBTLE);
+        graphics.fill(panelLeft, panelTop, panelLeft + 1, panelBottom, CodTheme.BORDER_SUBTLE);
+        graphics.fill(panelRight - 1, panelTop, panelRight, panelBottom, CodTheme.BORDER_SUBTLE);
 
         // 标题
         graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.available_rooms"), roomListX,
-                roomListY - 20, 0xFFFFFF);
+                roomListY - 20, CodTheme.TEXT_PRIMARY);
 
         if (rooms.isEmpty()) {
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.no_rooms"), roomListX,
-                    roomListY + 10, 0xAAAAAA);
+                    roomListY + 10, CodTheme.TEXT_SECONDARY);
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.create_hint"), roomListX,
-                    roomListY + 25, 0x888888);
-            graphics.drawString(mc.font, "§b/fpsm map create cdptdm <名称> <从> <到>", roomListX, roomListY + 40, 0x888888);
+                    roomListY + 25, CodTheme.TEXT_DIM);
+            graphics.drawString(mc.font, "§b/fpsm map create cdptdm <名称> <从> <到>", roomListX, roomListY + 40, CodTheme.TEXT_DIM);
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.command_scope_hint"), roomListX,
-                    roomListY + 55, 0xE0AA00);
+                    roomListY + 55, CodTheme.SELECTED_TEXT);
             return;
         }
 
@@ -227,6 +324,9 @@ public class TdmRoomScreen extends Screen {
         roomNames.clear();
         int y = roomListY;
         for (Map.Entry<String, RoomData> entry : rooms.entrySet()) {
+            if (y + roomItemHeight > roomListY + roomListHeight) {
+                break;
+            }
             String mapName = entry.getKey();
             RoomData room = entry.getValue();
             roomNames.add(mapName);
@@ -241,16 +341,22 @@ public class TdmRoomScreen extends Screen {
 
             // 背景颜色
             int bgColor;
+            int edgeColor = 0;
             if (joined) {
-                bgColor = 0x6000FF00; // 绿色 - 已加入
+                bgColor = withAlpha(CodTheme.HOVER_BG_BOTTOM, 150);
+                edgeColor = CodTheme.HOVER_BORDER;
             } else if (selected) {
-                bgColor = 0x60FFFF00; // 黄色 - 选中
+                bgColor = withAlpha(CodTheme.CARD_BG_TOP, 180);
+                edgeColor = CodTheme.SELECTED_BORDER;
             } else if (hovered) {
-                bgColor = 0x40FFFFFF; // 白色 - 悬停
+                bgColor = withAlpha(CodTheme.HOVER_BG_TOP, 110);
             } else {
-                bgColor = 0x20FFFFFF; // 透明
+                bgColor = withAlpha(CodTheme.CARD_BG_TOP, 70);
             }
             graphics.fill(roomListX, y, roomListX + roomListWidth, y + roomItemHeight - 2, bgColor);
+            if (edgeColor != 0) {
+                graphics.fill(roomListX, y, roomListX + 2, y + roomItemHeight - 2, edgeColor);
+            }
 
             // 房间信息
             String statusIcon = getStatusIcon(room.state);
@@ -260,13 +366,13 @@ public class TdmRoomScreen extends Screen {
             }
             String infoText = String.format("%d/%d", room.playerCount, room.maxPlayers);
 
-            int textColor = joined ? 0x00FF00 : (selected ? 0xFFFF00 : 0xFFFFFF);
+            int textColor = joined ? CodTheme.TEXT_HOVER : (selected ? CodTheme.SELECTED_TEXT : CodTheme.TEXT_PRIMARY);
             graphics.drawString(mc.font, roomText, roomListX + 5, y + 4, textColor);
             graphics.drawString(mc.font, infoText, roomListX + roomListWidth - mc.font.width(infoText) - 5, y + 4,
-                    0xAAAAAA);
+                    CodTheme.TEXT_SECONDARY);
 
             String statusText = buildRoomListStatusText(room);
-            graphics.drawString(mc.font, statusText, roomListX + 5, y + 18, 0xAFAFAF);
+            graphics.drawString(mc.font, statusText, roomListX + 5, y + 18, 0xFFAFAFAF);
 
             y += roomItemHeight;
         }
@@ -361,36 +467,48 @@ public class TdmRoomScreen extends Screen {
         int panelWidth = this.width - panelX - padding;
         int panelHeight = this.height - headerHeight - 50 - padding;
 
-        // 面板背景
-        graphics.fill(panelX - 5, panelY - 5, panelX + panelWidth + 5, panelY + panelHeight + 5, 0x80000000);
+        // 面板背景与边框
+        graphics.fillGradient(panelX - 5, panelY - 5, panelX + panelWidth + 5, panelY + panelHeight + 5,
+                CodTheme.PANEL_BG, 0xCC101010);
+        graphics.fill(panelX - 5, panelY - 5, panelX + panelWidth + 5, panelY - 4, CodTheme.BORDER_SUBTLE);
+        graphics.fill(panelX - 5, panelY + panelHeight + 4, panelX + panelWidth + 5, panelY + panelHeight + 5,
+                CodTheme.BORDER_SUBTLE);
+        graphics.fill(panelX - 5, panelY - 5, panelX - 4, panelY + panelHeight + 5, CodTheme.BORDER_SUBTLE);
+        graphics.fill(panelX + panelWidth + 4, panelY - 5, panelX + panelWidth + 5, panelY + panelHeight + 5,
+                CodTheme.BORDER_SUBTLE);
 
         // 标题
         if (joinedRoom != null) {
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.current_room", joinedRoom),
-                    panelX, panelY, 0xFFFFFF);
+                    panelX, panelY, CodTheme.TEXT_PRIMARY);
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.select_team"), panelX,
-                    panelY + 15, 0xAAAAAA);
+                    panelY + 15, CodTheme.TEXT_SECONDARY);
         } else if (selectedRoom != null) {
             graphics.drawString(mc.font,
                     Component.translatable("screen.codpattern.tdm_room.selected_room", selectedRoom), panelX, panelY,
-                    0xFFFFFF);
+                    CodTheme.TEXT_PRIMARY);
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.join_hint"), panelX,
-                    panelY + 15, 0xAAAAAA);
+                    panelY + 15, CodTheme.TEXT_SECONDARY);
         } else {
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.select_hint"), panelX,
-                    panelY, 0xAAAAAA);
+                    panelY, CodTheme.TEXT_SECONDARY);
         }
 
-        int infoY = panelY + 30;
+        graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.room_actions"), panelX,
+                panelY + 30, CodTheme.TEXT_SECONDARY);
+        int actionDividerRight = panelX + Math.max(20, Math.min(190, panelWidth - 8));
+        graphics.fill(panelX, panelY + 40, actionDividerRight, panelY + 41, CodTheme.DIVIDER);
+
+        int infoY = Math.max(panelY + 78, infoActionBottomY + 12);
         if (joinedRoom != null) {
             RoomData joined = rooms.get(joinedRoom);
             if (joined != null) {
                 graphics.drawString(mc.font,
                         Component.translatable("screen.codpattern.tdm_room.current_score", buildTeamScoreText(joined)),
-                        panelX, infoY, 0xE5E5E5);
+                        panelX, infoY, 0xFFE5E5E5);
                 graphics.drawString(mc.font,
                         Component.translatable("screen.codpattern.tdm_room.current_phase", buildPhaseStatusText(joined)),
-                        panelX, infoY + 12, 0xB0B0B0);
+                        panelX, infoY + 12, 0xFFB0B0B0);
                 infoY += 26;
             }
         }
@@ -403,50 +521,138 @@ public class TdmRoomScreen extends Screen {
         }
         if (selected != null && !selected.hasMatchEndTeleportPoint) {
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.warning_no_end_tp"),
-                    panelX, infoY, 0xFF5555);
+                    panelX, infoY, CodTheme.TEXT_DANGER);
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.warning_no_end_tp_hint"),
                     panelX, infoY + 12, 0xFFAA55);
             infoY += 24;
         }
 
-        // 渲染队伍玩家列表 (在按钮下方)
-        if (joinedRoom != null && !teamPlayers.isEmpty()) {
-            int yOffset = Math.max(panelY + 80, infoY + 8); // 留出按钮空间
-
-            for (Map.Entry<String, List<PlayerInfo>> entry : teamPlayers.entrySet()) {
-                String teamName = entry.getKey();
-                List<PlayerInfo> players = entry.getValue();
-
-                // 队伍标题颜色
-                String teamColor = teamName.equals(CodTdmMap.TEAM_KORTAC) ? "§c" : "§9";
-                graphics.drawString(mc.font, teamColor + teamName.toUpperCase() + " §7(" + players.size() + ")",
-                        panelX, yOffset, 0xFFFFFF);
-                yOffset += 15;
-
-                // 玩家列表
-                if (players.isEmpty()) {
-                    graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.no_players"),
-                            panelX, yOffset, 0x888888);
-                    yOffset += 12;
-                } else {
-                    for (PlayerInfo player : players) {
-                        String status = player.isAlive() ? "§a" : "§c";
-                        String playerText = String.format("  %s%s §7K:%d D:%d",
-                                status, player.name(), player.kills(), player.deaths());
-                        graphics.drawString(mc.font, playerText, panelX, yOffset, 0xFFFFFF);
-                        yOffset += 12;
-                    }
-                }
-                yOffset += 10;
-            }
+        // 渲染队伍玩家列表（含 ID / KD / 延迟）
+        int rosterTop = Math.max(infoActionBottomY + 18, infoY + 8);
+        int rosterBottom = panelY + panelHeight - (isLeavePending() ? 38 : 24);
+        if (joinedRoom != null && rosterTop < rosterBottom) {
+            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.roster_title"),
+                    panelX, rosterTop - 11, CodTheme.TEXT_SECONDARY);
+            renderTeamRosters(graphics, mc, panelX, panelWidth, rosterTop, rosterBottom);
         }
 
         if (isLeavePending()) {
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.leave_room_cancel_hint"),
-                    panelX, panelY + panelHeight - 24, 0xFFD75E);
+                    panelX, panelY + panelHeight - 24, 0xFFFFD75E);
         }
         graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.command_scope_hint"),
-                panelX, panelY + panelHeight - 12, 0xE0AA00);
+                panelX, panelY + panelHeight - 12, 0xFFE0AA00);
+    }
+
+    private int withAlpha(int color, int alpha) {
+        return (Math.max(0, Math.min(255, alpha)) << 24) | (color & 0x00FFFFFF);
+    }
+
+    private void renderTeamRosters(GuiGraphics graphics, Minecraft mc, int panelX, int panelWidth, int startY,
+            int maxY) {
+        List<String> teamOrder = new ArrayList<>();
+        teamOrder.add(CodTdmMap.TEAM_KORTAC);
+        teamOrder.add(CodTdmMap.TEAM_SPECGRU);
+        for (String key : teamPlayers.keySet()) {
+            if (!teamOrder.contains(key)) {
+                teamOrder.add(key);
+            }
+        }
+
+        int y = startY;
+        for (String teamName : teamOrder) {
+            List<PlayerInfo> players = teamPlayers.getOrDefault(teamName, List.of());
+            y = renderSingleTeamRoster(graphics, mc, panelX, panelWidth, y, maxY, teamName, players);
+            if (y > maxY) {
+                break;
+            }
+        }
+    }
+
+    private int renderSingleTeamRoster(GuiGraphics graphics, Minecraft mc, int panelX, int panelWidth, int startY, int maxY,
+            String teamName, List<PlayerInfo> players) {
+        int accent = getTeamAccentColor(teamName);
+        int headerHeight = 14;
+        if (startY + headerHeight > maxY) {
+            return maxY + 1;
+        }
+
+        graphics.fill(panelX, startY, panelX + panelWidth, startY + headerHeight, withAlpha(accent, 40));
+        graphics.fill(panelX, startY + headerHeight - 1, panelX + panelWidth, startY + headerHeight, withAlpha(accent, 160));
+
+        String teamKey = "screen.codpattern.tdm_room.team." + teamName.toLowerCase(Locale.ROOT);
+        String teamLabel = Component.translatable(teamKey).getString();
+        if (teamLabel.equals(teamKey)) {
+            teamLabel = teamName.toUpperCase(Locale.ROOT);
+        }
+        String headerText = teamLabel + "  (" + players.size() + ")";
+        graphics.drawString(mc.font, headerText, panelX + 5, startY + 3, accent);
+
+        int y = startY + headerHeight + 3;
+        if (players.isEmpty()) {
+            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.no_players"), panelX + 5, y,
+                    CodTheme.TEXT_DIM);
+            return y + 14;
+        }
+
+        int rowHeight = 24;
+        for (PlayerInfo player : players) {
+            if (y + rowHeight > maxY) {
+                graphics.drawString(mc.font, "...", panelX + panelWidth - 14, Math.max(startY + 2, maxY - 9),
+                        CodTheme.TEXT_DIM);
+                return maxY + 1;
+            }
+            renderPlayerStatCard(graphics, mc, panelX, panelWidth, y, rowHeight, player, accent);
+            y += rowHeight + 3;
+        }
+        return y + 4;
+    }
+
+    private void renderPlayerStatCard(GuiGraphics graphics, Minecraft mc, int x, int width, int y, int height,
+            PlayerInfo player, int teamColor) {
+        int cardTop = player.isAlive() ? withAlpha(teamColor, 30) : 0x66331515;
+        int cardBottom = player.isAlive() ? withAlpha(0xFF0F1114, 190) : 0x661A1212;
+        int lifeColor = player.isAlive() ? 0xFF4DFF8A : 0xFFFF6B6B;
+        int cardRight = x + width;
+
+        graphics.fillGradient(x, y, cardRight, y + height, cardTop, cardBottom);
+        graphics.fill(x, y, x + 2, y + height, lifeColor);
+
+        String aliveMark = player.isAlive() ? "● " : "✖ ";
+        String kdText = formatKd(player.kills(), player.deaths());
+        String headline = aliveMark + player.name();
+        String scoreText = "K/D " + player.kills() + "/" + player.deaths();
+        String meta = Component.translatable("screen.codpattern.tdm_room.player_meta",
+                shortPlayerId(player.uuid()), kdText, Math.max(0, player.pingMs())).getString();
+
+        graphics.drawString(mc.font, headline, x + 6, y + 3, 0xFFF4F4F4);
+        graphics.drawString(mc.font, scoreText, cardRight - mc.font.width(scoreText) - 5, y + 3, 0xFFCCCCCC);
+        graphics.drawString(mc.font, meta, x + 6, y + 13, 0xFFB5B5B5);
+    }
+
+    private int getTeamAccentColor(String teamName) {
+        if (CodTdmMap.TEAM_KORTAC.equalsIgnoreCase(teamName)) {
+            return 0xFFE35A5A;
+        }
+        if (CodTdmMap.TEAM_SPECGRU.equalsIgnoreCase(teamName)) {
+            return 0xFF66A6FF;
+        }
+        return 0xFFB4C1CE;
+    }
+
+    private String shortPlayerId(java.util.UUID uuid) {
+        String raw = uuid.toString();
+        return raw.substring(0, Math.min(raw.length(), 8)).toUpperCase(Locale.ROOT);
+    }
+
+    private String formatKd(int kills, int deaths) {
+        if (kills <= 0 && deaths <= 0) {
+            return "0.00";
+        }
+        if (deaths <= 0) {
+            return kills + ".00";
+        }
+        return String.format(Locale.ROOT, "%.2f", (double) kills / (double) deaths);
     }
 
     @Override
@@ -499,6 +705,13 @@ public class TdmRoomScreen extends Screen {
     private void selectTeam(String teamName) {
         if (joinedRoom == null)
             return;
+        if (!isTeamSwitchAllowed()) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player != null) {
+                mc.player.sendSystemMessage(Component.translatable("message.codpattern.game.team_switch_locked"));
+            }
+            return;
+        }
         PacketHandler.sendToServer(new SelectTeamPacket(teamName));
     }
 
@@ -547,6 +760,7 @@ public class TdmRoomScreen extends Screen {
      */
     public void updateRoomList(Map<String, RoomData> rooms) {
         this.rooms = rooms;
+        updateButtonStates();
     }
 
     /**
@@ -555,7 +769,6 @@ public class TdmRoomScreen extends Screen {
     public void updatePlayerList(String mapName, Map<String, List<PlayerInfo>> teamPlayers) {
         this.joinedRoom = mapName;
         this.teamPlayers = teamPlayers;
-        clearPendingLeave();
         updateButtonStates();
     }
 
@@ -565,7 +778,6 @@ public class TdmRoomScreen extends Screen {
     public void setJoinedRoom(String roomName) {
         this.joinedRoom = roomName;
         this.selectedRoom = roomName;
-        clearPendingLeave();
         updateButtonStates();
     }
 

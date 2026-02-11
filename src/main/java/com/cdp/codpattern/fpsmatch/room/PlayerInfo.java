@@ -14,7 +14,8 @@ public record PlayerInfo(
         boolean isReady, // 是否已准备（WAITING阶段）
         int kills, // 击杀数（比赛中）
         int deaths, // 死亡数（比赛中）
-        boolean isAlive // 是否存活
+        boolean isAlive, // 是否存活
+        int pingMs // 延迟（毫秒）
 ) {
     /**
      * 写入网络缓冲
@@ -26,6 +27,7 @@ public record PlayerInfo(
         buf.writeInt(kills);
         buf.writeInt(deaths);
         buf.writeBoolean(isAlive);
+        buf.writeInt(pingMs);
     }
 
     /**
@@ -38,6 +40,7 @@ public record PlayerInfo(
                 buf.readBoolean(),
                 buf.readInt(),
                 buf.readInt(),
-                buf.readBoolean());
+                buf.readBoolean(),
+                buf.readInt());
     }
 }

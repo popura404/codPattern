@@ -7,6 +7,7 @@ import com.cdp.codpattern.network.tdm.CountdownPacket;
 import com.cdp.codpattern.network.tdm.GamePhasePacket;
 import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
 import com.cdp.codpattern.network.tdm.TeamPlayerListPacket;
+import com.cdp.codpattern.network.tdm.VoteDialogPacket;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.PlayerData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
@@ -75,8 +76,8 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
     private final Map<UUID, Integer> playerDeaths = new HashMap<>();
 
     // ========== 投票系统 ==========
-    private final Set<UUID> startVotes = new HashSet<>();
-    private final Set<UUID> endVotes = new HashSet<>();
+    private VoteSession activeVoteSession = null;
+    private long voteSessionSequence = 0L;
 
     // ========== 装备系统 ==========
     private Map<String, ArrayList<ItemStack>> startKits = new HashMap<>();
@@ -90,6 +91,30 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
     public static final String TEAM_KORTAC = "kortac";
     public static final String TEAM_SPECGRU = "specgru";
     public static final int DEFAULT_TEAM_LIMIT = 6;
+    private static final int VOTE_TIMEOUT_TICKS = 15 * 20;
+
+    private enum VoteType {
+        START,
+        END
+    }
+
+    private static class VoteSession {
+        private final long voteId;
+        private final VoteType type;
+        private final UUID initiator;
+        private final Set<UUID> voters;
+        private final Set<UUID> accepted = new HashSet<>();
+        private final Set<UUID> rejected = new HashSet<>();
+        private int timeoutTicksRemaining;
+
+        private VoteSession(long voteId, VoteType type, UUID initiator, Set<UUID> voters) {
+            this.voteId = voteId;
+            this.type = type;
+            this.initiator = initiator;
+            this.voters = voters;
+            this.timeoutTicksRemaining = VOTE_TIMEOUT_TICKS;
+        }
+    }
 
     /**
      * 构造函数
@@ -118,6 +143,9 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
             case PLAYING -> tickPlaying();
             case ENDED -> tickEnded();
         }
+
+        // 更新投票超时
+        tickVoteSession();
 
         // 更新死亡视角
         tickDeathCam();
@@ -221,8 +249,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         deathCamPlayers.clear();
         playerKills.clear();
         playerDeaths.clear();
-        startVotes.clear();
-        endVotes.clear();
+        clearActiveVoteSession();
 
         // 重置队伍分数
         for (BaseTeam team : getMapTeams().getTeams()) {
@@ -244,8 +271,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         clearTransientPlayerState(playerId);
         playerKills.remove(playerId);
         playerDeaths.remove(playerId);
-        startVotes.remove(playerId);
-        endVotes.remove(playerId);
+        removePlayerFromActiveVote(playerId);
 
         if (!teleportPlayerToMatchEndPoint(player)) {
             player.sendSystemMessage(Component.translatable("message.codpattern.game.warning_no_end_teleport", mapName));
@@ -265,6 +291,10 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
      * 切换队伍（不会触发离房传送）。
      */
     public void switchTeam(ServerPlayer player, String teamName) {
+        if (phase != GamePhase.WAITING) {
+            player.sendSystemMessage(Component.translatable("message.codpattern.game.team_switch_locked"));
+            return;
+        }
         clearTransientPlayerState(player.getUUID());
         getMapTeams().leaveTeam(player);
         join(teamName, player);
@@ -277,6 +307,9 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
      * 切换到新阶段
      */
     private void transitionToPhase(GamePhase newPhase) {
+        if (newPhase != phase) {
+            clearActiveVoteSession();
+        }
         this.phase = newPhase;
         this.phaseTimer = 0;
 
@@ -781,12 +814,24 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
                             phase == GamePhase.WAITING, // isReady (在WAITING阶段显示)
                             playerKills.getOrDefault(playerId, 0),
                             playerDeaths.getOrDefault(playerId, 0),
-                            !respawnTimers.containsKey(playerId) // isAlive
+                            !respawnTimers.containsKey(playerId), // isAlive
+                            Math.max(0, serverPlayer.latency)
                     );
                     playerInfos.add(info);
                 }
             }
 
+            playerInfos.sort((a, b) -> {
+                int byKills = Integer.compare(b.kills(), a.kills());
+                if (byKills != 0) {
+                    return byKills;
+                }
+                int byDeaths = Integer.compare(a.deaths(), b.deaths());
+                if (byDeaths != 0) {
+                    return byDeaths;
+                }
+                return a.name().compareToIgnoreCase(b.name());
+            });
             result.put(team.name, playerInfos);
         }
 
@@ -796,132 +841,267 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
     // ========== 投票系统 ==========
 
     /**
-     * 投票开始游戏
-     * 
-     * @return 是否成功投票
+     * 发起开始投票（兼容旧接口）
      */
     public boolean voteToStart(UUID player) {
-        // 只有在等待阶段才能投票开始
-        if (phase != GamePhase.WAITING) {
-            Player p = getServerLevel().getPlayerByUUID(player);
-            if (p != null)
-                p.sendSystemMessage(Component.translatable("message.codpattern.game.already_started"));
-            return false;
-        }
-
-        // 检查是否已投票
-        if (startVotes.contains(player)) {
-            Player p = getServerLevel().getPlayerByUUID(player);
-            if (p != null)
-                p.sendSystemMessage(Component.translatable("message.codpattern.game.already_voted"));
-            return false;
-        }
-
-        startVotes.add(player);
-
-        int totalPlayers = getMapTeams().getJoinedPlayers().size();
-        CodTdmConfig config = CodTdmConfig.getConfig();
-        int requiredVotes = Math.max(1, (totalPlayers * config.getVotePercentageToStart()) / 100);
-
-        // 广播投票信息
-        getMapTeams().getJoinedPlayers().forEach(pd -> pd.getPlayer().ifPresent(p -> p.sendSystemMessage(Component
-                .translatable("message.codpattern.game.vote_start", startVotes.size(), totalPlayers, requiredVotes))));
-
-        return checkStartVote();
+        return initiateStartVote(player);
     }
 
     /**
-     * 投票结束游戏
-     * 
-     * @return 是否成功投票
+     * 发起结束投票（兼容旧接口）
      */
     public boolean voteToEnd(UUID player) {
-        // 只有在游戏中才能投票结束
-        if (phase != GamePhase.PLAYING && phase != GamePhase.WARMUP) {
-            Player p = getServerLevel().getPlayerByUUID(player);
-            if (p != null)
-                p.sendSystemMessage(Component.translatable("message.codpattern.game.not_started"));
-            return false;
-        }
-
-        // 检查是否已投票
-        if (endVotes.contains(player)) {
-            Player p = getServerLevel().getPlayerByUUID(player);
-            if (p != null)
-                p.sendSystemMessage(Component.translatable("message.codpattern.game.already_voted"));
-            return false;
-        }
-
-        endVotes.add(player);
-
-        int totalPlayers = getMapTeams().getJoinedPlayers().size();
-        CodTdmConfig config = CodTdmConfig.getConfig();
-        int requiredVotes = Math.max(1, (totalPlayers * config.getVotePercentageToEnd()) / 100);
-
-        // 广播投票信息
-        getMapTeams().getJoinedPlayers().forEach(pd -> pd.getPlayer().ifPresent(p -> p.sendSystemMessage(Component
-                .translatable("message.codpattern.game.vote_end", endVotes.size(), totalPlayers, requiredVotes))));
-
-        return checkEndVote();
+        return initiateEndVote(player);
     }
 
     /**
-     * 检查开始投票
+     * 发起开始投票（向当前房间所有玩家弹出接受/拒绝）
      */
-    public boolean checkStartVote() {
-        int totalPlayers = getMapTeams().getJoinedPlayers().size();
-        CodTdmConfig config = CodTdmConfig.getConfig();
+    public boolean initiateStartVote(UUID initiator) {
+        return initiateVote(VoteType.START, initiator);
+    }
 
-        if (totalPlayers < config.getMinPlayersToStart()) {
-            getMapTeams().getJoinedPlayers().forEach(pd -> pd.getPlayer().ifPresent(
-                    p -> p.sendSystemMessage(Component.translatable("message.codpattern.game.min_players_warning",
-                            config.getMinPlayersToStart(), totalPlayers))));
+    /**
+     * 发起结束投票（向当前房间所有玩家弹出接受/拒绝）
+     */
+    public boolean initiateEndVote(UUID initiator) {
+        return initiateVote(VoteType.END, initiator);
+    }
+
+    /**
+     * 玩家提交投票响应（接受/拒绝）
+     */
+    public boolean submitVoteResponse(UUID playerId, long voteId, boolean accepted) {
+        if (activeVoteSession == null || activeVoteSession.voteId != voteId) {
+            Player player = getServerLevel().getPlayerByUUID(playerId);
+            if (player != null) {
+                player.sendSystemMessage(Component.translatable("message.codpattern.game.vote_expired"));
+            }
             return false;
         }
 
-        int requiredVotes = Math.max(1, (totalPlayers * config.getVotePercentageToStart()) / 100);
-        if (startVotes.size() >= requiredVotes) {
-            getMapTeams().getJoinedPlayers().forEach(pd -> pd.getPlayer().ifPresent(
-                    p -> p.sendSystemMessage(Component.translatable("message.codpattern.game.vote_passed"))));
-            startGame();
+        VoteSession session = activeVoteSession;
+        if (!session.voters.contains(playerId)) {
+            return false;
+        }
+        if (session.accepted.contains(playerId) || session.rejected.contains(playerId)) {
+            Player player = getServerLevel().getPlayerByUUID(playerId);
+            if (player != null) {
+                player.sendSystemMessage(Component.translatable("message.codpattern.game.already_voted"));
+            }
+            return false;
+        }
+
+        if (accepted) {
+            session.accepted.add(playerId);
+        } else {
+            session.rejected.add(playerId);
+        }
+
+        broadcastVoteProgress(session);
+        return resolveVoteIfReady(session);
+    }
+
+    private boolean initiateVote(VoteType type, UUID initiator) {
+        Player initiatorPlayer = getServerLevel().getPlayerByUUID(initiator);
+        if (initiatorPlayer == null) {
+            return false;
+        }
+
+        if (activeVoteSession != null) {
+            initiatorPlayer.sendSystemMessage(Component.translatable("message.codpattern.game.vote_in_progress"));
+            return false;
+        }
+
+        if (type == VoteType.START) {
+            if (phase != GamePhase.WAITING) {
+                initiatorPlayer.sendSystemMessage(Component.translatable("message.codpattern.game.already_started"));
+                return false;
+            }
+        } else if (phase != GamePhase.PLAYING && phase != GamePhase.WARMUP) {
+            initiatorPlayer.sendSystemMessage(Component.translatable("message.codpattern.game.not_started"));
+            return false;
+        }
+
+        List<ServerPlayer> joinedPlayers = getJoinedServerPlayers();
+        if (joinedPlayers.isEmpty()) {
+            return false;
+        }
+
+        int totalPlayers = joinedPlayers.size();
+        CodTdmConfig config = CodTdmConfig.getConfig();
+        if (type == VoteType.START && totalPlayers < config.getMinPlayersToStart()) {
+            initiatorPlayer.sendSystemMessage(Component.translatable("message.codpattern.game.min_players_warning",
+                    config.getMinPlayersToStart(), totalPlayers));
+            return false;
+        }
+
+        Set<UUID> voters = new HashSet<>();
+        for (ServerPlayer joinedPlayer : joinedPlayers) {
+            voters.add(joinedPlayer.getUUID());
+        }
+
+        VoteSession session = new VoteSession(++voteSessionSequence, type, initiator, voters);
+        activeVoteSession = session;
+
+        String initiatorName = initiatorPlayer.getName().getString();
+        Component startMessage = type == VoteType.START
+                ? Component.translatable("message.codpattern.game.vote_initiated_start", initiatorName)
+                : Component.translatable("message.codpattern.game.vote_initiated_end", initiatorName);
+        broadcastToJoinedPlayers(startMessage);
+
+        int requiredVotes = getRequiredVotes(type, totalPlayers);
+        VoteDialogPacket dialogPacket = new VoteDialogPacket(mapName, session.voteId, type.name(), initiatorName,
+                requiredVotes, totalPlayers);
+        for (ServerPlayer joinedPlayer : joinedPlayers) {
+            PacketHandler.sendToPlayer(dialogPacket, joinedPlayer);
+        }
+
+        return true;
+    }
+
+    private boolean resolveVoteIfReady(VoteSession session) {
+        if (activeVoteSession == null || activeVoteSession != session) {
+            return false;
+        }
+
+        if (session.voters.isEmpty()) {
+            clearActiveVoteSession();
+            return false;
+        }
+
+        if (session.type == VoteType.START) {
+            int totalPlayers = session.voters.size();
+            CodTdmConfig config = CodTdmConfig.getConfig();
+            if (totalPlayers < config.getMinPlayersToStart()) {
+                broadcastToJoinedPlayers(Component.translatable("message.codpattern.game.min_players_warning",
+                        config.getMinPlayersToStart(), totalPlayers));
+                broadcastToJoinedPlayers(Component.translatable("message.codpattern.game.vote_failed"));
+                clearActiveVoteSession();
+                return false;
+            }
+        } else if (phase != GamePhase.PLAYING && phase != GamePhase.WARMUP) {
+            clearActiveVoteSession();
+            return false;
+        }
+
+        int totalPlayers = session.voters.size();
+        int requiredVotes = getRequiredVotes(session.type, totalPlayers);
+        int acceptCount = session.accepted.size();
+        int rejectCount = session.rejected.size();
+        int unresolvedCount = Math.max(0, totalPlayers - acceptCount - rejectCount);
+
+        if (acceptCount >= requiredVotes) {
+            if (session.type == VoteType.START) {
+                broadcastToJoinedPlayers(Component.translatable("message.codpattern.game.vote_passed"));
+                clearActiveVoteSession();
+                startGame();
+            } else {
+                broadcastToJoinedPlayers(Component.translatable("message.codpattern.game.vote_passed_end"));
+                clearActiveVoteSession();
+                transitionToPhase(GamePhase.ENDED);
+            }
             return true;
+        }
+
+        if (acceptCount + unresolvedCount < requiredVotes) {
+            Component failMessage = session.type == VoteType.START
+                    ? Component.translatable("message.codpattern.game.vote_failed")
+                    : Component.translatable("message.codpattern.game.vote_failed_end");
+            broadcastToJoinedPlayers(failMessage);
+            clearActiveVoteSession();
+            return false;
+        }
+
+        if (acceptCount + rejectCount >= totalPlayers) {
+            Component failMessage = session.type == VoteType.START
+                    ? Component.translatable("message.codpattern.game.vote_failed")
+                    : Component.translatable("message.codpattern.game.vote_failed_end");
+            broadcastToJoinedPlayers(failMessage);
+            clearActiveVoteSession();
+            return false;
         }
 
         return false;
     }
 
-    /**
-     * 检查结束投票
-     */
-    public boolean checkEndVote() {
-        int totalPlayers = getMapTeams().getJoinedPlayers().size();
+    private int getRequiredVotes(VoteType type, int totalPlayers) {
         CodTdmConfig config = CodTdmConfig.getConfig();
+        int votePercent = type == VoteType.START ? config.getVotePercentageToStart() : config.getVotePercentageToEnd();
+        return Math.max(1, (totalPlayers * votePercent) / 100);
+    }
 
-        int requiredVotes = Math.max(1, (totalPlayers * config.getVotePercentageToEnd()) / 100);
-        if (endVotes.size() >= requiredVotes) {
-            getMapTeams().getJoinedPlayers().forEach(pd -> pd.getPlayer().ifPresent(
-                    p -> p.sendSystemMessage(Component.translatable("message.codpattern.game.vote_passed_end"))));
-            transitionToPhase(GamePhase.ENDED);
-            return true;
+    private void tickVoteSession() {
+        if (activeVoteSession == null) {
+            return;
+        }
+        VoteSession session = activeVoteSession;
+        session.timeoutTicksRemaining--;
+        if (session.timeoutTicksRemaining > 0) {
+            return;
         }
 
-        return false;
+        Component timeoutMessage = session.type == VoteType.START
+                ? Component.translatable("message.codpattern.game.vote_timeout_start")
+                : Component.translatable("message.codpattern.game.vote_timeout_end");
+        broadcastToJoinedPlayers(timeoutMessage);
+        clearActiveVoteSession();
+    }
+
+    private void broadcastVoteProgress(VoteSession session) {
+        int totalPlayers = session.voters.size();
+        int requiredVotes = getRequiredVotes(session.type, totalPlayers);
+        int acceptCount = session.accepted.size();
+        int rejectCount = session.rejected.size();
+
+        Component progressMessage = session.type == VoteType.START
+                ? Component.translatable("message.codpattern.game.vote_progress_start", acceptCount, rejectCount,
+                        totalPlayers, requiredVotes)
+                : Component.translatable("message.codpattern.game.vote_progress_end", acceptCount, rejectCount,
+                        totalPlayers, requiredVotes);
+        broadcastToJoinedPlayers(progressMessage);
+    }
+
+    private void broadcastToJoinedPlayers(Component message) {
+        getMapTeams().getJoinedPlayers().forEach(pd -> pd.getPlayer().ifPresent(p -> p.sendSystemMessage(message)));
+    }
+
+    private List<ServerPlayer> getJoinedServerPlayers() {
+        List<ServerPlayer> players = new ArrayList<>();
+        getMapTeams().getJoinedPlayers().forEach(pd -> pd.getPlayer().ifPresent(players::add));
+        return players;
+    }
+
+    private void clearActiveVoteSession() {
+        activeVoteSession = null;
+    }
+
+    private void removePlayerFromActiveVote(UUID playerId) {
+        if (activeVoteSession == null) {
+            return;
+        }
+
+        VoteSession session = activeVoteSession;
+        if (!session.voters.remove(playerId)) {
+            return;
+        }
+        session.accepted.remove(playerId);
+        session.rejected.remove(playerId);
+        resolveVoteIfReady(session);
     }
 
     /**
      * 获取投票状态信息
      */
     public String getVoteStatus() {
-        int totalPlayers = getMapTeams().getJoinedPlayers().size();
-        CodTdmConfig config = CodTdmConfig.getConfig();
-
-        if (phase == GamePhase.WAITING) {
-            int requiredVotes = Math.max(1, (totalPlayers * config.getVotePercentageToStart()) / 100);
-            return Component.translatable("message.codpattern.game.status_vote_start", startVotes.size(), requiredVotes)
-                    .getString();
-        } else if (phase == GamePhase.PLAYING || phase == GamePhase.WARMUP) {
-            int requiredVotes = Math.max(1, (totalPlayers * config.getVotePercentageToEnd()) / 100);
-            return Component.translatable("message.codpattern.game.status_vote_end", endVotes.size(), requiredVotes)
+        if (activeVoteSession != null) {
+            int requiredVotes = getRequiredVotes(activeVoteSession.type, activeVoteSession.voters.size());
+            int acceptedVotes = activeVoteSession.accepted.size();
+            if (activeVoteSession.type == VoteType.START) {
+                return Component.translatable("message.codpattern.game.status_vote_start", acceptedVotes, requiredVotes)
+                        .getString();
+            }
+            return Component.translatable("message.codpattern.game.status_vote_end", acceptedVotes, requiredVotes)
                     .getString();
         }
         return "";

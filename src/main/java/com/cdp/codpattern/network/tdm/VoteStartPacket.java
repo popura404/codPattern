@@ -34,7 +34,7 @@ public class VoteStartPacket {
             if (player != null) {
                 FPSMCore.getInstance().getMapByPlayer(player).ifPresent(map -> {
                     if (map instanceof CodTdmMap tdmMap) {
-                        tdmMap.voteToStart(player.getUUID());
+                        tdmMap.initiateStartVote(player.getUUID());
                     }
                 });
             }

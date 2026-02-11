@@ -9,23 +9,29 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 /**
- * C→S: 投票结束游戏数据包
+ * C→S: 投票响应数据包（接受/拒绝）
  */
-public class VoteEndPacket {
+public class VoteResponsePacket {
+    private final long voteId;
+    private final boolean accepted;
 
-    public VoteEndPacket() {
+    public VoteResponsePacket(long voteId, boolean accepted) {
+        this.voteId = voteId;
+        this.accepted = accepted;
     }
 
-    public VoteEndPacket(FriendlyByteBuf buf) {
-        // 无数据需要读取
+    public VoteResponsePacket(FriendlyByteBuf buf) {
+        this.voteId = buf.readLong();
+        this.accepted = buf.readBoolean();
     }
 
     public void encode(FriendlyByteBuf buf) {
-        // 无数据需要写入
+        buf.writeLong(voteId);
+        buf.writeBoolean(accepted);
     }
 
-    public static VoteEndPacket decode(FriendlyByteBuf buf) {
-        return new VoteEndPacket(buf);
+    public static VoteResponsePacket decode(FriendlyByteBuf buf) {
+        return new VoteResponsePacket(buf);
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
@@ -34,7 +40,7 @@ public class VoteEndPacket {
             if (player != null) {
                 FPSMCore.getInstance().getMapByPlayer(player).ifPresent(map -> {
                     if (map instanceof CodTdmMap tdmMap) {
-                        tdmMap.initiateEndVote(player.getUUID());
+                        tdmMap.submitVoteResponse(player.getUUID(), voteId, accepted);
                     }
                 });
             }

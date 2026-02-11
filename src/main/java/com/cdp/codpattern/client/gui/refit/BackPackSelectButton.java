@@ -34,6 +34,7 @@ public class BackPackSelectButton extends Button {
 
     private final Integer BAGSERIAL;
     private int focusedtimes = 0;
+    private int hoverTicks = 0;
     private final BackpackConfig.Backpack backpack;
     private final boolean isCurrentlySelected;
 
@@ -205,6 +206,11 @@ public class BackPackSelectButton extends Button {
         } else if (!this.isHoveredOrFocused()) {
             focusedtimes = 0;
         }
+        if (this.isHoveredOrFocused()) {
+            hoverTicks = Math.min(6, hoverTicks + 1);
+        } else {
+            hoverTicks = Math.max(0, hoverTicks - 1);
+        }
 
         // 渲染基础按钮背景 - MWII 深色风格
         graphics.fillGradient(this.getX(), this.getY(),
@@ -285,6 +291,15 @@ public class BackPackSelectButton extends Button {
                 this.getX() + this.width, this.getY() + this.height,
                 CodTheme.HOVER_BG_TOP, CodTheme.HOVER_BG_BOTTOM);
 
+        if (hoverTicks > 0) {
+            int alphaTop = Math.min(180, 18 * hoverTicks);
+            int alphaBottom = Math.min(200, 22 * hoverTicks);
+            graphics.fillGradient(this.getX(), this.getY(),
+                    this.getX() + this.width, this.getY() + this.height,
+                    withAlpha(CodTheme.HOVER_BG_TOP, alphaTop),
+                    withAlpha(CodTheme.HOVER_BG_BOTTOM, alphaBottom));
+        }
+
         // 顶部荧光绿边框
         graphics.fill(this.getX(), this.getY() - 1,
                 this.getX() + this.width, this.getY(),
@@ -294,6 +309,10 @@ public class BackPackSelectButton extends Button {
         graphics.fill(this.getX(), this.getY() + this.height,
                 this.getX() + this.width, this.getY() + this.height + 1,
                 CodTheme.HOVER_BORDER_SEMI);
+    }
+
+    private int withAlpha(int color, int alpha) {
+        return (Math.max(0, Math.min(255, alpha)) << 24) | (color & 0x00FFFFFF);
     }
 
     @Override

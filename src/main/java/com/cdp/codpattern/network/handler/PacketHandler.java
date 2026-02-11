@@ -9,7 +9,7 @@ import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public class PacketHandler {
-        private static final String PROTOCOL_VERSION = "1";
+        private static final String PROTOCOL_VERSION = "3";
         public static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(
                         new ResourceLocation("codpattern", "main"),
                         () -> PROTOCOL_VERSION,
@@ -174,6 +174,14 @@ public class PacketHandler {
                                 .consumerMainThread(com.cdp.codpattern.network.tdm.VoteEndPacket::handle)
                                 .add();
 
+                // 投票响应（接受/拒绝）
+                INSTANCE.messageBuilder(com.cdp.codpattern.network.tdm.VoteResponsePacket.class, id(),
+                                NetworkDirection.PLAY_TO_SERVER)
+                                .decoder(com.cdp.codpattern.network.tdm.VoteResponsePacket::decode)
+                                .encoder(com.cdp.codpattern.network.tdm.VoteResponsePacket::encode)
+                                .consumerMainThread(com.cdp.codpattern.network.tdm.VoteResponsePacket::handle)
+                                .add();
+
                 // ========== TDM 数据包 (S2C) ==========
 
                 // 同步房间列表
@@ -190,6 +198,14 @@ public class PacketHandler {
                                 .decoder(com.cdp.codpattern.network.tdm.TeamPlayerListPacket::decode)
                                 .encoder(com.cdp.codpattern.network.tdm.TeamPlayerListPacket::encode)
                                 .consumerMainThread(com.cdp.codpattern.network.tdm.TeamPlayerListPacket::handle)
+                                .add();
+
+                // 投票弹窗
+                INSTANCE.messageBuilder(com.cdp.codpattern.network.tdm.VoteDialogPacket.class, id(),
+                                NetworkDirection.PLAY_TO_CLIENT)
+                                .decoder(com.cdp.codpattern.network.tdm.VoteDialogPacket::decode)
+                                .encoder(com.cdp.codpattern.network.tdm.VoteDialogPacket::encode)
+                                .consumerMainThread(com.cdp.codpattern.network.tdm.VoteDialogPacket::handle)
                                 .add();
 
                 // 死亡视角

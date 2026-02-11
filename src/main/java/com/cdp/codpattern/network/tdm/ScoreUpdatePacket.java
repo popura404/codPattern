@@ -39,11 +39,7 @@ public class ScoreUpdatePacket {
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
             Minecraft.getInstance().execute(() -> {
-                com.cdp.codpattern.client.ClientTdmState.team1Score = team1Score;
-                com.cdp.codpattern.client.ClientTdmState.team2Score = team2Score;
-                com.cdp.codpattern.client.ClientTdmState.gameTimeTicks = gameTimeTicks; // Keeping original fields as
-                                                                                        // new ones are not defined in
-                                                                                        // this packet
+                com.cdp.codpattern.client.ClientTdmState.updateScore(team1Score, team2Score, gameTimeTicks);
             });
         });
         ctx.get().setPacketHandled(true);
