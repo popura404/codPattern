@@ -33,7 +33,9 @@ public class LeaveRoomPacket {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
                 FPSMCore.getInstance().getMapByPlayer(player).ifPresent(map -> {
-                    if (map instanceof CodTdmMap) {
+                    if (map instanceof CodTdmMap tdmMap) {
+                        tdmMap.leaveRoom(player);
+                    } else {
                         map.leave(player);
                     }
                 });

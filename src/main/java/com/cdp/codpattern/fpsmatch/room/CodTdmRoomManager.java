@@ -53,6 +53,8 @@ public class CodTdmRoomManager {
             int playerCount = map.getMapTeams().getJoinedPlayers().size();
             int maxPlayers = 0;
             Map<String, Integer> teamPlayerCounts = new HashMap<>();
+            Map<String, Integer> teamScores = map.getTeamScoresSnapshot();
+            int remainingTimeTicks = map.getRemainingTimeTicks();
 
             for (BaseTeam team : map.getMapTeams().getTeams()) {
                 maxPlayers += team.getPlayerLimit();
@@ -63,7 +65,10 @@ public class CodTdmRoomManager {
                     map.getPhase().name(),
                     playerCount,
                     maxPlayers,
-                    teamPlayerCounts);
+                    teamPlayerCounts,
+                    teamScores,
+                    remainingTimeTicks,
+                    map.hasMatchEndTeleportPoint());
             roomInfos.put(map.mapName, info);
         }
 

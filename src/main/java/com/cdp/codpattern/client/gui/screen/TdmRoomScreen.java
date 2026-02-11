@@ -1,5 +1,6 @@
 package com.cdp.codpattern.client.gui.screen;
 
+import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
@@ -20,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -42,8 +44,10 @@ public class TdmRoomScreen extends Screen {
 
     // 房间列表区域
     private int roomListX, roomListY, roomListWidth, roomListHeight;
-    private int roomItemHeight = 24;
+    private int roomItemHeight = 34;
     private List<String> roomNames = new ArrayList<>();
+    private static final long LEAVE_CONFIRM_WINDOW_MS = 3000L;
+    private long pendingLeaveDeadlineMs = 0L;
 
     // 队伍选择按钮
     private Button kortacButton;
@@ -161,6 +165,7 @@ public class TdmRoomScreen extends Screen {
         leaveButton.active = hasJoinedRoom;
         kortacButton.active = hasJoinedRoom;
         specgruButton.active = hasJoinedRoom;
+        updateLeaveButtonLabel();
     }
 
     @Override
@@ -182,6 +187,19 @@ public class TdmRoomScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 
+    @Override
+    public void tick() {
+        super.tick();
+        if (pendingLeaveDeadlineMs <= 0L) {
+            return;
+        }
+        if (System.currentTimeMillis() >= pendingLeaveDeadlineMs) {
+            executeLeaveRoom();
+            return;
+        }
+        updateLeaveButtonLabel();
+    }
+
     /**
      * 渲染房间列表面板
      */
@@ -200,6 +218,8 @@ public class TdmRoomScreen extends Screen {
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.create_hint"), roomListX,
                     roomListY + 25, 0x888888);
             graphics.drawString(mc.font, "§b/fpsm map create cdptdm <名称> <从> <到>", roomListX, roomListY + 40, 0x888888);
+            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.command_scope_hint"), roomListX,
+                    roomListY + 55, 0xE0AA00);
             return;
         }
 
@@ -235,6 +255,9 @@ public class TdmRoomScreen extends Screen {
             // 房间信息
             String statusIcon = getStatusIcon(room.state);
             String roomText = String.format("%s %s", statusIcon, mapName);
+            if (!room.hasMatchEndTeleportPoint) {
+                roomText += " §c!";
+            }
             String infoText = String.format("%d/%d", room.playerCount, room.maxPlayers);
 
             int textColor = joined ? 0x00FF00 : (selected ? 0xFFFF00 : 0xFFFFFF);
@@ -242,12 +265,12 @@ public class TdmRoomScreen extends Screen {
             graphics.drawString(mc.font, infoText, roomListX + roomListWidth - mc.font.width(infoText) - 5, y + 4,
                     0xAAAAAA);
 
-            // 状态标签
-            String stateText = "§7[" + room.state + "]";
-            graphics.drawString(mc.font, stateText, roomListX + 5, y + 14, 0x888888);
+            String statusText = buildRoomListStatusText(room);
+            graphics.drawString(mc.font, statusText, roomListX + 5, y + 18, 0xAFAFAF);
 
             y += roomItemHeight;
         }
+
     }
 
     /**
@@ -261,6 +284,69 @@ public class TdmRoomScreen extends Screen {
             case "ENDED" -> "§7●";
             default -> "§f●";
         };
+    }
+
+    private String buildRoomListStatusText(RoomData room) {
+        String phaseText = Component
+                .translatable("screen.codpattern.tdm_room.phase." + room.state.toLowerCase(Locale.ROOT))
+                .getString();
+        String scoreText = buildTeamScoreText(room);
+        if (room.remainingTimeTicks > 0) {
+            return String.format("§7[%s %s]  %s", phaseText, formatTime(room.remainingTimeTicks), scoreText);
+        }
+        return String.format("§7[%s]  %s", phaseText, scoreText);
+    }
+
+    private String buildTeamScoreText(RoomData room) {
+        int kortacScore = room.teamScores.getOrDefault(CodTdmMap.TEAM_KORTAC, 0);
+        int specgruScore = room.teamScores.getOrDefault(CodTdmMap.TEAM_SPECGRU, 0);
+        return String.format("§cK:%d §7| §9S:%d", kortacScore, specgruScore);
+    }
+
+    private String buildPhaseStatusText(RoomData room) {
+        String phaseText = Component
+                .translatable("screen.codpattern.tdm_room.phase." + room.state.toLowerCase(Locale.ROOT))
+                .getString();
+        if (room.remainingTimeTicks > 0) {
+            return phaseText + " " + formatTime(room.remainingTimeTicks);
+        }
+        return phaseText;
+    }
+
+    private String formatTime(int ticks) {
+        int seconds = Math.max(0, ticks / 20);
+        int minutes = seconds / 60;
+        seconds %= 60;
+        return String.format("%02d:%02d", minutes, seconds);
+    }
+
+    private int getLeaveSecondsRemaining() {
+        long remainMs = pendingLeaveDeadlineMs - System.currentTimeMillis();
+        if (remainMs <= 0) {
+            return 0;
+        }
+        return (int) Math.ceil(remainMs / 1000.0);
+    }
+
+    private boolean isLeavePending() {
+        return pendingLeaveDeadlineMs > 0L && pendingLeaveDeadlineMs > System.currentTimeMillis();
+    }
+
+    private void clearPendingLeave() {
+        pendingLeaveDeadlineMs = 0L;
+        updateLeaveButtonLabel();
+    }
+
+    private void updateLeaveButtonLabel() {
+        if (leaveButton == null) {
+            return;
+        }
+        if (isLeavePending()) {
+            leaveButton.setMessage(Component.translatable("screen.codpattern.tdm_room.leave_room_pending",
+                    getLeaveSecondsRemaining()));
+            return;
+        }
+        leaveButton.setMessage(Component.translatable("screen.codpattern.tdm_room.leave_room"));
     }
 
     /**
@@ -295,9 +381,37 @@ public class TdmRoomScreen extends Screen {
                     panelY, 0xAAAAAA);
         }
 
+        int infoY = panelY + 30;
+        if (joinedRoom != null) {
+            RoomData joined = rooms.get(joinedRoom);
+            if (joined != null) {
+                graphics.drawString(mc.font,
+                        Component.translatable("screen.codpattern.tdm_room.current_score", buildTeamScoreText(joined)),
+                        panelX, infoY, 0xE5E5E5);
+                graphics.drawString(mc.font,
+                        Component.translatable("screen.codpattern.tdm_room.current_phase", buildPhaseStatusText(joined)),
+                        panelX, infoY + 12, 0xB0B0B0);
+                infoY += 26;
+            }
+        }
+
+        RoomData selected = null;
+        if (joinedRoom != null) {
+            selected = rooms.get(joinedRoom);
+        } else if (selectedRoom != null) {
+            selected = rooms.get(selectedRoom);
+        }
+        if (selected != null && !selected.hasMatchEndTeleportPoint) {
+            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.warning_no_end_tp"),
+                    panelX, infoY, 0xFF5555);
+            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.warning_no_end_tp_hint"),
+                    panelX, infoY + 12, 0xFFAA55);
+            infoY += 24;
+        }
+
         // 渲染队伍玩家列表 (在按钮下方)
         if (joinedRoom != null && !teamPlayers.isEmpty()) {
-            int yOffset = panelY + 80; // 留出按钮空间
+            int yOffset = Math.max(panelY + 80, infoY + 8); // 留出按钮空间
 
             for (Map.Entry<String, List<PlayerInfo>> entry : teamPlayers.entrySet()) {
                 String teamName = entry.getKey();
@@ -326,6 +440,13 @@ public class TdmRoomScreen extends Screen {
                 yOffset += 10;
             }
         }
+
+        if (isLeavePending()) {
+            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.leave_room_cancel_hint"),
+                    panelX, panelY + panelHeight - 24, 0xFFD75E);
+        }
+        graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.command_scope_hint"),
+                panelX, panelY + panelHeight - 12, 0xE0AA00);
     }
 
     @Override
@@ -365,6 +486,7 @@ public class TdmRoomScreen extends Screen {
         if (selectedRoom == null || selectedRoom.isEmpty()) {
             return;
         }
+        clearPendingLeave();
         // 先加入房间（不指定队伍，由后续选择决定）
         PacketHandler.sendToServer(new JoinRoomPacket(selectedRoom, null));
         joinedRoom = selectedRoom;
@@ -384,9 +506,23 @@ public class TdmRoomScreen extends Screen {
      * 离开当前房间
      */
     private void leaveRoom() {
+        if (joinedRoom == null) {
+            return;
+        }
+        if (isLeavePending()) {
+            clearPendingLeave();
+            return;
+        }
+        pendingLeaveDeadlineMs = System.currentTimeMillis() + LEAVE_CONFIRM_WINDOW_MS;
+        updateLeaveButtonLabel();
+    }
+
+    private void executeLeaveRoom() {
+        clearPendingLeave();
         PacketHandler.sendToServer(new LeaveRoomPacket());
         joinedRoom = null;
         teamPlayers.clear();
+        ClientTdmState.resetMatchState();
         updateButtonStates();
     }
 
@@ -419,6 +555,7 @@ public class TdmRoomScreen extends Screen {
     public void updatePlayerList(String mapName, Map<String, List<PlayerInfo>> teamPlayers) {
         this.joinedRoom = mapName;
         this.teamPlayers = teamPlayers;
+        clearPendingLeave();
         updateButtonStates();
     }
 
@@ -428,7 +565,14 @@ public class TdmRoomScreen extends Screen {
     public void setJoinedRoom(String roomName) {
         this.joinedRoom = roomName;
         this.selectedRoom = roomName;
+        clearPendingLeave();
         updateButtonStates();
+    }
+
+    @Override
+    public void onClose() {
+        clearPendingLeave();
+        super.onClose();
     }
 
     @Override
@@ -447,14 +591,21 @@ public class TdmRoomScreen extends Screen {
         public int playerCount;
         public int maxPlayers;
         public Map<String, Integer> teamPlayerCounts;
+        public Map<String, Integer> teamScores;
+        public int remainingTimeTicks;
+        public boolean hasMatchEndTeleportPoint;
 
         public RoomData(String mapName, String state, int playerCount, int maxPlayers,
-                Map<String, Integer> teamPlayerCounts) {
+                Map<String, Integer> teamPlayerCounts, Map<String, Integer> teamScores, int remainingTimeTicks,
+                boolean hasMatchEndTeleportPoint) {
             this.mapName = mapName;
             this.state = state;
             this.playerCount = playerCount;
             this.maxPlayers = maxPlayers;
             this.teamPlayerCounts = teamPlayerCounts;
+            this.teamScores = teamScores;
+            this.remainingTimeTicks = remainingTimeTicks;
+            this.hasMatchEndTeleportPoint = hasMatchEndTeleportPoint;
         }
     }
 }

@@ -80,6 +80,27 @@ public class ClientTdmState {
         gameTimeTicks = time;
     }
 
+    public static void resetMatchState() {
+        currentPhase = "WAITING";
+        remainingTimeTicks = 0;
+        team1Score = 0;
+        team2Score = 0;
+        gameTimeTicks = 0;
+        countdown = 0;
+        blackout = false;
+        blackoutPhase = BlackoutPhase.NONE;
+        blackoutTicksRemaining = 0;
+        blackoutTotalTicks = 0;
+        fadeOutTicksRemaining = 0;
+        fadeOutTotalTicks = 0;
+        playCountdownTickSound = false;
+        playTeleportSound = false;
+        previousPhase = "WAITING";
+        isDead = false;
+        killerName = "";
+        deathCamTicks = 0;
+    }
+
     // 更新倒计时（收到黑屏数据包时调用）
     public static void updateCountdown(int count, boolean black) {
         countdown = count;

@@ -36,9 +36,8 @@ public class SelectTeamPacket {
             if (player != null) {
                 FPSMCore.getInstance().getMapByPlayer(player).ifPresent(map -> {
                     if (map instanceof CodTdmMap tdmMap) {
-                        // 先离开当前队伍，再加入新队伍
-                        map.leave(player);
-                        map.join(teamName, player);
+                        // 切队不等同离房：不触发离房回传逻辑
+                        tdmMap.switchTeam(player, teamName);
                     }
                 });
             }

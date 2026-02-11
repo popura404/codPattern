@@ -3,6 +3,7 @@ package com.cdp.codpattern.core.handler;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
 import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
 import com.cdp.codpattern.config.WeaponFilterConfig.WeaponFilterConfig;
+import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
 import com.mojang.logging.LogUtils;
 import com.tacz.guns.api.item.IGun;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -35,8 +36,8 @@ public class Weaponhandling {
         //不是喜欢的冒险生存创造玩家，直接不发
         if (player.isSpectator()) return;
 
-        //不是喜欢的带标签的玩家，直接不发
-        if (filterConfig.isDistributeToTaggedPlayersOnly() && !player.getTags().contains("cdpplayer")) return;
+        // 未加入房间系统的玩家不发放
+        if (CodTdmRoomManager.getInstance().getPlayerMap(player.getUUID()).isEmpty()) return;
 
         String uuid = player.getUUID().toString();
         BackpackConfig.PlayerBackpackData playerData =

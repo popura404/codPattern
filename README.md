@@ -24,10 +24,10 @@ COD Pattern 是一个基于 Minecraft 模组《永恒枪械工坊：零》（Tim
 
 配置文件位于服务器端的 `weaponFilterConfig/codpattern/` 目录下。
 
-*   **`distributeToTaggedPlayersOnly`**
-    此选项用于控制装备的发放范围，支持两种模式：
-    *   **标签模式 (Tag Mode):** 设置为 `true` 时，仅向拥有 `cdpplayer` 标签的玩家发放装备。
-    *   **全体模式 (All Players Mode):** 设置为 `false` 时，向服务器上所有玩家发放装备。
+*   **背包发放范围**
+    当前版本仅向已加入房间系统（TDM 房间）的玩家发放装备。
+    *   未加入房间的玩家不会被发放武器。
+    *   旧版基于玩家 tag（如 `cdpplayer`）的分发逻辑已不再生效。
 
 *   **`primaryWeaponTabs` 和 `secondaryWeaponTabs`**
     这两个配置项用于定义主武器和副武器的检索范围。

@@ -2,6 +2,7 @@ package com.cdp.codpattern.network.tdm;
 
 import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
@@ -49,6 +50,10 @@ public class JoinRoomPacket {
                             map.join(teamName, player);
                         } else {
                             map.join(player);
+                        }
+                        if (!map.hasMatchEndTeleportPoint()) {
+                            player.sendSystemMessage(
+                                    Component.translatable("message.codpattern.game.warning_no_end_teleport", map.mapName));
                         }
                         // 同步数据到客户端
                         map.syncToClient();

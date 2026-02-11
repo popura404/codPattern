@@ -29,6 +29,8 @@ import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.registries.ForgeRegistries;
 
@@ -228,6 +230,47 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         }
     }
 
+    /**
+     * 玩家离开房间（不是换队）。
+     * 会尝试传送到比赛结束点，然后移除房间内状态。
+     */
+    @Override
+    public void leave(ServerPlayer player) {
+        leaveRoom(player);
+    }
+
+    public void leaveRoom(ServerPlayer player) {
+        UUID playerId = player.getUUID();
+        clearTransientPlayerState(playerId);
+        playerKills.remove(playerId);
+        playerDeaths.remove(playerId);
+        startVotes.remove(playerId);
+        endVotes.remove(playerId);
+
+        if (!teleportPlayerToMatchEndPoint(player)) {
+            player.sendSystemMessage(Component.translatable("message.codpattern.game.warning_no_end_teleport", mapName));
+        } else {
+            getServerLevel().playSound(null, player.getX(), player.getY(), player.getZ(),
+                    SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 0.8f, 1.0f);
+        }
+
+        PacketHandler.sendToPlayer(new GamePhasePacket(GamePhase.WAITING.name(), 0), player);
+        PacketHandler.sendToPlayer(new ScoreUpdatePacket(0, 0, 0), player);
+        clearPlayerInventory(player);
+        super.leave(player);
+        syncToClient();
+    }
+
+    /**
+     * 切换队伍（不会触发离房传送）。
+     */
+    public void switchTeam(ServerPlayer player, String teamName) {
+        clearTransientPlayerState(player.getUUID());
+        getMapTeams().leaveTeam(player);
+        join(teamName, player);
+        syncToClient();
+    }
+
     // ========== 阶段转换 ==========
 
     /**
@@ -341,10 +384,14 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
 
         // 5秒后传送到结束点
         if (phaseTimer >= 100) {
-            if (matchEndTeleportPoint != null) {
+            if (hasMatchEndTeleportPoint()) {
                 for (PlayerData playerData : getMapTeams().getJoinedPlayers()) {
-                    playerData.getPlayer().ifPresent(player -> teleportToPoint(player, matchEndTeleportPoint));
+                    playerData.getPlayer().ifPresent(player -> teleportPlayerToMatchEndPoint(player));
                 }
+            } else {
+                getMapTeams().getJoinedPlayers().forEach(pd -> pd.getPlayer().ifPresent(
+                        p -> p.sendSystemMessage(
+                                Component.translatable("message.codpattern.game.warning_no_end_teleport", mapName))));
             }
             resetGame();
         }
@@ -630,6 +677,21 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
 
     // ========== 辅助方法 ==========
 
+    private void clearTransientPlayerState(UUID playerId) {
+        respawnTimers.remove(playerId);
+        invinciblePlayers.remove(playerId);
+        invincibilityTimers.remove(playerId);
+        deathCamPlayers.remove(playerId);
+    }
+
+    private boolean teleportPlayerToMatchEndPoint(ServerPlayer player) {
+        if (matchEndTeleportPoint == null) {
+            return false;
+        }
+        teleportToPoint(player, matchEndTeleportPoint);
+        return true;
+    }
+
     /**
      * 传送所有玩家到出生点
      */
@@ -677,6 +739,28 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
      */
     public GamePhase getPhase() {
         return phase;
+    }
+
+    public Map<String, Integer> getTeamScoresSnapshot() {
+        return new HashMap<>(teamScores);
+    }
+
+    public int getRemainingTimeTicks() {
+        CodTdmConfig config = CodTdmConfig.getConfig();
+        return switch (phase) {
+            case COUNTDOWN -> Math.max(0, config.getPreGameCountdownTicks() - phaseTimer);
+            case WARMUP -> Math.max(0, config.getWarmupTimeTicks() - phaseTimer);
+            case PLAYING -> Math.max(0, (config.getTimeLimitSeconds() * 20) - gameTimeTicks);
+            default -> 0;
+        };
+    }
+
+    public boolean hasMatchEndTeleportPoint() {
+        return matchEndTeleportPoint != null;
+    }
+
+    public SpawnPointData getMatchEndTeleportPoint() {
+        return matchEndTeleportPoint;
     }
 
     /**

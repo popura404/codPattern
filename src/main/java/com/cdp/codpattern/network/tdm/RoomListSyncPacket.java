@@ -56,7 +56,10 @@ public class RoomListSyncPacket {
                                 info.state,
                                 info.playerCount,
                                 info.maxPlayers,
-                                info.teamPlayerCounts));
+                                info.teamPlayerCounts,
+                                info.teamScores,
+                                info.remainingTimeTicks,
+                                info.hasMatchEndTeleportPoint));
                     }
                     tdmScreen.updateRoomList(roomDataMap);
                 }
@@ -73,12 +76,19 @@ public class RoomListSyncPacket {
         public int playerCount;
         public int maxPlayers;
         public Map<String, Integer> teamPlayerCounts;
+        public Map<String, Integer> teamScores;
+        public int remainingTimeTicks;
+        public boolean hasMatchEndTeleportPoint;
 
-        public RoomInfo(String state, int playerCount, int maxPlayers, Map<String, Integer> teamPlayerCounts) {
+        public RoomInfo(String state, int playerCount, int maxPlayers, Map<String, Integer> teamPlayerCounts,
+                Map<String, Integer> teamScores, int remainingTimeTicks, boolean hasMatchEndTeleportPoint) {
             this.state = state;
             this.playerCount = playerCount;
             this.maxPlayers = maxPlayers;
             this.teamPlayerCounts = teamPlayerCounts;
+            this.teamScores = teamScores;
+            this.remainingTimeTicks = remainingTimeTicks;
+            this.hasMatchEndTeleportPoint = hasMatchEndTeleportPoint;
         }
 
         public void write(FriendlyByteBuf buf) {
@@ -90,6 +100,13 @@ public class RoomListSyncPacket {
                 buf.writeUtf(entry.getKey());
                 buf.writeInt(entry.getValue());
             }
+            buf.writeInt(teamScores.size());
+            for (Map.Entry<String, Integer> entry : teamScores.entrySet()) {
+                buf.writeUtf(entry.getKey());
+                buf.writeInt(entry.getValue());
+            }
+            buf.writeInt(remainingTimeTicks);
+            buf.writeBoolean(hasMatchEndTeleportPoint);
         }
 
         public static RoomInfo read(FriendlyByteBuf buf) {
@@ -101,7 +118,15 @@ public class RoomListSyncPacket {
             for (int i = 0; i < teamCount; i++) {
                 teamPlayerCounts.put(buf.readUtf(), buf.readInt());
             }
-            return new RoomInfo(state, playerCount, maxPlayers, teamPlayerCounts);
+            int scoreTeamCount = buf.readInt();
+            Map<String, Integer> teamScores = new HashMap<>();
+            for (int i = 0; i < scoreTeamCount; i++) {
+                teamScores.put(buf.readUtf(), buf.readInt());
+            }
+            int remainingTimeTicks = buf.readInt();
+            boolean hasMatchEndTeleportPoint = buf.readBoolean();
+            return new RoomInfo(state, playerCount, maxPlayers, teamPlayerCounts, teamScores, remainingTimeTicks,
+                    hasMatchEndTeleportPoint);
         }
     }
 }

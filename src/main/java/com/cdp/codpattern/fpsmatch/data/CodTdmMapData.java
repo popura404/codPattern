@@ -18,6 +18,7 @@ import net.minecraftforge.server.ServerLifecycleHooks;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * TDM 地图数据序列化和保存
@@ -33,12 +34,14 @@ public class CodTdmMapData {
             String mapName,
             String levelName,
             AreaData areaData,
-            Map<String, TeamData> teams) {
+            Map<String, TeamData> teams,
+            Optional<SpawnPointData> matchEndTeleportPoint) {
         public static final Codec<MapData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("mapName").forGetter(MapData::mapName),
                 Codec.STRING.fieldOf("levelName").forGetter(MapData::levelName),
                 AreaData.CODEC.fieldOf("areaData").forGetter(MapData::areaData),
-                Codec.unboundedMap(Codec.STRING, TeamData.CODEC).fieldOf("teams").forGetter(MapData::teams))
+                Codec.unboundedMap(Codec.STRING, TeamData.CODEC).fieldOf("teams").forGetter(MapData::teams),
+                SpawnPointData.CODEC.optionalFieldOf("matchEndTeleportPoint").forGetter(MapData::matchEndTeleportPoint))
                 .apply(instance, MapData::new));
     }
 
@@ -97,6 +100,7 @@ public class CodTdmMapData {
                     team.addAllSpawnPointData(teamData.spawnPoints());
                 }
             }
+            data.matchEndTeleportPoint().ifPresent(map::setMatchEndTeleportPoint);
 
             // 注册到 FPSMCore
             FPSMCore.getInstance().registerMap(CodTdmMap.GAME_TYPE, map);
@@ -136,6 +140,7 @@ public class CodTdmMapData {
                 map.mapName,
                 map.getServerLevel().dimension().location().toString(),
                 map.getMapArea(),
-                teams);
+                teams,
+                Optional.ofNullable(map.getMatchEndTeleportPoint()));
     }
 }
