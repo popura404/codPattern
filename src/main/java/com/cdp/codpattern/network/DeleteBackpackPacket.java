@@ -1,9 +1,9 @@
 package com.cdp.codpattern.network;
 
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
-import com.cdp.codpattern.core.ConfigPath.ConfigPath;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
+import com.cdp.codpattern.config.path.ConfigPath;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -41,7 +41,7 @@ public class DeleteBackpackPacket {
             }
             Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
             String uuid = player.getStringUUID();
-            BackpackConfig.PlayerBackpackData playerData = BackpackConfigManager.LoadorCreatePlayer(uuid, path);
+            BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
 
             if (!playerData.getBackpacks_MAP().containsKey(backpackId)) {
                 player.sendSystemMessage(Component.literal("§c背包不存在: #" + backpackId));
@@ -62,8 +62,8 @@ public class DeleteBackpackPacket {
                 playerData.setSelectedBackpack(nextId);
             }
 
-            BackpackConfigManager.save();
-            PacketHandler.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
+            BackpackConfigRepository.save();
+            ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
             player.sendSystemMessage(Component.literal("§a已删除背包 #" + backpackId));
         });
         ctx.get().setPacketHandled(true);

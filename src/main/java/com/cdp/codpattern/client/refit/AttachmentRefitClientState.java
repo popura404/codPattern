@@ -3,7 +3,7 @@ package com.cdp.codpattern.client.refit;
 import com.cdp.codpattern.client.gui.screen.CodGunRefitScreen;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
 import com.cdp.codpattern.network.SaveAttachmentPresetPacket;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.mojang.logging.LogUtils;
 import com.tacz.guns.api.item.IGun;
 import com.tacz.guns.resource.modifier.AttachmentPropertyManager;
@@ -79,7 +79,7 @@ public class AttachmentRefitClientState {
         }
         String nbtString = gunStack.hasTag() ? gunStack.getTag().toString() : "";
         String payload = AttachmentPresetUtil.buildPresetFromGun(gunStack).toString();
-        PacketHandler.sendToServer(new SaveAttachmentPresetPacket(bagId, slot, payload, nbtString));
+        ModNetworkChannel.sendToServer(new SaveAttachmentPresetPacket(bagId, slot, payload, nbtString));
         reset();
     }
 

@@ -3,7 +3,7 @@ package com.cdp.codpattern.client.gui.refit;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.refit.AttachmentRefitClientState;
 import com.cdp.codpattern.network.RequestAttachmentPresetPacket;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -25,7 +25,7 @@ public class AttachmentConfigButton extends Button {
         super(x, y, width, height, Component.literal("attachment config"),
                 button -> {
                     AttachmentRefitClientState.setParentScreen(Minecraft.getInstance().screen);
-                    PacketHandler.sendToServer(new RequestAttachmentPresetPacket(bagId, slot));
+                    ModNetworkChannel.sendToServer(new RequestAttachmentPresetPacket(bagId, slot));
                 },
                 DEFAULT_NARRATION);
         this.bagId = bagId;

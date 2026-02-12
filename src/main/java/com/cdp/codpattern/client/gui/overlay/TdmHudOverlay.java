@@ -33,14 +33,14 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private boolean shouldRenderHud() {
-        if (ClientTdmState.isDead || ClientTdmState.isBlackoutActive()) {
+        if (ClientTdmState.isDead() || ClientTdmState.isBlackoutActive()) {
             return true;
         }
-        if (ClientTdmState.announcementTicks > 0) {
+        if (ClientTdmState.announcementTicks() > 0) {
             return true;
         }
-        return !("WAITING".equals(ClientTdmState.currentPhase)
-                && ClientTdmState.remainingTimeTicks <= 0
+        return !("WAITING".equals(ClientTdmState.currentPhase())
+                && ClientTdmState.remainingTimeTicks() <= 0
                 && getKortacScore() == 0
                 && getSpecgruScore() == 0);
     }
@@ -57,7 +57,7 @@ public class TdmHudOverlay implements IGuiOverlay {
 
         graphics.fill(0, 0, screenWidth, screenHeight, alphaInt << 24);
         if (alpha > 0.55f) {
-            String text = ClientTdmState.blackoutPhase == ClientTdmState.BlackoutPhase.FADE_OUT
+            String text = ClientTdmState.blackoutPhase() == ClientTdmState.BlackoutPhase.FADE_OUT
                     ? Component.translatable("hud.codpattern.tdm.blackout.ready").getString()
                     : Component.translatable("hud.codpattern.tdm.blackout.teleport").getString();
             drawCenteredString(graphics, font, text, screenWidth / 2, screenHeight / 2 - 8, 0xFFF5F5F5);
@@ -101,7 +101,7 @@ public class TdmHudOverlay implements IGuiOverlay {
         graphics.fill(timerX, timerY + timerHeight - 1, timerX + timerWidth, timerY + timerHeight, 0x60FFFFFF);
 
         drawCenteredString(graphics, font, buildTimerText(), timerX + timerWidth / 2, timerY + 8, 0xFFFFDE7A);
-        drawCenteredString(graphics, font, phaseShortText(ClientTdmState.currentPhase), timerX + timerWidth / 2,
+        drawCenteredString(graphics, font, phaseShortText(ClientTdmState.currentPhase()), timerX + timerWidth / 2,
                 timerY + 22, 0xFFD6D6D6);
 
         int phaseGlow = (int) (ClientTdmState.getPhaseFlashStrength() * 95.0f);
@@ -136,10 +136,10 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private void renderPhaseAnnouncement(GuiGraphics graphics, Font font, int centerX, int screenHeight) {
-        if ("ENDED".equals(ClientTdmState.currentPhase)) {
+        if ("ENDED".equals(ClientTdmState.currentPhase())) {
             return;
         }
-        if (ClientTdmState.announcementTicks <= 0 || ClientTdmState.announcementKey.isEmpty()) {
+        if (ClientTdmState.announcementTicks() <= 0 || ClientTdmState.announcementKey().isEmpty()) {
             return;
         }
 
@@ -149,7 +149,7 @@ public class TdmHudOverlay implements IGuiOverlay {
             return;
         }
 
-        String text = Component.translatable(ClientTdmState.announcementKey).getString();
+        String text = Component.translatable(ClientTdmState.announcementKey()).getString();
         int boxWidth = Math.max(156, font.width(text) + 22);
         int boxHeight = 20;
         int x = centerX - boxWidth / 2;
@@ -163,10 +163,10 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private void renderCountdownFocus(GuiGraphics graphics, Font font, int centerX, int screenHeight) {
-        if (!"COUNTDOWN".equals(ClientTdmState.currentPhase)) {
+        if (!"COUNTDOWN".equals(ClientTdmState.currentPhase())) {
             return;
         }
-        int secondsLeft = Math.max(1, (ClientTdmState.remainingTimeTicks + 19) / 20);
+        int secondsLeft = Math.max(1, (ClientTdmState.remainingTimeTicks() + 19) / 20);
         if (secondsLeft > 10) {
             return;
         }
@@ -180,11 +180,11 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private void renderEndgameSplash(GuiGraphics graphics, Font font, int centerX, int screenWidth, int screenHeight) {
-        if (!"ENDED".equals(ClientTdmState.currentPhase)) {
+        if (!"ENDED".equals(ClientTdmState.currentPhase())) {
             return;
         }
 
-        float alphaF = ClientTdmState.announcementTicks > 0
+        float alphaF = ClientTdmState.announcementTicks() > 0
                 ? Math.max(0.35f, ClientTdmState.getAnnouncementAlpha())
                 : 0.35f;
         int alpha = clamp((int) (alphaF * 255.0f), 0, 255);
@@ -216,7 +216,7 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private void renderDeathCamPanel(GuiGraphics graphics, Font font, int centerX, int screenHeight) {
-        if (!ClientTdmState.isDead) {
+        if (!ClientTdmState.isDead()) {
             return;
         }
         int panelWidth = 240;
@@ -230,18 +230,18 @@ public class TdmHudOverlay implements IGuiOverlay {
         drawCenteredString(graphics, font, Component.translatable("hud.codpattern.tdm.death.title").getString(), centerX,
                 y + 7, 0xFFFFC4C4);
         drawCenteredString(graphics, font,
-                Component.translatable("hud.codpattern.tdm.death.killer", ClientTdmState.killerName).getString(), centerX,
+                Component.translatable("hud.codpattern.tdm.death.killer", ClientTdmState.killerName()).getString(), centerX,
                 y + 20, 0xFFF1F1F1);
         drawCenteredString(graphics, font,
                 Component.translatable("hud.codpattern.tdm.death.respawn", String.format(Locale.ROOT, "%.1f",
-                        ClientTdmState.deathCamTicks / 20.0f))
+                        ClientTdmState.deathCamTicks() / 20.0f))
                         .getString(),
                 centerX, y + 34, 0xFFD8D8D8);
     }
 
     private String buildTimerText() {
-        return switch (ClientTdmState.currentPhase) {
-            case "PLAYING", "COUNTDOWN", "WARMUP" -> formatTime(ClientTdmState.remainingTimeTicks);
+        return switch (ClientTdmState.currentPhase()) {
+            case "PLAYING", "COUNTDOWN", "WARMUP" -> formatTime(ClientTdmState.remainingTimeTicks());
             case "ENDED" -> "00:00";
             default -> "--:--";
         };
@@ -293,7 +293,7 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private int phaseAccentColor() {
-        return switch (ClientTdmState.currentPhase) {
+        return switch (ClientTdmState.currentPhase()) {
             case "COUNTDOWN" -> 0xFFF0C75E;
             case "WARMUP" -> 0xFFF5A24D;
             case "PLAYING" -> 0xFF7BFF9A;
@@ -313,11 +313,11 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private int getKortacScore() {
-        return ClientTdmState.getTeamScore("kortac", ClientTdmState.team1Score);
+        return ClientTdmState.getTeamScore("kortac", ClientTdmState.team1Score());
     }
 
     private int getSpecgruScore() {
-        return ClientTdmState.getTeamScore("specgru", ClientTdmState.team2Score);
+        return ClientTdmState.getTeamScore("specgru", ClientTdmState.team2Score());
     }
 
     private int withAlpha(int color, int alpha) {

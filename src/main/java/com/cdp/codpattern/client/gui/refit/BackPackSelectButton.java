@@ -1,9 +1,9 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
-import com.cdp.codpattern.compatibility.lrtactical.api.APIextension;
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
+import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.SelectBackpackPacket;
 import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.api.item.IGun;
@@ -61,7 +61,7 @@ public class BackPackSelectButton extends Button {
 
     public BackPackSelectButton(int x, int y, int width, int height, int bagserial, BackpackConfig.Backpack backpack, boolean isSelected) {
         super(x, y, width, height, Component.literal("choose your bag"), button -> {
-            PacketHandler.sendToServer(new SelectBackpackPacket(bagserial));
+            ModNetworkChannel.sendToServer(new SelectBackpackPacket(bagserial));
             Minecraft.getInstance().execute(() -> {
                 Minecraft.getInstance().setScreen(null);
             });
@@ -86,7 +86,12 @@ public class BackPackSelectButton extends Button {
             BackpackConfig.Backpack.ItemData itemData = entry.getValue();
 
             try {
-                ItemStack weaponStack = new ItemStack(Objects.requireNonNull(ForgeRegistries.ITEMS.getValue(new ResourceLocation(itemData.getItem()))));
+                ResourceLocation itemId = ResourceLocation.tryParse(itemData.getItem());
+                if (itemId == null) {
+                    continue;
+                }
+                ItemStack weaponStack = new ItemStack(
+                        Objects.requireNonNull(ForgeRegistries.ITEMS.getValue(itemId)));
 
                 if (itemData.getNbt() != null && !itemData.getNbt().isEmpty()) {
                     try {
@@ -147,7 +152,7 @@ public class BackPackSelectButton extends Button {
 
         try {
             Component weaponName = item.getHoverName();
-            Component packName = APIextension.getLrItemPackName(item);
+            Component packName = LrTacticalClientApi.getLrItemPackName(item);
             return new WeaponInfo(null, weaponName, packName, item);
         } catch (Exception e) {
             e.printStackTrace();

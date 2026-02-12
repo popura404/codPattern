@@ -1,0 +1,387 @@
+package com.cdp.codpattern.client.state;
+
+import com.cdp.codpattern.client.ClientTdmState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public final class ClientMatchStateStore {
+    private static final int SCORE_PULSE_DURATION = 12;
+    private static final int PHASE_FLASH_DURATION = 20;
+    private static final float FADE_IN_RATIO = 0.4f;
+    private static final int FADE_OUT_DURATION = 30;
+
+    private String currentPhase = "WAITING";
+    private int remainingTimeTicks = 0;
+    private int team1Score = 0;
+    private int team2Score = 0;
+    private final Map<String, Integer> teamScores = new HashMap<>();
+    private int gameTimeTicks = 0;
+    private int countdown = 0;
+    private boolean blackout = false;
+    private ClientTdmState.BlackoutPhase blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
+    private int blackoutTicksRemaining = 0;
+    private int blackoutTotalTicks = 0;
+    private int fadeOutTicksRemaining = 0;
+    private int fadeOutTotalTicks = 0;
+    private boolean playCountdownTickSound = false;
+    private boolean playTeleportSound = false;
+    private String previousPhase = "WAITING";
+    private String pendingPhaseCue = "";
+    private int scorePulseTicks = 0;
+    private int phaseFlashTicks = 0;
+    private String announcementKey = "";
+    private int announcementTicks = 0;
+    private int announcementTotalTicks = 0;
+    private boolean dead = false;
+    private String killerName = "";
+    private int deathCamTicks = 0;
+
+    public String currentPhase() {
+        return currentPhase;
+    }
+
+    public int remainingTimeTicks() {
+        return remainingTimeTicks;
+    }
+
+    public int team1Score() {
+        return team1Score;
+    }
+
+    public int team2Score() {
+        return team2Score;
+    }
+
+    public int gameTimeTicks() {
+        return gameTimeTicks;
+    }
+
+    public int countdown() {
+        return countdown;
+    }
+
+    public boolean blackout() {
+        return blackout;
+    }
+
+    public ClientTdmState.BlackoutPhase blackoutPhase() {
+        return blackoutPhase;
+    }
+
+    public String announcementKey() {
+        return announcementKey;
+    }
+
+    public int announcementTicks() {
+        return announcementTicks;
+    }
+
+    public boolean isDead() {
+        return dead;
+    }
+
+    public String killerName() {
+        return killerName;
+    }
+
+    public int deathCamTicks() {
+        return deathCamTicks;
+    }
+
+    public void updatePhase(String phase, int time) {
+        String oldPhase = currentPhase;
+        if (!phase.equals(oldPhase)) {
+            if (phase.equals("WARMUP") || phase.equals("PLAYING")) {
+                startFadeOut();
+                playTeleportSound = true;
+            }
+            if (!"PLAYING".equals(phase)) {
+                clearDeathCam();
+            }
+            phaseFlashTicks = PHASE_FLASH_DURATION;
+            triggerPhaseAnnouncement(phase);
+            queuePhaseCue(phase);
+        }
+        previousPhase = oldPhase;
+        currentPhase = phase;
+        remainingTimeTicks = time;
+    }
+
+    public void updateScore(int t1, int t2, int time) {
+        updateScore(new HashMap<>(), t1, t2, time);
+    }
+
+    public void updateScore(Map<String, Integer> scores, int legacyTeam1, int legacyTeam2, int time) {
+        int oldTeam1 = team1Score;
+        int oldTeam2 = team2Score;
+
+        teamScores.clear();
+        if (scores != null && !scores.isEmpty()) {
+            teamScores.putAll(scores);
+        }
+
+        team1Score = teamScores.getOrDefault("kortac", legacyTeam1);
+        team2Score = teamScores.getOrDefault("specgru", legacyTeam2);
+
+        if (team1Score != oldTeam1 || team2Score != oldTeam2) {
+            scorePulseTicks = SCORE_PULSE_DURATION;
+        }
+        gameTimeTicks = time;
+    }
+
+    public int getTeamScore(String teamName, int fallback) {
+        return teamScores.getOrDefault(teamName, fallback);
+    }
+
+    public void resetMatchState() {
+        currentPhase = "WAITING";
+        remainingTimeTicks = 0;
+        team1Score = 0;
+        team2Score = 0;
+        teamScores.clear();
+        gameTimeTicks = 0;
+        countdown = 0;
+        blackout = false;
+        blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
+        blackoutTicksRemaining = 0;
+        blackoutTotalTicks = 0;
+        fadeOutTicksRemaining = 0;
+        fadeOutTotalTicks = 0;
+        playCountdownTickSound = false;
+        playTeleportSound = false;
+        previousPhase = "WAITING";
+        pendingPhaseCue = "";
+        scorePulseTicks = 0;
+        phaseFlashTicks = 0;
+        announcementKey = "";
+        announcementTicks = 0;
+        announcementTotalTicks = 0;
+        clearDeathCam();
+    }
+
+    public void updateCountdown(int count, boolean black) {
+        countdown = count;
+        blackout = black;
+
+        if (black && count > 0) {
+            blackoutTotalTicks = count;
+            blackoutTicksRemaining = count;
+            blackoutPhase = ClientTdmState.BlackoutPhase.FADE_IN;
+        }
+
+        if (!black && count > 0) {
+            playCountdownTickSound = true;
+        }
+    }
+
+    public void setDeathCam(String killer, int duration) {
+        dead = true;
+        killerName = (killer == null || killer.isBlank()) ? "Unknown" : killer;
+        deathCamTicks = Math.max(0, duration);
+    }
+
+    public void clearDeathCam() {
+        dead = false;
+        killerName = "";
+        deathCamTicks = 0;
+    }
+
+    public float getBlackoutAlpha() {
+        switch (blackoutPhase) {
+            case FADE_IN -> {
+                if (blackoutTicksRemaining <= 0 || blackoutTotalTicks <= 0) {
+                    return 0.0f;
+                }
+                float progress = 1.0f - ((float) blackoutTicksRemaining / blackoutTotalTicks);
+                if (progress < FADE_IN_RATIO) {
+                    float t = progress / FADE_IN_RATIO;
+                    return smoothstep(t);
+                } else {
+                    return 1.0f;
+                }
+            }
+            case HOLD -> {
+                return 1.0f;
+            }
+            case FADE_OUT -> {
+                if (fadeOutTicksRemaining <= 0 || fadeOutTotalTicks <= 0) {
+                    return 0.0f;
+                }
+                float t = (float) fadeOutTicksRemaining / fadeOutTotalTicks;
+                return smoothstep(t);
+            }
+            default -> {
+                return 0.0f;
+            }
+        }
+    }
+
+    public boolean isBlackoutActive() {
+        return blackoutPhase != ClientTdmState.BlackoutPhase.NONE;
+    }
+
+    public float getAnnouncementAlpha() {
+        if (announcementTicks <= 0 || announcementTotalTicks <= 0) {
+            return 0.0f;
+        }
+        int fadeTicks = Math.min(10, announcementTotalTicks / 3);
+        int elapsed = announcementTotalTicks - announcementTicks;
+        if (elapsed < fadeTicks) {
+            return (float) elapsed / Math.max(1, fadeTicks);
+        }
+        if (announcementTicks < fadeTicks) {
+            return (float) announcementTicks / Math.max(1, fadeTicks);
+        }
+        return 1.0f;
+    }
+
+    public float getScorePulseStrength() {
+        if (scorePulseTicks <= 0) {
+            return 0.0f;
+        }
+        return (float) scorePulseTicks / SCORE_PULSE_DURATION;
+    }
+
+    public float getPhaseFlashStrength() {
+        if (phaseFlashTicks <= 0) {
+            return 0.0f;
+        }
+        return (float) phaseFlashTicks / PHASE_FLASH_DURATION;
+    }
+
+    public void clientTick() {
+        if (remainingTimeTicks > 0) {
+            remainingTimeTicks--;
+        }
+        if (scorePulseTicks > 0) {
+            scorePulseTicks--;
+        }
+        if (phaseFlashTicks > 0) {
+            phaseFlashTicks--;
+        }
+        if (announcementTicks > 0) {
+            announcementTicks--;
+        } else if (!announcementKey.isEmpty()) {
+            announcementKey = "";
+            announcementTotalTicks = 0;
+        }
+        if (deathCamTicks > 0) {
+            deathCamTicks--;
+            if (deathCamTicks == 0) {
+                clearDeathCam();
+            }
+        }
+
+        switch (blackoutPhase) {
+            case FADE_IN -> {
+                if (blackoutTicksRemaining > 0) {
+                    blackoutTicksRemaining--;
+                } else {
+                    blackoutPhase = ClientTdmState.BlackoutPhase.HOLD;
+                }
+            }
+            case FADE_OUT -> {
+                if (fadeOutTicksRemaining > 0) {
+                    fadeOutTicksRemaining--;
+                } else {
+                    blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
+                    fadeOutTotalTicks = 0;
+                }
+            }
+            default -> {
+            }
+        }
+
+        playPendingSounds();
+
+        if ("COUNTDOWN".equals(currentPhase) && remainingTimeTicks > 0 && remainingTimeTicks % 20 == 0) {
+            playCountdownTickSound = true;
+        }
+    }
+
+    private void triggerPhaseAnnouncement(String phase) {
+        switch (phase) {
+            case "COUNTDOWN" -> showAnnouncement("hud.codpattern.tdm.announce.countdown", 52);
+            case "WARMUP" -> showAnnouncement("hud.codpattern.tdm.announce.warmup", 46);
+            case "PLAYING" -> showAnnouncement("hud.codpattern.tdm.announce.playing", 58);
+            case "ENDED" -> showAnnouncement("hud.codpattern.tdm.announce.ended", 90);
+            default -> {
+            }
+        }
+    }
+
+    private void showAnnouncement(String key, int durationTicks) {
+        announcementKey = key;
+        announcementTicks = Math.max(0, durationTicks);
+        announcementTotalTicks = announcementTicks;
+    }
+
+    private void queuePhaseCue(String phase) {
+        pendingPhaseCue = switch (phase) {
+            case "COUNTDOWN" -> "countdown";
+            case "WARMUP" -> "warmup";
+            case "PLAYING" -> "playing";
+            case "ENDED" -> "ended";
+            default -> "";
+        };
+    }
+
+    private void startFadeOut() {
+        blackoutPhase = ClientTdmState.BlackoutPhase.FADE_OUT;
+        fadeOutTotalTicks = FADE_OUT_DURATION;
+        fadeOutTicksRemaining = FADE_OUT_DURATION;
+        blackoutTicksRemaining = 0;
+        blackoutTotalTicks = 0;
+    }
+
+    private void playPendingSounds() {
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null) {
+            return;
+        }
+
+        if (playCountdownTickSound) {
+            playCountdownTickSound = false;
+            int secondsLeft = remainingTimeTicks / 20;
+            if (secondsLeft <= 5 && secondsLeft > 0) {
+                float pitch = 1.0f + (5 - secondsLeft) * 0.15f;
+                player.playNotifySound(SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.8f, pitch);
+            } else {
+                player.playNotifySound(SoundEvents.NOTE_BLOCK_HAT.get(), SoundSource.PLAYERS, 0.5f, 1.2f);
+            }
+        }
+
+        if (!pendingPhaseCue.isEmpty()) {
+            switch (pendingPhaseCue) {
+                case "countdown" -> player.playNotifySound(SoundEvents.NOTE_BLOCK_HAT.get(), SoundSource.PLAYERS, 0.7f,
+                        0.9f);
+                case "warmup" -> player.playNotifySound(SoundEvents.NOTE_BLOCK_PLING.get(), SoundSource.PLAYERS, 0.75f,
+                        0.95f);
+                case "playing" -> player.playNotifySound(SoundEvents.NOTE_BLOCK_BELL.get(), SoundSource.PLAYERS, 0.9f,
+                        1.15f);
+                case "ended" -> {
+                    player.playNotifySound(SoundEvents.GENERIC_EXPLODE, SoundSource.PLAYERS, 0.45f, 1.3f);
+                    player.playNotifySound(SoundEvents.NOTE_BLOCK_BELL.get(), SoundSource.PLAYERS, 0.8f, 0.7f);
+                }
+                default -> {
+                }
+            }
+            pendingPhaseCue = "";
+        }
+
+        if (playTeleportSound) {
+            playTeleportSound = false;
+            player.playNotifySound(SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 0.6f, 1.0f);
+        }
+    }
+
+    private float smoothstep(float t) {
+        t = Math.max(0.0f, Math.min(1.0f, t));
+        return t * t * (3.0f - 2.0f * t);
+    }
+}

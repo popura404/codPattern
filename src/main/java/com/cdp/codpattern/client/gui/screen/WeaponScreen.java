@@ -2,9 +2,10 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.client.gui.refit.WeaponSelectionButton;
-import com.cdp.codpattern.compatibility.lrtactical.api.APIextension;
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
-import com.cdp.codpattern.config.WeaponFilterConfig.WeaponFilterConfig;
+import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
+import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.network.UpdateWeaponPacket;
 import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.api.item.GunTabType;
@@ -19,7 +20,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -93,7 +94,7 @@ public class WeaponScreen extends Screen {
             return;
         }
 
-        WeaponFilterConfig filterConfig = WeaponFilterConfig.getCLIENTweaponFilterConfig();
+        WeaponFilterConfig filterConfig = WeaponFilterClientCache.get();
         if (filterConfig == null) {
             return;
         }
@@ -120,8 +121,8 @@ public class WeaponScreen extends Screen {
             case "smg": gunTabType = GunTabType.SMG; break;
             case "mg": gunTabType = GunTabType.MG; break;
             case "rpg": gunTabType = GunTabType.RPG; break;
-            case "melee": return APIextension.fillLRItemCategory(true);
-            case "throwable": return APIextension.fillLRItemCategory(false);
+            case "melee": return LrTacticalClientApi.fillLrItemCategory(true);
+            case "throwable": return LrTacticalClientApi.fillLrItemCategory(false);
             default: return new ArrayList<>();
         }
         return AbstractGunItem.fillItemCategory(gunTabType);
@@ -326,7 +327,7 @@ public class WeaponScreen extends Screen {
         backpack.getItem_MAP().put(key, itemData);
 
         // 发数据包
-        PacketHandler.sendToServer(
+        ModNetworkChannel.sendToServer(
                 new UpdateWeaponPacket(BAGSERIAL, key, itemId, nbt));
 
         if (Minecraft.getInstance().player != null) {

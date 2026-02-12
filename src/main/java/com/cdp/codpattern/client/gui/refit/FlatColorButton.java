@@ -1,7 +1,7 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
-import com.cdp.codpattern.compatibility.lrtactical.api.APIextension;
+import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.api.item.IGun;
@@ -223,7 +223,7 @@ public class FlatColorButton extends Button {
                         .withStyle(ChatFormatting.ITALIC);
             }
         } else {
-            this.weaponPackinfo = APIextension.getLrItemPackName(weapon);
+            this.weaponPackinfo = LrTacticalClientApi.getLrItemPackName(weapon);
         }
 
         // 枪名处理

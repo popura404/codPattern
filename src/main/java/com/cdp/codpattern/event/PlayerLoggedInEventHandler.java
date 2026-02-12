@@ -1,11 +1,11 @@
 package com.cdp.codpattern.event;
 
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
-import com.cdp.codpattern.config.WeaponFilterConfig.WeaponFilterConfig;
-import com.cdp.codpattern.core.ConfigPath.ConfigPath;
+import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
+import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.network.SyncBackpackConfigPacket;
 import com.cdp.codpattern.network.SyncWeaponFilterPacket;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -29,13 +29,13 @@ public class PlayerLoggedInEventHandler {
         MinecraftServer server = player.getServer();
 
         Path backpackPath = ConfigPath.SERVERBACKPACK.getPath(server);
-        Path filterPath = ConfigPath.SERVERFLITER.getPath(server);
+        Path filterPath = ConfigPath.SERVER_FILTER.getPath(server);
 
-        var fliterconfig = WeaponFilterConfig.LoadorCreate(filterPath);
-        var playerBackpackData = BackpackConfigManager.LoadorCreatePlayer(player.getStringUUID(), backpackPath);
+        var fliterconfig = WeaponFilterConfigRepository.loadOrCreate(filterPath);
+        var playerBackpackData = BackpackConfigRepository.loadOrCreatePlayer(player.getStringUUID(), backpackPath);
 
         // 同步到客户端
-        PacketHandler.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), (ServerPlayer) player);
-        PacketHandler.sendToPlayer(new SyncWeaponFilterPacket(fliterconfig), (ServerPlayer) player);
+        ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), (ServerPlayer) player);
+        ModNetworkChannel.sendToPlayer(new SyncWeaponFilterPacket(fliterconfig), (ServerPlayer) player);
     }
 }

@@ -1,7 +1,6 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
-import com.phasetranscrystal.fpsmatch.core.FPSMCore;
+import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
@@ -34,12 +33,9 @@ public class SelectTeamPacket {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
-                FPSMCore.getInstance().getMapByPlayer(player).ifPresent(map -> {
-                    if (map instanceof CodTdmMap tdmMap) {
-                        // 切队不等同离房：不触发离房回传逻辑
-                        tdmMap.switchTeam(player, teamName);
-                    }
-                });
+                FpsMatchGatewayProvider.gateway()
+                        .findPlayerTdmMap(player)
+                        .ifPresent(tdmMap -> tdmMap.switchTeam(player, teamName));
             }
         });
         ctx.get().setPacketHandled(true);

@@ -2,7 +2,7 @@ package com.cdp.codpattern.fpsmatch.room;
 
 import com.cdp.codpattern.CodPattern;
 import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.tdm.RoomListSyncPacket;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
@@ -59,7 +59,7 @@ public class CodTdmRoomManager {
      * 向客户端同步房间列表
      */
     public void syncRoomListToClient(ServerPlayer player) {
-        PacketHandler.sendToPlayer(new RoomListSyncPacket(buildRoomInfos()), player);
+        ModNetworkChannel.sendToPlayer(new RoomListSyncPacket(buildRoomInfos()), player);
     }
 
     private Map<String, RoomListSyncPacket.RoomInfo> buildRoomInfos() {
@@ -122,7 +122,7 @@ public class CodTdmRoomManager {
         }
         RoomListSyncPacket packet = new RoomListSyncPacket(buildRoomInfos());
         for (ServerPlayer player : ServerLifecycleHooks.getCurrentServer().getPlayerList().getPlayers()) {
-            PacketHandler.sendToPlayer(packet, player);
+            ModNetworkChannel.sendToPlayer(packet, player);
         }
     }
 

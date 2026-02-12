@@ -2,7 +2,7 @@ package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.screen.WeaponMenuScreen;
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;

@@ -1,5 +1,7 @@
 package com.cdp.codpattern.command;
 
+import com.cdp.codpattern.adapter.forge.command.DistributeBackpackItemsCommand;
+import com.cdp.codpattern.adapter.forge.command.UpdateWeaponFilterConfigCommand;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
@@ -23,8 +25,8 @@ public final class CommandRegistration {
                             return 1;
                         }))
                 .then(MainMenuScreenCommand.buildCommand())
-                .then(UpdateWeaponfilterConfigCommand.buildCommand())
-                .then(distributeBackpackItemsCommand.buildCommand());
+                .then(UpdateWeaponFilterConfigCommand.buildCommand())
+                .then(DistributeBackpackItemsCommand.buildCommand());
         dispatcher.register(root);
     }
 }

@@ -1,7 +1,7 @@
 package com.cdp.codpattern.command;
 
 import com.cdp.codpattern.network.OpenBackpackScreenPacket;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -16,7 +16,7 @@ public class MainMenuScreenCommand {
         return Commands.literal("screen")
                 .executes(context -> {
                     if (context.getSource().getEntity() instanceof ServerPlayer player) {
-                        PacketHandler.sendToPlayer(new OpenBackpackScreenPacket(), player);
+                        ModNetworkChannel.sendToPlayer(new OpenBackpackScreenPacket(), player);
                         return 1;
                     }
                     context.getSource().sendFailure(Component.literal("服务端禁用"));

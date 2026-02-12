@@ -1,6 +1,6 @@
 package com.cdp.codpattern.client.gui.refit;
 
-import com.cdp.codpattern.compatibility.lrtactical.api.APIextension;
+import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.tacz.guns.api.item.IGun;
 import com.tacz.guns.client.resource.ClientAssetsManager;
@@ -91,7 +91,7 @@ public class WeaponSelectionButton extends Button {
                 }
             }
         } else {
-            packName = APIextension.getLrItemPackName(weapon);
+            packName = LrTacticalClientApi.getLrItemPackName(weapon);
         }
         if (packName != null) {
             graphics.drawString(Minecraft.getInstance().font, packName, this.getX() + 2, this.getY() + 2, 0xDDFFFFFF);

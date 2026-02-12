@@ -1,18 +1,11 @@
 package com.cdp.codpattern.network;
 
-import com.cdp.codpattern.config.AttachmentPreset.AttachmentPresetManager;
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
-import com.cdp.codpattern.core.refit.AttachmentEditSession;
-import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
-import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
+import com.cdp.codpattern.app.refit.service.AttachmentPresetSaveService;
 import com.mojang.logging.LogUtils;
-import com.tacz.guns.api.item.IGun;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.network.NetworkEvent;
 import org.slf4j.Logger;
 
@@ -54,67 +47,31 @@ public class SaveAttachmentPresetPacket {
             if (player == null || player.server == null) {
                 return;
             }
-            AttachmentEditSession session = AttachmentEditSessionManager.getSession(player.getUUID());
-            if (session == null) {
-                player.sendSystemMessage(Component.literal("§c配件保存失败：未找到改装会话"));
-                return;
+
+            AttachmentPresetSaveService.Result result = AttachmentPresetSaveService.save(
+                    player,
+                    packet.bagId,
+                    packet.slot,
+                    packet.presetPayload,
+                    packet.updatedGunNbtString
+            );
+
+            if (result.playerData() != null) {
+                ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(result.playerData()), player);
             }
-            if (session.getBagId() != packet.bagId || !session.getSlot().equals(packet.slot)) {
-                player.sendSystemMessage(Component.literal("§c配件保存失败：改装会话不匹配"));
-                AttachmentEditSessionManager.abortSession(player, "session_mismatch");
-                return;
-            }
-
-            boolean saved = false;
-            BackpackConfig.Backpack mutatedBackpack = null;
-            BackpackConfig.Backpack.ItemData previousItem = null;
-            try {
-                ItemStack gunStack = player.getInventory().getItem(session.getEditHotbarSlot());
-                if (!(gunStack.getItem() instanceof IGun)) {
-                    throw new IllegalStateException("当前槽位不是枪械");
-                }
-
-                String presetPayload = AttachmentPresetUtil.buildPresetFromGun(gunStack).toString();
-                String itemId = gunStack.getItem().builtInRegistryHolder().key().location().toString();
-                String nbtString = gunStack.hasTag() ? gunStack.getTag().toString() : "";
-
-                String uuid = player.getUUID().toString();
-                BackpackConfig.PlayerBackpackData playerData =
-                        BackpackConfigManager.getConfig().getOrCreatePlayerData(uuid);
-                BackpackConfig.Backpack backpack = playerData.getBackpacks_MAP().get(packet.bagId);
-                if (backpack == null) {
-                    throw new IllegalStateException("目标背包不存在");
-                }
-
-                AttachmentPresetManager.writePreset(player.server, player.getUUID(), packet.bagId, packet.slot, presetPayload);
-
-                mutatedBackpack = backpack;
-                previousItem = backpack.getItem_MAP().get(packet.slot);
-                backpack.getItem_MAP().put(packet.slot,
-                        new BackpackConfig.Backpack.ItemData(itemId, 1, nbtString));
-                BackpackConfigManager.save();
-                PacketHandler.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
-
-                saved = true;
+            if (result.success()) {
                 LOGGER.info("Attachment preset saved: player={} bagId={} slot={} bytes={}",
-                        player.getGameProfile().getName(), packet.bagId, packet.slot, presetPayload.length());
-            } catch (Exception e) {
-                if (!saved && mutatedBackpack != null) {
-                    if (previousItem == null) {
-                        mutatedBackpack.getItem_MAP().remove(packet.slot);
-                    } else {
-                        mutatedBackpack.getItem_MAP().put(packet.slot, previousItem);
-                    }
-                }
-                LOGGER.warn("Attachment preset save failed: player={} bagId={} slot={}",
-                        player.getGameProfile().getName(), packet.bagId, packet.slot, e);
-                player.sendSystemMessage(Component.literal("§c配件保存失败，已回滚：" + e.getMessage()));
-            } finally {
-                if (saved) {
-                    AttachmentEditSessionManager.endSession(player);
-                } else {
-                    AttachmentEditSessionManager.abortSession(player, "save_failed");
-                }
+                        player.getGameProfile().getName(),
+                        packet.bagId,
+                        packet.slot,
+                        result.payloadLength());
+            } else if (!result.userMessage().isBlank()) {
+                player.sendSystemMessage(Component.literal(result.userMessage()));
+                LOGGER.warn("Attachment preset save failed: player={} bagId={} slot={} message={}",
+                        player.getGameProfile().getName(),
+                        packet.bagId,
+                        packet.slot,
+                        result.userMessage());
             }
         });
         ctx.get().setPacketHandled(true);

@@ -1,9 +1,9 @@
 package com.cdp.codpattern.network;
 
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
-import com.cdp.codpattern.core.ConfigPath.ConfigPath;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
+import com.cdp.codpattern.config.path.ConfigPath;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -41,7 +41,7 @@ public class CloneBackpackPacket {
             }
             Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
             String uuid = player.getStringUUID();
-            BackpackConfig.PlayerBackpackData playerData = BackpackConfigManager.LoadorCreatePlayer(uuid, path);
+            BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
 
             BackpackConfig.Backpack source = playerData.getBackpacks_MAP().get(sourceId);
             if (source == null) {
@@ -71,8 +71,8 @@ public class CloneBackpackPacket {
             }
 
             if (playerData.addBackpack(newId, clone)) {
-                BackpackConfigManager.save();
-                PacketHandler.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
+                BackpackConfigRepository.save();
+                ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
                 player.sendSystemMessage(Component.literal("§a已复制背包 #" + sourceId + " -> #" + newId));
             } else {
                 player.sendSystemMessage(Component.literal("§c复制失败"));

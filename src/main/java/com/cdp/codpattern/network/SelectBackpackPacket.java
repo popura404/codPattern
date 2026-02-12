@@ -1,13 +1,15 @@
 package com.cdp.codpattern.network;
 
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
+import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.path.ConfigPath;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetActionBarTextPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
 
+import java.nio.file.Path;
 import java.util.function.Supplier;
 
 public class SelectBackpackPacket {
@@ -33,15 +35,16 @@ public class SelectBackpackPacket {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
+                Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
                 String uuid = player.getUUID().toString();
                 BackpackConfig.PlayerBackpackData playerData =
-                        BackpackConfigManager.getConfig().getOrCreatePlayerData(uuid);
+                        BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
 
                 // 检查背包是否存在
                 if (playerData.getBackpacks_MAP().containsKey(backpackId)) {
                     // 更新选中的背包
                     playerData.setSelectedBackpack(backpackId);
-                    BackpackConfigManager.save();
+                    BackpackConfigRepository.save();
 
                     // 获取背包名称
                     String backpackName = playerData.getBackpacks_MAP().get(backpackId).getName();

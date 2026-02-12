@@ -1,8 +1,7 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
+import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
-import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
@@ -34,17 +33,11 @@ public class LeaveRoomPacket {
             if (player == null) {
                 return;
             }
-            FPSMCore.getInstance().getMapByPlayerWithSpec(player).ifPresentOrElse(map -> {
-                String roomName = map.mapName;
-                if (map instanceof CodTdmMap tdmMap) {
-                    tdmMap.leaveRoom(player);
-                } else {
-                    map.leave(player);
-                }
+            FpsMatchGatewayProvider.gateway().leaveCurrentMapIncludingSpectator(player).ifPresentOrElse(roomName -> {
                 CodTdmRoomManager.getInstance().markRoomListDirty();
-                com.cdp.codpattern.network.handler.PacketHandler.sendToPlayer(
+                com.cdp.codpattern.adapter.forge.network.ModNetworkChannel.sendToPlayer(
                         new LeaveRoomResultPacket(true, roomName, "OK", ""), player);
-            }, () -> com.cdp.codpattern.network.handler.PacketHandler.sendToPlayer(
+            }, () -> com.cdp.codpattern.adapter.forge.network.ModNetworkChannel.sendToPlayer(
                     new LeaveRoomResultPacket(false, "", "NOT_IN_ROOM", "当前不在房间内"), player));
         });
         ctx.get().setPacketHandled(true);

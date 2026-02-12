@@ -1,7 +1,7 @@
 package com.cdp.codpattern.network.tdm;
 
 import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;

@@ -1,7 +1,6 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
-import com.phasetranscrystal.fpsmatch.core.FPSMCore;
+import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
@@ -32,11 +31,9 @@ public class VoteEndPacket {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
-                FPSMCore.getInstance().getMapByPlayer(player).ifPresent(map -> {
-                    if (map instanceof CodTdmMap tdmMap) {
-                        tdmMap.initiateEndVote(player.getUUID());
-                    }
-                });
+                FpsMatchGatewayProvider.gateway()
+                        .findPlayerTdmMap(player)
+                        .ifPresent(tdmMap -> tdmMap.initiateEndVote(player.getUUID()));
             }
         });
         ctx.get().setPacketHandled(true);

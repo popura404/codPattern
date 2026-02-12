@@ -1,6 +1,6 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -74,7 +74,7 @@ public class VoteDialogPacket {
 
                 minecraft.setScreen(new ConfirmScreen(accepted -> {
                     minecraft.setScreen(previous);
-                    PacketHandler.sendToServer(new VoteResponsePacket(voteId, accepted));
+                    ModNetworkChannel.sendToServer(new VoteResponsePacket(voteId, accepted));
                 },
                         title,
                         message,

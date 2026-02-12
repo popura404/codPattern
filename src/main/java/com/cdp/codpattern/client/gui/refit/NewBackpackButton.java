@@ -1,7 +1,7 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.AddBackpackPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -31,7 +31,7 @@ public class NewBackpackButton extends Button {
         super(x, y, width, height,
                 Component.literal("+ 添加背包"),
                 button -> {
-                    PacketHandler.sendToServer(new AddBackpackPacket());
+                    ModNetworkChannel.sendToServer(new AddBackpackPacket());
                     Minecraft mc = Minecraft.getInstance();
                     mc.execute(() -> {
                         if (mc.player != null) {

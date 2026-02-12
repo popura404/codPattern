@@ -1,6 +1,6 @@
 package com.cdp.codpattern.event;
 
-import com.cdp.codpattern.core.handler.Weaponhandling;
+import com.cdp.codpattern.app.backpack.service.BackpackDistributor;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -13,7 +13,7 @@ public class PlayerRespawnHandler {
     public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
         if (!event.getEntity().level().isClientSide) {
             ServerPlayer player = (ServerPlayer) event.getEntity();
-            Weaponhandling.distributeBackpackItems(player);
+            BackpackDistributor.distributeBackpackItems(player);
         }
     }
 }

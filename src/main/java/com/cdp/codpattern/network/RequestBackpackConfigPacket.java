@@ -1,13 +1,13 @@
 package com.cdp.codpattern.network;
 
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
-import com.cdp.codpattern.core.ConfigPath.ConfigPath;
+import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.path.ConfigPath;
+import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraftforge.network.NetworkEvent;
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 
 import java.nio.file.Path;
 import java.util.function.Supplier;
@@ -30,10 +30,10 @@ public class RequestBackpackConfigPacket {
             if (player != null) {
                 Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
                 String uuid = player.getUUID().toString();
-                BackpackConfig.PlayerBackpackData playerBackpackData = BackpackConfigManager.LoadorCreatePlayer(uuid,path);
+                BackpackConfig.PlayerBackpackData playerBackpackData = BackpackConfigRepository.loadOrCreatePlayer(uuid,path);
 
                 // 同步更新后的配置到客户端
-                PacketHandler.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), player);
+                ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), player);
             }
         });
         ctx.get().setPacketHandled(true);

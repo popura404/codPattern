@@ -3,7 +3,7 @@ package com.cdp.codpattern.client.gui.screen;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.refit.AttachmentConfigButton;
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.tacz.guns.api.item.IGun;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.logging.LogUtils;
@@ -84,7 +84,10 @@ public class WeaponMenuScreen extends Screen {
             return ItemStack.EMPTY;
         }
         try {
-            ResourceLocation itemId = new ResourceLocation(itemData.getItem());
+            ResourceLocation itemId = ResourceLocation.tryParse(itemData.getItem());
+            if (itemId == null) {
+                return new ItemStack(Items.AIR);
+            }
             ItemStack stack = new ItemStack(BuiltInRegistries.ITEM.get(itemId), itemData.getCount());
             String nbt = itemData.getNbt();
             if (nbt != null && !nbt.isEmpty()) {

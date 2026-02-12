@@ -1,6 +1,7 @@
 package com.cdp.codpattern.network.tdm;
 
 import com.cdp.codpattern.client.gui.screen.TdmRoomScreen;
+import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomData;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.FriendlyByteBuf;
@@ -48,10 +49,10 @@ public class RoomListSyncPacket {
                 Screen screen = Minecraft.getInstance().screen;
                 if (screen instanceof TdmRoomScreen tdmScreen) {
                     // 转换为 Screen 需要的格式
-                    Map<String, TdmRoomScreen.RoomData> roomDataMap = new HashMap<>();
+                    Map<String, TdmRoomData> roomDataMap = new HashMap<>();
                     for (Map.Entry<String, RoomInfo> entry : rooms.entrySet()) {
                         RoomInfo info = entry.getValue();
-                        roomDataMap.put(entry.getKey(), new TdmRoomScreen.RoomData(
+                        roomDataMap.put(entry.getKey(), new TdmRoomData(
                                 entry.getKey(),
                                 info.state,
                                 info.playerCount,

@@ -1,8 +1,8 @@
 package com.cdp.codpattern.network;
 
 import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfigManager;
-import com.cdp.codpattern.config.BackPackConfig.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackClientCache;
+import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.google.gson.Gson;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
@@ -36,7 +36,7 @@ public class SyncBackpackConfigPacket {
             //  更新c端缓存
             BackpackConfig.PlayerBackpackData playerData =
                     GSON.fromJson(configJson, BackpackConfig.PlayerBackpackData.class);
-            BackpackConfigManager.setCLIENTplayerBackpackData(playerData);
+            BackpackClientCache.set(playerData);
 
             // 如果正在打开 BackpackMenuScreen，就刷新按钮
             Minecraft mc = Minecraft.getInstance();

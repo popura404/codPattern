@@ -1,7 +1,7 @@
 package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.network.RenameBackpackPacket;
-import com.cdp.codpattern.network.handler.PacketHandler;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -78,7 +78,7 @@ public class RenameBackpackScreen extends Screen {
         if (newName.isEmpty()) {
             return;
         }
-        PacketHandler.sendToServer(new RenameBackpackPacket(backpackId, newName));
+        ModNetworkChannel.sendToServer(new RenameBackpackPacket(backpackId, newName));
         Minecraft.getInstance().setScreen(parent);
     }
 

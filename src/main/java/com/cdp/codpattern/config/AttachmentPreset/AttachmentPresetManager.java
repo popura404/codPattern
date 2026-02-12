@@ -1,6 +1,6 @@
 package com.cdp.codpattern.config.AttachmentPreset;
 
-import com.cdp.codpattern.core.ConfigPath.ConfigPath;
+import com.cdp.codpattern.config.path.ConfigPath;
 import com.mojang.logging.LogUtils;
 import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;

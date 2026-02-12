@@ -1,7 +1,7 @@
 package com.cdp.codpattern.network.tdm;
 
+import com.cdp.codpattern.compat.physicsmod.PhysicsModClientBridge;
 import com.mojang.authlib.GameProfile;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.RemotePlayer;
@@ -13,10 +13,8 @@ import net.minecraft.world.level.Level;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.fml.DistExecutor;
-import net.minecraftforge.fml.ModList;
 import net.minecraftforge.network.NetworkEvent;
 
-import java.lang.reflect.Method;
 import java.util.function.Supplier;
 
 /**
@@ -90,7 +88,7 @@ public class PhysicsMobRetainPacket {
 
     @OnlyIn(Dist.CLIENT)
     private static void onClient(PhysicsMobRetainPacket packet) {
-        if (!ModList.get().isLoaded("physicsmod")) {
+        if (!PhysicsModClientBridge.isPhysicsModLoaded()) {
             return;
         }
 
@@ -127,22 +125,6 @@ public class PhysicsMobRetainPacket {
             snapshot.setItemSlot(slot, sourcePlayer.getItemBySlot(slot).copy());
         }
 
-        if (RenderSystem.isOnRenderThread()) {
-            triggerPhysicsMod(level, snapshot);
-        } else {
-            RenderSystem.recordRenderCall(() -> triggerPhysicsMod(level, snapshot));
-        }
-    }
-
-    @OnlyIn(Dist.CLIENT)
-    private static void triggerPhysicsMod(Level level, Player snapshot) {
-        try {
-            Class<?> physicsMod = Class.forName("net.diebuddies.physics.PhysicsMod");
-            Method blockify = physicsMod.getMethod("blockifyEntity", Level.class,
-                    net.minecraft.world.entity.LivingEntity.class);
-            blockify.invoke(null, level, snapshot);
-        } catch (Throwable ignored) {
-            // physicsmod 不存在或触发失败时静默降级，不影响主流程
-        }
+        PhysicsModClientBridge.blockifySnapshot(level, snapshot);
     }
 }

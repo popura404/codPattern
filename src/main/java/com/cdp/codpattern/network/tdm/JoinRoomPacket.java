@@ -1,19 +1,14 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.config.TdmConfig.CodTdmConfig;
+import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
+import com.cdp.codpattern.config.tdm.CodTdmConfig;
 import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
 import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
-import com.phasetranscrystal.fpsmatch.core.FPSMCore;
-import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
-import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -59,11 +54,12 @@ public class JoinRoomPacket {
             if (player == null) {
                 return;
             }
-            Optional<BaseMap> baseMapOptional = FPSMCore.getInstance().getMapByName(mapName);
-            if (baseMapOptional.isEmpty() || !(baseMapOptional.get() instanceof CodTdmMap map)) {
+            Optional<CodTdmMap> mapOptional = FpsMatchGatewayProvider.gateway().findMapByName(mapName);
+            if (mapOptional.isEmpty()) {
                 sendResult(player, false, mapName, CODE_MAP_NOT_FOUND, "地图不存在");
                 return;
             }
+            CodTdmMap map = mapOptional.get();
 
             CodTdmRoomManager roomManager = CodTdmRoomManager.getInstance();
             CodTdmConfig config = CodTdmConfig.getConfig();
@@ -73,16 +69,7 @@ public class JoinRoomPacket {
                 return;
             }
 
-            FPSMCore.getInstance().getMapByPlayer(player).ifPresent(currentMap -> {
-                if (currentMap == map) {
-                    return;
-                }
-                if (currentMap instanceof CodTdmMap codMap) {
-                    codMap.leaveRoom(player);
-                } else {
-                    currentMap.leave(player);
-                }
-            });
+            FpsMatchGatewayProvider.gateway().leaveCurrentMapIfDifferent(player, map);
 
             CodTdmMap.GamePhase phase = map.getPhase();
             boolean isPlaying = phase == CodTdmMap.GamePhase.PLAYING;
@@ -116,7 +103,7 @@ public class JoinRoomPacket {
 
             String targetTeam = requestedTeam;
             if (targetTeam == null) {
-                Optional<String> autoTeam = chooseAutoTeam(map, config.getMaxTeamDiff());
+                Optional<String> autoTeam = map.chooseAutoJoinTeam(config.getMaxTeamDiff());
                 if (autoTeam.isEmpty()) {
                     sendResult(player, false, mapName, CODE_BALANCE_EXCEEDED, "无法分配队伍：队伍已满或超出人数差限制");
                     return;
@@ -127,7 +114,7 @@ public class JoinRoomPacket {
                     sendResult(player, false, mapName, CODE_TEAM_FULL, "目标队伍已满");
                     return;
                 }
-                if (!canJoinWithBalance(map, targetTeam, config.getMaxTeamDiff())) {
+                if (!map.canJoinWithBalance(targetTeam, config.getMaxTeamDiff())) {
                     sendResult(player, false, mapName, CODE_BALANCE_EXCEEDED, "加入该队伍会超出人数差限制");
                     return;
                 }
@@ -151,41 +138,6 @@ public class JoinRoomPacket {
         ctx.get().setPacketHandled(true);
     }
 
-    private static Optional<String> chooseAutoTeam(CodTdmMap map, int maxTeamDiff) {
-        List<BaseTeam> teams = new ArrayList<>(map.getMapTeams().getTeams());
-        teams.sort(Comparator.comparingInt(team -> team.getPlayerList().size()));
-        for (BaseTeam team : teams) {
-            if (map.getMapTeams().testTeamIsFull(team.name)) {
-                continue;
-            }
-            if (canJoinWithBalance(map, team.name, maxTeamDiff)) {
-                return Optional.of(team.name);
-            }
-        }
-        return Optional.empty();
-    }
-
-    private static boolean canJoinWithBalance(CodTdmMap map, String joiningTeam, int maxTeamDiff) {
-        if (maxTeamDiff < 0) {
-            return true;
-        }
-        int minPlayers = Integer.MAX_VALUE;
-        int maxPlayers = Integer.MIN_VALUE;
-
-        for (BaseTeam team : map.getMapTeams().getTeams()) {
-            int size = team.getPlayerList().size();
-            if (team.name.equals(joiningTeam)) {
-                size += 1;
-            }
-            minPlayers = Math.min(minPlayers, size);
-            maxPlayers = Math.max(maxPlayers, size);
-        }
-        if (minPlayers == Integer.MAX_VALUE || maxPlayers == Integer.MIN_VALUE) {
-            return true;
-        }
-        return (maxPlayers - minPlayers) <= maxTeamDiff;
-    }
-
     private static String normalizeTeam(String team) {
         if (team == null || team.isBlank()) {
             return null;
@@ -196,6 +148,6 @@ public class JoinRoomPacket {
     private static void sendResult(ServerPlayer player, boolean success, String mapName, String code, String message) {
         CodTdmRoomManager.getInstance().markRoomListDirty();
         JoinRoomResultPacket packet = new JoinRoomResultPacket(success, mapName, code, message);
-        com.cdp.codpattern.network.handler.PacketHandler.sendToPlayer(packet, player);
+        com.cdp.codpattern.adapter.forge.network.ModNetworkChannel.sendToPlayer(packet, player);
     }
 }
