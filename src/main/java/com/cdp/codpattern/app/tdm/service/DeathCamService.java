@@ -1,6 +1,6 @@
 package com.cdp.codpattern.app.tdm.service;
 
-import com.cdp.codpattern.fpsmatch.map.DeathCamData;
+import com.cdp.codpattern.app.tdm.model.DeathCamData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;

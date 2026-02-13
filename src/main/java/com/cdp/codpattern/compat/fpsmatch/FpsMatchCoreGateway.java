@@ -1,62 +1,61 @@
 package com.cdp.codpattern.compat.fpsmatch;
 
-import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
-import com.phasetranscrystal.fpsmatch.core.FPSMCore;
-import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
+import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMapAccess;
+import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
+import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
+import com.phasetranscrystal.fpsmatch.core.data.AreaData;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.server.ServerLifecycleHooks;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public final class FpsMatchCoreGateway implements FpsMatchGateway {
     @Override
     public boolean isInMatch(UUID playerId) {
-        if (ServerLifecycleHooks.getCurrentServer() == null) {
-            return false;
-        }
-        ServerPlayer player = ServerLifecycleHooks.getCurrentServer().getPlayerList().getPlayer(playerId);
-        return player != null && findPlayerTdmMap(player).isPresent();
+        return CodTdmMapAccess.isInMatch(playerId);
     }
 
     @Override
-    public Optional<CodTdmMap> findMapByName(String mapName) {
-        return FPSMCore.getInstance().getMapByName(mapName)
-                .filter(map -> map instanceof CodTdmMap)
-                .map(map -> (CodTdmMap) map);
+    public Optional<CodTdmActionPort> findMapActionPortByName(String mapName) {
+        return CodTdmMapAccess.findActionPortByMapName(mapName);
     }
 
     @Override
-    public Optional<CodTdmMap> findPlayerTdmMap(ServerPlayer player) {
-        return FPSMCore.getInstance().getMapByPlayer(player)
-                .filter(map -> map instanceof CodTdmMap)
-                .map(map -> (CodTdmMap) map);
+    public Optional<CodTdmActionPort> findPlayerTdmActionPort(ServerPlayer player) {
+        return CodTdmMapAccess.findActionPortByPlayer(player);
     }
 
     @Override
-    public void leaveCurrentMapIfDifferent(ServerPlayer player, CodTdmMap targetMap) {
-        FPSMCore.getInstance().getMapByPlayer(player).ifPresent(currentMap -> {
-            if (currentMap == targetMap) {
-                return;
-            }
-            if (currentMap instanceof CodTdmMap codMap) {
-                codMap.leaveRoom(player);
-            } else {
-                currentMap.leave(player);
-            }
-        });
+    public Optional<CodTdmReadPort> findMapReadPortByName(String mapName) {
+        return CodTdmMapAccess.findReadPortByMapName(mapName);
+    }
+
+    @Override
+    public Optional<CodTdmReadPort> findPlayerTdmReadPort(ServerPlayer player) {
+        return CodTdmMapAccess.findReadPortByPlayer(player);
+    }
+
+    @Override
+    public void leaveCurrentMapIfDifferent(ServerPlayer player, String targetMapName) {
+        CodTdmMapAccess.leaveCurrentMapIfDifferent(player, targetMapName);
     }
 
     @Override
     public Optional<String> leaveCurrentMapIncludingSpectator(ServerPlayer player) {
-        Optional<BaseMap> mapOptional = FPSMCore.getInstance().getMapByPlayerWithSpec(player);
-        mapOptional.ifPresent(map -> {
-            if (map instanceof CodTdmMap tdmMap) {
-                tdmMap.leaveRoom(player);
-            } else {
-                map.leave(player);
-            }
-        });
-        return mapOptional.map(map -> map.mapName);
+        return CodTdmMapAccess.leaveCurrentMapIncludingSpectator(player);
     }
+
+    @Override
+    public void createAndRegisterMap(ServerLevel level, String mapName, BlockPos from, BlockPos to) {
+        CodTdmMapAccess.createAndRegisterMap(level, mapName, new AreaData(from, to));
+    }
+
+    @Override
+    public List<CodTdmReadPort> listTdmReadPorts() {
+        return CodTdmMapAccess.listReadPorts();
+    }
+
 }

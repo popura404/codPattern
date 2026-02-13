@@ -5,8 +5,8 @@ import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
-import com.tacz.guns.api.TimelessAPI;
-import com.tacz.guns.api.item.IGun;
+import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
@@ -14,10 +14,11 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.world.item.Items;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public final class UpdateWeaponService {
@@ -97,8 +98,7 @@ public final class UpdateWeaponService {
         if (resourceLocation == null) {
             return ValidationResult.fail("ITEM_ID_INVALID", "物品 ID 非法");
         }
-        Item item = ForgeRegistries.ITEMS.getValue(resourceLocation);
-        if (item == null) {
+        if (resolveRegisteredItem(resourceLocation) == null) {
             return ValidationResult.fail("ITEM_NOT_REGISTERED", "物品未注册");
         }
         return ValidationResult.ok();
@@ -112,8 +112,8 @@ public final class UpdateWeaponService {
             filterConfig = new WeaponFilterConfig();
         }
 
-        ResourceLocation itemRl = ResourceLocation.tryParse(itemId);
-        Item item = itemRl == null ? null : ForgeRegistries.ITEMS.getValue(itemRl);
+        ResourceLocation itemResourceLocation = ResourceLocation.tryParse(itemId);
+        Item item = itemResourceLocation == null ? null : resolveRegisteredItem(itemResourceLocation);
         if (item == null) {
             return ValidationResult.fail("ITEM_NOT_REGISTERED", "物品未注册");
         }
@@ -123,15 +123,11 @@ public final class UpdateWeaponService {
             if (nbtTag != null && !nbtTag.isEmpty()) {
                 gunStack.setTag(nbtTag.copy());
             }
-            IGun iGun = IGun.getIGunOrNull(gunStack);
-            if (iGun == null) {
+            Optional<String> gunTypeOpt = TaczGatewayProvider.gateway().resolveGunType(gunStack);
+            if (gunTypeOpt.isEmpty()) {
                 return ValidationResult.fail("ITEM_CATEGORY_INVALID", "该槽位仅允许枪械");
             }
-            ResourceLocation gunId = iGun.getGunId(gunStack);
-            if (gunId == null || TimelessAPI.getCommonGunIndex(gunId).isEmpty()) {
-                return ValidationResult.fail("ITEM_CATEGORY_INVALID", "枪械数据无效");
-            }
-            String gunType = TimelessAPI.getCommonGunIndex(gunId).get().getType();
+            String gunType = gunTypeOpt.get();
             List<String> allowedTypes = "primary".equals(slot)
                     ? filterConfig.getPrimaryWeaponTabs()
                     : filterConfig.getSecondaryWeaponTabs();
@@ -151,6 +147,14 @@ public final class UpdateWeaponService {
             return ValidationResult.fail("NBT_INVALID", "投掷物 NBT 缺少 ThrowableId");
         }
         return ValidationResult.ok();
+    }
+
+    private static Item resolveRegisteredItem(ResourceLocation resourceLocation) {
+        Item item = BuiltInRegistries.ITEM.get(resourceLocation);
+        if (item == null || item == Items.AIR) {
+            return null;
+        }
+        return item;
     }
 
     private static CompoundTag parseNbt(String rawNbt) throws Exception {

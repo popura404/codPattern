@@ -1,11 +1,8 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
+import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.tacz.guns.api.item.IGun;
-import com.tacz.guns.client.resource.ClientAssetsManager;
-import com.tacz.guns.client.resource.pojo.PackInfo;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -81,16 +78,8 @@ public class WeaponSelectionButton extends Button {
         graphics.drawString(Minecraft.getInstance().font, weapon.getHoverName(), this.getX() + 2 , this.getY() + this.height - UNIT_LENGTH ,0xDDFFFFFF);
 
         //显示枪包名 / LR Tactical 包名
-        Component packName = null;
-        if (weapon.getItem() instanceof IGun iGun) {
-            ResourceLocation gunId = iGun.getGunId(weapon);
-            if (gunId != null) {
-                PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
-                if (packInfoObject != null && packInfoObject.getName() != null) {
-                    packName = Component.translatable(packInfoObject.getName()).withStyle(ChatFormatting.BLUE).withStyle(ChatFormatting.ITALIC);
-                }
-            }
-        } else {
+        Component packName = TaczClientApi.getGunPackName(weapon);
+        if (packName == null) {
             packName = LrTacticalClientApi.getLrItemPackName(weapon);
         }
         if (packName != null) {

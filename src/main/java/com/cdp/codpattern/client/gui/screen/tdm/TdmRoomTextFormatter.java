@@ -1,6 +1,6 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
-import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
+import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import net.minecraft.network.chat.Component;
 
 import java.util.Locale;
@@ -39,8 +39,8 @@ public final class TdmRoomTextFormatter {
     }
 
     public static String teamScoreText(Map<String, Integer> teamScores) {
-        int kortacScore = teamScores.getOrDefault(CodTdmMap.TEAM_KORTAC, 0);
-        int specgruScore = teamScores.getOrDefault(CodTdmMap.TEAM_SPECGRU, 0);
+        int kortacScore = teamScores.getOrDefault(TdmTeamNames.KORTAC, 0);
+        int specgruScore = teamScores.getOrDefault(TdmTeamNames.SPECGRU, 0);
         return String.format("§cK:%d §7| §9S:%d", kortacScore, specgruScore);
     }
 

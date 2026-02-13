@@ -4,10 +4,10 @@ import com.cdp.codpattern.config.AttachmentPreset.AttachmentPresetManager;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
+import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
-import com.tacz.guns.api.item.IGun;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
@@ -41,7 +41,7 @@ public final class AttachmentPresetSaveService {
 
         try {
             ItemStack gunStack = player.getInventory().getItem(session.getEditHotbarSlot());
-            if (!(gunStack.getItem() instanceof IGun)) {
+            if (!TaczGatewayProvider.gateway().isGun(gunStack)) {
                 throw new IllegalStateException("当前槽位不是枪械");
             }
 

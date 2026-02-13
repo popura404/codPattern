@@ -1,9 +1,9 @@
 package com.cdp.codpattern.app.tdm.service;
 
+import com.cdp.codpattern.app.tdm.model.TdmGamePhase;
+import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.config.tdm.CodTdmConfig;
-import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
 import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
-import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Map;
@@ -13,7 +13,7 @@ import java.util.function.Consumer;
 
 public final class ScoreService {
     public interface Hooks {
-        Optional<BaseTeam> findTeamByPlayer(ServerPlayer player);
+        Optional<String> findTeamNameByPlayer(ServerPlayer player);
 
         void broadcastScoreUpdate(ScoreUpdatePacket packet);
 
@@ -23,11 +23,11 @@ public final class ScoreService {
     private ScoreService() {
     }
 
-    public static boolean hasReachedVictoryGoal(CodTdmMap.GamePhase phase,
+    public static boolean hasReachedVictoryGoal(TdmGamePhase phase,
             int gameTimeTicks,
             Map<String, Integer> teamScores,
             CodTdmConfig config) {
-        if (phase != CodTdmMap.GamePhase.PLAYING) {
+        if (phase != TdmGamePhase.PLAYING) {
             return false;
         }
 
@@ -56,24 +56,68 @@ public final class ScoreService {
 
     public static void onPlayerKill(ServerPlayer killer,
             ServerPlayer victim,
-            CodTdmMap.GamePhase phase,
+            TdmGamePhase phase,
             Map<UUID, Integer> playerKills,
             Map<UUID, Integer> playerDeaths,
             Map<String, Integer> teamScores,
             int gameTimeTicks,
             Hooks hooks) {
-        if (phase != CodTdmMap.GamePhase.PLAYING || killer == null || victim == null) {
+        if (phase != TdmGamePhase.PLAYING || killer == null || victim == null) {
             return;
         }
 
         playerKills.merge(killer.getUUID(), 1, Integer::sum);
         playerDeaths.merge(victim.getUUID(), 1, Integer::sum);
 
-        hooks.findTeamByPlayer(killer).ifPresent(team -> {
-            teamScores.merge(team.name, 1, Integer::sum);
+        hooks.findTeamNameByPlayer(killer).ifPresent(teamName -> {
+            teamScores.merge(teamName, 1, Integer::sum);
             hooks.broadcastScoreUpdate(new ScoreUpdatePacket(teamScores, gameTimeTicks));
         });
 
         hooks.markRoomListDirty();
+    }
+
+    public static void onNonPlayerDeath(ServerPlayer victim,
+            ServerPlayer killer,
+            TdmGamePhase phase,
+            Map<UUID, Integer> playerDeaths,
+            Map<String, Integer> teamScores,
+            int gameTimeTicks,
+            Hooks hooks) {
+        if (phase != TdmGamePhase.PLAYING || victim == null) {
+            return;
+        }
+
+        // 仅在“非其他玩家击杀”的死亡场景触发：
+        // killer 为空（环境伤害）或 killer 就是死者本人（自杀/反伤等）。
+        if (killer != null && !killer.getUUID().equals(victim.getUUID())) {
+            return;
+        }
+
+        playerDeaths.merge(victim.getUUID(), 1, Integer::sum);
+
+        hooks.findTeamNameByPlayer(victim)
+                .flatMap(victimTeam -> findOpponentTeam(victimTeam, teamScores))
+                .ifPresent(opponentTeam -> {
+                    teamScores.merge(opponentTeam, 1, Integer::sum);
+                    hooks.broadcastScoreUpdate(new ScoreUpdatePacket(teamScores, gameTimeTicks));
+                });
+
+        hooks.markRoomListDirty();
+    }
+
+    private static Optional<String> findOpponentTeam(String victimTeam, Map<String, Integer> teamScores) {
+        if (teamScores.containsKey(TdmTeamNames.KORTAC) && teamScores.containsKey(TdmTeamNames.SPECGRU)) {
+            if (TdmTeamNames.KORTAC.equals(victimTeam)) {
+                return Optional.of(TdmTeamNames.SPECGRU);
+            }
+            if (TdmTeamNames.SPECGRU.equals(victimTeam)) {
+                return Optional.of(TdmTeamNames.KORTAC);
+            }
+        }
+        return teamScores.keySet().stream()
+                .filter(teamName -> !teamName.equals(victimTeam))
+                .sorted()
+                .findFirst();
     }
 }

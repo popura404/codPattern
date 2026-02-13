@@ -2,7 +2,7 @@ package com.cdp.codpattern.client.gui.screen.tdm;
 
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.gui.CodTheme;
-import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
+import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.tdm.JoinRoomPacket;
@@ -82,10 +82,10 @@ public final class TdmRoomActionController {
             }
             return;
         }
-        if (!CodTdmMap.TEAM_KORTAC.equals(teamName) && !CodTdmMap.TEAM_SPECGRU.equals(teamName)) {
+        if (!TdmTeamNames.KORTAC.equals(teamName) && !TdmTeamNames.SPECGRU.equals(teamName)) {
             return;
         }
-        ModNetworkChannel.sendToServer(new SelectTeamPacket(teamName));
+        ModNetworkChannel.sendToServer(new SelectTeamPacket(roomState.joinedRoom(), teamName));
     }
 
     public void leaveRoom() {

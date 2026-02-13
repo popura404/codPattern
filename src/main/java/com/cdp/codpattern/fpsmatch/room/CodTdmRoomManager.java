@@ -1,20 +1,18 @@
 package com.cdp.codpattern.fpsmatch.room;
 
 import com.cdp.codpattern.CodPattern;
-import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
+import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
+import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.tdm.RoomListSyncPacket;
-import com.phasetranscrystal.fpsmatch.core.FPSMCore;
-import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
-import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.server.ServerLifecycleHooks;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * TDM 房间管理器（单例）
@@ -40,17 +38,6 @@ public class CodTdmRoomManager {
         return INSTANCE;
     }
 
-    /**
-     * 获取所有 TDM 地图
-     */
-    public List<CodTdmMap> getAllMaps() {
-        List<BaseMap> maps = FPSMCore.getInstance().getAllMaps().getOrDefault(CodTdmMap.GAME_TYPE, new ArrayList<>());
-        return maps.stream()
-                .filter(map -> map instanceof CodTdmMap)
-                .map(map -> (CodTdmMap) map)
-                .collect(Collectors.toList());
-    }
-
     public void markRoomListDirty() {
         roomListDirty = true;
     }
@@ -65,48 +52,24 @@ public class CodTdmRoomManager {
     private Map<String, RoomListSyncPacket.RoomInfo> buildRoomInfos() {
         Map<String, RoomListSyncPacket.RoomInfo> roomInfos = new HashMap<>();
 
-        for (CodTdmMap map : getAllMaps()) {
-            // 计算玩家数和最大玩家数
-            int playerCount = map.getMapTeams().getJoinedPlayers().size();
-            int maxPlayers = 0;
-            Map<String, Integer> teamPlayerCounts = new HashMap<>();
-            Map<String, Integer> teamScores = map.getTeamScoresSnapshot();
-            int remainingTimeTicks = map.getRemainingTimeTicks();
-
-            for (BaseTeam team : map.getMapTeams().getTeams()) {
-                maxPlayers += team.getPlayerLimit();
-                teamPlayerCounts.put(team.name, team.getPlayerList().size());
-            }
+        for (CodTdmReadPort readPort : FpsMatchGatewayProvider.gateway().listTdmReadPorts()) {
+            Map<String, Integer> teamPlayerCounts = readPort.getTeamPlayerCountsSnapshot();
+            int playerCount = teamPlayerCounts.values().stream().mapToInt(Integer::intValue).sum();
+            int maxPlayers = readPort.getMaxPlayerCapacity();
+            Map<String, Integer> teamScores = readPort.getTeamScoresSnapshot();
+            int remainingTimeTicks = readPort.getRemainingTimeTicks();
 
             RoomListSyncPacket.RoomInfo info = new RoomListSyncPacket.RoomInfo(
-                    map.getPhase().name(),
+                    readPort.phaseName(),
                     playerCount,
                     maxPlayers,
                     teamPlayerCounts,
                     teamScores,
                     remainingTimeTicks,
-                    map.hasMatchEndTeleportPoint());
-            roomInfos.put(map.mapName, info);
+                    readPort.hasMatchEndTeleportPoint());
+            roomInfos.put(readPort.mapName(), info);
         }
         return roomInfos;
-    }
-
-    /**
-     * 根据地图名获取地图
-     */
-    public Optional<CodTdmMap> getMap(String mapName) {
-        return FPSMCore.getInstance().getMapByName(mapName)
-                .filter(map -> map instanceof CodTdmMap)
-                .map(map -> (CodTdmMap) map);
-    }
-
-    /**
-     * 获取玩家所在的 TDM 地图
-     */
-    public Optional<CodTdmMap> getPlayerMap(UUID playerId) {
-        return getAllMaps().stream()
-                .filter(map -> map.checkGameHasPlayer(playerId))
-                .findFirst();
     }
 
     /**

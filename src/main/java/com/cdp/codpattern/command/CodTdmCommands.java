@@ -1,10 +1,8 @@
 package com.cdp.codpattern.command;
 
-import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
+import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import com.phasetranscrystal.fpsmatch.core.FPSMCore;
-import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -32,13 +30,12 @@ public class CodTdmCommands {
                                     CommandSourceStack source = context.getSource();
                                     ServerLevel level = source.getLevel();
 
-                                    // 创建一个空的区域数据（以玩家当前位置为中心）
                                     net.minecraft.core.BlockPos pos = source.getPlayerOrException().blockPosition();
-                                    AreaData areaData = new AreaData(pos, pos.offset(10, 10, 10));
-
-                                    // 注册地图
-                                    FPSMCore.getInstance().registerMap(mapName,
-                                            new CodTdmMap(level, mapName, areaData));
+                                    FpsMatchGatewayProvider.gateway().createAndRegisterMap(
+                                            level,
+                                            mapName,
+                                            pos,
+                                            pos.offset(10, 10, 10));
 
                                     source.sendSuccess(() -> Component.literal(
                                             "§e[已弃用] §a已创建 TDM 地图: " + mapName + "\n§7请使用 §b/fpsm tdm §7命令管理 TDM 地图"),

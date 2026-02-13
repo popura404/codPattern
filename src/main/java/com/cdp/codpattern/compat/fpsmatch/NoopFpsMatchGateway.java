@@ -1,8 +1,12 @@
 package com.cdp.codpattern.compat.fpsmatch;
 
-import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
+import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
+import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,21 +17,41 @@ public final class NoopFpsMatchGateway implements FpsMatchGateway {
     }
 
     @Override
-    public Optional<CodTdmMap> findMapByName(String mapName) {
+    public Optional<CodTdmActionPort> findMapActionPortByName(String mapName) {
         return Optional.empty();
     }
 
     @Override
-    public Optional<CodTdmMap> findPlayerTdmMap(ServerPlayer player) {
+    public Optional<CodTdmActionPort> findPlayerTdmActionPort(ServerPlayer player) {
         return Optional.empty();
     }
 
     @Override
-    public void leaveCurrentMapIfDifferent(ServerPlayer player, CodTdmMap targetMap) {
+    public Optional<CodTdmReadPort> findMapReadPortByName(String mapName) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<CodTdmReadPort> findPlayerTdmReadPort(ServerPlayer player) {
+        return Optional.empty();
+    }
+
+    @Override
+    public void leaveCurrentMapIfDifferent(ServerPlayer player, String targetMapName) {
     }
 
     @Override
     public Optional<String> leaveCurrentMapIncludingSpectator(ServerPlayer player) {
         return Optional.empty();
+    }
+
+    @Override
+    public void createAndRegisterMap(ServerLevel level, String mapName, BlockPos from, BlockPos to) {
+        throw new UnsupportedOperationException("FPSMatch gateway unavailable");
+    }
+
+    @Override
+    public List<CodTdmReadPort> listTdmReadPorts() {
+        return List.of();
     }
 }

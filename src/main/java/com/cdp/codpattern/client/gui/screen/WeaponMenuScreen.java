@@ -3,8 +3,8 @@ package com.cdp.codpattern.client.gui.screen;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.refit.AttachmentConfigButton;
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
+import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
-import com.tacz.guns.api.item.IGun;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
@@ -341,7 +341,7 @@ public class WeaponMenuScreen extends Screen {
 
     /** 仅 TaCZ 枪械支持配件改装，LR Tactical 近战/投掷物等不支持 */
     private boolean supportsAttachmentConfig(ItemStack stack) {
-        return stack != null && !stack.isEmpty() && stack.getItem() instanceof IGun;
+        return TaczGatewayProvider.gateway().isGun(stack);
     }
 
     private void addAttachmentButton(String slot) {

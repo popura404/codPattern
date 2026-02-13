@@ -1,17 +1,18 @@
 package com.cdp.codpattern.client.refit;
 
-import com.cdp.codpattern.client.gui.screen.CodGunRefitScreen;
+import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
+import com.cdp.codpattern.compat.tacz.client.CodGunRefitScreen;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
 import com.cdp.codpattern.network.SaveAttachmentPresetPacket;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.mojang.logging.LogUtils;
-import com.tacz.guns.api.item.IGun;
-import com.tacz.guns.resource.modifier.AttachmentPropertyManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import org.slf4j.Logger;
+
+import java.util.Optional;
 
 public class AttachmentRefitClientState {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -47,16 +48,19 @@ public class AttachmentRefitClientState {
             return;
         }
         ItemStack gunStack = mc.player.getMainHandItem();
-        if (!(gunStack.getItem() instanceof IGun iGun)) {
+        if (!TaczGatewayProvider.gateway().isGun(gunStack)) {
             return;
         }
-        if (!expectedGunId.isEmpty() && !iGun.getGunId(gunStack).toString().equals(expectedGunId)) {
-            return;
+        if (!expectedGunId.isEmpty()) {
+            Optional<String> currentGunId = TaczGatewayProvider.gateway().resolveGunId(gunStack);
+            if (currentGunId.isEmpty() || !expectedGunId.equals(currentGunId.get())) {
+                return;
+            }
         }
         CompoundTag presetTag = AttachmentPresetUtil.parsePresetString(presetPayload);
         if (!presetTag.isEmpty()) {
             AttachmentPresetUtil.applyPresetToGun(gunStack, presetTag);
-            AttachmentPropertyManager.postChangeEvent(mc.player, gunStack);
+            TaczGatewayProvider.gateway().postAttachmentChanged(mc.player, gunStack);
         }
         mc.setScreen(new CodGunRefitScreen(parentScreen));
         pendingOpen = false;
@@ -73,7 +77,7 @@ public class AttachmentRefitClientState {
             return;
         }
         ItemStack gunStack = mc.player.getMainHandItem();
-        if (!(gunStack.getItem() instanceof IGun)) {
+        if (!TaczGatewayProvider.gateway().isGun(gunStack)) {
             reset();
             return;
         }

@@ -6,7 +6,7 @@ package com.cdp.codpattern.client.gui;
 public final class CodTheme {
     private CodTheme() {}
 
-    // ============ 背景色 ============
+    // 背景色
     /** 主背景 - 顶部 */
     public static final int BG_TOP = 0xE8101010;
     /** 主背景 - 底部 */
@@ -18,7 +18,7 @@ public final class CodTheme {
     /** 面板背景 */
     public static final int PANEL_BG = 0xD0151515;
 
-    // ============ 悬停/选中色 ============
+    // 悬停/选中色
     /** 悬停背景 - 顶部（暗绿） */
     public static final int HOVER_BG_TOP = 0xD0182018;
     /** 悬停背景 - 底部（暗绿） */
@@ -32,7 +32,7 @@ public final class CodTheme {
     /** 选中文字色 */
     public static final int SELECTED_TEXT = 0xFFFFD700;
 
-    // ============ 文字色 ============
+    // 文字色
     /** 主文字 - 白色 */
     public static final int TEXT_PRIMARY = 0xFFFFFFFF;
     /** 次级文字 - 灰色 */
@@ -44,7 +44,7 @@ public final class CodTheme {
     /** 警告/删除文字 - 红色 */
     public static final int TEXT_DANGER = 0xFFFF5555;
 
-    // ============ 边框/分隔线 ============
+    // 边框/分隔线
     /** 细边框 - 暗灰 */
     public static final int BORDER_SUBTLE = 0x50FFFFFF;
     /** 分隔线 */
@@ -52,7 +52,7 @@ public final class CodTheme {
     /** 阴影 */
     public static final int SHADOW = 0xC0000000;
 
-    // ============ 按钮状态 ============
+    // 按钮状态
     /** 禁用背景 */
     public static final int DISABLED_BG = 0xE0303030;
     /** 禁用文字 */
@@ -60,7 +60,7 @@ public final class CodTheme {
     /** 按下背景 */
     public static final int PRESSED_BG = 0xF0101810;
 
-    // ============ 上下文菜单 ============
+    // 上下文菜单
     /** 菜单背景 */
     public static final int MENU_BG = 0xF0101010;
     /** 菜单边框 */
@@ -70,7 +70,7 @@ public final class CodTheme {
     /** 菜单项悬停条 */
     public static final int MENU_ITEM_HOVER_BAR = 0xFF7FFF00;
 
-    // ============ 尺寸常量 ============
+    // 尺寸常量
     /** 边框宽度 */
     public static final int BORDER_WIDTH = 1;
     /** 菜单项高度（像素，非 UNIT） */

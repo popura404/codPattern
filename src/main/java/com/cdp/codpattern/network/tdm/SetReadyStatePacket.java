@@ -1,6 +1,6 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
+import com.cdp.codpattern.app.tdm.service.TdmRoomInteractionService;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -36,13 +36,7 @@ public class SetReadyStatePacket {
             if (player == null) {
                 return;
             }
-            CodTdmRoomManager.getInstance().getPlayerMap(player.getUUID()).ifPresentOrElse(map -> {
-                if (map.setPlayerReady(player, ready)) {
-                    player.sendSystemMessage(Component.literal(ready ? "§a已准备" : "§e已取消准备"));
-                } else {
-                    player.sendSystemMessage(Component.literal("§c当前阶段不可切换准备状态"));
-                }
-            }, () -> player.sendSystemMessage(Component.literal("§c未加入 TDM 房间")));
+            player.sendSystemMessage(Component.literal(TdmRoomInteractionService.setReadyState(player, ready)));
         });
         ctx.get().setPacketHandled(true);
     }

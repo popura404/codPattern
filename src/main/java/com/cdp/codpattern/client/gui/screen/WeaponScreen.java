@@ -3,14 +3,11 @@ package com.cdp.codpattern.client.gui.screen;
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.client.gui.refit.WeaponSelectionButton;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
+import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.network.UpdateWeaponPacket;
-import com.tacz.guns.api.TimelessAPI;
-import com.tacz.guns.api.item.GunTabType;
-import com.tacz.guns.api.item.gun.AbstractGunItem;
-import com.tacz.guns.client.resource.GunDisplayInstance;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -28,8 +25,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import static me.xjqsh.lrtactical.init.ModItems.MELEE_TAB;
 
 public class WeaponScreen extends Screen {
 
@@ -111,21 +106,11 @@ public class WeaponScreen extends Screen {
     }
 
     private List<ItemStack> getItemsFromTab(String tabName) {
-        GunTabType gunTabType;
-
         switch(tabName) {
-            case "pistol": gunTabType = GunTabType.PISTOL; break;
-            case "rifle": gunTabType = GunTabType.RIFLE; break;
-            case "sniper": gunTabType = GunTabType.SNIPER; break;
-            case "shotgun": gunTabType = GunTabType.SHOTGUN; break;
-            case "smg": gunTabType = GunTabType.SMG; break;
-            case "mg": gunTabType = GunTabType.MG; break;
-            case "rpg": gunTabType = GunTabType.RPG; break;
             case "melee": return LrTacticalClientApi.fillLrItemCategory(true);
             case "throwable": return LrTacticalClientApi.fillLrItemCategory(false);
-            default: return new ArrayList<>();
+            default: return TaczClientApi.fillGunItemCategory(tabName);
         }
-        return AbstractGunItem.fillItemCategory(gunTabType);
     }
 
     private void createTabButtons() {
@@ -202,11 +187,7 @@ public class WeaponScreen extends Screen {
             int buttonIndex = i - visibleStart;
             int x = startX + buttonIndex * (BUTTON_SIZE + BUTTON_SPACING) * UNIT_LENGTH;
 
-            ResourceLocation texture = null;
-            GunDisplayInstance display = TimelessAPI.getGunDisplay(weapon).orElse(null);
-            if (display != null) {
-                texture = display.getHUDTexture();
-            }
+            ResourceLocation texture = TaczClientApi.getGunHudTexture(weapon);
 
             WeaponSelectionButton button = new WeaponSelectionButton(
                     x, startY,

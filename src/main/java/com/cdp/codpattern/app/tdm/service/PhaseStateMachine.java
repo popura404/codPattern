@@ -1,7 +1,7 @@
 package com.cdp.codpattern.app.tdm.service;
 
+import com.cdp.codpattern.app.tdm.model.TdmGamePhase;
 import com.cdp.codpattern.config.tdm.CodTdmConfig;
-import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
 import com.cdp.codpattern.network.tdm.CountdownPacket;
 import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
 import net.minecraft.server.level.ServerPlayer;
@@ -41,14 +41,14 @@ public final class PhaseStateMachine {
 
     public record TickResult(int phaseTimer,
             int gameTimeTicks,
-            Optional<CodTdmMap.GamePhase> nextPhase,
+            Optional<TdmGamePhase> nextPhase,
             boolean resetTriggered) {
     }
 
     private PhaseStateMachine() {
     }
 
-    public static EnterPhaseResult enterPhase(CodTdmMap.GamePhase newPhase,
+    public static EnterPhaseResult enterPhase(TdmGamePhase newPhase,
             int gameTimeTicks,
             CodTdmConfig config,
             Hooks hooks) {
@@ -77,7 +77,7 @@ public final class PhaseStateMachine {
         return new EnterPhaseResult(0, nextGameTimeTicks);
     }
 
-    public static TickResult tick(CodTdmMap.GamePhase phase,
+    public static TickResult tick(TdmGamePhase phase,
             int phaseTimer,
             int gameTimeTicks,
             CodTdmConfig config,
@@ -92,7 +92,7 @@ public final class PhaseStateMachine {
         };
     }
 
-    public static int getRemainingTimeTicks(CodTdmMap.GamePhase phase,
+    public static int getRemainingTimeTicks(TdmGamePhase phase,
             int phaseTimer,
             int gameTimeTicks,
             CodTdmConfig config) {
@@ -125,7 +125,7 @@ public final class PhaseStateMachine {
         }
 
         if (nextPhaseTimer >= totalTicks) {
-            return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.of(CodTdmMap.GamePhase.WARMUP), false);
+            return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.of(TdmGamePhase.WARMUP), false);
         }
         return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.empty(), false);
     }
@@ -133,7 +133,7 @@ public final class PhaseStateMachine {
     private static TickResult tickWarmup(int phaseTimer, int gameTimeTicks, CodTdmConfig config) {
         int nextPhaseTimer = phaseTimer + 1;
         if (nextPhaseTimer >= config.getWarmupTimeTicks()) {
-            return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.of(CodTdmMap.GamePhase.PLAYING), false);
+            return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.of(TdmGamePhase.PLAYING), false);
         }
         return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.empty(), false);
     }

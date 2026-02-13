@@ -1,7 +1,7 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
 import com.cdp.codpattern.client.gui.CodTheme;
-import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
+import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -21,11 +21,11 @@ public final class TdmRoomRosterRenderer {
             int panelX,
             int panelWidth,
             int startY,
-            int maxY,
-            Map<String, List<PlayerInfo>> teamPlayers) {
+        int maxY,
+        Map<String, List<PlayerInfo>> teamPlayers) {
         List<String> teamOrder = new ArrayList<>();
-        teamOrder.add(CodTdmMap.TEAM_KORTAC);
-        teamOrder.add(CodTdmMap.TEAM_SPECGRU);
+        teamOrder.add(TdmTeamNames.KORTAC);
+        teamOrder.add(TdmTeamNames.SPECGRU);
         for (String key : teamPlayers.keySet()) {
             if (!teamOrder.contains(key)) {
                 teamOrder.add(key);
@@ -117,10 +117,10 @@ public final class TdmRoomRosterRenderer {
     }
 
     private static int getTeamAccentColor(String teamName) {
-        if (CodTdmMap.TEAM_KORTAC.equalsIgnoreCase(teamName)) {
+        if (TdmTeamNames.KORTAC.equalsIgnoreCase(teamName)) {
             return 0xFFE35A5A;
         }
-        if (CodTdmMap.TEAM_SPECGRU.equalsIgnoreCase(teamName)) {
+        if (TdmTeamNames.SPECGRU.equalsIgnoreCase(teamName)) {
             return 0xFF66A6FF;
         }
         return 0xFFB4C1CE;

@@ -5,8 +5,8 @@ import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
+import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
-import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
 import com.mojang.logging.LogUtils;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.TagParser;
@@ -44,7 +44,7 @@ public class BackpackDistributor {
         if (player.isSpectator()) return;
 
         // 未加入房间系统的玩家不发放
-        if (CodTdmRoomManager.getInstance().getPlayerMap(player.getUUID()).isEmpty()) return;
+        if (!FpsMatchGatewayProvider.gateway().isInMatch(player.getUUID())) return;
 
         String uuid = player.getUUID().toString();
         BackpackConfig.PlayerBackpackData playerData =

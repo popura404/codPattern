@@ -1,6 +1,6 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
+import com.cdp.codpattern.app.tdm.service.TdmRoomInteractionService;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
@@ -37,9 +37,7 @@ public class VoteResponsePacket {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
-                FpsMatchGatewayProvider.gateway()
-                        .findPlayerTdmMap(player)
-                        .ifPresent(tdmMap -> tdmMap.submitVoteResponse(player.getUUID(), voteId, accepted));
+                TdmRoomInteractionService.submitVoteResponse(player, voteId, accepted);
             }
         });
         ctx.get().setPacketHandled(true);

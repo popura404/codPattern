@@ -2,13 +2,10 @@ package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
+import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.SelectBackpackPacket;
-import com.tacz.guns.api.TimelessAPI;
-import com.tacz.guns.api.item.IGun;
-import com.tacz.guns.client.resource.ClientAssetsManager;
-import com.tacz.guns.client.resource.pojo.PackInfo;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -22,7 +19,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -90,8 +89,11 @@ public class BackPackSelectButton extends Button {
                 if (itemId == null) {
                     continue;
                 }
-                ItemStack weaponStack = new ItemStack(
-                        Objects.requireNonNull(ForgeRegistries.ITEMS.getValue(itemId)));
+                Item item = BuiltInRegistries.ITEM.get(itemId);
+                if (item == null || item == Items.AIR) {
+                    continue;
+                }
+                ItemStack weaponStack = new ItemStack(item);
 
                 if (itemData.getNbt() != null && !itemData.getNbt().isEmpty()) {
                     try {
@@ -104,7 +106,7 @@ public class BackPackSelectButton extends Button {
 
                 weaponStack.setCount(itemData.getCount());
 
-                WeaponInfo info = weaponStack.getItem() instanceof IGun
+                WeaponInfo info = TaczClientApi.isGun(weaponStack)
                         ? extractWeaponInfo(weaponStack)
                         : extractItemInfo(weaponStack);
                 if (info != null) {
@@ -120,22 +122,8 @@ public class BackPackSelectButton extends Button {
         if (weapon == null || weapon.isEmpty()) return null;
 
         try {
-            ResourceLocation texture = null;
-            var displayOpt = TimelessAPI.getGunDisplay(weapon);
-            if (displayOpt.isPresent()) {
-                texture = displayOpt.get().getHUDTexture();
-            }
-
-            Component packName = null;
-            if (weapon.getItem() instanceof IGun iGun) {
-                ResourceLocation gunId = iGun.getGunId(weapon);
-                PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
-                if (packInfoObject != null) {
-                    packName = Component.translatable(packInfoObject.getName())
-                            .withStyle(ChatFormatting.BLUE)
-                            .withStyle(ChatFormatting.ITALIC);
-                }
-            }
+            ResourceLocation texture = TaczClientApi.getGunHudTexture(weapon);
+            Component packName = TaczClientApi.getGunPackName(weapon);
 
             Component weaponName = weapon.getHoverName();
 

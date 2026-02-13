@@ -2,12 +2,8 @@ package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
+import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.tacz.guns.api.TimelessAPI;
-import com.tacz.guns.api.item.IGun;
-import com.tacz.guns.client.resource.ClientAssetsManager;
-import com.tacz.guns.client.resource.pojo.PackInfo;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -209,21 +205,12 @@ public class FlatColorButton extends Button {
         lastWeaponSnapshot = weapon.copy();
 
         // 图片处理
-        Teaxture = null;
-        TimelessAPI.getGunDisplay(weapon).ifPresent(display -> this.Teaxture = display.getHUDTexture());
+        Teaxture = TaczClientApi.getGunHudTexture(weapon);
 
         // 包名处理
-        weaponPackinfo = null;
-        if (weapon.getItem() instanceof IGun iGun) {
-            ResourceLocation gunId = iGun.getGunId(weapon);
-            PackInfo packInfoObject = ClientAssetsManager.INSTANCE.getPackInfo(gunId);
-            if (packInfoObject != null && packInfoObject.getName() != null) {
-                this.weaponPackinfo = Component.translatable(packInfoObject.getName())
-                        .withStyle(ChatFormatting.BLUE)
-                        .withStyle(ChatFormatting.ITALIC);
-            }
-        } else {
-            this.weaponPackinfo = LrTacticalClientApi.getLrItemPackName(weapon);
+        weaponPackinfo = TaczClientApi.getGunPackName(weapon);
+        if (weaponPackinfo == null) {
+            weaponPackinfo = LrTacticalClientApi.getLrItemPackName(weapon);
         }
 
         // 枪名处理

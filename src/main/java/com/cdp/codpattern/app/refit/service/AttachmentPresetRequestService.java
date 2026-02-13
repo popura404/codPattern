@@ -4,13 +4,11 @@ import com.cdp.codpattern.config.AttachmentPreset.AttachmentPresetManager;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
+import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
 import com.cdp.codpattern.network.SyncAttachmentPresetPacket;
-import com.tacz.guns.api.TimelessAPI;
-import com.tacz.guns.api.item.IGun;
-import com.tacz.guns.resource.modifier.AttachmentPropertyManager;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.TagParser;
@@ -59,11 +57,7 @@ public final class AttachmentPresetRequestService {
         }
 
         ItemStack gunStack = buildItemStack(itemData);
-        IGun iGun = IGun.getIGunOrNull(gunStack);
-        if (iGun == null) {
-            return Optional.empty();
-        }
-        if (TimelessAPI.getCommonGunIndex(iGun.getGunId(gunStack)).isEmpty()) {
+        if (!TaczGatewayProvider.gateway().isValidGun(gunStack)) {
             return Optional.empty();
         }
 
@@ -72,18 +66,21 @@ public final class AttachmentPresetRequestService {
         CompoundTag presetTag = presetPayload.map(AttachmentPresetUtil::parsePresetString).orElseGet(CompoundTag::new);
         if (!presetTag.isEmpty()) {
             AttachmentPresetUtil.applyPresetToGun(gunStack, presetTag);
-            AttachmentPropertyManager.postChangeEvent(player, gunStack);
+            TaczGatewayProvider.gateway().postAttachmentChanged(player, gunStack);
         }
 
-        List<ItemStack> playerOwnedAttachments = collectPlayerOwnedAttachments(player, gunStack, iGun);
+        Optional<String> expectedGunIdOpt = TaczGatewayProvider.gateway().resolveGunId(gunStack);
+        if (expectedGunIdOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        List<ItemStack> playerOwnedAttachments = collectPlayerOwnedAttachments(player, gunStack);
         AttachmentEditSession session = AttachmentEditSessionManager.startSession(
                 player, bagId, slot, gunStack, playerOwnedAttachments);
-        String expectedGunId = iGun.getGunId(gunStack).toString();
         SyncAttachmentPresetPacket packet = new SyncAttachmentPresetPacket(
                 bagId,
                 slot,
                 presetPayload.orElse(""),
-                expectedGunId
+                expectedGunIdOpt.get()
         );
         return Optional.of(new Result(
                 packet,
@@ -93,14 +90,14 @@ public final class AttachmentPresetRequestService {
         ));
     }
 
-    private static List<ItemStack> collectPlayerOwnedAttachments(ServerPlayer player, ItemStack gunStack, IGun iGun) {
+    private static List<ItemStack> collectPlayerOwnedAttachments(ServerPlayer player, ItemStack gunStack) {
         List<ItemStack> attachments = new ArrayList<>();
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
             ItemStack stack = player.getInventory().getItem(i);
             if (stack == null || stack.isEmpty()) {
                 continue;
             }
-            if (iGun.allowAttachment(gunStack, stack)) {
+            if (TaczGatewayProvider.gateway().canAttach(gunStack, stack)) {
                 attachments.add(stack.copy());
             }
         }

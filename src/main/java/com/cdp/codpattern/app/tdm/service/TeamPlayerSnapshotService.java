@@ -1,7 +1,6 @@
 package com.cdp.codpattern.app.tdm.service;
 
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
-import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.ArrayList;
@@ -13,10 +12,13 @@ import java.util.UUID;
 import java.util.function.Function;
 
 public final class TeamPlayerSnapshotService {
+    public record TeamRoster(String name, List<UUID> playerIds) {
+    }
+
     private TeamPlayerSnapshotService() {
     }
 
-    public static Map<String, List<PlayerInfo>> buildTeamPlayers(List<BaseTeam> teams,
+    public static Map<String, List<PlayerInfo>> buildTeamPlayers(List<TeamRoster> teams,
             Function<UUID, Player> playerLookup,
             Map<UUID, Boolean> readyStates,
             Map<UUID, Integer> playerKills,
@@ -24,10 +26,10 @@ public final class TeamPlayerSnapshotService {
             Set<UUID> respawningPlayers) {
         Map<String, List<PlayerInfo>> result = new HashMap<>();
 
-        for (BaseTeam team : teams) {
+        for (TeamRoster team : teams) {
             List<PlayerInfo> playerInfos = new ArrayList<>();
 
-            for (UUID playerId : team.getPlayerList()) {
+            for (UUID playerId : team.playerIds()) {
                 Player player = playerLookup.apply(playerId);
                 if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
                     PlayerInfo info = new PlayerInfo(
@@ -54,7 +56,7 @@ public final class TeamPlayerSnapshotService {
                 }
                 return a.name().compareToIgnoreCase(b.name());
             });
-            result.put(team.name, playerInfos);
+            result.put(team.name(), playerInfos);
         }
 
         return result;

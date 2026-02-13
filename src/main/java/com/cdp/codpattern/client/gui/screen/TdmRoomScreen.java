@@ -10,7 +10,7 @@ import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomListRenderer;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomSessionState;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomStateEvaluator;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomUiState;
-import com.cdp.codpattern.fpsmatch.map.CodTdmMap;
+import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -100,7 +100,7 @@ public class TdmRoomScreen extends Screen {
                 teamButtonWidth,
                 buttonHeight,
                 Component.translatable("screen.codpattern.tdm_room.join_kortac"),
-                btn -> actionController.selectTeam(CodTdmMap.TEAM_KORTAC),
+                btn -> actionController.selectTeam(TdmTeamNames.KORTAC),
                 0xFFE35A5A));
 
         // SPECGRU 队伍按钮
@@ -110,7 +110,7 @@ public class TdmRoomScreen extends Screen {
                 teamButtonWidth,
                 buttonHeight,
                 Component.translatable("screen.codpattern.tdm_room.join_specgru"),
-                btn -> actionController.selectTeam(CodTdmMap.TEAM_SPECGRU),
+                btn -> actionController.selectTeam(TdmTeamNames.SPECGRU),
                 0xFF66A6FF));
 
         // Ready 按钮
@@ -315,7 +315,7 @@ public class TdmRoomScreen extends Screen {
         graphics.fillGradient(0, 0, this.width, this.height, CodTheme.BG_TOP, CodTheme.BG_BOTTOM);
     }
 
-    // ========== 数据更新方法 (由网络包处理器调用) ==========
+    // 数据更新方法（由网络包处理器调用）
 
     /**
      * 更新房间列表

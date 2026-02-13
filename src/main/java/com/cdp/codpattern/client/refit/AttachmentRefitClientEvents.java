@@ -1,7 +1,7 @@
 package com.cdp.codpattern.client.refit;
 
 import com.cdp.codpattern.CodPattern;
-import com.tacz.guns.client.gui.GunRefitScreen;
+import com.cdp.codpattern.compat.tacz.client.CodGunRefitScreen;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.event.TickEvent;
@@ -20,7 +20,7 @@ public class AttachmentRefitClientEvents {
 
     @SubscribeEvent
     public static void onScreenClosing(ScreenEvent.Closing event) {
-        if (event.getScreen() instanceof GunRefitScreen) {
+        if (event.getScreen() instanceof CodGunRefitScreen) {
             AttachmentRefitClientState.onRefitScreenClosed();
         }
     }
