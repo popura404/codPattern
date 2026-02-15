@@ -1,11 +1,9 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.ConfirmScreen;
-import net.minecraft.client.gui.screens.Screen;
+import com.cdp.codpattern.network.handler.ClientPacketHandler;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.chat.Component;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -55,32 +53,13 @@ public class VoteDialogPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            Minecraft.getInstance().execute(() -> {
-                Minecraft minecraft = Minecraft.getInstance();
-                if (minecraft.player == null) {
-                    return;
-                }
-
-                Screen previous = minecraft.screen;
-                boolean startVote = "START".equalsIgnoreCase(voteType);
-                Component title = startVote
-                        ? Component.translatable("screen.codpattern.vote_dialog.title_start")
-                        : Component.translatable("screen.codpattern.vote_dialog.title_end");
-                Component message = startVote
-                        ? Component.translatable("screen.codpattern.vote_dialog.message_start", initiatorName, roomName,
-                                requiredVotes, totalVoters)
-                        : Component.translatable("screen.codpattern.vote_dialog.message_end", initiatorName, roomName,
-                                requiredVotes, totalVoters);
-
-                minecraft.setScreen(new ConfirmScreen(accepted -> {
-                    minecraft.setScreen(previous);
-                    ModNetworkChannel.sendToServer(new VoteResponsePacket(voteId, accepted));
-                },
-                        title,
-                        message,
-                        Component.translatable("screen.codpattern.vote_dialog.accept"),
-                        Component.translatable("screen.codpattern.vote_dialog.reject")));
-            });
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handleVoteDialog(
+                    roomName,
+                    voteId,
+                    voteType,
+                    initiatorName,
+                    requiredVotes,
+                    totalVoters));
         });
         ctx.get().setPacketHandled(true);
     }

@@ -98,11 +98,11 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     implementation fg.deobf("curse.maven:timeless-and-classics-zero-1028108:6654541-sources-6654543")
     implementation fg.deobf("maven.modrinth:lr-tactical:0.3.0")
-    implementation fg.deobf("maven.modrinth:cloth-config:11.1.136+forge")
+    //implementation fg.deobf("maven.modrinth:cloth-config:11.1.136+forge")
     implementation fg.deobf("maven.modrinth:fpsmatch:1.2.5")
     implementation fg.deobf("maven.modrinth:physicsmod:JkM3OTEl")
-    runtimeOnly fg.deobf("curse.maven:embeddium-908741:5175031")
-    runtimeOnly fg.deobf("curse.maven:oculus-581495:5299671")
+    //runtimeOnly fg.deobf("curse.maven:embeddium-908741:5175031")
+    //runtimeOnly fg.deobf("curse.maven:oculus-581495:5299671")
     //annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
