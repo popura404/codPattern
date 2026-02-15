@@ -1,8 +1,9 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.client.ClientTdmState;
-import net.minecraft.client.Minecraft;
+import com.cdp.codpattern.network.handler.ClientPacketHandler;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.UUID;
@@ -53,14 +54,8 @@ public class DeathCamPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            Minecraft.getInstance().execute(() -> {
-                if (respawnDelayTicks <= 0) {
-                    ClientTdmState.clearDeathCam();
-                    return;
-                }
-                // HUD 倒计时跟随复活延迟；镜头锁定由服务端 deathCamTicks 控制
-                ClientTdmState.setDeathCam(killerName, respawnDelayTicks);
-            });
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                    () -> () -> ClientPacketHandler.handleDeathCam(killerName, respawnDelayTicks));
         });
         ctx.get().setPacketHandled(true);
     }

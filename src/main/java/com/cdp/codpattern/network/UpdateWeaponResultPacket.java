@@ -1,8 +1,9 @@
 package com.cdp.codpattern.network;
 
-import net.minecraft.client.Minecraft;
+import com.cdp.codpattern.network.handler.ClientPacketHandler;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.chat.Component;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -43,11 +44,8 @@ public class UpdateWeaponResultPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            if (success || Minecraft.getInstance().player == null) {
-                return;
-            }
-            String text = message.isBlank() ? "配装写入被拒绝: " + code : message;
-            Minecraft.getInstance().player.sendSystemMessage(Component.literal("§c" + text));
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                    () -> () -> ClientPacketHandler.handleUpdateWeaponResult(success, code, message));
         });
         ctx.get().setPacketHandled(true);
     }

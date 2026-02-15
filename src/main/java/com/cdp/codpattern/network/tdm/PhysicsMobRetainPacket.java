@@ -1,17 +1,8 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.compat.physicsmod.PhysicsModClientBridge;
-import com.mojang.authlib.GameProfile;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.player.RemotePlayer;
+import com.cdp.codpattern.network.handler.ClientPacketHandler;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.Level;
 import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
@@ -82,49 +73,19 @@ public class PhysicsMobRetainPacket {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> onClient(this)));
+        ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
+                ClientPacketHandler.handlePhysicsMobRetain(
+                        entityId,
+                        x,
+                        y,
+                        z,
+                        yRot,
+                        xRot,
+                        yHeadRot,
+                        yBodyRot,
+                        motionX,
+                        motionY,
+                        motionZ)));
         ctx.get().setPacketHandled(true);
-    }
-
-    @OnlyIn(Dist.CLIENT)
-    private static void onClient(PhysicsMobRetainPacket packet) {
-        if (!PhysicsModClientBridge.isPhysicsModLoaded()) {
-            return;
-        }
-
-        Minecraft mc = Minecraft.getInstance();
-        ClientLevel level = mc.level;
-        if (level == null) {
-            return;
-        }
-
-        Entity source = level.getEntity(packet.entityId);
-        if (!(source instanceof Player sourcePlayer)) {
-            return;
-        }
-
-        GameProfile profile = sourcePlayer.getGameProfile();
-        RemotePlayer snapshot = new RemotePlayer(level, profile);
-        snapshot.setPos(packet.x, packet.y, packet.z);
-        snapshot.setYRot(packet.yRot);
-        snapshot.setXRot(packet.xRot);
-        snapshot.yRotO = packet.yRot;
-        snapshot.xRotO = packet.xRot;
-        snapshot.xo = packet.x;
-        snapshot.yo = packet.y;
-        snapshot.zo = packet.z;
-        snapshot.setOldPosAndRot();
-        snapshot.yHeadRot = packet.yHeadRot;
-        snapshot.yHeadRotO = packet.yHeadRot;
-        snapshot.yBodyRot = packet.yBodyRot;
-        snapshot.yBodyRotO = packet.yBodyRot;
-        snapshot.setDeltaMovement(packet.motionX, packet.motionY, packet.motionZ);
-        snapshot.setHealth(Math.max(0.01f, sourcePlayer.getHealth()));
-
-        for (EquipmentSlot slot : EquipmentSlot.values()) {
-            snapshot.setItemSlot(slot, sourcePlayer.getItemBySlot(slot).copy());
-        }
-
-        PhysicsModClientBridge.blockifySnapshot(level, snapshot);
     }
 }

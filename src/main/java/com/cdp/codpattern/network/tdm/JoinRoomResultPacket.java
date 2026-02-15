@@ -1,9 +1,9 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.client.gui.screen.TdmRoomScreen;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
+import com.cdp.codpattern.network.handler.ClientPacketHandler;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -43,12 +43,8 @@ public class JoinRoomResultPacket {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> Minecraft.getInstance().execute(() -> {
-            Screen screen = Minecraft.getInstance().screen;
-            if (screen instanceof TdmRoomScreen tdmRoomScreen) {
-                tdmRoomScreen.handleJoinResult(success, mapName, reasonCode, reasonMessage);
-            }
-        }));
+        ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                () -> () -> ClientPacketHandler.handleJoinRoomResult(success, mapName, reasonCode, reasonMessage)));
         ctx.get().setPacketHandled(true);
     }
 }

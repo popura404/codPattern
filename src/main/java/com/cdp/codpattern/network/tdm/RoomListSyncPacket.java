@@ -1,10 +1,9 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.client.gui.screen.TdmRoomScreen;
-import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomData;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
+import com.cdp.codpattern.network.handler.ClientPacketHandler;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.HashMap;
@@ -45,26 +44,7 @@ public class RoomListSyncPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            Minecraft.getInstance().execute(() -> {
-                Screen screen = Minecraft.getInstance().screen;
-                if (screen instanceof TdmRoomScreen tdmScreen) {
-                    // 转换为 Screen 需要的格式
-                    Map<String, TdmRoomData> roomDataMap = new HashMap<>();
-                    for (Map.Entry<String, RoomInfo> entry : rooms.entrySet()) {
-                        RoomInfo info = entry.getValue();
-                        roomDataMap.put(entry.getKey(), new TdmRoomData(
-                                entry.getKey(),
-                                info.state,
-                                info.playerCount,
-                                info.maxPlayers,
-                                info.teamPlayerCounts,
-                                info.teamScores,
-                                info.remainingTimeTicks,
-                                info.hasMatchEndTeleportPoint));
-                    }
-                    tdmScreen.updateRoomList(roomDataMap);
-                }
-            });
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handleRoomListSync(rooms));
         });
         ctx.get().setPacketHandled(true);
     }

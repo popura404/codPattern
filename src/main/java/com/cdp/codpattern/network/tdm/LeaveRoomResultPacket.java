@@ -1,10 +1,9 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.client.gui.screen.TdmRoomScreen;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
+import com.cdp.codpattern.network.handler.ClientPacketHandler;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.chat.Component;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -44,16 +43,8 @@ public class LeaveRoomResultPacket {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> Minecraft.getInstance().execute(() -> {
-            Screen screen = Minecraft.getInstance().screen;
-            if (screen instanceof TdmRoomScreen tdmRoomScreen) {
-                tdmRoomScreen.handleLeaveResult(success, roomName, reasonCode, reasonMessage);
-            }
-            if (!success && Minecraft.getInstance().player != null) {
-                String message = reasonMessage.isBlank() ? "离开房间失败: " + reasonCode : reasonMessage;
-                Minecraft.getInstance().player.sendSystemMessage(Component.literal("§c" + message));
-            }
-        }));
+        ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                () -> () -> ClientPacketHandler.handleLeaveRoomResult(success, roomName, reasonCode, reasonMessage)));
         ctx.get().setPacketHandled(true);
     }
 }

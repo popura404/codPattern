@@ -1,8 +1,9 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.client.ClientTdmState;
-import net.minecraft.client.Minecraft;
+import com.cdp.codpattern.network.handler.ClientPacketHandler;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -35,10 +36,8 @@ public class GamePhasePacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            Minecraft.getInstance().execute(() -> {
-                // 更新客户端游戏阶段显示
-                ClientTdmState.updatePhase(phase, remainingTicks);
-            });
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                    () -> () -> ClientPacketHandler.handleGamePhase(phase, remainingTicks));
         });
         ctx.get().setPacketHandled(true);
     }

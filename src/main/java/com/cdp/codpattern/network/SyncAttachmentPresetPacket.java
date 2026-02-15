@@ -1,9 +1,9 @@
 package com.cdp.codpattern.network;
 
-import com.cdp.codpattern.client.refit.AttachmentRefitClientState;
+import com.cdp.codpattern.network.handler.ClientPacketHandler;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -33,12 +33,9 @@ public class SyncAttachmentPresetPacket {
     }
 
     public static void handle(SyncAttachmentPresetPacket packet, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> onClient(packet));
+        ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
+                ClientPacketHandler.handleSyncAttachmentPreset(packet.bagId, packet.slot, packet.presetPayload,
+                        packet.expectedGunId)));
         ctx.get().setPacketHandled(true);
-    }
-
-    @OnlyIn(Dist.CLIENT)
-    private static void onClient(SyncAttachmentPresetPacket packet) {
-        AttachmentRefitClientState.onPresetSync(packet.bagId, packet.slot, packet.presetPayload, packet.expectedGunId);
     }
 }

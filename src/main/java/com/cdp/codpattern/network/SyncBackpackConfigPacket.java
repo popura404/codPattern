@@ -1,11 +1,11 @@
 package com.cdp.codpattern.network;
 
-import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
-import com.cdp.codpattern.config.backpack.BackpackClientCache;
+import com.cdp.codpattern.network.handler.ClientPacketHandler;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.google.gson.Gson;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -33,16 +33,8 @@ public class SyncBackpackConfigPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            //  更新c端缓存
-            BackpackConfig.PlayerBackpackData playerData =
-                    GSON.fromJson(configJson, BackpackConfig.PlayerBackpackData.class);
-            BackpackClientCache.set(playerData);
-
-            // 如果正在打开 BackpackMenuScreen，就刷新按钮
-            Minecraft mc = Minecraft.getInstance();
-            if (mc.screen instanceof BackpackMenuScreen screen) {
-                screen.reloadFromPlayerData();
-            }
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                    () -> () -> ClientPacketHandler.handleSyncBackpackConfig(configJson));
         });
         ctx.get().setPacketHandled(true);
     }
