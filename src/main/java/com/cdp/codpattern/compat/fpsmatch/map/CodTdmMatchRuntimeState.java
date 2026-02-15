@@ -10,6 +10,8 @@ final class CodTdmMatchRuntimeState {
     private int phaseTimer = 0;
     private int gameTimeTicks = 0;
     private final Map<String, Integer> teamScores = new HashMap<>();
+    private long playingStartEpochMillis = 0L;
+    private boolean resultExported = false;
 
     TdmGamePhase phase() {
         return phase;
@@ -47,10 +49,29 @@ final class CodTdmMatchRuntimeState {
         return new HashMap<>(teamScores);
     }
 
+    long playingStartEpochMillis() {
+        return playingStartEpochMillis;
+    }
+
+    void markPlayingStarted(long epochMillis) {
+        this.playingStartEpochMillis = Math.max(0L, epochMillis);
+        this.resultExported = false;
+    }
+
+    boolean isResultExported() {
+        return resultExported;
+    }
+
+    void markResultExported() {
+        this.resultExported = true;
+    }
+
     void resetCoreState() {
         phase = TdmGamePhase.WAITING;
         phaseTimer = 0;
         gameTimeTicks = 0;
         teamScores.clear();
+        playingStartEpochMillis = 0L;
+        resultExported = false;
     }
 }

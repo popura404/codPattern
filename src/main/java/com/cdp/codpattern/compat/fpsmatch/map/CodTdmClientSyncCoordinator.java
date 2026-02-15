@@ -8,7 +8,11 @@ import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.tdm.GamePhasePacket;
 import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
 import com.cdp.codpattern.network.tdm.TeamPlayerListPacket;
+import net.minecraft.server.level.ServerPlayer;
+
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
@@ -45,7 +49,15 @@ final class CodTdmClientSyncCoordinator {
         ScoreUpdatePacket scorePacket = new ScoreUpdatePacket(teamScores, gameTimeTicks);
         TeamPlayerListPacket playerListPacket = new TeamPlayerListPacket(port.mapName(), port.getTeamPlayers());
 
-        for (var player : port.getJoinedPlayers()) {
+        Map<UUID, ServerPlayer> recipients = new LinkedHashMap<>();
+        for (ServerPlayer player : port.getJoinedPlayers()) {
+            recipients.put(player.getUUID(), player);
+        }
+        for (ServerPlayer player : port.getSpectatorPlayers()) {
+            recipients.put(player.getUUID(), player);
+        }
+
+        for (ServerPlayer player : recipients.values()) {
             ModNetworkChannel.sendToPlayer(phasePacket, player);
             ModNetworkChannel.sendToPlayer(scorePacket, player);
             ModNetworkChannel.sendToPlayer(playerListPacket, player);

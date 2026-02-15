@@ -62,6 +62,12 @@ final class CodTdmMapComposition {
                 leaveFromBaseMapAction,
                 teleportToMatchEndPointAction
         );
+        CodTdmMatchResultExporter matchResultExporter = new CodTdmMatchResultExporter(
+                coordinatorMapPort,
+                matchState,
+                playerState,
+                mapNameSupplier
+        );
         PhaseStateMachine.Hooks phaseStateHooks = CodTdmHooksComposition.createPhaseStateHooks(
                 playerState,
                 supportHooks.joinedPlayerBroadcaster(),
@@ -71,7 +77,8 @@ final class CodTdmMapComposition {
                         joinedPlayersSupplier,
                         player -> teleportToMatchEndPointAction.apply(player),
                         mapNameSupplier,
-                        resetGameAction
+                        resetGameAction,
+                        matchResultExporter::exportOnMatchEnded
                 )
         );
         CodTdmVoteRuntime voteRuntime = new CodTdmVoteRuntime(supportHooks.voteService(), coordinators.voteCoordinator());

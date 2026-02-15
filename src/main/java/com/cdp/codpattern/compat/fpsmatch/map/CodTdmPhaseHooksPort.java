@@ -11,6 +11,8 @@ interface CodTdmPhaseHooksPort {
 
     void restoreAllRoomPlayersToAdventure();
 
+    void onMatchEnded();
+
     boolean hasMatchEndTeleportPoint();
 
     Iterable<ServerPlayer> getJoinedPlayers();

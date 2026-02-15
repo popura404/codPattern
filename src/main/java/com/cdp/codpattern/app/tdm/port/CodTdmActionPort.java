@@ -19,6 +19,8 @@ public interface CodTdmActionPort {
 
     void joinSpectator(ServerPlayer player);
 
+    void respawnPlayerNow(ServerPlayer player);
+
     void syncToClient();
 
     void applyTeamSpawnData(String teamName, int playerLimit, List<SpawnPointData> spawnPoints);

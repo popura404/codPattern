@@ -25,6 +25,8 @@ public final class PhaseStateMachine {
 
         void clearRoundTransientState();
 
+        void onMatchEnded();
+
         boolean hasMatchEndTeleportPoint();
 
         Iterable<ServerPlayer> getJoinedPlayers();
@@ -57,6 +59,7 @@ public final class PhaseStateMachine {
         switch (newPhase) {
             case COUNTDOWN -> hooks.broadcastCountdown(new CountdownPacket(config.getPreGameCountdownTicks(), false));
             case WARMUP -> {
+                hooks.restoreAllRoomPlayersToAdventure();
                 hooks.teleportAllPlayersToSpawn();
                 hooks.giveAllPlayersKits();
             }
@@ -66,6 +69,7 @@ public final class PhaseStateMachine {
                 hooks.giveAllPlayersKits();
             }
             case ENDED -> {
+                hooks.onMatchEnded();
                 hooks.clearAllPlayersInventory();
                 hooks.restoreAllRoomPlayersToAdventure();
                 hooks.clearRoundTransientState();

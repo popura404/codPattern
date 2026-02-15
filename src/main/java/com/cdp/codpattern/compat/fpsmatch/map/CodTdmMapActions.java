@@ -16,14 +16,16 @@ final class CodTdmMapActions {
             CodTdmTeamMembershipCoordinator teamMembershipCoordinator,
             CodTdmMapMutationRuntime mapMutationRuntime,
             CodTdmEndTeleportRuntime endTeleportRuntime,
-            CodTdmVoteRuntime voteRuntime
+            CodTdmVoteRuntime voteRuntime,
+            CodTdmRespawnRuntime respawnRuntime
     ) {
         return new MapActionPort(
                 combatRuntime,
                 teamMembershipCoordinator,
                 mapMutationRuntime,
                 endTeleportRuntime,
-                voteRuntime
+                voteRuntime,
+                respawnRuntime
         );
     }
 
@@ -32,7 +34,8 @@ final class CodTdmMapActions {
             CodTdmTeamMembershipCoordinator teamMembershipCoordinator,
             CodTdmMapMutationRuntime mapMutationRuntime,
             CodTdmEndTeleportRuntime endTeleportRuntime,
-            CodTdmVoteRuntime voteRuntime
+            CodTdmVoteRuntime voteRuntime,
+            CodTdmRespawnRuntime respawnRuntime
     ) implements CodTdmActionPort {
 
         @Override
@@ -63,6 +66,11 @@ final class CodTdmMapActions {
         @Override
         public void joinSpectator(ServerPlayer player) {
             mapMutationRuntime.joinSpectator(player);
+        }
+
+        @Override
+        public void respawnPlayerNow(ServerPlayer player) {
+            respawnRuntime.respawnPlayerNow(player);
         }
 
         @Override

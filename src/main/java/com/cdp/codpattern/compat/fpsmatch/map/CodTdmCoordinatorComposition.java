@@ -126,7 +126,8 @@ final class CodTdmCoordinatorComposition {
                                 playerState.playerDeaths(),
                                 playerState.respawnTimers().keySet()
                         ),
-                        mapPort::joinedPlayers
+                        mapPort::joinedPlayers,
+                        mapPort::spectatorPlayers
                 ),
                 matchState::phase,
                 matchState::phaseTimer,

@@ -47,6 +47,8 @@ final class CodTdmHooksComposition {
 
         void restoreAllRoomPlayersToAdventure();
 
+        void onMatchEnded();
+
         boolean hasMatchEndTeleportPoint();
 
         Iterable<ServerPlayer> joinedPlayers();
@@ -118,6 +120,7 @@ final class CodTdmHooksComposition {
                         phasePort::giveAllPlayersKits,
                         phasePort::clearAllPlayersInventory,
                         phasePort::restoreAllRoomPlayersToAdventure,
+                        phasePort::onMatchEnded,
                         phasePort::hasMatchEndTeleportPoint,
                         phasePort::joinedPlayers,
                         phasePort::teleportPlayerToMatchEndPoint,

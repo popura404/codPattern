@@ -12,7 +12,8 @@ final record CodTdmPhaseStateMapPortAdapter(
         Supplier<Iterable<ServerPlayer>> joinedPlayersSupplier,
         Consumer<ServerPlayer> teleportToMatchEndPointAction,
         Supplier<String> mapNameSupplier,
-        Runnable resetGameAction
+        Runnable resetGameAction,
+        Runnable onMatchEndedAction
 ) implements CodTdmHooksComposition.PhasePort {
 
     @Override
@@ -33,6 +34,11 @@ final record CodTdmPhaseStateMapPortAdapter(
     @Override
     public void restoreAllRoomPlayersToAdventure() {
         roundLifecycleCoordinator.restoreAllRoomPlayersToAdventure();
+    }
+
+    @Override
+    public void onMatchEnded() {
+        onMatchEndedAction.run();
     }
 
     @Override

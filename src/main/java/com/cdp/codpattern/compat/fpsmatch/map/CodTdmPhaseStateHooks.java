@@ -52,6 +52,11 @@ final class CodTdmPhaseStateHooks implements PhaseStateMachine.Hooks {
     }
 
     @Override
+    public void onMatchEnded() {
+        port.onMatchEnded();
+    }
+
+    @Override
     public void clearRoundTransientState() {
         playerState.clearRoundTransientState();
     }

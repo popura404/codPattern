@@ -39,6 +39,9 @@ final class CodTdmPhaseRuntime {
         matchState.setPhase(newPhase);
         matchState.setPhaseTimer(enterPhaseResult.phaseTimer());
         matchState.setGameTimeTicks(enterPhaseResult.gameTimeTicks());
+        if (newPhase == TdmGamePhase.PLAYING) {
+            matchState.markPlayingStarted(System.currentTimeMillis());
+        }
 
         if (newPhase != TdmGamePhase.PLAYING) {
             clearDeathHudForAllPlayersAction.run();

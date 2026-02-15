@@ -52,6 +52,10 @@ final class CodTdmRespawnRuntime {
         return playerState.isInvincible(playerId);
     }
 
+    void respawnPlayerNow(ServerPlayer player) {
+        respawnPlayer(player);
+    }
+
     private void respawnPlayer(ServerPlayer player) {
         RespawnService.respawnPlayer(
                 player,

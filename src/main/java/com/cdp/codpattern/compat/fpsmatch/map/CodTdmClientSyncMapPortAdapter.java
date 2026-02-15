@@ -10,7 +10,8 @@ import java.util.function.Supplier;
 final record CodTdmClientSyncMapPortAdapter(
         Supplier<String> mapNameSupplier,
         Supplier<Map<String, List<PlayerInfo>>> teamPlayersSupplier,
-        Supplier<List<ServerPlayer>> joinedPlayersSupplier
+        Supplier<List<ServerPlayer>> joinedPlayersSupplier,
+        Supplier<List<ServerPlayer>> spectatorPlayersSupplier
 ) implements CodTdmClientSyncPort {
 
     @Override
@@ -26,5 +27,10 @@ final record CodTdmClientSyncMapPortAdapter(
     @Override
     public List<ServerPlayer> getJoinedPlayers() {
         return joinedPlayersSupplier.get();
+    }
+
+    @Override
+    public List<ServerPlayer> getSpectatorPlayers() {
+        return spectatorPlayersSupplier.get();
     }
 }

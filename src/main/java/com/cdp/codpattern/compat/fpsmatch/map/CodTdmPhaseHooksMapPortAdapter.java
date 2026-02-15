@@ -11,6 +11,7 @@ final record CodTdmPhaseHooksMapPortAdapter(
         Runnable giveAllPlayersKitsAction,
         Runnable clearAllPlayersInventoryAction,
         Runnable restoreAllRoomPlayersToAdventureAction,
+        Runnable onMatchEndedAction,
         BooleanSupplier hasMatchEndTeleportPointSupplier,
         Supplier<Iterable<ServerPlayer>> joinedPlayersSupplier,
         Consumer<ServerPlayer> teleportPlayerToMatchEndPointAction,
@@ -36,6 +37,11 @@ final record CodTdmPhaseHooksMapPortAdapter(
     @Override
     public void restoreAllRoomPlayersToAdventure() {
         restoreAllRoomPlayersToAdventureAction.run();
+    }
+
+    @Override
+    public void onMatchEnded() {
+        onMatchEndedAction.run();
     }
 
     @Override

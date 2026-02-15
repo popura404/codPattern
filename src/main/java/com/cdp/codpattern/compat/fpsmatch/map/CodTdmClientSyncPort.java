@@ -12,4 +12,6 @@ interface CodTdmClientSyncPort {
     Map<String, List<PlayerInfo>> getTeamPlayers();
 
     List<ServerPlayer> getJoinedPlayers();
+
+    List<ServerPlayer> getSpectatorPlayers();
 }

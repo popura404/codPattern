@@ -159,6 +159,7 @@ public final class TdmRoomActionController {
             clearPendingAction();
         }
         if (success) {
+            roomState.clearTeamPlayers();
             roomState.setJoinedRoom(mapName);
             roomState.setSelectedRoom(mapName);
             clearRoomNotice();

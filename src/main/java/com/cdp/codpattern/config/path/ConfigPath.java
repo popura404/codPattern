@@ -10,7 +10,8 @@ public enum ConfigPath {
     SERVERBACKPACK("serverconfig/codpattern/backpackconfig"),
     SERVER_FILTER("serverconfig/codpattern/filterconfig"),
     SERVER_ATTACHMENT_PRESET("serverconfig/codpattern/attachment_preset"),
-    SERVER_TDM_CONFIG("serverconfig/codpattern/tdmconfig");
+    SERVER_TDM_CONFIG("serverconfig/codpattern/tdmconfig"),
+    SERVER_TDM_MATCH_RECORDS("serverconfig/codpattern/tdm_match_records");
 
     private final String path;
 

@@ -45,8 +45,6 @@ public final class TdmRoomInteractionService {
             return okJoin(mapName, "ALREADY_JOINED", "");
         }
 
-        gateway.leaveCurrentMapIfDifferent(player, mapName);
-
         boolean isPlaying = readPort.isPlayingPhase();
         boolean isWaiting = readPort.isWaitingPhase();
         if (isPlaying && !config.isAllowJoinDuringPlaying()) {
@@ -87,6 +85,11 @@ public final class TdmRoomInteractionService {
         actionPort.joinTeam(targetTeam, player);
         if (!readPort.containsJoinedPlayer(player.getUUID())) {
             return failJoin(mapName, CODE_UNKNOWN, "加入失败，请稍后重试");
+        }
+
+        if (isPlaying) {
+            // 进行中直入队时，立即按复活流程进入战斗态（传送/补给/无敌帧）。
+            actionPort.respawnPlayerNow(player);
         }
 
         actionPort.initializeReadyState(player);
