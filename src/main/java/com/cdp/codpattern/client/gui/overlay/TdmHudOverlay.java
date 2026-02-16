@@ -1,7 +1,6 @@
 package com.cdp.codpattern.client.gui.overlay;
 
 import com.cdp.codpattern.client.ClientTdmState;
-import com.cdp.codpattern.client.gui.CodTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -67,54 +66,39 @@ public class TdmHudOverlay implements IGuiOverlay {
     private void renderLeftScorePanel(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
         int x = 8;
         int y = screenHeight >= 500 ? 92 : 70; // 放在小地图下方
-        int panelWidth = 128;
-        int panelHeight = 52;
-        if (x + panelWidth >= screenWidth) {
+        int rowWidth = 120;
+        int rowHeight = 18;
+        int rowGap = 3;
+        int timerY = y + (rowHeight * 2) + rowGap + 4;
+        int phaseY = timerY + 10;
+        if (x + rowWidth >= screenWidth || phaseY >= screenHeight) {
             return;
         }
 
-        graphics.fillGradient(x, y, x + panelWidth, y + panelHeight, 0xD010131A, 0xDD07090E);
-        graphics.fill(x, y, x + panelWidth, y + 1, CodTheme.BORDER_SUBTLE);
-        graphics.fill(x, y + panelHeight - 1, x + panelWidth, y + panelHeight, CodTheme.BORDER_SUBTLE);
-        graphics.fill(x, y, x + 1, y + panelHeight, CodTheme.BORDER_SUBTLE);
-        graphics.fill(x + panelWidth - 1, y, x + panelWidth, y + panelHeight, CodTheme.BORDER_SUBTLE);
-
-        int timerWidth = 38;
-        int contentX = x + 4;
-        int contentY = y + 4;
-        int rowWidth = panelWidth - timerWidth - 10;
-        int rowHeight = 18;
         int kortacScore = getKortacScore();
         int specgruScore = getSpecgruScore();
         int maxScore = Math.max(1, Math.max(kortacScore, specgruScore));
         float pulseStrength = ClientTdmState.getScorePulseStrength();
 
-        renderScoreRow(graphics, font, contentX, contentY, rowWidth, rowHeight, teamShort("kortac"),
+        renderScoreRow(graphics, font, x, y, rowWidth, rowHeight, teamShort("kortac"),
                 kortacScore, (float) kortacScore / maxScore, 0xFFE35A5A, pulseStrength);
-        renderScoreRow(graphics, font, contentX, contentY + rowHeight + 2, rowWidth, rowHeight, teamShort("specgru"),
+        renderScoreRow(graphics, font, x, y + rowHeight + rowGap, rowWidth, rowHeight, teamShort("specgru"),
                 specgruScore, (float) specgruScore / maxScore, 0xFF66A6FF, pulseStrength);
 
-        int timerX = x + panelWidth - timerWidth - 4;
-        int timerY = y + 4;
-        int timerHeight = panelHeight - 8;
-        graphics.fillGradient(timerX, timerY, timerX + timerWidth, timerY + timerHeight, 0xCD111111, 0xCD202020);
-        graphics.fill(timerX, timerY + timerHeight - 1, timerX + timerWidth, timerY + timerHeight, 0x60FFFFFF);
-
-        drawCenteredString(graphics, font, buildTimerText(), timerX + timerWidth / 2, timerY + 8, 0xFFFFDE7A);
-        drawCenteredString(graphics, font, phaseShortText(ClientTdmState.currentPhase()), timerX + timerWidth / 2,
-                timerY + 22, 0xFFD6D6D6);
+        graphics.drawString(font, buildTimerText(), x, timerY, 0xFFB08A3E, false);
+        graphics.drawString(font, phaseShortText(ClientTdmState.currentPhase()), x, phaseY, 0xFF8F8F8F, false);
 
         int phaseGlow = (int) (ClientTdmState.getPhaseFlashStrength() * 95.0f);
         if (phaseGlow > 0) {
-            graphics.fill(x, y, x + panelWidth, y + 2,
+            graphics.fill(x, y, x + rowWidth, y + 2,
                     (clamp(phaseGlow, 0, 255) << 24) | (phaseAccentColor() & 0x00FFFFFF));
         }
     }
 
     private void renderScoreRow(GuiGraphics graphics, Font font, int x, int y, int width, int height, String label, int score,
             float ratio, int accent, float pulse) {
-        graphics.fillGradient(x, y, x + width, y + height, withAlpha(accent, 20), 0xAA0E1118);
-        graphics.fill(x, y, x + 2, y + height, accent);
+        graphics.fillGradient(x, y, x + width, y + height, withAlpha(accent, 28), withAlpha(accent, 10));
+        graphics.fill(x, y, x + 2, y + height, withAlpha(accent, 180));
 
         String scoreText = String.valueOf(score);
         graphics.drawString(font, label, x + 6, y + 2, 0xFFF2F2F2, false);
@@ -123,7 +107,7 @@ public class TdmHudOverlay implements IGuiOverlay {
         int barX = x + 24;
         int barY = y + height - 4;
         int barW = Math.max(8, width - 34);
-        graphics.fill(barX, barY, barX + barW, barY + 2, 0x66262626);
+        graphics.fill(barX, barY, barX + barW, barY + 2, 0x22FFFFFF);
         int fill = (int) (barW * Math.max(0.0f, Math.min(1.0f, ratio)));
         if (fill > 0) {
             graphics.fill(barX, barY, barX + fill, barY + 2, accent);

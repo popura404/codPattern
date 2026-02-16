@@ -24,6 +24,11 @@ import java.util.Set;
 public final class UpdateWeaponService {
     private static final Set<String> ALLOWED_SLOTS = Set.of("primary", "secondary", "tactical", "lethal");
     private static final String THROWABLE_ITEM_ID = "lrtactical:throwable";
+    private static final String THROWABLE_ID_TAG = "ThrowableId";
+    private static final String MELEE_ITEM_ID = "lrtactical:melee";
+    private static final String MELEE_WEAPON_ID_TAG = "MeleeWeaponId";
+    private static final String MELEE_TAB = "melee";
+    private static final String LR_MELEE_INTERFACE = "me.xjqsh.lrtactical.api.item.IMeleeWeapon";
 
     public record Result(BackpackConfig.PlayerBackpackData playerData, boolean success, String slot, String code,
             String message) {
@@ -119,19 +124,19 @@ public final class UpdateWeaponService {
         }
 
         if ("primary".equals(slot) || "secondary".equals(slot)) {
-            ItemStack gunStack = new ItemStack(item, 1);
+            ItemStack weaponStack = new ItemStack(item, 1);
             if (nbtTag != null && !nbtTag.isEmpty()) {
-                gunStack.setTag(nbtTag.copy());
+                weaponStack.setTag(nbtTag.copy());
             }
-            Optional<String> gunTypeOpt = TaczGatewayProvider.gateway().resolveGunType(gunStack);
-            if (gunTypeOpt.isEmpty()) {
-                return ValidationResult.fail("ITEM_CATEGORY_INVALID", "该槽位仅允许枪械");
+            Optional<String> weaponCategoryOpt = resolveWeaponCategory(itemId, weaponStack, nbtTag);
+            if (weaponCategoryOpt.isEmpty()) {
+                return ValidationResult.fail("ITEM_CATEGORY_INVALID", "该槽位仅允许武器");
             }
-            String gunType = gunTypeOpt.get();
+            String weaponCategory = weaponCategoryOpt.get();
             List<String> allowedTypes = "primary".equals(slot)
                     ? filterConfig.getPrimaryWeaponTabs()
                     : filterConfig.getSecondaryWeaponTabs();
-            if (allowedTypes != null && !allowedTypes.isEmpty() && !allowedTypes.contains(gunType)) {
+            if (allowedTypes != null && !allowedTypes.isEmpty() && !allowedTypes.contains(weaponCategory)) {
                 return ValidationResult.fail("ITEM_CATEGORY_INVALID", "该武器分类不允许写入此槽位");
             }
             return ValidationResult.ok();
@@ -143,10 +148,44 @@ public final class UpdateWeaponService {
         if (!THROWABLE_ITEM_ID.equals(itemId)) {
             return ValidationResult.fail("ITEM_CATEGORY_INVALID", "投掷物槽位物品非法");
         }
-        if (nbtTag == null || !nbtTag.contains("ThrowableId", Tag.TAG_STRING)) {
+        if (nbtTag == null || !nbtTag.contains(THROWABLE_ID_TAG, Tag.TAG_STRING)) {
             return ValidationResult.fail("NBT_INVALID", "投掷物 NBT 缺少 ThrowableId");
         }
         return ValidationResult.ok();
+    }
+
+    private static Optional<String> resolveWeaponCategory(String itemId, ItemStack weaponStack, CompoundTag nbtTag) {
+        Optional<String> gunTypeOpt = TaczGatewayProvider.gateway().resolveGunType(weaponStack);
+        if (gunTypeOpt.isPresent()) {
+            return gunTypeOpt;
+        }
+
+        if (isLrTacticalMelee(itemId, weaponStack, nbtTag)) {
+            return Optional.of(MELEE_TAB);
+        }
+        return Optional.empty();
+    }
+
+    private static boolean isLrTacticalMelee(String itemId, ItemStack stack, CompoundTag nbtTag) {
+        if (nbtTag == null || !nbtTag.contains(MELEE_WEAPON_ID_TAG, Tag.TAG_STRING)) {
+            return false;
+        }
+        if (MELEE_ITEM_ID.equals(itemId)) {
+            return true;
+        }
+        return implementsInterface(stack.getItem().getClass(), LR_MELEE_INTERFACE);
+    }
+
+    private static boolean implementsInterface(Class<?> type, String interfaceName) {
+        if (type == null) {
+            return false;
+        }
+        for (Class<?> iface : type.getInterfaces()) {
+            if (interfaceName.equals(iface.getName()) || implementsInterface(iface, interfaceName)) {
+                return true;
+            }
+        }
+        return implementsInterface(type.getSuperclass(), interfaceName);
     }
 
     private static Item resolveRegisteredItem(ResourceLocation resourceLocation) {

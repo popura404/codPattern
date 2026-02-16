@@ -58,7 +58,7 @@ COD Pattern 是一个基于 Minecraft 模组《永恒枪械工坊：零》（Tim
 
 ## 更新日志
 
-### v0.4.1b
+### v0.4.2b
 
 *   请参阅CHANGES.md
 

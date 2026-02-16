@@ -5,10 +5,11 @@ import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMap;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
-import com.phasetranscrystal.fpsmatch.core.event.PlayerKillOnMapEvent;
 import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMapEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -29,40 +30,6 @@ public class CodTdmEventHandler {
     @SubscribeEvent
     public static void onRegisterFPSMap(RegisterFPSMapEvent event) {
         event.registerGameType(TdmGameTypes.CDP_TDM, CodTdmMap::new);
-    }
-
-    /**
-     * 处理玩家击杀事件
-     */
-    @SubscribeEvent
-    public static void onPlayerKill(PlayerKillOnMapEvent event) {
-        ServerPlayer killer = event.getKiller();
-        ServerPlayer victim = event.getDead();
-        var gateway = FpsMatchGatewayProvider.gateway();
-        Optional<CodTdmReadPort> readPortOptional = gateway.findPlayerTdmReadPort(victim);
-        Optional<CodTdmActionPort> actionPortOptional = gateway.findPlayerTdmActionPort(victim);
-        if (readPortOptional.isEmpty() || actionPortOptional.isEmpty()) {
-            return;
-        }
-        CodTdmReadPort readPort = readPortOptional.get();
-        CodTdmActionPort actionPort = actionPortOptional.get();
-
-        // 热身期间不计分
-        if (!readPort.canDealDamage()) {
-            // 注意：PlayerKillOnMapEvent 不可取消，只是不记分
-            return;
-        }
-
-        // 无敌期间不计分
-        if (readPort.isPlayerInvincible(victim.getUUID())) {
-            return;
-        }
-
-        // 处理击杀计分
-        actionPort.onPlayerKill(killer, victim);
-
-        // 死亡视角逻辑已移至 onPlayerDead 处理
-        // tdmMap.startDeathCam(victim, killer);
     }
 
     /**
@@ -105,15 +72,24 @@ public class CodTdmEventHandler {
      * 处理玩家死亡事件
      * 即使没有攻击者也处理（自杀、摔落等）
      */
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public static void onPlayerDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
 
+        ServerPlayer killer = resolveKiller(event);
         var gateway = FpsMatchGatewayProvider.gateway();
         Optional<CodTdmReadPort> readPortOptional = gateway.findPlayerTdmReadPort(player);
         Optional<CodTdmActionPort> actionPortOptional = gateway.findPlayerTdmActionPort(player);
+        if ((readPortOptional.isEmpty() || actionPortOptional.isEmpty()) && killer != null) {
+            if (readPortOptional.isEmpty()) {
+                readPortOptional = gateway.findPlayerTdmReadPort(killer);
+            }
+            if (actionPortOptional.isEmpty()) {
+                actionPortOptional = gateway.findPlayerTdmActionPort(killer);
+            }
+        }
         if (readPortOptional.isEmpty() || actionPortOptional.isEmpty()) {
             return;
         }
@@ -128,10 +104,10 @@ public class CodTdmEventHandler {
         // 取消死亡事件，防止玩家真正死亡
         event.setCanceled(true);
 
-        ServerPlayer killer = null;
-        Entity sourceEntity = event.getSource().getEntity();
-        if (sourceEntity instanceof ServerPlayer serverPlayer) {
-            killer = serverPlayer;
+        // 击杀计分统一在死亡事件处理，兼容子弹/投射物 owner。
+        if (killer != null
+                && !killer.getUUID().equals(player.getUUID())) {
+            actionPort.onPlayerKill(killer, player);
         }
 
         // 调用地图的死亡处理逻辑
@@ -139,5 +115,60 @@ public class CodTdmEventHandler {
 
         // 恢复玩家到满血状态（取消死亡）
         player.setHealth(player.getMaxHealth());
+    }
+
+    private static ServerPlayer resolveKiller(LivingDeathEvent event) {
+        Entity sourceEntity = event.getSource().getEntity();
+        ServerPlayer killer = asServerPlayer(sourceEntity);
+        if (killer != null) {
+            return killer;
+        }
+
+        Entity directEntity = event.getSource().getDirectEntity();
+        killer = asServerPlayer(directEntity);
+        if (killer != null) {
+            return killer;
+        }
+
+        killer = resolveProjectileOwner(sourceEntity);
+        if (killer != null) {
+            return killer;
+        }
+        killer = resolveProjectileOwner(directEntity);
+        if (killer != null) {
+            return killer;
+        }
+
+        if (event.getEntity() instanceof ServerPlayer victim) {
+            Entity killCredit = victim.getKillCredit();
+            killer = asServerPlayer(killCredit);
+            if (killer != null) {
+                return killer;
+            }
+            killer = resolveProjectileOwner(killCredit);
+            if (killer != null) {
+                return killer;
+            }
+
+            Entity lastHurtBy = victim.getLastHurtByMob();
+            killer = asServerPlayer(lastHurtBy);
+            if (killer != null) {
+                return killer;
+            }
+            return resolveProjectileOwner(lastHurtBy);
+        }
+
+        return null;
+    }
+
+    private static ServerPlayer asServerPlayer(Entity entity) {
+        return entity instanceof ServerPlayer serverPlayer ? serverPlayer : null;
+    }
+
+    private static ServerPlayer resolveProjectileOwner(Entity entity) {
+        if (entity instanceof Projectile projectile && projectile.getOwner() instanceof ServerPlayer owner) {
+            return owner;
+        }
+        return null;
     }
 }
