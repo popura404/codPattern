@@ -45,7 +45,8 @@ public class UpdateWeaponFilterConfigCommand {
         for (ServerPlayer player : players) {
             try {
                 // 加载玩家的背包配置
-                var playerBackpackData = BackpackConfigRepository.loadOrCreatePlayer(player.getStringUUID(), backpackPath);
+                var playerBackpackData = BackpackConfigRepository.loadOrCreatePlayer(player.getStringUUID(),
+                        backpackPath);
 
                 // 同步到客户端
                 ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), player);
@@ -59,9 +60,9 @@ public class UpdateWeaponFilterConfigCommand {
 
         // 对执行者反馈
         int finalSuccessCount1 = successCount;
-        source.sendSuccess(() -> Component.literal("已同步 " + finalSuccessCount1 + " 名玩家的配置"), true);
+        source.sendSuccess(() -> Component.translatable("message.codpattern.command.sync_success", finalSuccessCount1),
+                true);
 
         return 1;
     }
 }
-

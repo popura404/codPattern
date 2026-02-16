@@ -29,7 +29,7 @@ public class NewBackpackButton extends Button {
 
     public NewBackpackButton(int x, int y, int width, int height, int currentCount) {
         super(x, y, width, height,
-                Component.literal("+ 添加背包"),
+                Component.translatable("screen.codpattern.backpack.add_new"),
                 button -> {
                     ModNetworkChannel.sendToServer(new AddBackpackPacket());
                     Minecraft mc = Minecraft.getInstance();
@@ -37,8 +37,7 @@ public class NewBackpackButton extends Button {
                         if (mc.player != null) {
                             mc.player.playNotifySound(
                                     SoundEvents.BAMBOO_WOOD_BUTTON_CLICK_ON,
-                                    SoundSource.PLAYERS, 0.5f, 1.2f
-                            );
+                                    SoundSource.PLAYERS, 0.5f, 1.2f);
                         }
                     });
                 },
@@ -47,10 +46,11 @@ public class NewBackpackButton extends Button {
         this.currentBackpackCount = currentCount;
 
         if (currentCount >= 10) {
-            this.setTooltip(Tooltip.create(Component.literal("§c已达到最大背包数量限制 (10个)")));
+            this.setTooltip(Tooltip.create(Component.translatable("screen.codpattern.backpack.limit_reached")));
             this.active = false;
         } else {
-            this.setTooltip(Tooltip.create(Component.literal("§a点击添加新背包 §7(" + currentCount + "/10)")));
+            this.setTooltip(
+                    Tooltip.create(Component.translatable("screen.codpattern.backpack.add_hint", currentCount)));
         }
     }
 
@@ -103,10 +103,10 @@ public class NewBackpackButton extends Button {
 
     protected void renderButtonText(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
-        String text = this.active ? "+ 添加新背包" : "已达上限";
-        int textColor = this.active ?
-                (this.isHoveredOrFocused() ? CodTheme.HOVER_BORDER : CodTheme.TEXT_PRIMARY) :
-                CodTheme.DISABLED_TEXT;
+        String text = this.active ? Component.translatable("screen.codpattern.backpack.add_new").getString()
+                : Component.translatable("screen.codpattern.backpack.limit_reached").getString();
+        int textColor = this.active ? (this.isHoveredOrFocused() ? CodTheme.HOVER_BORDER : CodTheme.TEXT_PRIMARY)
+                : CodTheme.DISABLED_TEXT;
 
         int textWidth = minecraft.font.width(text);
         int textX = this.getX() + (this.width - textWidth) / 2;

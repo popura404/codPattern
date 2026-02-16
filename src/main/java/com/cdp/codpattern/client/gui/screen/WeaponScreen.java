@@ -51,7 +51,7 @@ public class WeaponScreen extends Screen {
     private static final int BUTTON_SPACING = 2;
 
     public WeaponScreen(WeaponMenuScreen parent, BackpackConfig.Backpack backpack,
-                        Integer bagSerial, String slotType) {
+            Integer bagSerial, String slotType) {
         super(Component.literal("WeaponScreen"));
         this.parentScreen = parent;
         this.BAGSERIAL = bagSerial;
@@ -64,7 +64,7 @@ public class WeaponScreen extends Screen {
         super.init();
         SCREEN_WIDTH = this.width;
         SCREEN_HEIGHT = this.height;
-        UNIT_LENGTH = (int) ( ( ( float ) this.width ) / 120f);
+        UNIT_LENGTH = (int) (((float) this.width) / 120f);
 
         loadWeaponTabs();
         createTabButtons();
@@ -106,10 +106,13 @@ public class WeaponScreen extends Screen {
     }
 
     private List<ItemStack> getItemsFromTab(String tabName) {
-        switch(tabName) {
-            case "melee": return LrTacticalClientApi.fillLrItemCategory(true);
-            case "throwable": return LrTacticalClientApi.fillLrItemCategory(false);
-            default: return TaczClientApi.fillGunItemCategory(tabName);
+        switch (tabName) {
+            case "melee":
+                return LrTacticalClientApi.fillLrItemCategory(true);
+            case "throwable":
+                return LrTacticalClientApi.fillLrItemCategory(false);
+            default:
+                return TaczClientApi.fillGunItemCategory(tabName);
         }
     }
 
@@ -118,7 +121,7 @@ public class WeaponScreen extends Screen {
         int tabHeight = (int) (1.5f * UNIT_LENGTH);
         int tabSpacing = UNIT_LENGTH;
         int totalTabsWidth = weaponsByTab.size() * (tabWidth + tabSpacing) - tabSpacing;
-        int startX = 6 * UNIT_LENGTH;    //(this.width - totalTabsWidth) / 2;
+        int startX = 6 * UNIT_LENGTH; // (this.width - totalTabsWidth) / 2;
         int startY = SCREEN_HEIGHT - 18 * UNIT_LENGTH;
 
         int index = 0;
@@ -127,8 +130,7 @@ public class WeaponScreen extends Screen {
 
             TabButton tabButton = new TabButton(
                     x, startY, tabWidth, tabHeight,
-                    tabName, btn -> switchTab(tabName)
-            );
+                    tabName, btn -> switchTab(tabName));
 
             if (index == 0) {
                 tabButton.setSelected(true);
@@ -148,8 +150,7 @@ public class WeaponScreen extends Screen {
             if (Minecraft.getInstance().player != null) {
                 Minecraft.getInstance().player.playNotifySound(
                         SoundEvents.BAMBOO_WOOD_BUTTON_CLICK_ON,
-                        SoundSource.PLAYERS, 0.5f, 1.2f
-                );
+                        SoundSource.PLAYERS, 0.5f, 1.2f);
             }
 
             for (TabButton tab : tabButtons) {
@@ -174,7 +175,8 @@ public class WeaponScreen extends Screen {
         weaponButtons.forEach(this::removeWidget);
         weaponButtons.clear();
 
-        if (currentWeapons.isEmpty()) return;
+        if (currentWeapons.isEmpty())
+            return;
 
         int startX = 6 * UNIT_LENGTH;
         int startY = this.height - 16 * UNIT_LENGTH;
@@ -195,8 +197,7 @@ public class WeaponScreen extends Screen {
                     BUTTON_SIZE * UNIT_LENGTH / 2,
                     weapon, texture,
                     btn -> onWeaponSelected(weapon),
-                    UNIT_LENGTH
-            );
+                    UNIT_LENGTH);
 
             weaponButtons.add(button);
             addRenderableWidget(button);
@@ -209,19 +210,17 @@ public class WeaponScreen extends Screen {
                 SCREEN_HEIGHT - 16 * UNIT_LENGTH,
                 3 * UNIT_LENGTH,
                 7 * UNIT_LENGTH,
-                btn -> scrollLeft()
-        ) {
+                btn -> scrollLeft()) {
             @Override
             public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
                 if (scrollOffset > 0) {
                     super.renderWidget(graphics, mouseX, mouseY, partialTick);
                     graphics.drawCenteredString(
                             Minecraft.getInstance().font,
-                            Component.literal("<"),
+                            Component.translatable("screen.codpattern.weapon.scroll_left"),
                             this.getX() + this.width / 2,
                             this.getY() + (this.height - 8) / 2,
-                            0xFFFFFF
-                    );
+                            0xFFFFFF);
                 }
             }
         });
@@ -230,19 +229,17 @@ public class WeaponScreen extends Screen {
                 SCREEN_HEIGHT - 16 * UNIT_LENGTH,
                 3 * UNIT_LENGTH,
                 7 * UNIT_LENGTH,
-                btn -> scrollRight()
-        ) {
+                btn -> scrollRight()) {
             @Override
             public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
                 if (scrollOffset < maxScroll) {
                     super.renderWidget(graphics, mouseX, mouseY, partialTick);
                     graphics.drawCenteredString(
                             Minecraft.getInstance().font,
-                            Component.literal(">"),
+                            Component.translatable("screen.codpattern.weapon.scroll_right"),
                             this.getX() + this.width / 2,
                             this.getY() + (this.height - 8) / 2,
-                            0xFFFFFF
-                    );
+                            0xFFFFFF);
                 }
             }
         });
@@ -256,8 +253,7 @@ public class WeaponScreen extends Screen {
             if (Minecraft.getInstance().player != null) {
                 Minecraft.getInstance().player.playNotifySound(
                         SoundEvents.BAMBOO_WOOD_BUTTON_CLICK_ON,
-                        SoundSource.PLAYERS, 0.3f, 1.5f
-                );
+                        SoundSource.PLAYERS, 0.3f, 1.5f);
             }
         }
     }
@@ -270,8 +266,7 @@ public class WeaponScreen extends Screen {
             if (Minecraft.getInstance().player != null) {
                 Minecraft.getInstance().player.playNotifySound(
                         SoundEvents.BAMBOO_WOOD_BUTTON_CLICK_ON,
-                        SoundSource.PLAYERS, 0.3f, 1.5f
-                );
+                        SoundSource.PLAYERS, 0.3f, 1.5f);
             }
         }
     }
@@ -282,18 +277,16 @@ public class WeaponScreen extends Screen {
                 this.height - 4 * UNIT_LENGTH,
                 6 * UNIT_LENGTH,
                 3 * UNIT_LENGTH,
-                btn -> Minecraft.getInstance().setScreen(parentScreen)
-        ) {
+                btn -> Minecraft.getInstance().setScreen(parentScreen)) {
             @Override
             public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
                 super.renderWidget(graphics, mouseX, mouseY, partialTick);
                 graphics.drawCenteredString(
                         Minecraft.getInstance().font,
-                        Component.literal("< 返回"),
+                        Component.translatable("screen.codpattern.weapon.back"),
                         this.getX() + this.width / 2,
                         this.getY() + (this.height - 8) / 2,
-                        0xFFFFFF
-                );
+                        0xFFFFFF);
             }
         });
     }
@@ -303,8 +296,7 @@ public class WeaponScreen extends Screen {
         String itemId = weapon.getItem().builtInRegistryHolder().key().location().toString();
         String nbt = weapon.hasTag() ? weapon.getTag().toString() : "";
 
-        BackpackConfig.Backpack.ItemData itemData =
-                new BackpackConfig.Backpack.ItemData(itemId, 1, nbt);
+        BackpackConfig.Backpack.ItemData itemData = new BackpackConfig.Backpack.ItemData(itemId, 1, nbt);
         backpack.getItem_MAP().put(key, itemData);
 
         // 发数据包
@@ -314,8 +306,7 @@ public class WeaponScreen extends Screen {
         if (Minecraft.getInstance().player != null) {
             Minecraft.getInstance().player.playNotifySound(
                     SoundEvents.EXPERIENCE_ORB_PICKUP,
-                    SoundSource.PLAYERS, 0.5f, 1f
-            );
+                    SoundSource.PLAYERS, 0.5f, 1f);
         }
         Minecraft.getInstance().setScreen(parentScreen);
 
@@ -327,19 +318,18 @@ public class WeaponScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
 
         String title = switch (slotType) {
-            case "primary" -> "选择主武器";
-            case "secondary" -> "选择副武器";
-            case "tactical" -> "选择投掷物 1";
-            case "lethal" -> "选择投掷物 2";
-            default -> "选择武器";
+            case "primary" -> Component.translatable("screen.codpattern.weapon.select_primary").getString();
+            case "secondary" -> Component.translatable("screen.codpattern.weapon.select_secondary").getString();
+            case "tactical" -> Component.translatable("screen.codpattern.weapon.select_tactical").getString();
+            case "lethal" -> Component.translatable("screen.codpattern.weapon.select_lethal").getString();
+            default -> Component.translatable("screen.codpattern.weapon.select_weapon").getString();
         };
         graphics.drawCenteredString(
                 this.font,
                 Component.literal(title),
                 this.width / 2,
                 3 * UNIT_LENGTH,
-                0xFFFFFF
-        );
+                0xFFFFFF);
 
         String categoryInfo = getTabDisplayName(currentTab).getString();
         graphics.drawCenteredString(
@@ -347,8 +337,7 @@ public class WeaponScreen extends Screen {
                 Component.literal(categoryInfo),
                 this.width / 2,
                 17 * UNIT_LENGTH,
-                0xFFFF55
-        );
+                0xFFFF55);
     }
 
     private Component getTabDisplayName(String tabName) {
@@ -361,7 +350,7 @@ public class WeaponScreen extends Screen {
             case "mg" -> Component.translatable("tacz.type.mg.name");
             case "rpg" -> Component.translatable("tacz.type.rpg.name");
             case "melee" -> Component.translatable("lrtactical.type.melee.name");
-            case "throwable" -> Component.literal("投掷物");
+            case "throwable" -> Component.translatable("screen.codpattern.weapon.throwable");
             default -> Component.literal(tabName.toUpperCase());
         };
     }
@@ -407,43 +396,37 @@ public class WeaponScreen extends Screen {
                 graphics.fillGradient(
                         this.getX(), this.getY(),
                         this.getX() + this.width, this.getY() + this.height,
-                        0xFF2A5F2A, 0xFF145214
-                );
+                        0xFF2A5F2A, 0xFF145214);
             } else if (isHoveredOrFocused()) {
                 graphics.fillGradient(
                         this.getX(), this.getY(),
                         this.getX() + this.width, this.getY() + this.height,
-                        0xDA6C666C, 0xED393739
-                );
+                        0xDA6C666C, 0xED393739);
             } else {
                 graphics.fillGradient(
                         this.getX(), this.getY(),
                         this.getX() + this.width, this.getY() + this.height,
-                        0xDA5C565C, 0xED292729
-                );
+                        0xDA5C565C, 0xED292729);
             }
 
             if (selected) {
                 graphics.fillGradient(
                         this.getX(), this.getY() + this.height - 2,
                         this.getX() + this.width, this.getY() + this.height,
-                        0xFF52FF52, 0xFF52FF52
-                );
+                        0xFF52FF52, 0xFF52FF52);
             }
 
             graphics.fillGradient(
                     this.getX(), this.getY() + this.height,
                     this.getX() + this.width, this.getY() + this.height + 1,
-                    0x7019181A, 0x7019181A
-            );
+                    0x7019181A, 0x7019181A);
 
             graphics.drawCenteredString(
                     Minecraft.getInstance().font,
                     getMessage(),
                     this.getX() + this.width / 2,
                     this.getY() + (this.height - 8) / 2,
-                    selected ? 0xFFFFFF : (isHoveredOrFocused() ? 0xFFFF55 : 0xAAAAAA)
-            );
+                    selected ? 0xFFFFFF : (isHoveredOrFocused() ? 0xFFFF55 : 0xAAAAAA));
         }
 
         public void setSelected(boolean selected) {

@@ -105,7 +105,7 @@ public class AttachmentEditSessionManager {
         player.inventoryMenu.broadcastChanges();
 
         if (abnormal && notifyPlayer) {
-            player.sendSystemMessage(Component.literal("§e改装会话已回滚: " + reason));
+            player.sendSystemMessage(Component.translatable("message.codpattern.refit.session_rollback", reason));
         }
         LOGGER.info("Attachment edit session ended: player={} bagId={} slot={} reason={} abnormal={}",
                 player.getGameProfile().getName(), session.getBagId(), session.getSlot(), reason, abnormal);

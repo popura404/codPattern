@@ -19,7 +19,8 @@ public class MainMenuScreenCommand {
                         ModNetworkChannel.sendToPlayer(new OpenBackpackScreenPacket(), player);
                         return 1;
                     }
-                    context.getSource().sendFailure(Component.literal("服务端禁用"));
+                    context.getSource()
+                            .sendFailure(Component.translatable("message.codpattern.command.server_disabled"));
                     return 0;
                 });
     }

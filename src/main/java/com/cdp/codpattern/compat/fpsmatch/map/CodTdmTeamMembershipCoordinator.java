@@ -38,13 +38,13 @@ final class CodTdmTeamMembershipCoordinator {
             return;
         }
         if (!port.hasTeam(teamName)) {
-            player.sendSystemMessage(Component.literal("§c队伍不存在: " + teamName));
+            player.sendSystemMessage(Component.translatable("message.codpattern.team.not_found", teamName));
             return;
         }
 
         Optional<String> currentTeamOpt = port.findTeamNameByPlayer(player);
         if (currentTeamOpt.isEmpty()) {
-            player.sendSystemMessage(Component.literal("§c当前未加入可切换的队伍"));
+            player.sendSystemMessage(Component.translatable("message.codpattern.team.not_joined"));
             return;
         }
 
@@ -53,13 +53,13 @@ final class CodTdmTeamMembershipCoordinator {
             return;
         }
         if (port.isTeamFull(teamName)) {
-            player.sendSystemMessage(Component.literal("§c目标队伍已满"));
+            player.sendSystemMessage(Component.translatable("message.codpattern.team.full"));
             return;
         }
 
         int maxTeamDiff = CodTdmConfig.getConfig().getMaxTeamDiff();
         if (!port.canSwitchWithBalance(currentTeam, teamName, maxTeamDiff)) {
-            player.sendSystemMessage(Component.literal("§c切换后将超出队伍人数差限制"));
+            player.sendSystemMessage(Component.translatable("message.codpattern.team.balance_exceeded"));
             return;
         }
 

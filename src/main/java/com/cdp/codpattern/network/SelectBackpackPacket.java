@@ -37,8 +37,7 @@ public class SelectBackpackPacket {
             if (player != null) {
                 Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
                 String uuid = player.getUUID().toString();
-                BackpackConfig.PlayerBackpackData playerData =
-                        BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
+                BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
 
                 // 检查背包是否存在
                 if (playerData.getBackpacks_MAP().containsKey(backpackId)) {
@@ -51,18 +50,17 @@ public class SelectBackpackPacket {
 
                     // 发送提示
                     player.connection.send(new ClientboundSetActionBarTextPacket(
-                            Component.literal("已选择背包 # " + backpackId + " [" + backpackName + "] 在下次重生时获得")
+                            Component.translatable("message.codpattern.backpack.selected", backpackId, backpackName)
                                     .withStyle(style -> style
                                             .withColor(0xDDDDDD)
                                             .withBold(true)
-                                            .withItalic(false))
-                    ));
+                                            .withItalic(false))));
                 } else {
                     // 背包ID无效，发送错误提示
                     player.connection.send(new ClientboundSetActionBarTextPacket(
-                            Component.literal("§c无效的背包ID: " + backpackId +
-                                    "  ##前往服务端config检查背包完整性或询问管理员")
-                    ));
+                            Component.translatable("message.codpattern.backpack.invalid_id", backpackId)
+                                    .append("\n")
+                                    .append(Component.translatable("message.codpattern.backpack.check_integrity"))));
                 }
             }
         });

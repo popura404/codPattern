@@ -44,7 +44,7 @@ public class RenameBackpackPacket {
             }
             String name = newName.trim();
             if (name.isEmpty()) {
-                player.sendSystemMessage(Component.literal("§c背包名称不能为空"));
+                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.name_empty"));
                 return;
             }
             if (name.length() > 32) {
@@ -56,14 +56,14 @@ public class RenameBackpackPacket {
             BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
             BackpackConfig.Backpack backpack = playerData.getBackpacks_MAP().get(backpackId);
             if (backpack == null) {
-                player.sendSystemMessage(Component.literal("§c背包不存在: #" + backpackId));
+                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.not_found", backpackId));
                 return;
             }
 
             backpack.setName(name);
             BackpackConfigRepository.save();
             ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
-            player.sendSystemMessage(Component.literal("§a已重命名背包 #" + backpackId + " -> " + name));
+            player.sendSystemMessage(Component.translatable("message.codpattern.backpack.renamed", backpackId, name));
         });
         ctx.get().setPacketHandled(true);
     }

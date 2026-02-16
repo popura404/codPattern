@@ -45,18 +45,23 @@ public class CloneBackpackPacket {
 
             BackpackConfig.Backpack source = playerData.getBackpacks_MAP().get(sourceId);
             if (source == null) {
-                player.sendSystemMessage(Component.literal("§c背包不存在: #" + sourceId));
+                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.not_found", sourceId));
                 return;
             }
 
             int newId = playerData.getNextAvailableId();
             if (newId == 0) {
-                player.sendSystemMessage(Component.literal("§c无法复制背包，已达到上限"));
+                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.clone_limit"));
                 return;
             }
 
-            String baseName = source.getName() == null ? "背包" : source.getName().trim();
-            String copyName = baseName.isEmpty() ? "背包 副本" : baseName + " 副本";
+            String baseName = source.getName() == null
+                    ? Component.translatable("message.codpattern.backpack.default_name").getString()
+                    : source.getName().trim();
+            String copySuffix = Component.translatable("message.codpattern.backpack.copy_suffix").getString();
+            String copyName = baseName.isEmpty()
+                    ? Component.translatable("message.codpattern.backpack.default_name").getString() + copySuffix
+                    : baseName + copySuffix;
             if (copyName.length() > 32) {
                 copyName = copyName.substring(0, 32);
             }
@@ -73,9 +78,9 @@ public class CloneBackpackPacket {
             if (playerData.addBackpack(newId, clone)) {
                 BackpackConfigRepository.save();
                 ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
-                player.sendSystemMessage(Component.literal("§a已复制背包 #" + sourceId + " -> #" + newId));
+                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.cloned", sourceId, newId));
             } else {
-                player.sendSystemMessage(Component.literal("§c复制失败"));
+                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.clone_failed"));
             }
         });
         ctx.get().setPacketHandled(true);

@@ -143,16 +143,16 @@ public final class TdmRoomInteractionService {
             return;
         }
         if (!readPort.hasTeam(teamName)) {
-            player.sendSystemMessage(Component.literal("§c队伍不存在: " + teamName));
+            player.sendSystemMessage(Component.translatable("message.codpattern.team.not_found", teamName));
             return;
         }
         if (readPort.isTeamFull(teamName)) {
-            player.sendSystemMessage(Component.literal("§c目标队伍已满"));
+            player.sendSystemMessage(Component.translatable("message.codpattern.team.full"));
             return;
         }
         int maxTeamDiff = CodTdmConfig.getConfig().getMaxTeamDiff();
         if (!readPort.canJoinWithBalance(teamName, maxTeamDiff)) {
-            player.sendSystemMessage(Component.literal("§c加入该队伍会超出人数差限制"));
+            player.sendSystemMessage(Component.translatable("message.codpattern.team.join_balance_exceeded"));
             return;
         }
 
@@ -162,14 +162,16 @@ public final class TdmRoomInteractionService {
     }
 
     public static String setReadyState(ServerPlayer player, boolean ready) {
-        Optional<CodTdmActionPort> actionPortOptional = FpsMatchGatewayProvider.gateway().findPlayerTdmActionPort(player);
+        Optional<CodTdmActionPort> actionPortOptional = FpsMatchGatewayProvider.gateway()
+                .findPlayerTdmActionPort(player);
         if (actionPortOptional.isEmpty()) {
             return "§c未加入 TDM 房间";
         }
         if (actionPortOptional.get().setPlayerReady(player, ready)) {
-            return ready ? "§a已准备" : "§e已取消准备";
+            return ready ? Component.translatable("message.codpattern.room.ready").getString()
+                    : Component.translatable("message.codpattern.room.not_ready").getString();
         }
-        return "§c当前阶段不可切换准备状态";
+        return Component.translatable("message.codpattern.room.ready_change_locked").getString();
     }
 
     public static void initiateStartVote(ServerPlayer player) {

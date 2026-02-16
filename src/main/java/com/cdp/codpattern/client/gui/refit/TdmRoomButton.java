@@ -10,7 +10,7 @@ import net.minecraft.network.chat.Component;
  */
 public class TdmRoomButton {
     public static Button create(int x, int y, int w, int h) {
-        return Button.builder(Component.literal("团队竞技"), button -> {
+        return Button.builder(Component.translatable("screen.codpattern.tdm.room_button"), button -> {
             Minecraft minecraft = Minecraft.getInstance();
             minecraft.setScreen(new TdmRoomScreen());
         }).bounds(x, y, w, h).build();

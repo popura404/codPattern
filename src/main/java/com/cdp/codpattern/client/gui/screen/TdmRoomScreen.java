@@ -121,7 +121,7 @@ public class TdmRoomScreen extends Screen {
                 readyY,
                 voteStartWidth,
                 buttonHeight,
-                Component.literal("准备"),
+                Component.translatable("screen.codpattern.tdm.ready"),
                 btn -> actionController.toggleReady(),
                 0xFF6CCF8A));
 
@@ -267,8 +267,7 @@ public class TdmRoomScreen extends Screen {
                 roomState.selectedRoom(),
                 roomState.joinedRoom(),
                 mouseX,
-                mouseY
-        );
+                mouseY);
     }
 
     /**
@@ -290,8 +289,7 @@ public class TdmRoomScreen extends Screen {
                 actionController.isLeavePending(),
                 actionController.hasRoomNotice(),
                 actionController.roomNoticeText(),
-                actionController.roomNoticeColor()
-        );
+                actionController.roomNoticeColor());
     }
 
     @Override

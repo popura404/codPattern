@@ -14,11 +14,14 @@ import java.util.function.Supplier;
 
 public class AddBackpackPacket {
 
-    public AddBackpackPacket() {}
+    public AddBackpackPacket() {
+    }
 
-    public AddBackpackPacket(FriendlyByteBuf buf) {}
+    public AddBackpackPacket(FriendlyByteBuf buf) {
+    }
 
-    public void encode(FriendlyByteBuf buf) {}
+    public void encode(FriendlyByteBuf buf) {
+    }
 
     public static AddBackpackPacket decode(FriendlyByteBuf buf) {
         return new AddBackpackPacket();
@@ -37,12 +40,13 @@ public class AddBackpackPacket {
                 int newId = BackpackConfigRepository.addCustomBackpack(uuid);
 
                 if (newId != -1) {
-                    player.sendSystemMessage(Component.literal("§a成功添加新背包 #" + newId));
+                    player.sendSystemMessage(Component.translatable("message.codpattern.backpack.added", newId));
 
-                    BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
-                    ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData) , player);
+                    BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid,
+                            path);
+                    ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
                 } else {
-                    player.sendSystemMessage(Component.literal("§c无法添加新背包，已达到上限或发生错误"));
+                    player.sendSystemMessage(Component.translatable("message.codpattern.backpack.add_failed"));
                 }
             }
         });

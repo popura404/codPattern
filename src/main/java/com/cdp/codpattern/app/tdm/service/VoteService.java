@@ -200,7 +200,7 @@ public final class VoteService {
                     .filter(joinedPlayer -> !hooks.isPlayerReady(joinedPlayer.getUUID()))
                     .count();
             if (unreadyCount > 0) {
-                initiatorPlayer.sendSystemMessage(Component.literal("§e仍有玩家未准备，无法发起开始投票。"));
+                initiatorPlayer.sendSystemMessage(Component.translatable("message.codpattern.vote.players_not_ready"));
                 return false;
             }
         }

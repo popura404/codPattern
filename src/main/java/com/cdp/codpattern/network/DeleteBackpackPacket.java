@@ -44,11 +44,11 @@ public class DeleteBackpackPacket {
             BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
 
             if (!playerData.getBackpacks_MAP().containsKey(backpackId)) {
-                player.sendSystemMessage(Component.literal("§c背包不存在: #" + backpackId));
+                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.not_found", backpackId));
                 return;
             }
             if (playerData.getBackpacks_MAP().size() <= 1) {
-                player.sendSystemMessage(Component.literal("§c至少保留一个背包"));
+                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.keep_one"));
                 return;
             }
 
@@ -64,7 +64,7 @@ public class DeleteBackpackPacket {
 
             BackpackConfigRepository.save();
             ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
-            player.sendSystemMessage(Component.literal("§a已删除背包 #" + backpackId));
+            player.sendSystemMessage(Component.translatable("message.codpattern.backpack.deleted", backpackId));
         });
         ctx.get().setPacketHandled(true);
     }

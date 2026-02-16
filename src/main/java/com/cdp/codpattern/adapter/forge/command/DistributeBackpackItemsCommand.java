@@ -41,7 +41,7 @@ public class DistributeBackpackItemsCommand {
 
     private static int distributeGunsplayer(CommandSourceStack pSource, Collection<ServerPlayer> pTargets) {
         if (pTargets == null) {
-            pSource.sendFailure(Component.literal("目标玩家为空"));
+            pSource.sendFailure(Component.translatable("message.codpattern.command.target_player_empty"));
             return 0;
         }
         for (ServerPlayer serverplayer : pTargets) {

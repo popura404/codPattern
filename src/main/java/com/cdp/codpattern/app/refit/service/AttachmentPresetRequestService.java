@@ -37,7 +37,7 @@ public final class AttachmentPresetRequestService {
             return Optional.empty();
         }
         if (player.isSpectator()) {
-            player.sendSystemMessage(Component.literal("§c旁观模式下无法进入改装"));
+            player.sendSystemMessage(Component.translatable("message.codpattern.refit.spectator_blocked"));
             return Optional.empty();
         }
         if (!"primary".equals(slot) && !"secondary".equals(slot)) {
@@ -80,14 +80,12 @@ public final class AttachmentPresetRequestService {
                 bagId,
                 slot,
                 presetPayload.orElse(""),
-                expectedGunIdOpt.get()
-        );
+                expectedGunIdOpt.get());
         return Optional.of(new Result(
                 packet,
                 presetPayload.isPresent(),
                 session.getSandboxAttachmentCount(),
-                session.getTruncatedAttachmentCount()
-        ));
+                session.getTruncatedAttachmentCount()));
     }
 
     private static List<ItemStack> collectPlayerOwnedAttachments(ServerPlayer player, ItemStack gunStack) {
