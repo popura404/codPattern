@@ -1,10 +1,13 @@
 package com.cdp.codpattern.client.gui.screen;
 
+import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.refit.AttachmentConfigButton;
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
@@ -96,6 +99,10 @@ public class WeaponMenuScreen extends Screen {
                 } catch (CommandSyntaxException e) {
                     LOGGER.warn("Invalid NBT for item {} in backpack {}", itemId, this.BAGSERIAL, e);
                 }
+            }
+            WeaponFilterConfig filterConfig = WeaponFilterClientCache.get();
+            if (filterConfig != null && BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {
+                return ItemStack.EMPTY;
             }
             return stack;
         } catch (Exception e) {

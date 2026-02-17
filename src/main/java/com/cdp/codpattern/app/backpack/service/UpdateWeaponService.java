@@ -123,12 +123,16 @@ public final class UpdateWeaponService {
             return ValidationResult.fail("ITEM_NOT_REGISTERED", "物品未注册");
         }
 
+        ItemStack candidateStack = new ItemStack(item, 1);
+        if (nbtTag != null && !nbtTag.isEmpty()) {
+            candidateStack.setTag(nbtTag.copy());
+        }
+        if (BackpackNamespaceFilter.isBlocked(filterConfig, candidateStack, itemResourceLocation)) {
+            return ValidationResult.fail("ITEM_NAMESPACE_BLOCKED", "该枪包已在黑名单中");
+        }
+
         if ("primary".equals(slot) || "secondary".equals(slot)) {
-            ItemStack weaponStack = new ItemStack(item, 1);
-            if (nbtTag != null && !nbtTag.isEmpty()) {
-                weaponStack.setTag(nbtTag.copy());
-            }
-            Optional<String> weaponCategoryOpt = resolveWeaponCategory(itemId, weaponStack, nbtTag);
+            Optional<String> weaponCategoryOpt = resolveWeaponCategory(itemId, candidateStack, nbtTag);
             if (weaponCategoryOpt.isEmpty()) {
                 return ValidationResult.fail("ITEM_CATEGORY_INVALID", "该槽位仅允许武器");
             }

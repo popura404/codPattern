@@ -1,11 +1,14 @@
 package com.cdp.codpattern.client.gui.screen.backpack;
 
+import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.client.gui.refit.BackPackSelectButton;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.Map;
 
@@ -79,6 +82,13 @@ public final class BackpackWeaponPreviewPanel {
         for (Map.Entry<String, BackPackSelectButton.WeaponInfo> entry : weaponInfo.entrySet()) {
             String type = entry.getKey();
             BackPackSelectButton.WeaponInfo info = entry.getValue();
+
+            if (filterConfig != null && info.itemStack != null && !info.itemStack.isEmpty()) {
+                ResourceLocation fallbackItemId = BuiltInRegistries.ITEM.getKey(info.itemStack.getItem());
+                if (BackpackNamespaceFilter.isBlocked(filterConfig, info.itemStack, fallbackItemId)) {
+                    continue;
+                }
+            }
 
             int weaponX = switch (type) {
                 case "primary" -> primaryWeaponX;

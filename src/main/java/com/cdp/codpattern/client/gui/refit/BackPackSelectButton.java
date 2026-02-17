@@ -1,9 +1,12 @@
 package com.cdp.codpattern.client.gui.refit;
 
+import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
 import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.SelectBackpackPacket;
 import net.minecraft.ChatFormatting;
@@ -80,6 +83,8 @@ public class BackPackSelectButton extends Button {
     private void initWeaponInfo() {
         if (backpack == null || backpack.getItem_MAP() == null) return;
 
+        WeaponFilterConfig filterConfig = WeaponFilterClientCache.get();
+
         for (Map.Entry<String, BackpackConfig.Backpack.ItemData> entry : backpack.getItem_MAP().entrySet()) {
             String type = entry.getKey();
             BackpackConfig.Backpack.ItemData itemData = entry.getValue();
@@ -105,6 +110,10 @@ public class BackPackSelectButton extends Button {
                 }
 
                 weaponStack.setCount(itemData.getCount());
+
+                if (filterConfig != null && BackpackNamespaceFilter.isBlocked(filterConfig, weaponStack, itemId)) {
+                    continue;
+                }
 
                 WeaponInfo info = TaczClientApi.isGun(weaponStack)
                         ? extractWeaponInfo(weaponStack)

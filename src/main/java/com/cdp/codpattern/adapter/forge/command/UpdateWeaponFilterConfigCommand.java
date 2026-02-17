@@ -49,8 +49,8 @@ public class UpdateWeaponFilterConfigCommand {
                         backpackPath);
 
                 // 同步到客户端
-                ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), player);
                 ModNetworkChannel.sendToPlayer(new SyncWeaponFilterPacket(filterConfig), player);
+                ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), player);
 
                 successCount++;
             } catch (Exception e) {

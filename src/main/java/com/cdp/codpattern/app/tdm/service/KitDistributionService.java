@@ -1,6 +1,7 @@
 package com.cdp.codpattern.app.tdm.service;
 
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
+import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
@@ -44,11 +45,11 @@ public final class KitDistributionService {
         boolean throwablesEnabled = (filterConfig == null) || filterConfig.isThrowablesEnabled();
 
         if (backpack != null) {
-            giveBackpackItem(player, backpack, "primary", 0, ammoMultiple);
-            giveBackpackItem(player, backpack, "secondary", 1, ammoMultiple);
+            giveBackpackItem(player, backpack, filterConfig, "primary", 0, ammoMultiple);
+            giveBackpackItem(player, backpack, filterConfig, "secondary", 1, ammoMultiple);
             if (throwablesEnabled) {
-                giveBackpackItem(player, backpack, "tactical", 2, 0);
-                giveBackpackItem(player, backpack, "lethal", 3, 0);
+                giveBackpackItem(player, backpack, filterConfig, "tactical", 2, 0);
+                giveBackpackItem(player, backpack, filterConfig, "lethal", 3, 0);
             }
 
             player.sendSystemMessage(
@@ -59,8 +60,8 @@ public final class KitDistributionService {
         player.inventoryMenu.slotsChanged(player.getInventory());
     }
 
-    private static void giveBackpackItem(ServerPlayer player, BackpackConfig.Backpack backpack, String key, int slot,
-            int ammoMultiple) {
+    private static void giveBackpackItem(ServerPlayer player, BackpackConfig.Backpack backpack,
+            WeaponFilterConfig filterConfig, String key, int slot, int ammoMultiple) {
         BackpackConfig.Backpack.ItemData itemData = backpack.getItem_MAP().get(key);
         if (itemData == null) {
             return;
@@ -83,6 +84,10 @@ public final class KitDistributionService {
                 stack.setTag(tag);
             } catch (Exception ignored) {
             }
+        }
+
+        if (BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {
+            return;
         }
 
         if (TaczGatewayProvider.gateway().isGun(stack)) {

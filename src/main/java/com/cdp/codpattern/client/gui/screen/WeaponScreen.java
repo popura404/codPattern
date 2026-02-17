@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.client.gui.refit.WeaponSelectionButton;
+import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
 import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
@@ -12,6 +13,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
@@ -80,16 +82,21 @@ public class WeaponScreen extends Screen {
     }
 
     private void loadWeaponTabs() {
+        WeaponFilterConfig filterConfig = WeaponFilterClientCache.get();
+
         // 战术/杀伤投掷物只显示投掷物列表
         if ("tactical".equals(slotType) || "lethal".equals(slotType)) {
-            List<ItemStack> throwables = getItemsFromTab("throwable");
+            if (filterConfig == null || !filterConfig.isThrowablesEnabled()) {
+                return;
+            }
+
+            List<ItemStack> throwables = getItemsFromTab("throwable", filterConfig);
             if (!throwables.isEmpty()) {
                 weaponsByTab.put("throwable", throwables);
             }
             return;
         }
 
-        WeaponFilterConfig filterConfig = WeaponFilterClientCache.get();
         if (filterConfig == null) {
             return;
         }
@@ -98,22 +105,38 @@ public class WeaponScreen extends Screen {
                 : filterConfig.getSecondaryWeaponTabs();
 
         for (String tabName : tabNames) {
-            List<ItemStack> items = getItemsFromTab(tabName);
+            List<ItemStack> items = getItemsFromTab(tabName, filterConfig);
             if (!items.isEmpty()) {
                 weaponsByTab.put(tabName, items);
             }
         }
     }
 
-    private List<ItemStack> getItemsFromTab(String tabName) {
-        switch (tabName) {
+    private List<ItemStack> getItemsFromTab(String tabName, @Nullable WeaponFilterConfig filterConfig) {
+        List<ItemStack> rawItems = switch (tabName) {
             case "melee":
-                return LrTacticalClientApi.fillLrItemCategory(true);
+                yield LrTacticalClientApi.fillLrItemCategory(true);
             case "throwable":
-                return LrTacticalClientApi.fillLrItemCategory(false);
+                yield LrTacticalClientApi.fillLrItemCategory(false);
             default:
-                return TaczClientApi.fillGunItemCategory(tabName);
+                yield TaczClientApi.fillGunItemCategory(tabName);
+        };
+
+        if (filterConfig == null || rawItems.isEmpty()) {
+            return rawItems;
         }
+
+        List<ItemStack> filteredItems = new ArrayList<>();
+        for (ItemStack stack : rawItems) {
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            ResourceLocation fallbackItemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+            if (!BackpackNamespaceFilter.isBlocked(filterConfig, stack, fallbackItemId)) {
+                filteredItems.add(stack);
+            }
+        }
+        return filteredItems;
     }
 
     private void createTabButtons() {

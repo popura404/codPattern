@@ -98,6 +98,10 @@ public class BackpackDistributor {
                 }
             }
 
+            if (BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {
+                continue;
+            }
+
             if (TaczGatewayProvider.gateway().isGun(stack)) {
                 TaczGatewayProvider.gateway().configureGunAmmo(stack, ammoMultiple);
             }

@@ -12,6 +12,7 @@ import com.cdp.codpattern.config.backpack.BackpackClientCache;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.network.DeleteBackpackPacket;
 import com.cdp.codpattern.network.RequestBackpackConfigPacket;
+import com.cdp.codpattern.network.RequestWeaponFilterPacket;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -288,6 +289,7 @@ public class BackpackMenuScreen extends Screen {
 
     private void loadPlayerData() {
         if (Minecraft.getInstance().player != null) {
+            ModNetworkChannel.sendToServer(new RequestWeaponFilterPacket());
             ModNetworkChannel.sendToServer(new RequestBackpackConfigPacket());
             playerData = BackpackClientCache.get();
             if (playerData != null) {
