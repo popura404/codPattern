@@ -22,7 +22,7 @@ public class DistributeBackpackItemsCommand {
                 .executes(commandcontext -> {
                     List<ServerPlayer> list = getAllOnlinePlayers();
                     for (ServerPlayer player : list) {
-                        BackpackDistributor.distributeBackpackItems(player);
+                        BackpackDistributor.forceDistributeBackpackItems(player);
                     }
                     return 1;
                 })
@@ -45,7 +45,7 @@ public class DistributeBackpackItemsCommand {
             return 0;
         }
         for (ServerPlayer serverplayer : pTargets) {
-            BackpackDistributor.distributeBackpackItems(serverplayer);
+            BackpackDistributor.forceDistributeBackpackItems(serverplayer);
         }
         return 1;
     }

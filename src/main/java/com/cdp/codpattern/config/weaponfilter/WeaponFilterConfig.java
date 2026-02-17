@@ -9,7 +9,6 @@ import java.util.List;
 public class WeaponFilterConfig {
     private List<String> primaryWeaponTabs = defaultPrimaryWeaponTabs();
     private List<String> secondaryWeaponTabs = defaultSecondaryWeaponTabs();
-    private boolean distributeToTaggedPlayersOnly = false;
 
     /** null 或旧配置无此键时视为 true */
     private Boolean throwablesEnabled = true;
@@ -31,14 +30,6 @@ public class WeaponFilterConfig {
 
     public void setSecondaryWeaponTabs(List<String> secondaryWeaponTabs) {
         this.secondaryWeaponTabs = secondaryWeaponTabs == null ? defaultSecondaryWeaponTabs() : secondaryWeaponTabs;
-    }
-
-    public boolean isDistributeToTaggedPlayersOnly() {
-        return distributeToTaggedPlayersOnly;
-    }
-
-    public void setDistributeToTaggedPlayersOnly(boolean value) {
-        this.distributeToTaggedPlayersOnly = value;
     }
 
     public Integer getAmmunitionPerMagazineMultiple() {

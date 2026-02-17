@@ -27,6 +27,15 @@ public class BackpackDistributor {
      * 分发物品逻辑处理
      */
     public static void distributeBackpackItems(ServerPlayer player) {
+        distributeBackpackItems(player, false);
+    }
+
+    /** 强制发放 */
+    public static void forceDistributeBackpackItems(ServerPlayer player) {
+        distributeBackpackItems(player, true);
+    }
+
+    private static void distributeBackpackItems(ServerPlayer player, boolean forceDistribute) {
         if (player.server == null) {
             return;
         }
@@ -43,8 +52,8 @@ public class BackpackDistributor {
         //不是喜欢的冒险生存创造玩家，直接不发
         if (player.isSpectator()) return;
 
-        // 未加入房间系统的玩家不发放
-        if (!FpsMatchGatewayProvider.gateway().isInMatch(player.getUUID())) return;
+        // 非强制需在房间内
+        if (!forceDistribute && !FpsMatchGatewayProvider.gateway().isInMatch(player.getUUID())) return;
 
         String uuid = player.getUUID().toString();
         BackpackConfig.PlayerBackpackData playerData =
