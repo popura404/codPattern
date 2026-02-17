@@ -202,7 +202,7 @@ public class TdmHudOverlay implements IGuiOverlay {
         renderEndBackdrop(graphics, screenWidth, screenHeight, alpha, accent);
 
         switch (pageIndex) {
-            case 1 -> renderMvpSvpPage(graphics, font, centerX, screenWidth, screenHeight, alpha, pageTick);
+            case 1 -> renderMvpSvpPage(graphics, font, centerX, screenWidth, screenHeight, alpha);
             case 2 -> renderTeamRosterPage(graphics, font, centerX, screenWidth, screenHeight, alpha, pageTick);
             default -> renderPrimaryResultPage(graphics, font, centerX, screenWidth, screenHeight, alpha, accent);
         }
@@ -241,8 +241,7 @@ public class TdmHudOverlay implements IGuiOverlay {
                 centerX, y + 99, (alpha << 24) | 0x00C8C8C8);
     }
 
-    private void renderMvpSvpPage(GuiGraphics graphics, Font font, int centerX, int screenWidth, int screenHeight, int alpha,
-            int pageTick) {
+    private void renderMvpSvpPage(GuiGraphics graphics, Font font, int centerX, int screenWidth, int screenHeight, int alpha) {
         int panelWidth = Math.min(760, screenWidth - 38);
         int panelHeight = Math.min(236, screenHeight - 88);
         int x = centerX - panelWidth / 2;
@@ -261,13 +260,13 @@ public class TdmHudOverlay implements IGuiOverlay {
         int cardHeight = panelHeight - 38;
 
         renderSpotlightCard(graphics, font, x + 10, y + 24, cardWidth, cardHeight,
-                pair.mvp(), Component.translatable("hud.codpattern.tdm.result.mvp").getString(), alpha, pageTick, 0);
+                pair.mvp(), Component.translatable("hud.codpattern.tdm.result.mvp").getString(), alpha, 0);
         renderSpotlightCard(graphics, font, x + 10 + cardWidth + gap, y + 24, cardWidth, cardHeight,
-                pair.svp(), Component.translatable("hud.codpattern.tdm.result.svp").getString(), alpha, pageTick, 1);
+                pair.svp(), Component.translatable("hud.codpattern.tdm.result.svp").getString(), alpha, 1);
     }
 
     private void renderSpotlightCard(GuiGraphics graphics, Font font, int x, int y, int width, int height,
-            ResultCandidate candidate, String title, int alpha, int pageTick, int slotIndex) {
+            ResultCandidate candidate, String title, int alpha, int slotIndex) {
         int accentColor = resolveCandidateAccent(candidate);
         int accent = withAlpha(accentColor, alpha);
         graphics.fillGradient(x, y, x + width, y + height, withAlpha(0xFF121820, alpha), withAlpha(0xFF0C1117, alpha));
@@ -291,17 +290,9 @@ public class TdmHudOverlay implements IGuiOverlay {
         renderSpotlightCone(graphics, stageCenterX, y + 19, stageTop + 4, stageBottom - 6, accentColor, alpha, slotIndex);
         renderPedestal(graphics, stageCenterX, stageBottom - 12, pedestalWidth, accentColor, alpha);
 
-        int scanTop = stageTop + 6;
-        int scanBottom = stageBottom - 18;
-        if (scanBottom > scanTop) {
-            int scanRange = scanBottom - scanTop;
-            int scanY = scanTop + ((pageTick * 2 + slotIndex * 17) % scanRange);
-            graphics.fill(x + 16, scanY, x + width - 16, scanY + 1, withAlpha(accentColor, Math.max(28, alpha / 2)));
-        }
-
         int modelScale = Math.max(30, Math.min(70, width / 3));
-        float turn = (float) Math.sin((pageTick + slotIndex * 13) / 8.5f) * 24.0f;
-        float pitch = -10.0f + (float) Math.cos((pageTick + slotIndex * 9) / 11.0f) * 4.0f;
+        float turn = slotIndex == 0 ? 14.0f : -14.0f;
+        float pitch = -10.0f;
         int modelBaseline = stageBottom - 8;
         boolean modelRendered = alpha > 20
                 && TdmPlayerModelRenderer.render(graphics, player, stageCenterX, modelBaseline, modelScale, turn, pitch);
