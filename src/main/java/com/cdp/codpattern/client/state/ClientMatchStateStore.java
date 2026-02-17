@@ -1,12 +1,16 @@
 package com.cdp.codpattern.client.state;
 
 import com.cdp.codpattern.client.ClientTdmState;
+import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
+import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public final class ClientMatchStateStore {
@@ -37,9 +41,12 @@ public final class ClientMatchStateStore {
     private String announcementKey = "";
     private int announcementTicks = 0;
     private int announcementTotalTicks = 0;
+    private int endSummaryTicks = 0;
     private boolean dead = false;
     private String killerName = "";
     private int deathCamTicks = 0;
+    private String syncedMapName = "";
+    private final Map<String, List<PlayerInfo>> teamPlayers = new HashMap<>();
 
     public String currentPhase() {
         return currentPhase;
@@ -93,6 +100,51 @@ public final class ClientMatchStateStore {
         return deathCamTicks;
     }
 
+    public int endSummaryPageIndex() {
+        if (!"ENDED".equals(currentPhase)) {
+            return 0;
+        }
+        int pageTicks = Math.max(1, PhaseStateMachine.END_SUMMARY_PAGE_TICKS);
+        int page = endSummaryTicks / pageTicks;
+        return Math.max(0, Math.min(PhaseStateMachine.END_SUMMARY_PAGE_COUNT - 1, page));
+    }
+
+    public int endSummaryPageTick() {
+        int pageTicks = Math.max(1, PhaseStateMachine.END_SUMMARY_PAGE_TICKS);
+        return endSummaryTicks % pageTicks;
+    }
+
+    public int endSummaryPageDurationTicks() {
+        return Math.max(1, PhaseStateMachine.END_SUMMARY_PAGE_TICKS);
+    }
+
+    public String syncedMapName() {
+        return syncedMapName;
+    }
+
+    public Map<String, List<PlayerInfo>> teamPlayersSnapshot() {
+        Map<String, List<PlayerInfo>> snapshot = new HashMap<>();
+        for (Map.Entry<String, List<PlayerInfo>> entry : teamPlayers.entrySet()) {
+            snapshot.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+        return snapshot;
+    }
+
+    public void updateTeamPlayers(String mapName, Map<String, List<PlayerInfo>> latestTeamPlayers) {
+        syncedMapName = mapName == null ? "" : mapName;
+        teamPlayers.clear();
+        if (latestTeamPlayers == null || latestTeamPlayers.isEmpty()) {
+            return;
+        }
+
+        for (Map.Entry<String, List<PlayerInfo>> entry : latestTeamPlayers.entrySet()) {
+            List<PlayerInfo> players = entry.getValue() == null
+                    ? List.of()
+                    : new ArrayList<>(entry.getValue());
+            teamPlayers.put(entry.getKey(), players);
+        }
+    }
+
     public void updatePhase(String phase, int time) {
         String oldPhase = currentPhase;
         if (!phase.equals(oldPhase)) {
@@ -106,6 +158,12 @@ public final class ClientMatchStateStore {
             phaseFlashTicks = PHASE_FLASH_DURATION;
             triggerPhaseAnnouncement(phase);
             queuePhaseCue(phase);
+            if ("ENDED".equals(phase)) {
+                endSummaryTicks = 0;
+            }
+            if ("ENDED".equals(oldPhase) && !"ENDED".equals(phase)) {
+                endSummaryTicks = 0;
+            }
         }
         previousPhase = oldPhase;
         currentPhase = phase;
@@ -161,6 +219,9 @@ public final class ClientMatchStateStore {
         announcementKey = "";
         announcementTicks = 0;
         announcementTotalTicks = 0;
+        endSummaryTicks = 0;
+        syncedMapName = "";
+        teamPlayers.clear();
         clearDeathCam();
     }
 
@@ -269,6 +330,10 @@ public final class ClientMatchStateStore {
         } else if (!announcementKey.isEmpty()) {
             announcementKey = "";
             announcementTotalTicks = 0;
+        }
+        if ("ENDED".equals(currentPhase)
+                && endSummaryTicks < PhaseStateMachine.END_PHASE_TOTAL_TICKS) {
+            endSummaryTicks++;
         }
         if (deathCamTicks > 0) {
             deathCamTicks--;

@@ -124,6 +124,7 @@ final class CodTdmCoordinatorComposition {
                                 playerState.readyStates(),
                                 playerState.playerKills(),
                                 playerState.playerDeaths(),
+                                playerState.maxKillStreaks(),
                                 playerState.respawnTimers().keySet()
                         ),
                         mapPort::joinedPlayers,

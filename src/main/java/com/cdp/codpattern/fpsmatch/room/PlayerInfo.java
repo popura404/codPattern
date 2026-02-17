@@ -14,6 +14,7 @@ public record PlayerInfo(
         boolean isReady, // 是否已准备（WAITING阶段）
         int kills, // 击杀数（比赛中）
         int deaths, // 死亡数（比赛中）
+        int maxKillStreak, // 本局最高连杀
         boolean isAlive, // 是否存活
         int pingMs // 延迟（毫秒）
 ) {
@@ -26,6 +27,7 @@ public record PlayerInfo(
         buf.writeBoolean(isReady);
         buf.writeInt(kills);
         buf.writeInt(deaths);
+        buf.writeInt(maxKillStreak);
         buf.writeBoolean(isAlive);
         buf.writeInt(pingMs);
     }
@@ -38,6 +40,7 @@ public record PlayerInfo(
                 buf.readUUID(),
                 buf.readUtf(),
                 buf.readBoolean(),
+                buf.readInt(),
                 buf.readInt(),
                 buf.readInt(),
                 buf.readBoolean(),

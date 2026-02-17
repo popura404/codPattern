@@ -59,6 +59,8 @@ public final class ScoreService {
             TdmGamePhase phase,
             Map<UUID, Integer> playerKills,
             Map<UUID, Integer> playerDeaths,
+            Map<UUID, Integer> currentKillStreaks,
+            Map<UUID, Integer> maxKillStreaks,
             Map<String, Integer> teamScores,
             int gameTimeTicks,
             Hooks hooks) {
@@ -68,6 +70,13 @@ public final class ScoreService {
 
         playerKills.merge(killer.getUUID(), 1, Integer::sum);
         playerDeaths.merge(victim.getUUID(), 1, Integer::sum);
+
+        int killerStreak = currentKillStreaks.merge(killer.getUUID(), 1, Integer::sum);
+        int currentMax = maxKillStreaks.getOrDefault(killer.getUUID(), 0);
+        if (killerStreak > currentMax) {
+            maxKillStreaks.put(killer.getUUID(), killerStreak);
+        }
+        currentKillStreaks.put(victim.getUUID(), 0);
 
         hooks.findTeamNameByPlayer(killer).ifPresent(teamName -> {
             teamScores.merge(teamName, 1, Integer::sum);
@@ -81,6 +90,7 @@ public final class ScoreService {
             ServerPlayer killer,
             TdmGamePhase phase,
             Map<UUID, Integer> playerDeaths,
+            Map<UUID, Integer> currentKillStreaks,
             Map<String, Integer> teamScores,
             int gameTimeTicks,
             Hooks hooks) {
@@ -95,6 +105,7 @@ public final class ScoreService {
         }
 
         playerDeaths.merge(victim.getUUID(), 1, Integer::sum);
+        currentKillStreaks.put(victim.getUUID(), 0);
 
         hooks.findTeamNameByPlayer(victim)
                 .flatMap(victimTeam -> findOpponentTeam(victimTeam, teamScores))

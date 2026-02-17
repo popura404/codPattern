@@ -23,6 +23,7 @@ public final class TeamPlayerSnapshotService {
             Map<UUID, Boolean> readyStates,
             Map<UUID, Integer> playerKills,
             Map<UUID, Integer> playerDeaths,
+            Map<UUID, Integer> maxKillStreaks,
             Set<UUID> respawningPlayers) {
         Map<String, List<PlayerInfo>> result = new HashMap<>();
 
@@ -38,6 +39,7 @@ public final class TeamPlayerSnapshotService {
                             readyStates.getOrDefault(playerId, false),
                             playerKills.getOrDefault(playerId, 0),
                             playerDeaths.getOrDefault(playerId, 0),
+                            maxKillStreaks.getOrDefault(playerId, 0),
                             !respawningPlayers.contains(playerId),
                             Math.max(0, serverPlayer.latency)
                     );

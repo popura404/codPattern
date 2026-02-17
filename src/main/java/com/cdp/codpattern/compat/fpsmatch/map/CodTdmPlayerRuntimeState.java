@@ -15,6 +15,8 @@ final class CodTdmPlayerRuntimeState {
     private final Map<UUID, DeathCamData> deathCamPlayers = new HashMap<>();
     private final Map<UUID, Integer> playerKills = new HashMap<>();
     private final Map<UUID, Integer> playerDeaths = new HashMap<>();
+    private final Map<UUID, Integer> currentKillStreaks = new HashMap<>();
+    private final Map<UUID, Integer> maxKillStreaks = new HashMap<>();
     private final Map<UUID, Boolean> readyStates = new HashMap<>();
 
     Map<UUID, Integer> respawnTimers() {
@@ -41,6 +43,14 @@ final class CodTdmPlayerRuntimeState {
         return playerDeaths;
     }
 
+    Map<UUID, Integer> currentKillStreaks() {
+        return currentKillStreaks;
+    }
+
+    Map<UUID, Integer> maxKillStreaks() {
+        return maxKillStreaks;
+    }
+
     Map<UUID, Boolean> readyStates() {
         return readyStates;
     }
@@ -56,6 +66,8 @@ final class CodTdmPlayerRuntimeState {
         invincibilityTimers.clear();
         playerKills.clear();
         playerDeaths.clear();
+        currentKillStreaks.clear();
+        maxKillStreaks.clear();
         readyStates.clear();
     }
 
@@ -69,6 +81,8 @@ final class CodTdmPlayerRuntimeState {
     void removePlayerCombatStats(UUID playerId) {
         playerKills.remove(playerId);
         playerDeaths.remove(playerId);
+        currentKillStreaks.remove(playerId);
+        maxKillStreaks.remove(playerId);
     }
 
     boolean isInvincible(UUID playerId) {

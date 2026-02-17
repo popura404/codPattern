@@ -120,6 +120,7 @@ public class ClientPacketHandler {
 
     public static void handleTeamPlayerList(String mapName, Map<String, List<PlayerInfo>> teamPlayers) {
         Minecraft.getInstance().execute(() -> {
+            ClientTdmState.updateTeamPlayers(mapName, teamPlayers);
             Screen screen = Minecraft.getInstance().screen;
             if (screen instanceof TdmRoomScreen tdmScreen) {
                 tdmScreen.updatePlayerList(mapName, teamPlayers);

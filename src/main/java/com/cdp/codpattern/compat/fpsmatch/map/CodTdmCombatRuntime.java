@@ -35,6 +35,8 @@ final class CodTdmCombatRuntime {
                 matchState.phase(),
                 playerState.playerKills(),
                 playerState.playerDeaths(),
+                playerState.currentKillStreaks(),
+                playerState.maxKillStreaks(),
                 matchState.teamScores(),
                 matchState.gameTimeTicks(),
                 scoreHooks
@@ -47,6 +49,7 @@ final class CodTdmCombatRuntime {
                 killer,
                 matchState.phase(),
                 playerState.playerDeaths(),
+                playerState.currentKillStreaks(),
                 matchState.teamScores(),
                 matchState.gameTimeTicks(),
                 scoreHooks

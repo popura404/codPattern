@@ -10,6 +10,10 @@ import java.util.Map;
 import java.util.Optional;
 
 public final class PhaseStateMachine {
+    public static final int END_SUMMARY_PAGE_TICKS = 100;
+    public static final int END_SUMMARY_PAGE_COUNT = 3;
+    public static final int END_PHASE_TOTAL_TICKS = END_SUMMARY_PAGE_TICKS * END_SUMMARY_PAGE_COUNT;
+
     public interface Hooks {
         void broadcastCountdown(CountdownPacket packet);
 
@@ -152,7 +156,7 @@ public final class PhaseStateMachine {
 
     private static TickResult tickEnded(int phaseTimer, int gameTimeTicks, Hooks hooks) {
         int nextPhaseTimer = phaseTimer + 1;
-        if (nextPhaseTimer >= 100) {
+        if (nextPhaseTimer >= END_PHASE_TOTAL_TICKS) {
             if (hooks.hasMatchEndTeleportPoint()) {
                 for (ServerPlayer player : hooks.getJoinedPlayers()) {
                     hooks.teleportPlayerToMatchEndPoint(player);

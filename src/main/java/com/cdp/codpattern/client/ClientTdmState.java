@@ -1,7 +1,9 @@
 package com.cdp.codpattern.client;
 
 import com.cdp.codpattern.client.state.ClientMatchStateStore;
+import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -31,6 +33,26 @@ public final class ClientTdmState {
 
     public static void updateScore(Map<String, Integer> scores, int legacyTeam1, int legacyTeam2, int time) {
         STORE.updateScore(scores, legacyTeam1, legacyTeam2, time);
+    }
+
+    public static void updateTeamPlayers(String mapName, Map<String, List<PlayerInfo>> teamPlayers) {
+        STORE.updateTeamPlayers(mapName, teamPlayers);
+    }
+
+    public static Map<String, List<PlayerInfo>> teamPlayersSnapshot() {
+        return STORE.teamPlayersSnapshot();
+    }
+
+    public static int endSummaryPageIndex() {
+        return STORE.endSummaryPageIndex();
+    }
+
+    public static int endSummaryPageTick() {
+        return STORE.endSummaryPageTick();
+    }
+
+    public static int endSummaryPageDurationTicks() {
+        return STORE.endSummaryPageDurationTicks();
     }
 
     public static int getTeamScore(String teamName, int fallback) {
