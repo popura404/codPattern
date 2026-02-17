@@ -202,7 +202,7 @@ public class TdmHudOverlay implements IGuiOverlay {
         renderEndBackdrop(graphics, screenWidth, screenHeight, alpha, accent);
 
         switch (pageIndex) {
-            case 1 -> renderMvpSvpPage(graphics, font, centerX, screenWidth, screenHeight, alpha);
+            case 1 -> renderMvpSvpPage(graphics, font, centerX, screenWidth, screenHeight, alpha, pageTick);
             case 2 -> renderTeamRosterPage(graphics, font, centerX, screenWidth, screenHeight, alpha, pageTick);
             default -> renderPrimaryResultPage(graphics, font, centerX, screenWidth, screenHeight, alpha, accent);
         }
@@ -241,7 +241,8 @@ public class TdmHudOverlay implements IGuiOverlay {
                 centerX, y + 99, (alpha << 24) | 0x00C8C8C8);
     }
 
-    private void renderMvpSvpPage(GuiGraphics graphics, Font font, int centerX, int screenWidth, int screenHeight, int alpha) {
+    private void renderMvpSvpPage(GuiGraphics graphics, Font font, int centerX, int screenWidth, int screenHeight, int alpha,
+            int pageTick) {
         int panelWidth = Math.min(760, screenWidth - 38);
         int panelHeight = Math.min(236, screenHeight - 88);
         int x = centerX - panelWidth / 2;
@@ -260,17 +261,19 @@ public class TdmHudOverlay implements IGuiOverlay {
         int cardHeight = panelHeight - 38;
 
         renderSpotlightCard(graphics, font, x + 10, y + 24, cardWidth, cardHeight,
-                pair.mvp(), Component.translatable("hud.codpattern.tdm.result.mvp").getString(), alpha);
+                pair.mvp(), Component.translatable("hud.codpattern.tdm.result.mvp").getString(), alpha, pageTick, 0);
         renderSpotlightCard(graphics, font, x + 10 + cardWidth + gap, y + 24, cardWidth, cardHeight,
-                pair.svp(), Component.translatable("hud.codpattern.tdm.result.svp").getString(), alpha);
+                pair.svp(), Component.translatable("hud.codpattern.tdm.result.svp").getString(), alpha, pageTick, 1);
     }
 
     private void renderSpotlightCard(GuiGraphics graphics, Font font, int x, int y, int width, int height,
-            ResultCandidate candidate, String title, int alpha) {
-        int accent = withAlpha(resolveCandidateAccent(candidate), alpha);
+            ResultCandidate candidate, String title, int alpha, int pageTick, int slotIndex) {
+        int accentColor = resolveCandidateAccent(candidate);
+        int accent = withAlpha(accentColor, alpha);
         graphics.fillGradient(x, y, x + width, y + height, withAlpha(0xFF121820, alpha), withAlpha(0xFF0C1117, alpha));
         graphics.fill(x, y, x + 2, y + height, accent);
         graphics.fill(x, y + height - 2, x + width, y + height, accent);
+        graphics.fill(x, y + 18, x + width, y + 19, withAlpha(accentColor, Math.max(36, alpha / 3)));
 
         drawScaledCenteredString(graphics, font, title, x + width / 2, y + 8, withAlpha(0xFFF8F8F8, alpha), 1.25f);
 
@@ -281,27 +284,78 @@ public class TdmHudOverlay implements IGuiOverlay {
         }
 
         PlayerInfo player = candidate.player();
-        int avatarSize = 52;
-        int avatarX = x + 12;
-        int avatarY = y + 38;
-        renderPlayerAvatar(graphics, player, avatarX, avatarY, avatarSize, alpha);
+        int stageTop = y + 30;
+        int stageBottom = y + height - 66;
+        int stageCenterX = x + width / 2;
+        int pedestalWidth = Math.max(72, width - 52);
+        renderSpotlightCone(graphics, stageCenterX, y + 19, stageTop + 4, stageBottom - 6, accentColor, alpha, slotIndex);
+        renderPedestal(graphics, stageCenterX, stageBottom - 12, pedestalWidth, accentColor, alpha);
 
-        int nameX = avatarX + avatarSize + 12;
-        int textY = y + 44;
-        graphics.drawString(font, player.name(), nameX, textY, withAlpha(0xFFF2F2F2, alpha), false);
+        int scanTop = stageTop + 6;
+        int scanBottom = stageBottom - 18;
+        if (scanBottom > scanTop) {
+            int scanRange = scanBottom - scanTop;
+            int scanY = scanTop + ((pageTick * 2 + slotIndex * 17) % scanRange);
+            graphics.fill(x + 16, scanY, x + width - 16, scanY + 1, withAlpha(accentColor, Math.max(28, alpha / 2)));
+        }
 
+        int modelScale = Math.max(30, Math.min(70, width / 3));
+        float turn = (float) Math.sin((pageTick + slotIndex * 13) / 8.5f) * 24.0f;
+        float pitch = -10.0f + (float) Math.cos((pageTick + slotIndex * 9) / 11.0f) * 4.0f;
+        int modelBaseline = stageBottom - 8;
+        boolean modelRendered = alpha > 20
+                && TdmPlayerModelRenderer.render(graphics, player, stageCenterX, modelBaseline, modelScale, turn, pitch);
+        if (!modelRendered) {
+            int avatarSize = 50;
+            int avatarX = stageCenterX - avatarSize / 2;
+            int avatarY = stageTop + 8;
+            renderPlayerAvatar(graphics, player, avatarX, avatarY, avatarSize, alpha);
+        }
+
+        int textY = stageBottom + 3;
+        drawCenteredString(graphics, font, player.name(), stageCenterX, textY, withAlpha(0xFFF2F2F2, alpha));
         String kdText = Component.translatable("hud.codpattern.tdm.result.kd_line",
                 formatKd(player.kills(), player.deaths()),
                 player.kills(),
                 player.deaths()).getString();
         String streakText = Component.translatable("hud.codpattern.tdm.result.streak_line",
                 player.maxKillStreak()).getString();
-
-        graphics.drawString(font, kdText, nameX, textY + 16, withAlpha(0xFFE6D79E, alpha), false);
-        graphics.drawString(font, streakText, nameX, textY + 29, withAlpha(0xFFBFD0FF, alpha), false);
+        drawCenteredString(graphics, font, kdText, stageCenterX, textY + 14, withAlpha(0xFFE6D79E, alpha));
+        drawCenteredString(graphics, font, streakText, stageCenterX, textY + 26, withAlpha(0xFFBFD0FF, alpha));
 
         String teamText = Component.translatable("hud.codpattern.tdm.result.team_tag", teamNameLabel(candidate.teamName())).getString();
-        graphics.drawString(font, teamText, nameX, textY + 43, withAlpha(0xFFBBBBBB, alpha), false);
+        drawCenteredString(graphics, font, teamText, stageCenterX, textY + 39, withAlpha(0xFFBBBBBB, alpha));
+    }
+
+    private void renderSpotlightCone(GuiGraphics graphics, int centerX, int lightY, int topY, int bottomY,
+            int accentColor, int alpha, int slotIndex) {
+        int sourceWidth = 16;
+        graphics.fill(centerX - sourceWidth / 2, lightY, centerX + sourceWidth / 2, lightY + 3,
+                withAlpha(0xFFFFFFFF, Math.max(20, alpha / 2)));
+
+        int baseHalfWidth = 56 + slotIndex * 4;
+        for (int i = 0; i < 5; i++) {
+            int halfWidth = Math.max(10, baseHalfWidth - i * 10);
+            int layerAlpha = Math.max(0, (alpha / 8) - i * 5);
+            if (layerAlpha <= 0) {
+                continue;
+            }
+            int layerTop = topY + i * 3;
+            graphics.fillGradient(centerX - halfWidth, layerTop, centerX + halfWidth, bottomY,
+                    withAlpha(accentColor, layerAlpha),
+                    withAlpha(accentColor, 0));
+        }
+    }
+
+    private void renderPedestal(GuiGraphics graphics, int centerX, int y, int width, int accentColor, int alpha) {
+        int halfWidth = Math.max(34, width / 2);
+        graphics.fillGradient(centerX - halfWidth, y, centerX + halfWidth, y + 8,
+                withAlpha(0xFF263344, alpha),
+                withAlpha(0xFF101720, alpha));
+        graphics.fill(centerX - halfWidth, y + 8, centerX + halfWidth, y + 10,
+                withAlpha(accentColor, Math.max(34, alpha / 2)));
+        graphics.fill(centerX - halfWidth + 8, y + 2, centerX + halfWidth - 8, y + 4,
+                withAlpha(0xFFF2F6FF, Math.max(20, alpha / 4)));
     }
 
     private void renderTeamRosterPage(GuiGraphics graphics, Font font, int centerX, int screenWidth, int screenHeight,
