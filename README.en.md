@@ -133,7 +133,7 @@ When reporting issues, include:
 
 ## Changelog
 
-Current version: `v0.4.5b`  
+Current version: `v0.4.5b-fix`  
 See `CHANGES.md` for detailed history.
 
 ## License

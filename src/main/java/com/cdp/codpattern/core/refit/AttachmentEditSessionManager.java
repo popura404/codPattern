@@ -20,6 +20,7 @@ public class AttachmentEditSessionManager {
     private static final Map<UUID, AttachmentEditSession> SESSIONS = new ConcurrentHashMap<>();
     private static final long SESSION_TIMEOUT_MS = 120_000L;
     private static final int SANDBOX_MAIN_INVENTORY_SIZE = 36;
+    private static final int SANDBOX_RESERVED_EMPTY_SLOTS = 1;
 
     public static AttachmentEditSession startSession(ServerPlayer player, int bagId, String slot, ItemStack gunStack,
             List<ItemStack> sandboxAttachments) {
@@ -35,14 +36,16 @@ public class AttachmentEditSessionManager {
         int insertedAttachments = 0;
         int truncatedAttachments = 0;
         int writeCursor = 0;
+        int maxWritableSlotExclusive = Math.max(0, SANDBOX_MAIN_INVENTORY_SIZE - SANDBOX_RESERVED_EMPTY_SLOTS);
         for (ItemStack attachment : sandboxAttachments) {
             if (attachment == null || attachment.isEmpty()) {
                 continue;
             }
-            while (writeCursor < SANDBOX_MAIN_INVENTORY_SIZE && writeCursor == editSlot) {
+            // Keep at least one empty slot so TaCZ unload action can always proceed.
+            while (writeCursor < maxWritableSlotExclusive && writeCursor == editSlot) {
                 writeCursor++;
             }
-            if (writeCursor >= SANDBOX_MAIN_INVENTORY_SIZE) {
+            if (writeCursor >= maxWritableSlotExclusive) {
                 truncatedAttachments++;
                 continue;
             }
