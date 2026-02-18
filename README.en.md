@@ -46,6 +46,7 @@ The project follows a server-authoritative design with client synchronization to
 * Gunpack namespace blocking via `blockedItemNamespaces`.
 * Throwable and ammo multiplier controls via `throwablesEnabled` and `ammunitionPerMagazineMultiple`.
 * Optional integrations for LR Tactical and Physics Mod with graceful fallback when absent.
+* Includes compatibility handling for `tacz-addon 1.1.6` in backpack refit flow to prevent unload-button lockups.
 
 ## Commands and Entrypoints
 
@@ -113,11 +114,13 @@ Server configuration is stored under world save path: `serverconfig/codpattern/`
 * **Optional Integrations:**
   * LR Tactical (throwable/melee content path)
   * Physics Mod (ragdoll/retained death entity presentation)
+  * tacz-addon `1.1.6` (backpack refit unload flow compatibility included)
 
 ## Deployment Notes
 
 * Non-forced distribution applies only to players joined in room/match flow.
 * If no match-end teleport point is configured, end phase warns but does not auto-teleport back.
+* If `tacz-addon` is enabled and attachment unload behaves abnormally in refit UI, ensure `/gamerule liberateAttachment false`.
 * Before production rollout, verify:
   * `tdmconfig/config.json` values match your server pacing
   * `filterconfig` matches your gunpack filtering policy

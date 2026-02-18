@@ -5,6 +5,7 @@ import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
+import com.cdp.codpattern.compat.taczaddon.TaczAddonRefitCompat;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
@@ -60,6 +61,8 @@ public final class AttachmentPresetRequestService {
         if (!TaczGatewayProvider.gateway().isValidGun(gunStack)) {
             return Optional.empty();
         }
+
+        TaczAddonRefitCompat.sanitizeGunForBackpackRefitSession(gunStack);
 
         UUID playerId = player.getUUID();
         Optional<String> presetPayload = AttachmentPresetManager.readPreset(player.server, playerId, bagId, slot);

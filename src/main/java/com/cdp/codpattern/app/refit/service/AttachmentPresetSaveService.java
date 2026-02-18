@@ -5,6 +5,7 @@ import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
+import com.cdp.codpattern.compat.taczaddon.TaczAddonRefitCompat;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
@@ -44,6 +45,8 @@ public final class AttachmentPresetSaveService {
             if (!TaczGatewayProvider.gateway().isGun(gunStack)) {
                 throw new IllegalStateException("当前槽位不是枪械");
             }
+
+            TaczAddonRefitCompat.sanitizeGunForBackpackRefitSession(gunStack);
 
             String builtPresetPayload = AttachmentPresetUtil.buildPresetFromGun(gunStack).toString();
             String itemId = gunStack.getItem().builtInRegistryHolder().key().location().toString();

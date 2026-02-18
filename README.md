@@ -46,6 +46,7 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
 * 支持枪包命名空间黑名单过滤（`blockedItemNamespaces`）。
 * 支持投掷物开关与弹药倍率配置（`throwablesEnabled` / `ammunitionPerMagazineMultiple`）。
 * 支持 LR Tactical 与 Physics Mod 联动；未加载时保持主流程可用。
+* 已适配 `tacz-addon 1.1.6` 在背包改装场景下的卸载冲突，避免“卸载按钮卡住/无法拆卸”的问题。
 
 ## 命令与入口
 
@@ -113,11 +114,13 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
 * **可选联动:**
   * LR Tactical（投掷物/近战资源）
   * Physics Mod（死亡实体物理表现）
+  * tacz-addon `1.1.6`（背包改装流程已做兼容处理）
 
 ## 部署建议
 
 * 非强制发放逻辑仅对“已加入房间/对局”的玩家生效。
 * 若地图未设置 TDM 结束传送点，结算阶段会提示但不会自动回传。
+* 若启用 `tacz-addon` 并在改装界面出现卸载异常，建议确认：`/gamerule liberateAttachment false`。
 * 上线前建议完成以下检查：
   * `tdmconfig/config.json` 是否符合服务器节奏
   * `filterconfig` 是否符合枪包筛选策略
