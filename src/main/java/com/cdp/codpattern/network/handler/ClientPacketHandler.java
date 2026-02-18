@@ -206,7 +206,8 @@ public class ClientPacketHandler {
         snapshot.yHeadRotO = yHeadRot;
         snapshot.yBodyRot = yBodyRot;
         snapshot.yBodyRotO = yBodyRot;
-        snapshot.setDeltaMovement(motionX, motionY, motionZ);
+        double compensatedMotionY = compensatePlayerRagdollMotionY(level, x, y, z, motionY);
+        snapshot.setDeltaMovement(motionX, compensatedMotionY, motionZ);
         snapshot.setHealth(Math.max(0.01f, sourcePlayer.getHealth()));
 
         for (EquipmentSlot slot : EquipmentSlot.values()) {
@@ -214,5 +215,27 @@ public class ClientPacketHandler {
         }
 
         PhysicsModClientBridge.blockifySnapshot(level, snapshot);
+    }
+
+    /**
+     * physicsmod 会在玩家实体 blockify 时额外注入一段朝上的 ragdoll 初速度（y=2 归一化后再 *5）。
+     * 这里把该分量预先从快照速度里抵消，避免玩家死亡残影“上抛”。
+     */
+    private static double compensatePlayerRagdollMotionY(ClientLevel level, double x, double y, double z,
+            double originalMotionY) {
+        Player nearestPlayer = level.getNearestPlayer(x, y, z, 8.0, false);
+        if (nearestPlayer == null) {
+            return originalMotionY;
+        }
+
+        double dx = x - nearestPlayer.getX();
+        double dz = z - nearestPlayer.getZ();
+        double length = Math.sqrt(dx * dx + 4.0 + dz * dz);
+        if (length <= 1.0E-6) {
+            return originalMotionY;
+        }
+
+        double injectedUpwardVelocity = 10.0 / length;
+        return originalMotionY - injectedUpwardVelocity / 10.0;
     }
 }
