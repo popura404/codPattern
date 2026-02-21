@@ -102,10 +102,11 @@ Server configuration is stored under world save path: `serverconfig/codpattern/`
 | `allowJoinDuringPlaying` | `true` | Allow joining during active match |
 | `joinAsSpectatorWhenPlaying` | `true` | Join as spectator during active match |
 | `maxTeamDiff` | `1` | Max allowed team size difference |
-| `markerFocusHalfAngleDegrees` | `30.0` | Enemy bar focus cone half-angle (degrees) |
-| `markerFocusRequiredTicks` | `20` | Ticks required in focus cone before enemy bar appears |
-| `markerBarMaxDistance` | `96.0` | Max distance for enemy bar detection (blocks) |
-| `markerVisibleGraceTicks` | `3` | Anti-flicker grace ticks while enemy remains visible |
+| `enemyMarkerStyle` | `HEALTH_BAR` | Enemy marker style: `HEALTH_BAR` (health bar) / `MARKER_DOT` (marker dot) |
+| `markerFocusHalfAngleDegrees` | `30.0` | Enemy marker focus cone half-angle (degrees) |
+| `markerFocusRequiredTicks` | `20` | Ticks required in focus cone before enemy marker appears |
+| `markerBarMaxDistance` | `96.0` | Max distance for enemy marker detection (blocks) |
+| `markerVisibleGraceTicks` | `3` | Anti-flicker grace ticks while enemy marker remains visible |
 
 ## Compatibility and Dependencies
 

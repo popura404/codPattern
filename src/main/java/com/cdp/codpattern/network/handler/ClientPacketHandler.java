@@ -153,11 +153,13 @@ public class ClientPacketHandler {
                 () -> ClientTdmState.updateScore(teamScores, team1Score, team2Score, gameTimeTicks));
     }
 
-    public static void handleCombatMarkerConfig(float focusHalfAngleDegrees,
+    public static void handleCombatMarkerConfig(boolean enemyMarkerHealthBar,
+            float focusHalfAngleDegrees,
             int focusRequiredTicks,
             double barMaxDistance,
             int barVisibleGraceTicks) {
         Minecraft.getInstance().execute(() -> TdmCombatMarkerTracker.INSTANCE.updateConfig(
+                enemyMarkerHealthBar,
                 focusHalfAngleDegrees,
                 focusRequiredTicks,
                 barMaxDistance,

@@ -12,15 +12,18 @@ import java.util.function.Supplier;
  * S→C: 战斗标识参数同步数据包
  */
 public class CombatMarkerConfigPacket {
+    private final boolean enemyMarkerHealthBar;
     private final float focusHalfAngleDegrees;
     private final int focusRequiredTicks;
     private final double barMaxDistance;
     private final int barVisibleGraceTicks;
 
-    public CombatMarkerConfigPacket(float focusHalfAngleDegrees,
+    public CombatMarkerConfigPacket(boolean enemyMarkerHealthBar,
+            float focusHalfAngleDegrees,
             int focusRequiredTicks,
             double barMaxDistance,
             int barVisibleGraceTicks) {
+        this.enemyMarkerHealthBar = enemyMarkerHealthBar;
         this.focusHalfAngleDegrees = focusHalfAngleDegrees;
         this.focusRequiredTicks = focusRequiredTicks;
         this.barMaxDistance = barMaxDistance;
@@ -28,6 +31,7 @@ public class CombatMarkerConfigPacket {
     }
 
     public CombatMarkerConfigPacket(FriendlyByteBuf buf) {
+        this.enemyMarkerHealthBar = buf.readBoolean();
         this.focusHalfAngleDegrees = buf.readFloat();
         this.focusRequiredTicks = buf.readInt();
         this.barMaxDistance = buf.readDouble();
@@ -35,6 +39,7 @@ public class CombatMarkerConfigPacket {
     }
 
     public void encode(FriendlyByteBuf buf) {
+        buf.writeBoolean(enemyMarkerHealthBar);
         buf.writeFloat(focusHalfAngleDegrees);
         buf.writeInt(focusRequiredTicks);
         buf.writeDouble(barMaxDistance);
@@ -48,6 +53,7 @@ public class CombatMarkerConfigPacket {
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
                 () -> () -> ClientPacketHandler.handleCombatMarkerConfig(
+                        enemyMarkerHealthBar,
                         focusHalfAngleDegrees,
                         focusRequiredTicks,
                         barMaxDistance,

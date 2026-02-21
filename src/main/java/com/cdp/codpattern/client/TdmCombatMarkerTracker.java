@@ -24,6 +24,7 @@ import java.util.UUID;
 public final class TdmCombatMarkerTracker {
     public static final TdmCombatMarkerTracker INSTANCE = new TdmCombatMarkerTracker();
 
+    private static final boolean DEFAULT_ENEMY_MARKER_HEALTH_BAR = true;
     private static final float DEFAULT_ENEMY_FOCUS_HALF_ANGLE_DEGREES = 30.0f;
     private static final int DEFAULT_ENEMY_FOCUS_REQUIRED_TICKS = 20;
     private static final double DEFAULT_ENEMY_BAR_MAX_DISTANCE = 96.0D;
@@ -42,6 +43,7 @@ public final class TdmCombatMarkerTracker {
     private final Map<UUID, Integer> enemyBarGraceTicks = new HashMap<>();
     private final Set<UUID> visibleEnemyBars = new HashSet<>();
 
+    private boolean enemyMarkerHealthBar = DEFAULT_ENEMY_MARKER_HEALTH_BAR;
     private float enemyFocusHalfAngleDegrees = DEFAULT_ENEMY_FOCUS_HALF_ANGLE_DEGREES;
     private int enemyFocusRequiredTicks = DEFAULT_ENEMY_FOCUS_REQUIRED_TICKS;
     private double enemyBarMaxDistance = DEFAULT_ENEMY_BAR_MAX_DISTANCE;
@@ -129,10 +131,12 @@ public final class TdmCombatMarkerTracker {
         }
     }
 
-    public void updateConfig(float focusHalfAngleDegrees,
+    public void updateConfig(boolean enemyMarkerHealthBar,
+            float focusHalfAngleDegrees,
             int focusRequiredTicks,
             double barMaxDistance,
             int barVisibleGraceTicks) {
+        this.enemyMarkerHealthBar = enemyMarkerHealthBar;
         this.enemyFocusHalfAngleDegrees = clampFloat(
                 focusHalfAngleDegrees,
                 MIN_ENEMY_FOCUS_HALF_ANGLE_DEGREES,
@@ -156,8 +160,16 @@ public final class TdmCombatMarkerTracker {
         return latestSnapshot;
     }
 
-    public boolean shouldRenderEnemyHealthBar(UUID playerId) {
+    public boolean shouldRenderEnemyMarker(UUID playerId) {
         return playerId != null && visibleEnemyBars.contains(playerId);
+    }
+
+    public boolean shouldRenderEnemyHealthBar(UUID playerId) {
+        return shouldRenderEnemyMarker(playerId);
+    }
+
+    public boolean isEnemyMarkerHealthBar() {
+        return enemyMarkerHealthBar;
     }
 
     public void clear() {

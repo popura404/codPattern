@@ -680,6 +680,7 @@ public class TdmHudOverlay implements IGuiOverlay {
                 || !snapshot.localPlayerId().equals(localPlayer.getUUID())) {
             return;
         }
+        TdmCombatMarkerTracker markerTracker = TdmCombatMarkerTracker.INSTANCE;
 
         for (Map.Entry<UUID, String> entry : snapshot.teamByPlayer().entrySet()) {
             UUID playerId = entry.getKey();
@@ -708,7 +709,7 @@ public class TdmHudOverlay implements IGuiOverlay {
 
             if (playing
                     && snapshot.isEnemy(playerId)
-                    && TdmCombatMarkerTracker.INSTANCE.shouldRenderEnemyHealthBar(playerId)) {
+                    && markerTracker.shouldRenderEnemyMarker(playerId)) {
                 ScreenProjection barProjection = projectWorldToScreen(
                         minecraft,
                         partialTick,
@@ -716,7 +717,11 @@ public class TdmHudOverlay implements IGuiOverlay {
                         screenWidth,
                         screenHeight);
                 if (barProjection != null) {
-                    drawEnemyHealthBar(graphics, localPlayer, tracked, barProjection, screenWidth, screenHeight);
+                    if (markerTracker.isEnemyMarkerHealthBar()) {
+                        drawEnemyHealthBar(graphics, localPlayer, tracked, barProjection, screenWidth, screenHeight);
+                    } else {
+                        drawTeamMarkerDot(graphics, barProjection.x(), barProjection.y(), teamAccent(entry.getValue()), false);
+                    }
                 }
             }
         }
@@ -743,8 +748,8 @@ public class TdmHudOverlay implements IGuiOverlay {
 
         float distance = localPlayer.distanceTo(enemy);
         float distanceScale = Mth.clamp(1.25f - (distance / 80.0f), 0.6f, 1.25f);
-        int barWidth = Math.max(16, Math.round(34.0f * distanceScale));
-        int barHeight = Math.max(2, Math.round(3.0f * distanceScale));
+        int barWidth = Math.max(22, Math.round((34.0f * 4.0f / 3.0f) * distanceScale));
+        int barHeight = Math.max(1, Math.round((3.0f * 0.5f) * distanceScale));
 
         int left = projection.x() - barWidth / 2;
         int top = projection.y() - 4;

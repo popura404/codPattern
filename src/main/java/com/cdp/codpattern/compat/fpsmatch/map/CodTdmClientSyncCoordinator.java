@@ -50,6 +50,7 @@ final class CodTdmClientSyncCoordinator {
         ScoreUpdatePacket scorePacket = new ScoreUpdatePacket(teamScores, gameTimeTicks);
         TeamPlayerListPacket playerListPacket = new TeamPlayerListPacket(port.mapName(), port.getTeamPlayers());
         CombatMarkerConfigPacket markerConfigPacket = new CombatMarkerConfigPacket(
+                config.isEnemyMarkerHealthBar(),
                 config.getMarkerFocusHalfAngleDegrees(),
                 config.getMarkerFocusRequiredTicks(),
                 config.getMarkerBarMaxDistance(),

@@ -102,10 +102,11 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
 | `allowJoinDuringPlaying` | `true` | 进行中是否允许加入 |
 | `joinAsSpectatorWhenPlaying` | `true` | 进行中加入是否先以旁观进入 |
 | `maxTeamDiff` | `1` | 队伍人数允许最大差值 |
-| `markerFocusHalfAngleDegrees` | `30.0` | 敌方血条视锥半角（度） |
-| `markerFocusRequiredTicks` | `20` | 视锥内持续判定触发血条所需 tick |
-| `markerBarMaxDistance` | `96.0` | 敌方血条判定最大距离（格） |
-| `markerVisibleGraceTicks` | `3` | 敌方可见时血条防闪烁缓冲 tick |
+| `enemyMarkerStyle` | `HEALTH_BAR` | 敌方标识样式：`HEALTH_BAR`（血条）/ `MARKER_DOT`（标识点） |
+| `markerFocusHalfAngleDegrees` | `30.0` | 敌方标识视锥半角（度） |
+| `markerFocusRequiredTicks` | `20` | 视锥内持续判定触发敌方标识所需 tick |
+| `markerBarMaxDistance` | `96.0` | 敌方标识判定最大距离（格） |
+| `markerVisibleGraceTicks` | `3` | 敌方可见时标识防闪烁缓冲 tick |
 
 ## 兼容性与依赖
 
