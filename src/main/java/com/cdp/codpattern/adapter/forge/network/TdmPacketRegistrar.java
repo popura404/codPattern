@@ -1,6 +1,7 @@
 package com.cdp.codpattern.adapter.forge.network;
 
 import com.cdp.codpattern.network.tdm.CountdownPacket;
+import com.cdp.codpattern.network.tdm.CombatMarkerConfigPacket;
 import com.cdp.codpattern.network.tdm.DeathCamPacket;
 import com.cdp.codpattern.network.tdm.GamePhasePacket;
 import com.cdp.codpattern.network.tdm.JoinRoomPacket;
@@ -113,6 +114,12 @@ final class TdmPacketRegistrar {
                 .decoder(ScoreUpdatePacket::decode)
                 .encoder(ScoreUpdatePacket::encode)
                 .consumerMainThread(ScoreUpdatePacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(CombatMarkerConfigPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(CombatMarkerConfigPacket::decode)
+                .encoder(CombatMarkerConfigPacket::encode)
+                .consumerMainThread(CombatMarkerConfigPacket::handle)
                 .add();
 
         ModNetworkChannel.CHANNEL.messageBuilder(SetReadyStatePacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_SERVER)

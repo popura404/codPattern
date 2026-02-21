@@ -35,6 +35,10 @@ public class CodTdmConfig {
     private boolean allowJoinDuringPlaying = true; // 对局进行中是否允许加入
     private boolean joinAsSpectatorWhenPlaying = true; // 对局中加入是否旁观
     private int maxTeamDiff = 1; // 自动分队允许的最大人数差
+    private float markerFocusHalfAngleDegrees = 30.0f; // 敌方血条判定半角（度）
+    private int markerFocusRequiredTicks = 20; // 视锥内累计显示血条所需 tick
+    private double markerBarMaxDistance = 96.0D; // 敌方血条判定最远距离（格）
+    private int markerVisibleGraceTicks = 3; // 可见状态下血条防闪烁缓冲 tick
 
     // Getters
     public static CodTdmConfig getConfig() {
@@ -97,6 +101,22 @@ public class CodTdmConfig {
         return maxTeamDiff;
     }
 
+    public float getMarkerFocusHalfAngleDegrees() {
+        return markerFocusHalfAngleDegrees;
+    }
+
+    public int getMarkerFocusRequiredTicks() {
+        return markerFocusRequiredTicks;
+    }
+
+    public double getMarkerBarMaxDistance() {
+        return markerBarMaxDistance;
+    }
+
+    public int getMarkerVisibleGraceTicks() {
+        return markerVisibleGraceTicks;
+    }
+
     // Setters
     public void setTimeLimitSeconds(int value) {
         this.timeLimitSeconds = value;
@@ -152,6 +172,22 @@ public class CodTdmConfig {
 
     public void setMaxTeamDiff(int value) {
         this.maxTeamDiff = value;
+    }
+
+    public void setMarkerFocusHalfAngleDegrees(float value) {
+        this.markerFocusHalfAngleDegrees = value;
+    }
+
+    public void setMarkerFocusRequiredTicks(int value) {
+        this.markerFocusRequiredTicks = value;
+    }
+
+    public void setMarkerBarMaxDistance(double value) {
+        this.markerBarMaxDistance = value;
+    }
+
+    public void setMarkerVisibleGraceTicks(int value) {
+        this.markerVisibleGraceTicks = value;
     }
 
     /**

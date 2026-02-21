@@ -3,6 +3,7 @@ package com.cdp.codpattern.client.gui.overlay;
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 import com.cdp.codpattern.client.ClientTdmState;
+import com.cdp.codpattern.client.TdmCombatMarkerTracker;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.mojang.authlib.GameProfile;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -10,8 +11,14 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 
@@ -20,12 +27,20 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 public class TdmHudOverlay implements IGuiOverlay {
 
     private static final int RESULT_PAGE_FADE_TICKS = 12;
     private static final int ROSTER_ROW_STAGGER_TICKS = 6;
     private static final int ROSTER_ROW_FADE_TICKS = 10;
+    private static final int COMBAT_MARKER_SCREEN_MARGIN = 24;
+    private static final int TEAM_MARKER_DOT_SIZE = 6;
+    private static final int TEAM_MARKER_ALPHA = 128;
+    private static final int TEAM_MARKER_GREEN_BASE_COLOR = 0xFF54F28C;
+    private static final double TEAM_MARKER_HEAD_OFFSET = 0.45D;
+    private static final double ENEMY_BAR_HEAD_OFFSET = 0.62D;
+    private static final Vec3 WORLD_UP = new Vec3(0.0D, 1.0D, 0.0D);
 
     public static final TdmHudOverlay INSTANCE = new TdmHudOverlay();
 
@@ -33,6 +48,9 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private record SpotlightPair(ResultCandidate mvp, ResultCandidate svp) {
+    }
+
+    private record ScreenProjection(int x, int y, double depth) {
     }
 
     @Override
@@ -48,6 +66,7 @@ public class TdmHudOverlay implements IGuiOverlay {
         renderLeftScorePanel(graphics, font, screenWidth, screenHeight);
         renderPhaseAnnouncement(graphics, font, centerX, screenHeight);
         renderCountdownFocus(graphics, font, centerX, screenHeight);
+        renderCombatMarkers(graphics, partialTick, screenWidth, screenHeight);
         renderEndgameSplash(graphics, font, centerX, screenWidth, screenHeight);
         renderDeathCamPanel(graphics, font, centerX, screenHeight);
     }
@@ -638,6 +657,172 @@ public class TdmHudOverlay implements IGuiOverlay {
             return teamName.toUpperCase(Locale.ROOT);
         }
         return text;
+    }
+
+    private void renderCombatMarkers(GuiGraphics graphics, float partialTick, int screenWidth, int screenHeight) {
+        String phase = ClientTdmState.currentPhase();
+        boolean warmup = "WARMUP".equals(phase);
+        boolean playing = "PLAYING".equals(phase);
+        if (!warmup && !playing) {
+            return;
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        LocalPlayer localPlayer = minecraft.player;
+        ClientLevel level = minecraft.level;
+        if (localPlayer == null || level == null) {
+            return;
+        }
+
+        TdmCombatMarkerTracker.TeamVisionSnapshot snapshot = TdmCombatMarkerTracker.INSTANCE.snapshot();
+        if (!snapshot.hasLocalTeam()
+                || snapshot.localPlayerId() == null
+                || !snapshot.localPlayerId().equals(localPlayer.getUUID())) {
+            return;
+        }
+
+        for (Map.Entry<UUID, String> entry : snapshot.teamByPlayer().entrySet()) {
+            UUID playerId = entry.getKey();
+            if (playerId == null || playerId.equals(localPlayer.getUUID()) || !snapshot.isLiving(playerId)) {
+                continue;
+            }
+
+            Player tracked = level.getPlayerByUUID(playerId);
+            if (tracked == null || !tracked.isAlive() || tracked.isRemoved()) {
+                continue;
+            }
+
+            boolean teammate = snapshot.isTeammate(playerId);
+            if (warmup || teammate) {
+                ScreenProjection markerProjection = projectWorldToScreen(
+                        minecraft,
+                        partialTick,
+                        interpolatePlayerHeadPos(tracked, partialTick, TEAM_MARKER_HEAD_OFFSET),
+                        screenWidth,
+                        screenHeight);
+                if (markerProjection != null) {
+                    drawTeamMarkerDot(graphics, markerProjection.x(), markerProjection.y(), teamAccent(entry.getValue()),
+                            playing);
+                }
+            }
+
+            if (playing
+                    && snapshot.isEnemy(playerId)
+                    && TdmCombatMarkerTracker.INSTANCE.shouldRenderEnemyHealthBar(playerId)) {
+                ScreenProjection barProjection = projectWorldToScreen(
+                        minecraft,
+                        partialTick,
+                        interpolatePlayerHeadPos(tracked, partialTick, ENEMY_BAR_HEAD_OFFSET),
+                        screenWidth,
+                        screenHeight);
+                if (barProjection != null) {
+                    drawEnemyHealthBar(graphics, localPlayer, tracked, barProjection, screenWidth, screenHeight);
+                }
+            }
+        }
+    }
+
+    private void drawTeamMarkerDot(GuiGraphics graphics, int centerX, int centerY, int teamColor, boolean showGreenBase) {
+        int half = TEAM_MARKER_DOT_SIZE / 2;
+        int left = centerX - half;
+        int top = centerY - half;
+        int right = left + TEAM_MARKER_DOT_SIZE;
+        int bottom = top + TEAM_MARKER_DOT_SIZE;
+
+        graphics.fill(left - 1, top - 1, right + 1, bottom + 1, withAlpha(0xFF000000, 90));
+        graphics.fill(left, top, right, bottom, withAlpha(teamColor, TEAM_MARKER_ALPHA));
+        if (showGreenBase) {
+            graphics.fill(left, bottom - 1, right, bottom, withAlpha(TEAM_MARKER_GREEN_BASE_COLOR, 220));
+        }
+    }
+
+    private void drawEnemyHealthBar(GuiGraphics graphics, LocalPlayer localPlayer, Player enemy, ScreenProjection projection,
+            int screenWidth, int screenHeight) {
+        float maxHealth = Math.max(1.0f, enemy.getMaxHealth());
+        float healthRatio = Mth.clamp(enemy.getHealth() / maxHealth, 0.0f, 1.0f);
+
+        float distance = localPlayer.distanceTo(enemy);
+        float distanceScale = Mth.clamp(1.25f - (distance / 80.0f), 0.6f, 1.25f);
+        int barWidth = Math.max(16, Math.round(34.0f * distanceScale));
+        int barHeight = Math.max(2, Math.round(3.0f * distanceScale));
+
+        int left = projection.x() - barWidth / 2;
+        int top = projection.y() - 4;
+        int right = left + barWidth;
+        int bottom = top + barHeight;
+        if (right < 0 || left > screenWidth || bottom < 0 || top > screenHeight) {
+            return;
+        }
+
+        graphics.fill(left - 1, top - 1, right + 1, bottom + 1, withAlpha(0xFF000000, 180));
+        graphics.fill(left, top, right, bottom, withAlpha(0xFF2B0E0E, 155));
+
+        int fillWidth = Math.round(barWidth * healthRatio);
+        if (fillWidth > 0) {
+            graphics.fill(left, top, left + fillWidth, bottom, withAlpha(0xFFFF3A3A, 230));
+        }
+    }
+
+    private ScreenProjection projectWorldToScreen(Minecraft minecraft,
+            float partialTick,
+            Vec3 worldPos,
+            int screenWidth,
+            int screenHeight) {
+        if (minecraft.gameRenderer == null || minecraft.gameRenderer.getMainCamera() == null
+                || !minecraft.gameRenderer.getMainCamera().isInitialized()) {
+            return null;
+        }
+
+        Entity cameraEntity = minecraft.getCameraEntity();
+        if (cameraEntity == null) {
+            cameraEntity = minecraft.player;
+        }
+        if (cameraEntity == null) {
+            return null;
+        }
+
+        Vec3 cameraPos = minecraft.gameRenderer.getMainCamera().getPosition();
+        Vec3 relative = worldPos.subtract(cameraPos);
+
+        float pitch = cameraEntity.getViewXRot(partialTick);
+        float yaw = cameraEntity.getViewYRot(partialTick);
+        Vec3 forward = Vec3.directionFromRotation(pitch, yaw).normalize();
+
+        Vec3 right = forward.cross(WORLD_UP);
+        if (right.lengthSqr() <= 1.0E-6) {
+            right = new Vec3(1.0D, 0.0D, 0.0D);
+        } else {
+            right = right.normalize();
+        }
+        Vec3 up = right.cross(forward).normalize();
+
+        double depth = relative.dot(forward);
+        if (depth <= 0.05D) {
+            return null;
+        }
+
+        double horizontal = relative.dot(right);
+        double vertical = relative.dot(up);
+
+        double fovDegrees = minecraft.options.fov().get();
+        double focalLength = screenHeight / (2.0D * Math.tan(Math.toRadians(fovDegrees) / 2.0D));
+
+        int screenX = (int) Math.round((screenWidth * 0.5D) + (horizontal * focalLength / depth));
+        int screenY = (int) Math.round((screenHeight * 0.5D) - (vertical * focalLength / depth));
+
+        if (screenX < -COMBAT_MARKER_SCREEN_MARGIN || screenX > screenWidth + COMBAT_MARKER_SCREEN_MARGIN
+                || screenY < -COMBAT_MARKER_SCREEN_MARGIN || screenY > screenHeight + COMBAT_MARKER_SCREEN_MARGIN) {
+            return null;
+        }
+
+        return new ScreenProjection(screenX, screenY, depth);
+    }
+
+    private Vec3 interpolatePlayerHeadPos(Player player, float partialTick, double headOffset) {
+        double x = Mth.lerp(partialTick, player.xo, player.getX());
+        double y = Mth.lerp(partialTick, player.yo, player.getY()) + player.getBbHeight() + headOffset;
+        double z = Mth.lerp(partialTick, player.zo, player.getZ());
+        return new Vec3(x, y, z);
     }
 
     private void renderDeathCamPanel(GuiGraphics graphics, Font font, int centerX, int screenHeight) {

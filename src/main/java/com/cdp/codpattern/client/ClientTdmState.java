@@ -61,6 +61,7 @@ public final class ClientTdmState {
 
     public static void resetMatchState() {
         STORE.resetMatchState();
+        TdmCombatMarkerTracker.INSTANCE.clear();
     }
 
     public static void updateCountdown(int count, boolean black) {

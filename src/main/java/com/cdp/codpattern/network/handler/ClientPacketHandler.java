@@ -2,6 +2,7 @@ package com.cdp.codpattern.network.handler;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.client.ClientTdmState;
+import com.cdp.codpattern.client.TdmCombatMarkerTracker;
 import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
 import com.cdp.codpattern.client.gui.screen.TdmRoomScreen;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomData;
@@ -150,6 +151,17 @@ public class ClientPacketHandler {
             int gameTimeTicks) {
         Minecraft.getInstance().execute(
                 () -> ClientTdmState.updateScore(teamScores, team1Score, team2Score, gameTimeTicks));
+    }
+
+    public static void handleCombatMarkerConfig(float focusHalfAngleDegrees,
+            int focusRequiredTicks,
+            double barMaxDistance,
+            int barVisibleGraceTicks) {
+        Minecraft.getInstance().execute(() -> TdmCombatMarkerTracker.INSTANCE.updateConfig(
+                focusHalfAngleDegrees,
+                focusRequiredTicks,
+                barMaxDistance,
+                barVisibleGraceTicks));
     }
 
     public static void handleJoinRoomResult(boolean success, String mapName, String reasonCode, String reasonMessage) {

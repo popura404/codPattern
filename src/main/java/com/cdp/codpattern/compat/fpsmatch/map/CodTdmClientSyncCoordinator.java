@@ -8,6 +8,7 @@ import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.tdm.GamePhasePacket;
 import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
 import com.cdp.codpattern.network.tdm.TeamPlayerListPacket;
+import com.cdp.codpattern.network.tdm.CombatMarkerConfigPacket;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.LinkedHashMap;
@@ -48,6 +49,11 @@ final class CodTdmClientSyncCoordinator {
         GamePhasePacket phasePacket = new GamePhasePacket(phase.name(), remainingTime);
         ScoreUpdatePacket scorePacket = new ScoreUpdatePacket(teamScores, gameTimeTicks);
         TeamPlayerListPacket playerListPacket = new TeamPlayerListPacket(port.mapName(), port.getTeamPlayers());
+        CombatMarkerConfigPacket markerConfigPacket = new CombatMarkerConfigPacket(
+                config.getMarkerFocusHalfAngleDegrees(),
+                config.getMarkerFocusRequiredTicks(),
+                config.getMarkerBarMaxDistance(),
+                config.getMarkerVisibleGraceTicks());
 
         Map<UUID, ServerPlayer> recipients = new LinkedHashMap<>();
         for (ServerPlayer player : port.getJoinedPlayers()) {
@@ -61,6 +67,7 @@ final class CodTdmClientSyncCoordinator {
             ModNetworkChannel.sendToPlayer(phasePacket, player);
             ModNetworkChannel.sendToPlayer(scorePacket, player);
             ModNetworkChannel.sendToPlayer(playerListPacket, player);
+            ModNetworkChannel.sendToPlayer(markerConfigPacket, player);
         }
 
         CodTdmRoomManager.getInstance().markRoomListDirty();
