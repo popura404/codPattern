@@ -26,7 +26,7 @@ public class CodTdmConfig {
     // 游戏配置参数
     private int timeLimitSeconds = 420; // 7分钟
     private int scoreLimit = 75; // 75击杀获胜
-    private int invincibilityTicks = 10; // 0.5秒无敌
+    private int invincibilityTicks = 30; // 1.5秒无敌
     private int respawnDelayTicks = 40; // 2秒复活延迟
     private int warmupTimeTicks = 400; // 20秒热身
     private int preGameCountdownTicks = 200; // 10秒倒计时

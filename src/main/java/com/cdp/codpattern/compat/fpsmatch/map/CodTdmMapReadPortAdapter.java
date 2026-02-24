@@ -33,6 +33,7 @@ final record CodTdmMapReadPortAdapter(
                 () -> CodTdmMapTeamViews.maxPlayerCapacity(map),
                 teamName -> map.getMapTeams().checkTeam(teamName),
                 teamName -> map.getMapTeams().testTeamIsFull(teamName),
+                player -> CodTdmMapTeamViews.findTeamNameByPlayer(map, player),
                 () -> CodTdmMapTeamViews.teamBalanceSnapshots(map),
                 map::getMapArea,
                 () -> map.getServerLevel().dimension().location().toString(),
@@ -119,6 +120,11 @@ final record CodTdmMapReadPortAdapter(
     @Override
     public boolean isTeamFull(String teamName) {
         return readViews.isTeamFull(teamName);
+    }
+
+    @Override
+    public Optional<String> findTeamNameByPlayer(ServerPlayer player) {
+        return readViews.findTeamNameByPlayer(player);
     }
 
     @Override

@@ -16,6 +16,7 @@ public record PlayerInfo(
         int deaths, // 死亡数（比赛中）
         int maxKillStreak, // 本局最高连杀
         boolean isAlive, // 是否存活
+        boolean isInvincible, // 是否处于复活保护时间
         int pingMs // 延迟（毫秒）
 ) {
     /**
@@ -29,6 +30,7 @@ public record PlayerInfo(
         buf.writeInt(deaths);
         buf.writeInt(maxKillStreak);
         buf.writeBoolean(isAlive);
+        buf.writeBoolean(isInvincible);
         buf.writeInt(pingMs);
     }
 
@@ -43,6 +45,7 @@ public record PlayerInfo(
                 buf.readInt(),
                 buf.readInt(),
                 buf.readInt(),
+                buf.readBoolean(),
                 buf.readBoolean(),
                 buf.readInt());
     }

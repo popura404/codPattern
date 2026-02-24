@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -23,6 +24,7 @@ final record CodTdmMapReadViews(
         IntSupplier maxPlayerCapacitySupplier,
         Predicate<String> hasTeamPredicate,
         Predicate<String> isTeamFullPredicate,
+        Function<ServerPlayer, Optional<String>> findTeamNameByPlayerFunction,
         Supplier<List<TeamBalanceService.TeamSnapshot>> teamBalanceSnapshotsSupplier,
         Supplier<AreaData> mapAreaSupplier,
         Supplier<String> dimensionIdSupplier,
@@ -59,6 +61,10 @@ final record CodTdmMapReadViews(
 
     boolean isTeamFull(String teamName) {
         return isTeamFullPredicate.test(teamName);
+    }
+
+    Optional<String> findTeamNameByPlayer(ServerPlayer player) {
+        return findTeamNameByPlayerFunction.apply(player);
     }
 
     Optional<String> chooseAutoJoinTeam(int maxTeamDiff) {

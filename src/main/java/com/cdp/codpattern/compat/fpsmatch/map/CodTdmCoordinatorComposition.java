@@ -125,7 +125,8 @@ final class CodTdmCoordinatorComposition {
                                 playerState.playerKills(),
                                 playerState.playerDeaths(),
                                 playerState.maxKillStreaks(),
-                                playerState.respawnTimers().keySet()
+                                playerState.respawnTimers().keySet(),
+                                playerState.invinciblePlayers()
                         ),
                         mapPort::joinedPlayers,
                         mapPort::spectatorPlayers

@@ -190,6 +190,7 @@ public final class TdmCombatMarkerTracker {
 
         Map<UUID, String> teamByPlayer = new HashMap<>();
         Set<UUID> livingPlayers = new HashSet<>();
+        Set<UUID> invinciblePlayers = new HashSet<>();
 
         for (Map.Entry<String, List<PlayerInfo>> entry : teamPlayers.entrySet()) {
             String teamName = entry.getKey() == null ? "" : entry.getKey();
@@ -205,13 +206,16 @@ public final class TdmCombatMarkerTracker {
                 if (info.isAlive()) {
                     livingPlayers.add(info.uuid());
                 }
+                if (info.isInvincible()) {
+                    invinciblePlayers.add(info.uuid());
+                }
             }
         }
 
         String localTeam = teamByPlayer.get(localPlayerId);
         if (localTeam == null) {
             return new TeamVisionSnapshot(localPlayerId, null, Map.copyOf(teamByPlayer), Set.copyOf(livingPlayers),
-                    Set.of(), Set.of());
+                    Set.copyOf(invinciblePlayers), Set.of(), Set.of());
         }
 
         Set<UUID> teammates = new HashSet<>();
@@ -229,7 +233,7 @@ public final class TdmCombatMarkerTracker {
         }
 
         return new TeamVisionSnapshot(localPlayerId, localTeam, Map.copyOf(teamByPlayer), Set.copyOf(livingPlayers),
-                Set.copyOf(teammates), Set.copyOf(enemies));
+                Set.copyOf(invinciblePlayers), Set.copyOf(teammates), Set.copyOf(enemies));
     }
 
     private boolean isCenterAimedEnemy(Minecraft minecraft, Player enemy) {
@@ -265,12 +269,13 @@ public final class TdmCombatMarkerTracker {
 
     public static final class TeamVisionSnapshot {
         private static final TeamVisionSnapshot EMPTY = new TeamVisionSnapshot(null, null, Map.of(), Set.of(), Set.of(),
-                Set.of());
+                Set.of(), Set.of());
 
         private final UUID localPlayerId;
         private final String localTeam;
         private final Map<UUID, String> teamByPlayer;
         private final Set<UUID> livingPlayers;
+        private final Set<UUID> invinciblePlayers;
         private final Set<UUID> teammates;
         private final Set<UUID> enemies;
 
@@ -278,12 +283,14 @@ public final class TdmCombatMarkerTracker {
                 String localTeam,
                 Map<UUID, String> teamByPlayer,
                 Set<UUID> livingPlayers,
+                Set<UUID> invinciblePlayers,
                 Set<UUID> teammates,
                 Set<UUID> enemies) {
             this.localPlayerId = localPlayerId;
             this.localTeam = localTeam;
             this.teamByPlayer = teamByPlayer;
             this.livingPlayers = livingPlayers;
+            this.invinciblePlayers = invinciblePlayers;
             this.teammates = teammates;
             this.enemies = enemies;
         }
@@ -310,6 +317,10 @@ public final class TdmCombatMarkerTracker {
 
         public boolean isLiving(UUID playerId) {
             return playerId != null && livingPlayers.contains(playerId);
+        }
+
+        public boolean isInvincible(UUID playerId) {
+            return playerId != null && invinciblePlayers.contains(playerId);
         }
 
         public boolean isTeammate(UUID playerId) {

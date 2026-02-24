@@ -61,6 +61,12 @@ public class CodTdmEventHandler {
             return;
         }
 
+        ServerPlayer attacker = resolveAttacker(event);
+        if (isTeammate(readPort, attacker, player)) {
+            event.setCanceled(true);
+            return;
+        }
+
         // 热身期间：伤害归零但保留事件（保留击退效果）
         if (!readPort.canDealDamage()) {
             event.setAmount(0);
@@ -106,7 +112,8 @@ public class CodTdmEventHandler {
 
         // 击杀计分统一在死亡事件处理，兼容子弹/投射物 owner。
         if (killer != null
-                && !killer.getUUID().equals(player.getUUID())) {
+                && !killer.getUUID().equals(player.getUUID())
+                && !isTeammate(readPort, killer, player)) {
             actionPort.onPlayerKill(killer, player);
         }
 
@@ -159,6 +166,38 @@ public class CodTdmEventHandler {
         }
 
         return null;
+    }
+
+    private static ServerPlayer resolveAttacker(LivingHurtEvent event) {
+        Entity sourceEntity = event.getSource().getEntity();
+        ServerPlayer attacker = asServerPlayer(sourceEntity);
+        if (attacker != null) {
+            return attacker;
+        }
+
+        Entity directEntity = event.getSource().getDirectEntity();
+        attacker = asServerPlayer(directEntity);
+        if (attacker != null) {
+            return attacker;
+        }
+
+        attacker = resolveProjectileOwner(sourceEntity);
+        if (attacker != null) {
+            return attacker;
+        }
+        return resolveProjectileOwner(directEntity);
+    }
+
+    private static boolean isTeammate(CodTdmReadPort readPort, ServerPlayer attacker, ServerPlayer victim) {
+        if (readPort == null || attacker == null || victim == null) {
+            return false;
+        }
+        if (attacker.getUUID().equals(victim.getUUID())) {
+            return false;
+        }
+        Optional<String> attackerTeam = readPort.findTeamNameByPlayer(attacker);
+        Optional<String> victimTeam = readPort.findTeamNameByPlayer(victim);
+        return attackerTeam.isPresent() && attackerTeam.equals(victimTeam);
     }
 
     private static ServerPlayer asServerPlayer(Entity entity) {

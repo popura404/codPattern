@@ -43,6 +43,8 @@ public interface CodTdmReadPort {
 
     boolean isTeamFull(String teamName);
 
+    Optional<String> findTeamNameByPlayer(ServerPlayer player);
+
     Optional<String> chooseAutoJoinTeam(int maxTeamDiff);
 
     boolean canJoinWithBalance(String teamName, int maxTeamDiff);

@@ -38,8 +38,12 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int TEAM_MARKER_DOT_SIZE = 6;
     private static final int TEAM_MARKER_ALPHA = 128;
     private static final int TEAM_MARKER_GREEN_BASE_COLOR = 0xFF54F28C;
+    private static final int INVINCIBILITY_MARKER_SIZE = 8;
+    private static final int INVINCIBILITY_MARKER_COLOR = 0xFFF6F6F6;
+    private static final int INVINCIBILITY_MARKER_OUTLINE = 0xFFBFC7D0;
     private static final double TEAM_MARKER_HEAD_OFFSET = 0.45D;
     private static final double ENEMY_BAR_HEAD_OFFSET = 0.62D;
+    private static final double INVINCIBILITY_MARKER_HEAD_OFFSET = 0.92D;
     private static final Vec3 WORLD_UP = new Vec3(0.0D, 1.0D, 0.0D);
 
     public static final TdmHudOverlay INSTANCE = new TdmHudOverlay();
@@ -693,6 +697,20 @@ public class TdmHudOverlay implements IGuiOverlay {
                 continue;
             }
 
+            if (playing
+                    && snapshot.isInvincible(playerId)
+                    && localPlayer.hasLineOfSight(tracked)) {
+                ScreenProjection invincibleProjection = projectWorldToScreen(
+                        minecraft,
+                        partialTick,
+                        interpolatePlayerHeadPos(tracked, partialTick, INVINCIBILITY_MARKER_HEAD_OFFSET),
+                        screenWidth,
+                        screenHeight);
+                if (invincibleProjection != null) {
+                    drawInvincibilityMarker(graphics, invincibleProjection.x(), invincibleProjection.y(), partialTick);
+                }
+            }
+
             boolean teammate = snapshot.isTeammate(playerId);
             if (warmup || teammate) {
                 ScreenProjection markerProjection = projectWorldToScreen(
@@ -739,6 +757,22 @@ public class TdmHudOverlay implements IGuiOverlay {
         if (showGreenBase) {
             graphics.fill(left, bottom - 1, right, bottom, withAlpha(TEAM_MARKER_GREEN_BASE_COLOR, 220));
         }
+    }
+
+    private void drawInvincibilityMarker(GuiGraphics graphics, int centerX, int centerY, float partialTick) {
+        int half = INVINCIBILITY_MARKER_SIZE / 2;
+        int left = centerX - half;
+        int top = centerY - half;
+        int right = left + INVINCIBILITY_MARKER_SIZE;
+        int bottom = top + INVINCIBILITY_MARKER_SIZE;
+
+        float wave = 0.5f + 0.5f * Mth.sin((System.currentTimeMillis() / 120.0f) + partialTick);
+        int pulseAlpha = 145 + (int) (wave * 65.0f);
+        int fillAlpha = 170 + (int) (wave * 50.0f);
+
+        graphics.fill(left - 2, top - 2, right + 2, bottom + 2, withAlpha(INVINCIBILITY_MARKER_OUTLINE, pulseAlpha));
+        graphics.fill(left - 1, top - 1, right + 1, bottom + 1, withAlpha(0xFF000000, 110));
+        graphics.fill(left, top, right, bottom, withAlpha(INVINCIBILITY_MARKER_COLOR, fillAlpha));
     }
 
     private void drawEnemyHealthBar(GuiGraphics graphics, LocalPlayer localPlayer, Player enemy, ScreenProjection projection,

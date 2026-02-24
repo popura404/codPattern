@@ -25,7 +25,7 @@ final class CodTdmTickRuntime {
         tickPhaseStateMachine.run();
         tickVoteSession.run();
         tickDeathCam.run();
-        tickRespawn.run();
         tickInvincibility.run();
+        tickRespawn.run();
     }
 }
