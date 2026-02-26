@@ -19,6 +19,12 @@ interface CodTdmTeamMembershipPort {
 
     void syncToClient();
 
+    void setSpectatorPreferredTeam(UUID playerId, String teamName);
+
+    Optional<String> getSpectatorPreferredTeam(UUID playerId);
+
+    void clearSpectatorPreferredTeam(UUID playerId);
+
     boolean isWaitingPhase();
 
     boolean hasTeam(String teamName);

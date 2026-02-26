@@ -5,6 +5,7 @@ import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 final class CodTdmMapActions {
@@ -111,6 +112,16 @@ final class CodTdmMapActions {
         @Override
         public boolean setPlayerReady(ServerPlayer player, boolean ready) {
             return voteRuntime.setPlayerReady(player, ready);
+        }
+
+        @Override
+        public void setSpectatorPreferredTeam(ServerPlayer player, String teamName) {
+            teamMembershipCoordinator.setSpectatorPreferredTeam(player, teamName);
+        }
+
+        @Override
+        public Optional<String> consumeSpectatorPreferredTeam(ServerPlayer player) {
+            return teamMembershipCoordinator.consumeSpectatorPreferredTeam(player);
         }
     }
 }

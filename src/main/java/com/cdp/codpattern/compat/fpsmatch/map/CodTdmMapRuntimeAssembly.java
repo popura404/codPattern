@@ -4,7 +4,9 @@ import com.cdp.codpattern.app.tdm.model.TdmTeamDefaults;
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
+import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.scores.Team;
 
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -104,9 +106,19 @@ final class CodTdmMapRuntimeAssembly {
     }
 
     private static void initializeDefaultTeamsAndScores(CodTdmMap map, CodTdmMatchRuntimeState matchState) {
-        map.addTeam(TdmTeamNames.KORTAC, TdmTeamDefaults.DEFAULT_TEAM_LIMIT);
-        map.addTeam(TdmTeamNames.SPECGRU, TdmTeamDefaults.DEFAULT_TEAM_LIMIT);
+        BaseTeam kortac = map.addTeam(TdmTeamNames.KORTAC, TdmTeamDefaults.DEFAULT_TEAM_LIMIT);
+        BaseTeam specgru = map.addTeam(TdmTeamNames.SPECGRU, TdmTeamDefaults.DEFAULT_TEAM_LIMIT);
+        applyDefaultNameTagRule(kortac);
+        applyDefaultNameTagRule(specgru);
         matchState.putTeamScore(TdmTeamNames.KORTAC, 0);
         matchState.putTeamScore(TdmTeamNames.SPECGRU, 0);
+    }
+
+    private static void applyDefaultNameTagRule(BaseTeam team) {
+        if (team == null || team.getPlayerTeam() == null) {
+            return;
+        }
+        // Hide nametags from enemy team while preserving teammate visibility.
+        team.getPlayerTeam().setNameTagVisibility(Team.Visibility.HIDE_FOR_OTHER_TEAMS);
     }
 }

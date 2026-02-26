@@ -5,6 +5,7 @@ import com.cdp.codpattern.app.tdm.model.DeathCamData;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -18,6 +19,7 @@ final class CodTdmPlayerRuntimeState {
     private final Map<UUID, Integer> currentKillStreaks = new HashMap<>();
     private final Map<UUID, Integer> maxKillStreaks = new HashMap<>();
     private final Map<UUID, Boolean> readyStates = new HashMap<>();
+    private final Map<UUID, String> spectatorPreferredJoinTeams = new HashMap<>();
 
     Map<UUID, Integer> respawnTimers() {
         return respawnTimers;
@@ -55,6 +57,27 @@ final class CodTdmPlayerRuntimeState {
         return readyStates;
     }
 
+    void setSpectatorPreferredJoinTeam(UUID playerId, String teamName) {
+        if (playerId == null || teamName == null || teamName.isBlank()) {
+            return;
+        }
+        spectatorPreferredJoinTeams.put(playerId, teamName);
+    }
+
+    Optional<String> getSpectatorPreferredJoinTeam(UUID playerId) {
+        if (playerId == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(spectatorPreferredJoinTeams.get(playerId));
+    }
+
+    void clearSpectatorPreferredJoinTeam(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        spectatorPreferredJoinTeams.remove(playerId);
+    }
+
     void clearRoundTransientState() {
         deathCamPlayers.clear();
         respawnTimers.clear();
@@ -69,6 +92,7 @@ final class CodTdmPlayerRuntimeState {
         currentKillStreaks.clear();
         maxKillStreaks.clear();
         readyStates.clear();
+        spectatorPreferredJoinTeams.clear();
     }
 
     void clearTransientPlayerState(UUID playerId) {
@@ -76,6 +100,7 @@ final class CodTdmPlayerRuntimeState {
         invinciblePlayers.remove(playerId);
         invincibilityTimers.remove(playerId);
         deathCamPlayers.remove(playerId);
+        spectatorPreferredJoinTeams.remove(playerId);
     }
 
     void removePlayerCombatStats(UUID playerId) {

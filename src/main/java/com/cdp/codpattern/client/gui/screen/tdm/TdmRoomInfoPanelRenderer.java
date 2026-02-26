@@ -25,6 +25,7 @@ public final class TdmRoomInfoPanelRenderer {
             Map<String, TdmRoomData> rooms,
             Map<String, List<PlayerInfo>> teamPlayers,
             boolean leavePending,
+            boolean joinGamePending,
             boolean hasRoomNotice,
             String roomNoticeText,
             int roomNoticeColor) {
@@ -95,20 +96,28 @@ public final class TdmRoomInfoPanelRenderer {
             infoY += 24;
         }
 
+        int hintLines = (leavePending ? 1 : 0) + (joinGamePending ? 1 : 0);
         int rosterTop = Math.max(infoActionBottomY + 18, infoY + 8);
-        int rosterBottom = panelY + panelHeight - (leavePending ? 38 : 24);
+        int rosterBottom = panelY + panelHeight - 24 - (hintLines * 12);
         if (joinedRoom != null && rosterTop < rosterBottom) {
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.roster_title"),
                     panelX, rosterTop - 11, CodTheme.TEXT_SECONDARY);
             TdmRoomRosterRenderer.render(graphics, mc, panelX, panelWidth, rosterTop, rosterBottom, teamPlayers);
         }
 
+        int hintY = panelY + panelHeight - 24;
         if (leavePending) {
             graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.leave_room_cancel_hint"),
-                    panelX, panelY + panelHeight - 24, 0xFFFFD75E);
+                    panelX, hintY, 0xFFFFD75E);
+            hintY -= 12;
+        }
+        if (joinGamePending) {
+            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm.join_game_cancel_hint"),
+                    panelX, hintY, 0xFFFFD75E);
+            hintY -= 12;
         }
         if (hasRoomNotice) {
-            int noticeY = panelY + panelHeight - (leavePending ? 36 : 24);
+            int noticeY = hintY;
             graphics.drawString(mc.font, roomNoticeText, panelX, noticeY, roomNoticeColor);
         }
     }

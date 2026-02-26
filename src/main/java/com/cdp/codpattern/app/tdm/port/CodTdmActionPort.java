@@ -4,6 +4,7 @@ import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface CodTdmActionPort {
@@ -36,4 +37,8 @@ public interface CodTdmActionPort {
     void initializeReadyState(ServerPlayer player);
 
     boolean setPlayerReady(ServerPlayer player, boolean ready);
+
+    void setSpectatorPreferredTeam(ServerPlayer player, String teamName);
+
+    Optional<String> consumeSpectatorPreferredTeam(ServerPlayer player);
 }

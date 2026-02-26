@@ -188,6 +188,20 @@ public class ClientPacketHandler {
         });
     }
 
+    public static void handleJoinGameResult(
+            boolean success,
+            long requestId,
+            String mapName,
+            String reasonCode,
+            String reasonMessage) {
+        Minecraft.getInstance().execute(() -> {
+            Screen screen = Minecraft.getInstance().screen;
+            if (screen instanceof TdmRoomScreen tdmRoomScreen) {
+                tdmRoomScreen.handleJoinGameResult(success, requestId, mapName, reasonCode, reasonMessage);
+            }
+        });
+    }
+
     public static void handlePhysicsMobRetain(int entityId, double x, double y, double z, float yRot, float xRot,
             float yHeadRot, float yBodyRot, double motionX, double motionY, double motionZ) {
         if (!PhysicsModClientBridge.isPhysicsModLoaded()) {

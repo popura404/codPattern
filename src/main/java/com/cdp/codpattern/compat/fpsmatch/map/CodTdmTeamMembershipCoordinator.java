@@ -24,6 +24,7 @@ final class CodTdmTeamMembershipCoordinator {
         port.clearTransientPlayerState(playerId);
         port.clearPlayerCombatStats(playerId);
         port.removePlayerFromVote(playerId);
+        port.clearSpectatorPreferredTeam(playerId);
 
         leaveRoomEffects.handleTeleportResult(player, port.teleportPlayerToMatchEndPoint(player));
         leaveRoomEffects.sendLeaveStatePackets(player);
@@ -64,8 +65,26 @@ final class CodTdmTeamMembershipCoordinator {
         }
 
         port.clearTransientPlayerState(player.getUUID());
+        port.clearSpectatorPreferredTeam(player.getUUID());
         port.leaveTeam(player);
         port.joinTeam(teamName, player);
         port.syncToClient();
+    }
+
+    void setSpectatorPreferredTeam(ServerPlayer player, String teamName) {
+        if (player == null || teamName == null || teamName.isBlank()) {
+            return;
+        }
+        port.setSpectatorPreferredTeam(player.getUUID(), teamName);
+    }
+
+    Optional<String> consumeSpectatorPreferredTeam(ServerPlayer player) {
+        if (player == null) {
+            return Optional.empty();
+        }
+        UUID playerId = player.getUUID();
+        Optional<String> preferredTeam = port.getSpectatorPreferredTeam(playerId);
+        port.clearSpectatorPreferredTeam(playerId);
+        return preferredTeam;
     }
 }

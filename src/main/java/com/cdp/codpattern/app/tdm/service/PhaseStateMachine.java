@@ -29,6 +29,8 @@ public final class PhaseStateMachine {
 
         void clearRoundTransientState();
 
+        void notifyMatchEnded();
+
         void onMatchEnded();
 
         boolean hasMatchEndTeleportPoint();
@@ -73,6 +75,7 @@ public final class PhaseStateMachine {
                 hooks.giveAllPlayersKits();
             }
             case ENDED -> {
+                hooks.notifyMatchEnded();
                 hooks.onMatchEnded();
                 hooks.clearAllPlayersInventory();
                 hooks.restoreAllRoomPlayersToAdventure();

@@ -6,10 +6,13 @@ public final class TdmRoomUiState {
     public enum PendingAction {
         NONE,
         JOINING,
-        LEAVING
+        LEAVING,
+        JOINING_GAME
     }
 
     private long pendingLeaveDeadlineMs = 0L;
+    private long pendingJoinGameDeadlineMs = 0L;
+    private long pendingJoinGameRequestId = 0L;
     private long pendingActionDeadlineMs = 0L;
     private PendingAction pendingAction = PendingAction.NONE;
     private String pendingRoomName = null;
@@ -38,7 +41,16 @@ public final class TdmRoomUiState {
     public void clearPendingAction() {
         pendingAction = PendingAction.NONE;
         pendingRoomName = null;
+        pendingJoinGameRequestId = 0L;
         pendingActionDeadlineMs = 0L;
+    }
+
+    public void setPendingJoinGameRequestId(long requestId) {
+        pendingJoinGameRequestId = requestId;
+    }
+
+    public long pendingJoinGameRequestId() {
+        return pendingJoinGameRequestId;
     }
 
     public PendingAction consumeExpiredPendingAction(long nowMs) {
@@ -68,6 +80,30 @@ public final class TdmRoomUiState {
 
     public int leaveSecondsRemaining(long nowMs) {
         long remainMs = pendingLeaveDeadlineMs - nowMs;
+        if (remainMs <= 0L) {
+            return 0;
+        }
+        return (int) Math.ceil(remainMs / 1000.0);
+    }
+
+    public void startJoinGameConfirm(long nowMs, long windowMs) {
+        pendingJoinGameDeadlineMs = nowMs + windowMs;
+    }
+
+    public void clearJoinGameConfirm() {
+        pendingJoinGameDeadlineMs = 0L;
+    }
+
+    public boolean isJoinGamePending(long nowMs) {
+        return pendingJoinGameDeadlineMs > 0L && nowMs < pendingJoinGameDeadlineMs;
+    }
+
+    public boolean shouldAutoExecuteJoinGame(long nowMs) {
+        return pendingJoinGameDeadlineMs > 0L && nowMs >= pendingJoinGameDeadlineMs;
+    }
+
+    public int joinGameSecondsRemaining(long nowMs) {
+        long remainMs = pendingJoinGameDeadlineMs - nowMs;
         if (remainMs <= 0L) {
             return 0;
         }
@@ -108,6 +144,7 @@ public final class TdmRoomUiState {
 
     public void reset() {
         clearLeaveConfirm();
+        clearJoinGameConfirm();
         clearPendingAction();
         clearNotice();
     }

@@ -19,6 +19,9 @@ final record CodTdmTeamMembershipMapPortAdapter(
         Function<ServerPlayer, Boolean> teleportPlayerToMatchEndPointAction,
         Consumer<ServerPlayer> clearPlayerInventoryAction,
         Runnable syncToClientAction,
+        BiConsumer<UUID, String> setSpectatorPreferredTeamAction,
+        Function<UUID, Optional<String>> getSpectatorPreferredTeamAction,
+        Consumer<UUID> clearSpectatorPreferredTeamAction,
         BooleanSupplier waitingPhaseChecker,
         Predicate<String> teamExistsChecker,
         Predicate<String> teamFullChecker,
@@ -58,6 +61,21 @@ final record CodTdmTeamMembershipMapPortAdapter(
     @Override
     public void syncToClient() {
         syncToClientAction.run();
+    }
+
+    @Override
+    public void setSpectatorPreferredTeam(UUID playerId, String teamName) {
+        setSpectatorPreferredTeamAction.accept(playerId, teamName);
+    }
+
+    @Override
+    public Optional<String> getSpectatorPreferredTeam(UUID playerId) {
+        return getSpectatorPreferredTeamAction.apply(playerId);
+    }
+
+    @Override
+    public void clearSpectatorPreferredTeam(UUID playerId) {
+        clearSpectatorPreferredTeamAction.accept(playerId);
     }
 
     @Override

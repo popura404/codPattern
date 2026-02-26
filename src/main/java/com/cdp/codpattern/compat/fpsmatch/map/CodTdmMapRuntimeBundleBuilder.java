@@ -60,7 +60,15 @@ final class CodTdmMapRuntimeBundleBuilder {
                 respawnRuntime::tickInvincibility
         );
         CodTdmMapMutationRuntime mapMutationRuntime = new CodTdmMapMutationRuntime(
-                map::join,
+                (teamName, player) -> {
+                    if (map.checkSpecHasPlayer(player)) {
+                        // Spectator -> in-match join on the same map should not trigger leave-room side effects.
+                        map.getMapTeams().leaveTeam(player);
+                        map.getMapTeams().joinTeam(teamName, player);
+                    } else {
+                        map.join(teamName, player);
+                    }
+                },
                 map::joinSpec,
                 map::syncToClient,
                 map::addTeam,

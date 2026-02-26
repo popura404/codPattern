@@ -52,6 +52,11 @@ final class CodTdmPhaseStateHooks implements PhaseStateMachine.Hooks {
     }
 
     @Override
+    public void notifyMatchEnded() {
+        joinedPlayerBroadcaster.broadcastToJoinedPlayers(Component.translatable("message.codpattern.game.match_ended"));
+    }
+
+    @Override
     public void onMatchEnded() {
         port.onMatchEnded();
     }

@@ -22,9 +22,12 @@ public final class TdmRoomButtonStateBinder {
             TdmRoomUiState.PendingAction pendingAction,
             boolean leavePending,
             int leaveSecondsRemaining,
-            boolean localPlayerReady
+            boolean localPlayerReady,
+            boolean localSpectatorInPlaying,
+            boolean joinGamePending,
+            int joinGameSecondsRemaining
     ) {
-        boolean canSwitchTeam = TdmRoomStateEvaluator.isTeamSwitchAllowed(currentRoomState);
+        boolean canSwitchTeam = TdmRoomStateEvaluator.isTeamSwitchAllowed(currentRoomState) || localSpectatorInPlaying;
         boolean canStartVote = TdmRoomStateEvaluator.canStartVote(currentRoomState);
         boolean canEndVote = TdmRoomStateEvaluator.canEndVote(currentRoomState);
 
@@ -49,8 +52,13 @@ public final class TdmRoomButtonStateBinder {
         }
 
         if (readyButton != null) {
-            readyButton.active = hasJoinedRoom && "WAITING".equals(currentRoomState) && !hasPendingAction;
-            readyButton.setMessage(Component.literal(localPlayerReady ? "取消准备" : "准备"));
+            if (localSpectatorInPlaying) {
+                readyButton.active = false;
+                readyButton.setMessage(Component.translatable("screen.codpattern.tdm.join_game_disabled"));
+            } else {
+                readyButton.active = hasJoinedRoom && "WAITING".equals(currentRoomState) && !hasPendingAction;
+                readyButton.setMessage(Component.literal(localPlayerReady ? "取消准备" : "准备"));
+            }
         }
 
         if (voteStartButton != null) {
