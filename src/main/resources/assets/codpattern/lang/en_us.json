@@ -3,6 +3,7 @@
     "screen.codpattern.common.cancel": "Cancel",
     "screen.codpattern.common.refresh": "Refresh",
     "screen.codpattern.common.back": "Back",
+    "screen.codpattern.popup.title": "Notice",
     "screen.codpattern.rename_backpack.title": "Rename Backpack",
     "screen.codpattern.rename_backpack.name_label": "Backpack Name",
     "screen.codpattern.rename_backpack.header": "Rename Backpack #%s",

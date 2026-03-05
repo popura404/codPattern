@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.gui.screen.tdm;
 
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.screen.PopupNoticeHelper;
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
@@ -117,10 +118,7 @@ public final class TdmRoomActionController {
             return;
         }
         if (!TdmRoomStateEvaluator.isTeamSwitchAllowed(currentRoomState()) && !isLocalSpectatorInPlaying()) {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc.player != null) {
-                mc.player.sendSystemMessage(Component.translatable("message.codpattern.game.team_switch_locked"));
-            }
+            showRoomNotice(Component.translatable("message.codpattern.game.team_switch_locked").getString(), CodTheme.TEXT_DANGER);
             return;
         }
         if (!TdmTeamNames.KORTAC.equals(teamName) && !TdmTeamNames.SPECGRU.equals(teamName)) {
@@ -408,7 +406,11 @@ public final class TdmRoomActionController {
     }
 
     private void showRoomNotice(String message, int color, long durationMs) {
-        uiState.showNotice(message, color, durationMs, System.currentTimeMillis());
+        if (message == null || message.isBlank()) {
+            return;
+        }
+        uiState.clearNotice();
+        PopupNoticeHelper.show(Component.literal(message));
     }
 
     private void clearRoomNotice() {

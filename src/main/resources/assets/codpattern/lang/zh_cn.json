@@ -3,6 +3,7 @@
     "screen.codpattern.common.cancel": "取消",
     "screen.codpattern.common.refresh": "刷新",
     "screen.codpattern.common.back": "返回",
+    "screen.codpattern.popup.title": "提示",
     "screen.codpattern.rename_backpack.title": "重命名背包",
     "screen.codpattern.rename_backpack.name_label": "背包名称",
     "screen.codpattern.rename_backpack.header": "重命名背包 #%s",

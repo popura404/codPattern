@@ -36,6 +36,8 @@ public final class VoteService {
 
         void sendVoteDialog(VoteDialogPacket packet, ServerPlayer player);
 
+        void notifyPlayer(Player player, Component message);
+
         void onStartVotePassed();
 
         void onEndVotePassed();
@@ -83,7 +85,7 @@ public final class VoteService {
         if (activeVoteSession == null || activeVoteSession.voteId != voteId) {
             Player player = hooks.getPlayer(playerId);
             if (player != null) {
-                player.sendSystemMessage(Component.translatable("message.codpattern.game.vote_expired"));
+                hooks.notifyPlayer(player, Component.translatable("message.codpattern.game.vote_expired"));
             }
             return false;
         }
@@ -95,7 +97,7 @@ public final class VoteService {
         if (session.accepted.contains(playerId) || session.rejected.contains(playerId)) {
             Player player = hooks.getPlayer(playerId);
             if (player != null) {
-                player.sendSystemMessage(Component.translatable("message.codpattern.game.already_voted"));
+                hooks.notifyPlayer(player, Component.translatable("message.codpattern.game.already_voted"));
             }
             return false;
         }
@@ -169,17 +171,17 @@ public final class VoteService {
         }
 
         if (activeVoteSession != null) {
-            initiatorPlayer.sendSystemMessage(Component.translatable("message.codpattern.game.vote_in_progress"));
+            hooks.notifyPlayer(initiatorPlayer, Component.translatable("message.codpattern.game.vote_in_progress"));
             return false;
         }
 
         if (type == VoteType.START) {
             if (!hooks.isWaitingPhase()) {
-                initiatorPlayer.sendSystemMessage(Component.translatable("message.codpattern.game.already_started"));
+                hooks.notifyPlayer(initiatorPlayer, Component.translatable("message.codpattern.game.already_started"));
                 return false;
             }
         } else if (!hooks.isPlayingOrWarmupPhase()) {
-            initiatorPlayer.sendSystemMessage(Component.translatable("message.codpattern.game.not_started"));
+            hooks.notifyPlayer(initiatorPlayer, Component.translatable("message.codpattern.game.not_started"));
             return false;
         }
 
@@ -190,7 +192,7 @@ public final class VoteService {
 
         int totalPlayers = joinedPlayers.size();
         if (type == VoteType.START && totalPlayers < hooks.getMinPlayersToStart()) {
-            initiatorPlayer.sendSystemMessage(Component.translatable("message.codpattern.game.min_players_warning",
+            hooks.notifyPlayer(initiatorPlayer, Component.translatable("message.codpattern.game.min_players_warning",
                     hooks.getMinPlayersToStart(), totalPlayers));
             return false;
         }
@@ -200,7 +202,7 @@ public final class VoteService {
                     .filter(joinedPlayer -> !hooks.isPlayerReady(joinedPlayer.getUUID()))
                     .count();
             if (unreadyCount > 0) {
-                initiatorPlayer.sendSystemMessage(Component.translatable("message.codpattern.vote.players_not_ready"));
+                hooks.notifyPlayer(initiatorPlayer, Component.translatable("message.codpattern.vote.players_not_ready"));
                 return false;
             }
         }

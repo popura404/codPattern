@@ -4,6 +4,8 @@ import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.TdmCombatMarkerTracker;
 import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
+import com.cdp.codpattern.client.gui.screen.NoticePopupScreen;
+import com.cdp.codpattern.client.gui.screen.PopupNoticeHelper;
 import com.cdp.codpattern.client.gui.screen.TdmRoomScreen;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomData;
 import com.cdp.codpattern.client.refit.AttachmentRefitClientState;
@@ -72,6 +74,19 @@ public class ClientPacketHandler {
                 message,
                 Component.translatable("screen.codpattern.vote_dialog.accept"),
                 Component.translatable("screen.codpattern.vote_dialog.reject")));
+    }
+
+    public static void handlePopupNotice(Component title, Component message) {
+        Minecraft.getInstance().execute(() -> {
+            Screen current = Minecraft.getInstance().screen;
+            if (current instanceof TdmRoomScreen || current instanceof NoticePopupScreen) {
+                PopupNoticeHelper.show(title, message);
+                return;
+            }
+            if (Minecraft.getInstance().player != null) {
+                Minecraft.getInstance().player.sendSystemMessage(message);
+            }
+        });
     }
 
     public static void handleSyncBackpackConfig(String configJson) {
@@ -183,7 +198,7 @@ public class ClientPacketHandler {
             }
             if (!success && Minecraft.getInstance().player != null) {
                 String message = reasonMessage.isBlank() ? "离开房间失败: " + reasonCode : reasonMessage;
-                Minecraft.getInstance().player.sendSystemMessage(Component.literal("§c" + message));
+                PopupNoticeHelper.show(Component.literal("§c" + message));
             }
         });
     }

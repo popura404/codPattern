@@ -11,6 +11,7 @@ import com.cdp.codpattern.network.tdm.JoinRoomResultPacket;
 import com.cdp.codpattern.network.tdm.LeaveRoomPacket;
 import com.cdp.codpattern.network.tdm.LeaveRoomResultPacket;
 import com.cdp.codpattern.network.tdm.PhysicsMobRetainPacket;
+import com.cdp.codpattern.network.tdm.PopupNoticePacket;
 import com.cdp.codpattern.network.tdm.RequestRoomListPacket;
 import com.cdp.codpattern.network.tdm.RoomListSyncPacket;
 import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
@@ -92,6 +93,12 @@ final class TdmPacketRegistrar {
                 .decoder(VoteDialogPacket::decode)
                 .encoder(VoteDialogPacket::encode)
                 .consumerMainThread(VoteDialogPacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(PopupNoticePacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(PopupNoticePacket::decode)
+                .encoder(PopupNoticePacket::encode)
+                .consumerMainThread(PopupNoticePacket::handle)
                 .add();
 
         ModNetworkChannel.CHANNEL.messageBuilder(DeathCamPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)

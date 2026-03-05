@@ -6,6 +6,7 @@ import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.tdm.service.VoteService;
 import com.cdp.codpattern.config.tdm.CodTdmConfig;
 import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
+import com.cdp.codpattern.network.tdm.PopupNoticePacket;
 import com.cdp.codpattern.network.tdm.VoteDialogPacket;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -84,6 +85,19 @@ final class CodTdmVoteHooks implements VoteService.Hooks {
     @Override
     public void sendVoteDialog(VoteDialogPacket packet, ServerPlayer player) {
         ModNetworkChannel.sendToPlayer(packet, player);
+    }
+
+    @Override
+    public void notifyPlayer(Player player, Component message) {
+        if (player instanceof ServerPlayer serverPlayer) {
+            ModNetworkChannel.sendToPlayer(
+                    new PopupNoticePacket(Component.translatable("screen.codpattern.popup.title"), message),
+                    serverPlayer);
+            return;
+        }
+        if (player != null) {
+            player.sendSystemMessage(message);
+        }
     }
 
     @Override
