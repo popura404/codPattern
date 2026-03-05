@@ -16,6 +16,7 @@ public final class TdmRoomButtonStateBinder {
             Button kortacButton,
             Button specgruButton,
             boolean hasSelectedRoom,
+            boolean selectedDifferentRoom,
             boolean hasJoinedRoom,
             boolean hasPendingAction,
             String currentRoomState,
@@ -30,18 +31,23 @@ public final class TdmRoomButtonStateBinder {
         boolean canSwitchTeam = TdmRoomStateEvaluator.isTeamSwitchAllowed(currentRoomState) || localSpectatorInPlaying;
         boolean canStartVote = TdmRoomStateEvaluator.canStartVote(currentRoomState);
         boolean canEndVote = TdmRoomStateEvaluator.canEndVote(currentRoomState);
+        boolean canJoin = !hasPendingAction && ((!hasJoinedRoom && hasSelectedRoom) || (hasJoinedRoom && selectedDifferentRoom));
 
         if (joinButton != null) {
-            joinButton.active = hasSelectedRoom && !hasJoinedRoom && !hasPendingAction;
-            joinButton.setMessage(pendingAction == TdmRoomUiState.PendingAction.JOINING
-                    ? Component.literal("加入中...")
-                    : Component.translatable("screen.codpattern.tdm_room.join_room"));
+            joinButton.active = canJoin;
+            if (pendingAction == TdmRoomUiState.PendingAction.JOINING) {
+                joinButton.setMessage(Component.translatable("screen.codpattern.tdm_room.joining"));
+            } else if (hasJoinedRoom && selectedDifferentRoom) {
+                joinButton.setMessage(Component.translatable("screen.codpattern.tdm_room.switch_room"));
+            } else {
+                joinButton.setMessage(Component.translatable("screen.codpattern.tdm_room.join_room"));
+            }
         }
 
         if (leaveButton != null) {
             leaveButton.active = hasJoinedRoom && !hasPendingAction;
             if (pendingAction == TdmRoomUiState.PendingAction.LEAVING) {
-                leaveButton.setMessage(Component.literal("离开中..."));
+                leaveButton.setMessage(Component.translatable("screen.codpattern.tdm_room.leaving"));
             } else if (leavePending) {
                 leaveButton.setMessage(Component.translatable(
                         "screen.codpattern.tdm_room.leave_room_pending",
@@ -57,7 +63,8 @@ public final class TdmRoomButtonStateBinder {
                 readyButton.setMessage(Component.translatable("screen.codpattern.tdm.join_game_disabled"));
             } else {
                 readyButton.active = hasJoinedRoom && "WAITING".equals(currentRoomState) && !hasPendingAction;
-                readyButton.setMessage(Component.literal(localPlayerReady ? "取消准备" : "准备"));
+                readyButton.setMessage(Component.translatable(
+                        localPlayerReady ? "screen.codpattern.tdm.ready_cancel" : "screen.codpattern.tdm.ready"));
             }
         }
 

@@ -13,12 +13,13 @@ public final class TdmRoomInfoPanelRenderer {
     private TdmRoomInfoPanelRenderer() {
     }
 
-    public static void render(GuiGraphics graphics,
+    public static void render(
+            GuiGraphics graphics,
             Minecraft mc,
-            int screenWidth,
-            int screenHeight,
-            int roomListX,
-            int roomListWidth,
+            int panelX,
+            int panelY,
+            int panelWidth,
+            int panelHeight,
             int infoActionBottomY,
             String joinedRoom,
             String selectedRoom,
@@ -28,97 +29,222 @@ public final class TdmRoomInfoPanelRenderer {
             boolean joinGamePending,
             boolean hasRoomNotice,
             String roomNoticeText,
-            int roomNoticeColor) {
-        int padding = 15;
-        int headerHeight = 45;
-        int panelX = roomListX + roomListWidth + padding * 2;
-        int panelY = headerHeight;
-        int panelWidth = screenWidth - panelX - padding;
-        int panelHeight = screenHeight - headerHeight - 50 - padding;
+            int roomNoticeColor,
+            float panelAlphaFactor,
+            float contentAlphaFactor) {
+        int frameLeft = panelX - 5;
+        int frameTop = panelY - 5;
+        int frameRight = panelX + panelWidth + 5;
+        int frameBottom = panelY + panelHeight + 5;
+        float contentFactor = Math.max(0.0f, Math.min(1.0f, panelAlphaFactor * contentAlphaFactor));
 
-        graphics.fillGradient(panelX - 5, panelY - 5, panelX + panelWidth + 5, panelY + panelHeight + 5,
-                CodTheme.PANEL_BG, 0xCC101010);
-        graphics.fill(panelX - 5, panelY - 5, panelX + panelWidth + 5, panelY - 4, CodTheme.BORDER_SUBTLE);
-        graphics.fill(panelX - 5, panelY + panelHeight + 4, panelX + panelWidth + 5, panelY + panelHeight + 5,
-                CodTheme.BORDER_SUBTLE);
-        graphics.fill(panelX - 5, panelY - 5, panelX - 4, panelY + panelHeight + 5, CodTheme.BORDER_SUBTLE);
-        graphics.fill(panelX + panelWidth + 4, panelY - 5, panelX + panelWidth + 5, panelY + panelHeight + 5,
-                CodTheme.BORDER_SUBTLE);
+        graphics.fillGradient(frameLeft, frameTop, frameRight, frameBottom,
+                scaleAlpha(CodTheme.PANEL_BG, panelAlphaFactor),
+                scaleAlpha(0xCC101010, panelAlphaFactor));
+        graphics.fill(frameLeft, frameTop, frameRight, frameTop + 1, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
+        graphics.fill(frameLeft, frameBottom - 1, frameRight, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
+        graphics.fill(frameLeft, frameTop, frameLeft + 1, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
+        graphics.fill(frameRight - 1, frameTop, frameRight, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
 
-        if (joinedRoom != null) {
-            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.current_room", joinedRoom),
-                    panelX, panelY, CodTheme.TEXT_PRIMARY);
-            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.select_team"), panelX,
-                    panelY + 15, CodTheme.TEXT_SECONDARY);
-        } else if (selectedRoom != null) {
-            graphics.drawString(mc.font,
-                    Component.translatable("screen.codpattern.tdm_room.selected_room", selectedRoom), panelX, panelY,
-                    CodTheme.TEXT_PRIMARY);
-            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.join_hint"), panelX,
-                    panelY + 15, CodTheme.TEXT_SECONDARY);
-        } else {
-            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.select_hint"), panelX,
-                    panelY, CodTheme.TEXT_SECONDARY);
-        }
+        int contentX = panelX + 8;
+        int contentWidth = Math.max(40, panelWidth - 16);
 
-        graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.room_actions"), panelX,
-                panelY + 30, CodTheme.TEXT_SECONDARY);
-        int actionDividerRight = panelX + Math.max(20, Math.min(190, panelWidth - 8));
-        graphics.fill(panelX, panelY + 40, actionDividerRight, panelY + 41, CodTheme.DIVIDER);
+        renderHeader(graphics, mc, contentX, panelY, joinedRoom, selectedRoom, contentFactor);
 
-        int infoY = Math.max(panelY + 78, infoActionBottomY + 12);
+        TdmRoomData activeRoom = joinedRoom != null ? rooms.get(joinedRoom)
+                : (selectedRoom != null ? rooms.get(selectedRoom) : null);
+        renderOverviewCard(graphics, mc, contentX, panelY + 28, contentWidth, activeRoom, contentFactor);
+
+        graphics.drawString(mc.font,
+                Component.translatable("screen.codpattern.tdm_room.room_actions"),
+                contentX,
+                panelY + 76,
+                scaleAlpha(CodTheme.TEXT_SECONDARY, contentFactor));
+        int dividerEndX = contentX + Math.max(24, Math.min(220, contentWidth - 8));
+        graphics.fill(contentX, panelY + 85, dividerEndX, panelY + 86, scaleAlpha(CodTheme.DIVIDER, contentFactor));
+
+        int infoY = Math.max(panelY + 90, infoActionBottomY + 12);
         if (joinedRoom != null) {
             TdmRoomData joined = rooms.get(joinedRoom);
             if (joined != null) {
                 graphics.drawString(mc.font,
                         Component.translatable("screen.codpattern.tdm_room.current_score",
                                 TdmRoomTextFormatter.teamScoreText(joined.teamScores)),
-                        panelX, infoY, 0xFFE5E5E5);
+                        contentX,
+                        infoY,
+                        scaleAlpha(0xFFE5E5E5, contentFactor));
                 graphics.drawString(mc.font,
                         Component.translatable("screen.codpattern.tdm_room.current_phase",
                                 TdmRoomTextFormatter.phaseStatusText(joined.state, joined.remainingTimeTicks)),
-                        panelX, infoY + 12, 0xFFB0B0B0);
+                        contentX,
+                        infoY + 12,
+                        scaleAlpha(0xFFB0B0B0, contentFactor));
                 infoY += 26;
             }
         }
 
-        TdmRoomData selected = null;
-        if (joinedRoom != null) {
-            selected = rooms.get(joinedRoom);
-        } else if (selectedRoom != null) {
-            selected = rooms.get(selectedRoom);
-        }
-        if (selected != null && !selected.hasMatchEndTeleportPoint) {
-            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.warning_no_end_tp"),
-                    panelX, infoY, CodTheme.TEXT_DANGER);
-            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.warning_no_end_tp_hint"),
-                    panelX, infoY + 12, 0xFFAA55);
+        if (activeRoom != null && !activeRoom.hasMatchEndTeleportPoint) {
+            graphics.drawString(mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.warning_no_end_tp"),
+                    contentX,
+                    infoY,
+                    scaleAlpha(CodTheme.TEXT_DANGER, contentFactor));
+            graphics.drawString(mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.warning_no_end_tp_hint"),
+                    contentX,
+                    infoY + 12,
+                    scaleAlpha(0xFFAA55, contentFactor));
             infoY += 24;
         }
 
-        int hintLines = (leavePending ? 1 : 0) + (joinGamePending ? 1 : 0);
+        int hintLines = (leavePending ? 1 : 0) + (joinGamePending ? 1 : 0) + (hasRoomNotice ? 1 : 0);
         int rosterTop = Math.max(infoActionBottomY + 18, infoY + 8);
         int rosterBottom = panelY + panelHeight - 24 - (hintLines * 12);
         if (joinedRoom != null && rosterTop < rosterBottom) {
-            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.roster_title"),
-                    panelX, rosterTop - 11, CodTheme.TEXT_SECONDARY);
-            TdmRoomRosterRenderer.render(graphics, mc, panelX, panelWidth, rosterTop, rosterBottom, teamPlayers);
+            graphics.drawString(mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.roster_title"),
+                    contentX,
+                    rosterTop - 11,
+                    scaleAlpha(CodTheme.TEXT_SECONDARY, contentFactor));
+            TdmRoomRosterRenderer.render(
+                    graphics,
+                    mc,
+                    contentX,
+                    contentWidth,
+                    rosterTop,
+                    rosterBottom,
+                    teamPlayers,
+                    contentFactor,
+                    System.currentTimeMillis());
         }
 
         int hintY = panelY + panelHeight - 24;
         if (leavePending) {
-            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.leave_room_cancel_hint"),
-                    panelX, hintY, 0xFFFFD75E);
+            graphics.drawString(mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.leave_room_cancel_hint"),
+                    contentX,
+                    hintY,
+                    scaleAlpha(0xFFFFD75E, contentFactor));
             hintY -= 12;
         }
         if (joinGamePending) {
-            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm.join_game_cancel_hint"),
-                    panelX, hintY, 0xFFFFD75E);
+            graphics.drawString(mc.font,
+                    Component.translatable("screen.codpattern.tdm.join_game_cancel_hint"),
+                    contentX,
+                    hintY,
+                    scaleAlpha(0xFFFFD75E, contentFactor));
             hintY -= 12;
         }
         if (hasRoomNotice) {
-            int noticeY = hintY;
-            graphics.drawString(mc.font, roomNoticeText, panelX, noticeY, roomNoticeColor);
+            graphics.drawString(mc.font, roomNoticeText, contentX, hintY, scaleAlpha(roomNoticeColor, contentFactor));
         }
+    }
+
+    private static void renderHeader(
+            GuiGraphics graphics,
+            Minecraft mc,
+            int x,
+            int panelY,
+            String joinedRoom,
+            String selectedRoom,
+            float alphaFactor) {
+        if (joinedRoom != null) {
+            graphics.drawString(mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.current_room", joinedRoom),
+                    x,
+                    panelY,
+                    scaleAlpha(CodTheme.TEXT_PRIMARY, alphaFactor));
+            graphics.drawString(mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.select_team"),
+                    x,
+                    panelY + 13,
+                    scaleAlpha(CodTheme.TEXT_SECONDARY, alphaFactor));
+            return;
+        }
+
+        if (selectedRoom != null) {
+            graphics.drawString(mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.selected_room", selectedRoom),
+                    x,
+                    panelY,
+                    scaleAlpha(CodTheme.TEXT_PRIMARY, alphaFactor));
+            graphics.drawString(mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.join_hint"),
+                    x,
+                    panelY + 13,
+                    scaleAlpha(CodTheme.TEXT_SECONDARY, alphaFactor));
+            return;
+        }
+
+        graphics.drawString(mc.font,
+                Component.translatable("screen.codpattern.tdm_room.select_hint"),
+                x,
+                panelY,
+                scaleAlpha(CodTheme.TEXT_SECONDARY, alphaFactor));
+    }
+
+    private static void renderOverviewCard(
+            GuiGraphics graphics,
+            Minecraft mc,
+            int x,
+            int y,
+            int width,
+            TdmRoomData activeRoom,
+            float alphaFactor) {
+        int cardHeight = 42;
+        graphics.fillGradient(
+                x,
+                y,
+                x + width,
+                y + cardHeight,
+                scaleAlpha(withAlpha(CodTheme.CARD_BG_TOP, 180), alphaFactor),
+                scaleAlpha(withAlpha(CodTheme.CARD_BG_BOTTOM, 200), alphaFactor));
+        graphics.fill(x, y + cardHeight - 2, x + width, y + cardHeight, scaleAlpha(withAlpha(CodTheme.SELECTED_BORDER, 170), alphaFactor));
+
+        graphics.drawString(mc.font,
+                Component.translatable("screen.codpattern.tdm_room.overview"),
+                x + 6,
+                y + 4,
+                scaleAlpha(CodTheme.TEXT_SECONDARY, alphaFactor));
+
+        if (activeRoom == null) {
+            graphics.drawString(mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.select_hint"),
+                    x + 6,
+                    y + 16,
+                    scaleAlpha(CodTheme.TEXT_DIM, alphaFactor));
+            return;
+        }
+
+        graphics.drawString(mc.font,
+                Component.translatable(
+                        "screen.codpattern.tdm_room.players",
+                        activeRoom.playerCount,
+                        activeRoom.maxPlayers),
+                x + 6,
+                y + 16,
+                scaleAlpha(CodTheme.TEXT_PRIMARY, alphaFactor));
+
+        String phaseText = TdmRoomTextFormatter.phaseStatusText(activeRoom.state, activeRoom.remainingTimeTicks);
+        int phaseColor = "PLAYING".equals(activeRoom.state) ? 0xFFFF7A7A : 0xFFB8C7D8;
+        graphics.drawString(mc.font,
+                Component.translatable("screen.codpattern.tdm_room.current_phase", phaseText),
+                x + 6,
+                y + 28,
+                scaleAlpha(phaseColor, alphaFactor));
+    }
+
+    private static int scaleAlpha(int color, float factor) {
+        int alpha = (color >>> 24) & 0xFF;
+        int scaled = clamp((int) (alpha * Math.max(0.0f, Math.min(1.0f, factor))), 0, 255);
+        return (scaled << 24) | (color & 0x00FFFFFF);
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (clamp(alpha, 0, 255) << 24) | (color & 0x00FFFFFF);
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 }

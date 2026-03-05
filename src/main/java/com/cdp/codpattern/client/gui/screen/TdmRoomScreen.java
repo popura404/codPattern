@@ -1,5 +1,6 @@
 package com.cdp.codpattern.client.gui.screen;
 
+import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.refit.TdmRoomActionButton;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomActionController;
@@ -10,7 +11,6 @@ import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomListRenderer;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomSessionState;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomStateEvaluator;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomUiState;
-import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -20,14 +20,26 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * TDM 房间选择界面
  * 显示所有可用房间和房间内的玩家信息
  */
 public class TdmRoomScreen extends Screen {
+    private static final int PAGE_PADDING = 14;
+    private static final int PANEL_GAP = 12;
+    private static final int HEADER_HEIGHT = 44;
+    private static final int FOOTER_HEIGHT = 50;
+    private static final int ROOM_ITEM_HEIGHT = 36;
+    private static final long ENTER_ANIMATION_MS = 260L;
+    private static final long ROOM_LIST_APPLY_DEBOUNCE_MS = 120L;
+    private static final long INFO_CONTENT_FADE_MS = 170L;
+
     private final TdmRoomSessionState roomState = new TdmRoomSessionState();
     private final TdmRoomUiState uiState = new TdmRoomUiState();
     private final TdmRoomActionController actionController;
@@ -37,8 +49,25 @@ public class TdmRoomScreen extends Screen {
     private int roomListY;
     private int roomListWidth;
     private int roomListHeight;
-    private final int roomItemHeight = 34;
+    private int roomListScrollOffset = 0;
+    private int roomListMaxScrollOffset = 0;
     private List<String> roomNames = new ArrayList<>();
+
+    // 右侧信息面板区域
+    private int rightPanelX;
+    private int rightPanelY;
+    private int rightPanelWidth;
+    private int rightPanelHeight;
+
+    // 视觉状态
+    private long openedAtMs = 0L;
+    private int currentEnterOffsetY = 0;
+    private final Map<String, Float> roomHighlightProgress = new HashMap<>();
+    private final Map<String, Long> roomEnteredAtMs = new HashMap<>();
+    private Map<String, TdmRoomData> pendingRoomListUpdate = null;
+    private long pendingRoomListReceivedAtMs = 0L;
+    private String infoContextKey = "";
+    private long infoContentTransitionAtMs = 0L;
 
     // 队伍选择按钮
     private Button kortacButton;
@@ -49,6 +78,10 @@ public class TdmRoomScreen extends Screen {
     private Button voteStartButton;
     private Button voteEndButton;
     private int infoActionBottomY;
+    private int bottomActionBarX;
+    private int bottomActionBarY;
+    private int bottomActionBarWidth;
+    private int bottomActionBarHeight;
 
     public TdmRoomScreen() {
         super(Component.translatable("screen.codpattern.tdm_room.title"));
@@ -59,45 +92,62 @@ public class TdmRoomScreen extends Screen {
     protected void init() {
         super.init();
 
-        // 计算稳定的布局尺寸
-        int padding = 15;
-        int headerHeight = 45;
-        int footerHeight = 50;
+        int contentTop = HEADER_HEIGHT;
+        int contentBottom = Math.max(contentTop + 140, this.height - FOOTER_HEIGHT);
+        int contentHeight = Math.max(120, contentBottom - contentTop);
 
-        // 左侧房间列表面板 (占屏幕 35%)
-        roomListX = padding;
-        roomListY = headerHeight;
-        roomListWidth = (int) (this.width * 0.35) - padding * 2;
-        roomListHeight = this.height - headerHeight - footerHeight - padding;
+        roomListX = PAGE_PADDING;
+        roomListY = contentTop;
+        roomListHeight = contentHeight;
 
-        // 右侧面板起始位置
-        int rightPanelX = roomListX + roomListWidth + padding * 2;
-        int rightPanelWidth = this.width - rightPanelX - padding;
+        int availableContentWidth = Math.max(280, this.width - PAGE_PADDING * 2 - PANEL_GAP);
+        int minRightPanelWidth = 250;
+        int desiredLeftWidth = (int) (availableContentWidth * 0.36f);
+        int maxLeftWidth = Math.max(170, availableContentWidth - minRightPanelWidth);
+        roomListWidth = clamp(desiredLeftWidth, 180, maxLeftWidth);
+
+        rightPanelX = roomListX + roomListWidth + PANEL_GAP;
+        rightPanelY = contentTop;
+        rightPanelWidth = this.width - rightPanelX - PAGE_PADDING;
+        rightPanelHeight = contentHeight;
+
+        if (rightPanelWidth < minRightPanelWidth) {
+            roomListWidth = Math.max(160, availableContentWidth - minRightPanelWidth);
+            rightPanelX = roomListX + roomListWidth + PANEL_GAP;
+            rightPanelWidth = this.width - rightPanelX - PAGE_PADDING;
+        }
+
+        roomListScrollOffset = 0;
+        roomListMaxScrollOffset = 0;
+        openedAtMs = System.currentTimeMillis();
+        infoContextKey = currentInfoContextKey();
+        infoContentTransitionAtMs = openedAtMs;
 
         // 请求房间列表
         actionController.requestRoomList();
 
         // 添加 UI 按钮
-        addButtons(rightPanelX, rightPanelWidth);
+        addButtons();
     }
 
     /**
      * 添加 UI 按钮
      */
-    private void addButtons(int rightPanelX, int rightPanelWidth) {
+    private void addButtons() {
         int buttonHeight = 20;
-        int spacing = 8;
+        int spacing = 6;
+        int actionPadding = 8;
 
-        // 队伍选择按钮 (在右侧面板内)
-        int teamButtonY = roomListY + 46;
-        int teamButtonWidth = (rightPanelWidth - spacing) / 2;
-        teamButtonWidth = Math.max(1, Math.min(teamButtonWidth, 150));
+        int actionX = rightPanelX + actionPadding;
+        int actionWidth = Math.max(120, rightPanelWidth - actionPadding * 2);
+        int halfWidth = Math.max(1, (actionWidth - spacing) / 2);
+        int teamButtonY = rightPanelY + 88;
 
         // KORTAC 队伍按钮
         kortacButton = addRenderableWidget(new TdmRoomActionButton(
-                rightPanelX,
+                actionX,
                 teamButtonY,
-                teamButtonWidth,
+                halfWidth,
                 buttonHeight,
                 Component.translatable("screen.codpattern.tdm_room.join_kortac"),
                 btn -> actionController.selectTeam(TdmTeamNames.KORTAC),
@@ -105,9 +155,9 @@ public class TdmRoomScreen extends Screen {
 
         // SPECGRU 队伍按钮
         specgruButton = addRenderableWidget(new TdmRoomActionButton(
-                rightPanelX + teamButtonWidth + spacing,
+                actionX + halfWidth + spacing,
                 teamButtonY,
-                teamButtonWidth,
+                halfWidth,
                 buttonHeight,
                 Component.translatable("screen.codpattern.tdm_room.join_specgru"),
                 btn -> actionController.selectTeam(TdmTeamNames.SPECGRU),
@@ -115,70 +165,59 @@ public class TdmRoomScreen extends Screen {
 
         // Ready 按钮
         int readyY = teamButtonY + buttonHeight + spacing;
-        int voteStartWidth = Math.max(1, Math.min(180, rightPanelWidth));
         readyButton = addRenderableWidget(new TdmRoomActionButton(
-                rightPanelX,
+                actionX,
                 readyY,
-                voteStartWidth,
+                actionWidth,
                 buttonHeight,
                 Component.translatable("screen.codpattern.tdm.ready"),
                 btn -> actionController.toggleReady(),
                 0xFF6CCF8A));
 
-        // 将“发起开始投票/发起结束投票”放到房间信息区
-        int voteStartY = readyY + buttonHeight + spacing;
+        // 开始/结束投票按钮
+        int voteY = readyY + buttonHeight + spacing;
         voteStartButton = addRenderableWidget(new TdmRoomActionButton(
-                rightPanelX,
-                voteStartY,
-                voteStartWidth,
+                actionX,
+                voteY,
+                halfWidth,
                 buttonHeight,
                 Component.translatable("screen.codpattern.tdm_room.vote_start"),
                 btn -> actionController.voteStart(),
                 CodTheme.SELECTED_BORDER));
-        int voteEndY = voteStartY + buttonHeight + spacing;
         voteEndButton = addRenderableWidget(new TdmRoomActionButton(
-                rightPanelX,
-                voteEndY,
-                voteStartWidth,
+                actionX + halfWidth + spacing,
+                voteY,
+                halfWidth,
                 buttonHeight,
                 Component.translatable("screen.codpattern.tdm_room.vote_end"),
                 btn -> actionController.voteEnd(),
                 CodTheme.TEXT_DANGER));
-        infoActionBottomY = voteEndY + buttonHeight;
-
-        // 刷新按钮移动到房间列表区标题栏右侧
-        int refreshWidth = 74;
-        int refreshHeight = 18;
-        int refreshX = roomListX + roomListWidth - refreshWidth;
-        int refreshY = roomListY - 22;
-        addRenderableWidget(new TdmRoomActionButton(
-                refreshX,
-                refreshY,
-                refreshWidth,
-                refreshHeight,
-                Component.translatable("screen.codpattern.common.refresh"),
-                btn -> actionController.requestRoomList()));
+        infoActionBottomY = voteY + buttonHeight;
 
         // 底部按钮栏
-        int buttonWidth = 120;
-        int bottomY = this.height - 34;
-        int totalButtons = 3;
-        int totalWidth = totalButtons * buttonWidth + (totalButtons - 1) * spacing;
-        int startX = (this.width - totalWidth) / 2;
+        int stripOuterPadding = 2;
+        bottomActionBarX = roomListX - stripOuterPadding;
+        bottomActionBarWidth = (rightPanelX + rightPanelWidth) - bottomActionBarX + stripOuterPadding;
+        bottomActionBarHeight = 34;
+        bottomActionBarY = this.height - bottomActionBarHeight - 8;
 
-        // 加入房间按钮
+        int stripInnerPadding = 8;
+        int buttonWidth = Math.max(80, Math.min(130, (bottomActionBarWidth - stripInnerPadding * 2 - spacing * 3) / 4));
+        int bottomY = bottomActionBarY + 8;
+        int totalWidth = 4 * buttonWidth + 3 * spacing;
+        int startX = bottomActionBarX + (bottomActionBarWidth - totalWidth) / 2;
+
         joinButton = addRenderableWidget(new TdmRoomActionButton(
                 startX,
                 bottomY,
                 buttonWidth,
                 buttonHeight,
                 Component.translatable("screen.codpattern.tdm_room.join_room"),
-                btn -> actionController.joinSelectedRoom(),
+                btn -> handlePrimaryJoinAction(),
                 CodTheme.HOVER_BORDER));
 
-        // 离开房间按钮
         leaveButton = addRenderableWidget(new TdmRoomActionButton(
-                startX + (buttonWidth + spacing),
+                startX + buttonWidth + spacing,
                 bottomY,
                 buttonWidth,
                 buttonHeight,
@@ -186,9 +225,17 @@ public class TdmRoomScreen extends Screen {
                 btn -> actionController.leaveRoom(),
                 CodTheme.TEXT_DANGER));
 
-        // 返回按钮
         addRenderableWidget(new TdmRoomActionButton(
                 startX + 2 * (buttonWidth + spacing),
+                bottomY,
+                buttonWidth,
+                buttonHeight,
+                Component.translatable("screen.codpattern.common.refresh"),
+                btn -> actionController.requestRoomList(),
+                CodTheme.SELECTED_BORDER));
+
+        addRenderableWidget(new TdmRoomActionButton(
+                startX + 3 * (buttonWidth + spacing),
                 bottomY,
                 buttonWidth,
                 buttonHeight,
@@ -196,7 +243,6 @@ public class TdmRoomScreen extends Screen {
                 btn -> onClose(),
                 0xFF9AA5B1));
 
-        // 更新按钮状态
         updateButtonStates();
     }
 
@@ -205,6 +251,9 @@ public class TdmRoomScreen extends Screen {
      */
     private void updateButtonStates() {
         String currentRoomState = actionController.currentRoomState();
+        boolean selectedDifferentRoom = roomState.selectedRoom() != null
+                && roomState.joinedRoom() != null
+                && !roomState.selectedRoom().equals(roomState.joinedRoom());
         boolean localPlayerReady = TdmRoomStateEvaluator.isLocalPlayerReady(
                 Minecraft.getInstance().player == null ? null : Minecraft.getInstance().player.getUUID(),
                 roomState.teamPlayers());
@@ -218,6 +267,7 @@ public class TdmRoomScreen extends Screen {
                 kortacButton,
                 specgruButton,
                 roomState.selectedRoom() != null,
+                selectedDifferentRoom,
                 roomState.joinedRoom() != null,
                 actionController.hasPendingAction(),
                 currentRoomState,
@@ -235,16 +285,22 @@ public class TdmRoomScreen extends Screen {
         this.renderBackground(graphics);
 
         Minecraft mc = Minecraft.getInstance();
+        float enterProgress = enterProgress();
+        int enterOffsetY = (int) ((1.0f - enterProgress) * 12.0f);
+        int titleColor = withAlpha(0xFFFFFFFF, Math.max(85, (int) (255.0f * enterProgress)));
+        currentEnterOffsetY = enterOffsetY;
 
-        // 标题
-        graphics.drawCenteredString(mc.font, Component.translatable("screen.codpattern.tdm_room.header"),
-                this.width / 2, 20, 0xFFFFFF);
+        graphics.drawCenteredString(
+                mc.font,
+                Component.translatable("screen.codpattern.tdm_room.header"),
+                this.width / 2,
+                20 + enterOffsetY,
+                titleColor);
 
-        // 渲染房间列表面板
-        renderRoomListPanel(graphics, mc, mouseX, mouseY);
-
-        // 渲染右侧信息面板
-        renderInfoPanel(graphics, mc);
+        renderRoomListPanel(graphics, mc, mouseX, mouseY, enterProgress, enterOffsetY);
+        refreshInfoContextTransition(false);
+        renderInfoPanel(graphics, mc, enterProgress, enterOffsetY);
+        renderBottomActionStrip(graphics, mc, enterProgress);
 
         super.render(graphics, mouseX, mouseY, partialTick);
     }
@@ -253,39 +309,55 @@ public class TdmRoomScreen extends Screen {
     public void tick() {
         super.tick();
         actionController.tick();
+        flushPendingRoomListUpdate(false);
+        refreshInfoContextTransition(false);
     }
 
     /**
      * 渲染房间列表面板
      */
-    private void renderRoomListPanel(GuiGraphics graphics, Minecraft mc, int mouseX, int mouseY) {
+    private void renderRoomListPanel(
+            GuiGraphics graphics,
+            Minecraft mc,
+            int mouseX,
+            int mouseY,
+            float enterProgress,
+            int enterOffsetY) {
+        roomListMaxScrollOffset = Math.max(0, roomState.rooms().size() - visibleRoomCapacity());
+        roomListScrollOffset = clamp(roomListScrollOffset, 0, roomListMaxScrollOffset);
+
         roomNames = TdmRoomListRenderer.render(
                 graphics,
                 mc,
                 roomListX,
-                roomListY,
+                roomListY + enterOffsetY,
                 roomListWidth,
                 roomListHeight,
-                roomItemHeight,
+                ROOM_ITEM_HEIGHT,
                 roomState.rooms(),
                 roomState.selectedRoom(),
                 roomState.joinedRoom(),
+                roomListScrollOffset,
+                roomHighlightProgress,
+                roomEnteredAtMs,
+                System.currentTimeMillis(),
                 mouseX,
-                mouseY);
+                mouseY,
+                enterProgress);
     }
 
     /**
      * 渲染右侧信息面板
      */
-    private void renderInfoPanel(GuiGraphics graphics, Minecraft mc) {
+    private void renderInfoPanel(GuiGraphics graphics, Minecraft mc, float enterProgress, int enterOffsetY) {
         TdmRoomInfoPanelRenderer.render(
                 graphics,
                 mc,
-                this.width,
-                this.height,
-                roomListX,
-                roomListWidth,
-                infoActionBottomY,
+                rightPanelX,
+                rightPanelY + enterOffsetY,
+                rightPanelWidth,
+                rightPanelHeight,
+                infoActionBottomY + enterOffsetY,
                 roomState.joinedRoom(),
                 roomState.selectedRoom(),
                 roomState.rooms(),
@@ -294,18 +366,24 @@ public class TdmRoomScreen extends Screen {
                 actionController.isJoinGamePending(),
                 actionController.hasRoomNotice(),
                 actionController.roomNoticeText(),
-                actionController.roomNoticeColor());
+                actionController.roomNoticeColor(),
+                enterProgress,
+                infoContentFadeProgress());
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // 检查是否点击了房间列表
-        if (button == 0 && mouseX >= roomListX && mouseX <= roomListX + roomListWidth
-                && mouseY >= roomListY && mouseY < roomListY + roomListHeight) {
+        int listTop = roomListY + currentEnterOffsetY;
+        if (button == 0
+                && mouseX >= roomListX
+                && mouseX <= roomListX + roomListWidth
+                && mouseY >= listTop
+                && mouseY < listTop + roomListHeight) {
 
-            int index = (int) ((mouseY - roomListY) / roomItemHeight);
+            int index = roomListScrollOffset + (int) ((mouseY - listTop) / ROOM_ITEM_HEIGHT);
             if (index >= 0 && index < roomNames.size()) {
                 roomState.setSelectedRoom(roomNames.get(index));
+                refreshInfoContextTransition(true);
                 updateButtonStates();
                 return true;
             }
@@ -314,17 +392,56 @@ public class TdmRoomScreen extends Screen {
     }
 
     @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        int listTop = roomListY + currentEnterOffsetY;
+        if (mouseX >= roomListX
+                && mouseX <= roomListX + roomListWidth
+                && mouseY >= listTop
+                && mouseY < listTop + roomListHeight) {
+            if (delta > 0 && roomListScrollOffset > 0) {
+                roomListScrollOffset--;
+                return true;
+            }
+            if (delta < 0 && roomListScrollOffset < roomListMaxScrollOffset) {
+                roomListScrollOffset++;
+                return true;
+            }
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
+    }
+
+    @Override
     public void renderBackground(@NotNull GuiGraphics graphics) {
         graphics.fillGradient(0, 0, this.width, this.height, CodTheme.BG_TOP, CodTheme.BG_BOTTOM);
     }
-
-    // 数据更新方法（由网络包处理器调用）
 
     /**
      * 更新房间列表
      */
     public void updateRoomList(Map<String, TdmRoomData> rooms) {
+        pendingRoomListUpdate = rooms == null ? new HashMap<>() : new HashMap<>(rooms);
+        pendingRoomListReceivedAtMs = System.currentTimeMillis();
+        if (roomState.rooms().isEmpty()) {
+            flushPendingRoomListUpdate(true);
+        }
+    }
+
+    private void applyRoomListUpdate(Map<String, TdmRoomData> rooms) {
+        Set<String> previous = new HashSet<>(roomState.rooms().keySet());
         actionController.updateRoomList(rooms);
+
+        long now = System.currentTimeMillis();
+        for (String roomName : roomState.rooms().keySet()) {
+            if (!previous.contains(roomName)) {
+                roomEnteredAtMs.put(roomName, now);
+            }
+        }
+        roomEnteredAtMs.keySet().retainAll(roomState.rooms().keySet());
+        roomHighlightProgress.keySet().retainAll(roomState.rooms().keySet());
+
+        roomListMaxScrollOffset = Math.max(0, roomState.rooms().size() - visibleRoomCapacity());
+        roomListScrollOffset = clamp(roomListScrollOffset, 0, roomListMaxScrollOffset);
     }
 
     /**
@@ -349,12 +466,14 @@ public class TdmRoomScreen extends Screen {
         actionController.handleLeaveResult(success, roomName, reasonCode, reasonMessage);
     }
 
-    public void handleJoinGameResult(boolean success, long requestId, String mapName, String reasonCode, String reasonMessage) {
+    public void handleJoinGameResult(boolean success, long requestId, String mapName, String reasonCode,
+            String reasonMessage) {
         actionController.handleJoinGameResult(success, requestId, mapName, reasonCode, reasonMessage);
     }
 
     @Override
     public void onClose() {
+        pendingRoomListUpdate = null;
         actionController.reset();
         super.onClose();
     }
@@ -362,5 +481,121 @@ public class TdmRoomScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    private void renderBottomActionStrip(GuiGraphics graphics, Minecraft mc, float enterProgress) {
+        int stripTop = bottomActionBarY - 4;
+        int stripBottom = bottomActionBarY + bottomActionBarHeight + 4;
+        int stripLeft = bottomActionBarX;
+        int stripRight = bottomActionBarX + bottomActionBarWidth;
+
+        graphics.fillGradient(stripLeft, stripTop, stripRight, stripBottom,
+                withAlpha(CodTheme.PANEL_BG, Math.max(60, (int) (170 * enterProgress))),
+                withAlpha(CodTheme.CARD_BG_BOTTOM, Math.max(70, (int) (190 * enterProgress))));
+        graphics.fill(stripLeft, stripTop, stripRight, stripTop + 1, withAlpha(CodTheme.BORDER_SUBTLE, 160));
+        graphics.fill(stripLeft, stripBottom - 1, stripRight, stripBottom, withAlpha(CodTheme.BORDER_SUBTLE, 160));
+        graphics.fill(stripLeft, stripTop, stripLeft + 1, stripBottom, withAlpha(CodTheme.BORDER_SUBTLE, 160));
+        graphics.fill(stripRight - 1, stripTop, stripRight, stripBottom, withAlpha(CodTheme.BORDER_SUBTLE, 160));
+
+        Component hint = actionHintText();
+        graphics.drawString(
+                mc.font,
+                hint,
+                stripLeft + 8,
+                stripTop - 10,
+                withAlpha(CodTheme.TEXT_SECONDARY, Math.max(70, (int) (230 * enterProgress))));
+    }
+
+    private Component actionHintText() {
+        String joinedRoom = roomState.joinedRoom();
+        String selectedRoom = roomState.selectedRoom();
+        if (joinedRoom != null && selectedRoom != null && !joinedRoom.equals(selectedRoom)) {
+            return Component.translatable("screen.codpattern.tdm_room.action_hint_switch", joinedRoom, selectedRoom);
+        }
+        if (joinedRoom != null) {
+            return Component.translatable("screen.codpattern.tdm_room.action_hint_joined", joinedRoom);
+        }
+        if (selectedRoom != null) {
+            return Component.translatable("screen.codpattern.tdm_room.action_hint_selected", selectedRoom);
+        }
+        return Component.translatable("screen.codpattern.tdm_room.action_hint_none");
+    }
+
+    private void handlePrimaryJoinAction() {
+        String joinedRoom = roomState.joinedRoom();
+        String selectedRoom = roomState.selectedRoom();
+        if (joinedRoom != null) {
+            if (selectedRoom != null && !selectedRoom.equals(joinedRoom)) {
+                actionController.switchToRoom(selectedRoom);
+            }
+            return;
+        }
+        actionController.joinSelectedRoom();
+    }
+
+    private void flushPendingRoomListUpdate(boolean force) {
+        if (pendingRoomListUpdate == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (!force && now - pendingRoomListReceivedAtMs < ROOM_LIST_APPLY_DEBOUNCE_MS) {
+            return;
+        }
+        Map<String, TdmRoomData> toApply = pendingRoomListUpdate;
+        pendingRoomListUpdate = null;
+        pendingRoomListReceivedAtMs = 0L;
+        applyRoomListUpdate(toApply);
+    }
+
+    private void refreshInfoContextTransition(boolean force) {
+        String currentKey = currentInfoContextKey();
+        if (force || !currentKey.equals(infoContextKey)) {
+            infoContextKey = currentKey;
+            infoContentTransitionAtMs = System.currentTimeMillis();
+        }
+    }
+
+    private String currentInfoContextKey() {
+        String joined = roomState.joinedRoom();
+        if (joined != null && !joined.isBlank()) {
+            return "J:" + joined;
+        }
+        String selected = roomState.selectedRoom();
+        if (selected != null && !selected.isBlank()) {
+            return "S:" + selected;
+        }
+        return "";
+    }
+
+    private float infoContentFadeProgress() {
+        if (infoContentTransitionAtMs <= 0L) {
+            return 1.0f;
+        }
+        long elapsed = System.currentTimeMillis() - infoContentTransitionAtMs;
+        float raw = Math.min(1.0f, Math.max(0.0f, elapsed / (float) INFO_CONTENT_FADE_MS));
+        return 0.35f + (raw * 0.65f);
+    }
+
+    private int visibleRoomCapacity() {
+        return Math.max(1, roomListHeight / ROOM_ITEM_HEIGHT);
+    }
+
+    private float enterProgress() {
+        if (openedAtMs <= 0L) {
+            return 1.0f;
+        }
+        long elapsed = System.currentTimeMillis() - openedAtMs;
+        return Math.min(1.0f, Math.max(0.0f, elapsed / (float) ENTER_ANIMATION_MS));
+    }
+
+    private static int clamp(int value, int min, int max) {
+        if (max < min) {
+            return min;
+        }
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (Math.max(0, Math.min(255, alpha)) << 24) | (color & 0x00FFFFFF);
     }
 }

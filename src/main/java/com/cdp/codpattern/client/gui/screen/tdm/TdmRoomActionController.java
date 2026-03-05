@@ -2,7 +2,6 @@ package com.cdp.codpattern.client.gui.screen.tdm;
 
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.gui.CodTheme;
-import com.cdp.codpattern.client.gui.screen.PopupNoticeHelper;
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
@@ -32,6 +31,9 @@ public final class TdmRoomActionController {
     private final TdmRoomUiState uiState;
     private final Runnable buttonStateUpdater;
     private long nextJoinGameRequestId = MIN_JOIN_GAME_REQUEST_ID;
+    private String queuedJoinRoomAfterLeave = null;
+    private String switchOriginRoom = null;
+    private String switchTargetRoom = null;
 
     public TdmRoomActionController(TdmRoomSessionState roomState, TdmRoomUiState uiState, Runnable buttonStateUpdater) {
         this.roomState = roomState;
@@ -107,10 +109,35 @@ public final class TdmRoomActionController {
         }
         clearPendingLeave();
         clearPendingJoinGame();
+        clearSwitchFlow();
         clearRoomNotice();
         ModNetworkChannel.sendToServer(new JoinRoomPacket(selectedRoom, null));
         startPendingAction(TdmRoomUiState.PendingAction.JOINING, selectedRoom);
         buttonStateUpdater.run();
+    }
+
+    public void switchToRoom(String targetRoom) {
+        if (targetRoom == null || targetRoom.isBlank()) {
+            return;
+        }
+        if (uiState.hasPendingAction()) {
+            return;
+        }
+        String joinedRoom = roomState.joinedRoom();
+        if (joinedRoom == null || joinedRoom.isBlank()) {
+            roomState.setSelectedRoom(targetRoom);
+            joinSelectedRoom();
+            return;
+        }
+        if (joinedRoom.equals(targetRoom)) {
+            return;
+        }
+
+        clearPendingLeave();
+        clearPendingJoinGame();
+        clearRoomNotice();
+        startSwitchFlow(joinedRoom, targetRoom);
+        executeLeaveRoom();
     }
 
     public void selectTeam(String teamName) {
@@ -134,6 +161,7 @@ public final class TdmRoomActionController {
         if (uiState.hasPendingAction()) {
             return;
         }
+        clearSwitchFlow();
         clearPendingJoinGame();
         if (isLeavePending()) {
             clearPendingLeave();
@@ -206,11 +234,14 @@ public final class TdmRoomActionController {
         roomState.setJoinedRoom(roomName);
         roomState.setSelectedRoom(roomName);
         clearPendingJoinGame();
+        clearSwitchFlow();
         clearPendingAction();
         buttonStateUpdater.run();
     }
 
     public void handleJoinResult(boolean success, String mapName, String reasonCode, String reasonMessage) {
+        String pendingRoom = uiState.pendingRoomName();
+        boolean switchJoinAttempt = isSwitchJoinAttempt(pendingRoom);
         if (uiState.pendingAction() == TdmRoomUiState.PendingAction.JOINING) {
             clearPendingAction();
         }
@@ -220,12 +251,23 @@ public final class TdmRoomActionController {
             roomState.setJoinedRoom(mapName);
             roomState.setSelectedRoom(mapName);
             clearRoomNotice();
+            if (switchJoinAttempt && mapName != null && !mapName.isBlank()) {
+                showRoomNotice(
+                        Component.translatable("screen.codpattern.tdm_room.switch_success", mapName).getString(),
+                        CodTheme.TEXT_SECONDARY);
+            }
+            clearSwitchFlow();
             buttonStateUpdater.run();
             return;
         }
-        String message = (reasonMessage == null || reasonMessage.isBlank())
-                ? "加入房间失败: " + (reasonCode == null ? "UNKNOWN" : reasonCode)
-                : "加入房间失败: " + reasonMessage;
+        String reason = resolveReasonText(reasonCode, reasonMessage);
+        String message;
+        if (switchJoinAttempt) {
+            message = Component.translatable("screen.codpattern.tdm_room.switch_failed_join_retry", reason).getString();
+        } else {
+            message = Component.translatable("screen.codpattern.tdm_room.error.join_failed", reason).getString();
+        }
+        clearSwitchFlow();
         showRoomNotice(message, CodTheme.TEXT_DANGER);
         buttonStateUpdater.run();
     }
@@ -235,18 +277,33 @@ public final class TdmRoomActionController {
             clearPendingAction();
         }
         clearPendingJoinGame();
+        String queuedJoinTarget = queuedJoinRoomAfterLeave;
+        queuedJoinRoomAfterLeave = null;
         if (success) {
             roomState.setJoinedRoom(null);
             roomState.clearTeamPlayers();
             ClientTdmState.resetMatchState();
+
+            if (queuedJoinTarget != null && !queuedJoinTarget.isBlank()) {
+                roomState.setSelectedRoom(queuedJoinTarget);
+                clearRoomNotice();
+                ModNetworkChannel.sendToServer(new JoinRoomPacket(queuedJoinTarget, null));
+                startPendingAction(TdmRoomUiState.PendingAction.JOINING, queuedJoinTarget);
+                buttonStateUpdater.run();
+                return;
+            }
+
             showRoomNotice("已离开房间", CodTheme.TEXT_SECONDARY);
+            clearSwitchFlow();
             if (roomName != null && roomName.equals(roomState.selectedRoom())) {
                 roomState.setSelectedRoom(roomName);
             }
         } else {
-            String message = (reasonMessage == null || reasonMessage.isBlank())
-                    ? "离开房间失败: " + (reasonCode == null ? "UNKNOWN" : reasonCode)
-                    : "离开房间失败: " + reasonMessage;
+            String reason = resolveReasonText(reasonCode, reasonMessage);
+            String message = hasActiveSwitchFlow()
+                    ? Component.translatable("screen.codpattern.tdm_room.switch_failed_leave_retry", reason).getString()
+                    : Component.translatable("screen.codpattern.tdm_room.error.leave_failed", reason).getString();
+            clearSwitchFlow();
             showRoomNotice(message, CodTheme.TEXT_DANGER);
         }
         buttonStateUpdater.run();
@@ -270,9 +327,8 @@ public final class TdmRoomActionController {
             buttonStateUpdater.run();
             return;
         }
-        String message = (reasonMessage == null || reasonMessage.isBlank())
-                ? "加入游戏失败: " + (reasonCode == null ? "UNKNOWN" : reasonCode)
-                : "加入游戏失败: " + reasonMessage;
+        String reason = resolveReasonText(reasonCode, reasonMessage);
+        String message = Component.translatable("screen.codpattern.tdm_room.error.join_game_failed", reason).getString();
         showRoomNotice(message, CodTheme.TEXT_DANGER);
         buttonStateUpdater.run();
     }
@@ -327,6 +383,7 @@ public final class TdmRoomActionController {
     }
 
     public void reset() {
+        clearSwitchFlow();
         uiState.reset();
     }
 
@@ -409,12 +466,61 @@ public final class TdmRoomActionController {
         if (message == null || message.isBlank()) {
             return;
         }
-        uiState.clearNotice();
-        PopupNoticeHelper.show(Component.literal(message));
+        uiState.showNotice(message, color, durationMs, System.currentTimeMillis());
     }
 
     private void clearRoomNotice() {
         uiState.clearNotice();
+    }
+
+    private void startSwitchFlow(String originRoom, String targetRoom) {
+        switchOriginRoom = originRoom;
+        switchTargetRoom = targetRoom;
+        queuedJoinRoomAfterLeave = targetRoom;
+    }
+
+    private void clearSwitchFlow() {
+        switchOriginRoom = null;
+        switchTargetRoom = null;
+        queuedJoinRoomAfterLeave = null;
+    }
+
+    private boolean hasActiveSwitchFlow() {
+        return switchTargetRoom != null && !switchTargetRoom.isBlank();
+    }
+
+    private boolean isSwitchJoinAttempt(String pendingRoom) {
+        return hasActiveSwitchFlow()
+                && pendingRoom != null
+                && switchTargetRoom.equals(pendingRoom)
+                && switchOriginRoom != null
+                && !switchOriginRoom.equals(switchTargetRoom);
+    }
+
+    private String resolveReasonText(String reasonCode, String reasonMessage) {
+        String code = reasonCode == null ? "" : reasonCode.trim();
+        if (!code.isEmpty()) {
+            return switch (code) {
+                case "MAP_NOT_FOUND" -> Component.translatable("screen.codpattern.tdm_room.error.map_not_found").getString();
+                case "PHASE_LOCKED" -> Component.translatable("screen.codpattern.tdm_room.error.phase_locked").getString();
+                case "TEAM_NOT_FOUND" -> Component.translatable("screen.codpattern.tdm_room.error.team_not_found").getString();
+                case "TEAM_FULL" -> Component.translatable("screen.codpattern.tdm_room.error.team_full").getString();
+                case "TEAM_BALANCE_EXCEEDED" -> Component.translatable("screen.codpattern.tdm_room.error.team_balance_exceeded").getString();
+                case "NOT_IN_ROOM" -> Component.translatable("screen.codpattern.tdm_room.error.not_in_room").getString();
+                case "NOT_SPECTATOR" -> Component.translatable("screen.codpattern.tdm_room.error.not_spectator").getString();
+                case "UNKNOWN" -> Component.translatable("screen.codpattern.tdm_room.error.unknown").getString();
+                default -> {
+                    if (reasonMessage != null && !reasonMessage.isBlank()) {
+                        yield reasonMessage;
+                    }
+                    yield Component.translatable("screen.codpattern.tdm_room.error.unknown").getString();
+                }
+            };
+        }
+        if (reasonMessage != null && !reasonMessage.isBlank()) {
+            return reasonMessage;
+        }
+        return Component.translatable("screen.codpattern.tdm_room.error.unknown").getString();
     }
 
     private boolean isMidMatchJoinTemporarilyDisabled() {

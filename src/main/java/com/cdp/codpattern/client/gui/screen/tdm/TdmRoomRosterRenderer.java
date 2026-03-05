@@ -1,13 +1,14 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
-import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
+import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -16,13 +17,16 @@ public final class TdmRoomRosterRenderer {
     private TdmRoomRosterRenderer() {
     }
 
-    public static void render(GuiGraphics graphics,
+    public static void render(
+            GuiGraphics graphics,
             Minecraft mc,
             int panelX,
             int panelWidth,
             int startY,
-        int maxY,
-        Map<String, List<PlayerInfo>> teamPlayers) {
+            int maxY,
+            Map<String, List<PlayerInfo>> teamPlayers,
+            float alphaFactor,
+            long nowMs) {
         List<String> teamOrder = new ArrayList<>();
         teamOrder.add(TdmTeamNames.KORTAC);
         teamOrder.add(TdmTeamNames.SPECGRU);
@@ -33,31 +37,52 @@ public final class TdmRoomRosterRenderer {
         }
 
         int y = startY;
+        int rowIndex = 0;
         for (String teamName : teamOrder) {
-            List<PlayerInfo> players = teamPlayers.getOrDefault(teamName, List.of());
-            y = renderSingleTeamRoster(graphics, mc, panelX, panelWidth, y, maxY, teamName, players);
+            List<PlayerInfo> players = new ArrayList<>(teamPlayers.getOrDefault(teamName, List.of()));
+            players.sort(playerComparator());
+            RenderResult result = renderSingleTeamRoster(
+                    graphics,
+                    mc,
+                    panelX,
+                    panelWidth,
+                    y,
+                    maxY,
+                    teamName,
+                    players,
+                    rowIndex,
+                    alphaFactor,
+                    nowMs);
+            y = result.nextY;
+            rowIndex = result.nextRowIndex;
             if (y > maxY) {
                 break;
             }
         }
     }
 
-    private static int renderSingleTeamRoster(GuiGraphics graphics,
+    private static RenderResult renderSingleTeamRoster(
+            GuiGraphics graphics,
             Minecraft mc,
             int panelX,
             int panelWidth,
             int startY,
             int maxY,
             String teamName,
-            List<PlayerInfo> players) {
+            List<PlayerInfo> players,
+            int rowIndex,
+            float alphaFactor,
+            long nowMs) {
         int accent = getTeamAccentColor(teamName);
         int headerHeight = 14;
         if (startY + headerHeight > maxY) {
-            return maxY + 1;
+            return new RenderResult(maxY + 1, rowIndex);
         }
 
-        graphics.fill(panelX, startY, panelX + panelWidth, startY + headerHeight, withAlpha(accent, 40));
-        graphics.fill(panelX, startY + headerHeight - 1, panelX + panelWidth, startY + headerHeight, withAlpha(accent, 160));
+        graphics.fill(panelX, startY, panelX + panelWidth, startY + headerHeight,
+                scaleAlpha(withAlpha(accent, 40), alphaFactor));
+        graphics.fill(panelX, startY + headerHeight - 1, panelX + panelWidth, startY + headerHeight,
+                scaleAlpha(withAlpha(accent, 160), alphaFactor));
 
         String teamKey = "screen.codpattern.tdm_room.team." + teamName.toLowerCase(Locale.ROOT);
         String teamLabel = Component.translatable(teamKey).getString();
@@ -65,55 +90,89 @@ public final class TdmRoomRosterRenderer {
             teamLabel = teamName.toUpperCase(Locale.ROOT);
         }
         String headerText = teamLabel + "  (" + players.size() + ")";
-        graphics.drawString(mc.font, headerText, panelX + 5, startY + 3, accent);
+        graphics.drawString(mc.font, headerText, panelX + 5, startY + 3, scaleAlpha(accent, alphaFactor));
 
         int y = startY + headerHeight + 3;
         if (players.isEmpty()) {
-            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.no_players"), panelX + 5, y,
-                    CodTheme.TEXT_DIM);
-            return y + 14;
+            graphics.drawString(mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.no_players"),
+                    panelX + 5,
+                    y,
+                    scaleAlpha(CodTheme.TEXT_DIM, alphaFactor));
+            return new RenderResult(y + 14, rowIndex);
         }
 
         int rowHeight = 24;
+        int currentIndex = rowIndex;
         for (PlayerInfo player : players) {
             if (y + rowHeight > maxY) {
-                graphics.drawString(mc.font, "...", panelX + panelWidth - 14, Math.max(startY + 2, maxY - 9),
-                        CodTheme.TEXT_DIM);
-                return maxY + 1;
+                graphics.drawString(mc.font,
+                        "...",
+                        panelX + panelWidth - 14,
+                        Math.max(startY + 2, maxY - 9),
+                        scaleAlpha(CodTheme.TEXT_DIM, alphaFactor));
+                return new RenderResult(maxY + 1, currentIndex);
             }
-            renderPlayerStatCard(graphics, mc, panelX, panelWidth, y, rowHeight, player, accent);
+            renderPlayerStatCard(graphics, mc, panelX, panelWidth, y, rowHeight, player, accent, currentIndex, alphaFactor, nowMs);
             y += rowHeight + 3;
+            currentIndex++;
         }
-        return y + 4;
+        return new RenderResult(y + 4, currentIndex);
     }
 
-    private static void renderPlayerStatCard(GuiGraphics graphics,
+    private static void renderPlayerStatCard(
+            GuiGraphics graphics,
             Minecraft mc,
             int x,
             int width,
             int y,
             int height,
             PlayerInfo player,
-            int teamColor) {
-        int cardTop = player.isAlive() ? withAlpha(teamColor, 30) : 0x66331515;
+            int teamColor,
+            int rowIndex,
+            float alphaFactor,
+            long nowMs) {
+        float alivePulse = player.isAlive()
+                ? (0.75f + 0.25f * (0.5f + 0.5f * (float) Math.sin((nowMs / 185.0) + rowIndex * 0.55)))
+                : 1.0f;
+
+        int cardTop = player.isAlive() ? withAlpha(teamColor, 32) : 0x66331515;
         int cardBottom = player.isAlive() ? withAlpha(0xFF0F1114, 190) : 0x661A1212;
-        int lifeColor = player.isAlive() ? 0xFF4DFF8A : 0xFFFF6B6B;
+        int lifeColor = player.isAlive()
+                ? withAlpha(0xFF4DFF8A, (int) (180.0f * alivePulse))
+                : 0xFFFF6B6B;
         int cardRight = x + width;
 
-        graphics.fillGradient(x, y, cardRight, y + height, cardTop, cardBottom);
-        graphics.fill(x, y, x + 2, y + height, lifeColor);
+        graphics.fillGradient(x, y, cardRight, y + height,
+                scaleAlpha(cardTop, alphaFactor),
+                scaleAlpha(cardBottom, alphaFactor));
+        graphics.fill(x, y, x + 2, y + height, scaleAlpha(lifeColor, alphaFactor));
 
         String aliveMark = player.isAlive() ? "● " : "✖ ";
         String readyMark = player.isReady() ? "§a[R] " : "§7[ ] ";
         String kdText = TdmRoomTextFormatter.formatKd(player.kills(), player.deaths());
         String headline = readyMark + aliveMark + player.name();
         String scoreText = "K/D " + player.kills() + "/" + player.deaths();
-        String meta = Component.translatable("screen.codpattern.tdm_room.player_meta",
-                TdmRoomTextFormatter.shortPlayerId(player.uuid()), kdText, Math.max(0, player.pingMs())).getString();
+        String meta = Component.translatable(
+                "screen.codpattern.tdm_room.player_meta",
+                TdmRoomTextFormatter.shortPlayerId(player.uuid()),
+                kdText,
+                Math.max(0, player.pingMs())).getString();
 
-        graphics.drawString(mc.font, headline, x + 6, y + 3, 0xFFF4F4F4);
-        graphics.drawString(mc.font, scoreText, cardRight - mc.font.width(scoreText) - 5, y + 3, 0xFFCCCCCC);
-        graphics.drawString(mc.font, meta, x + 6, y + 13, 0xFFB5B5B5);
+        graphics.drawString(mc.font, headline, x + 6, y + 3, scaleAlpha(0xFFF4F4F4, alphaFactor));
+        graphics.drawString(mc.font,
+                scoreText,
+                cardRight - mc.font.width(scoreText) - 5,
+                y + 3,
+                scaleAlpha(0xFFCCCCCC, alphaFactor));
+        graphics.drawString(mc.font, meta, x + 6, y + 13, scaleAlpha(0xFFB5B5B5, alphaFactor));
+    }
+
+    private static Comparator<PlayerInfo> playerComparator() {
+        return Comparator
+                .comparingInt(PlayerInfo::kills).reversed()
+                .thenComparingInt(PlayerInfo::deaths)
+                .thenComparing(PlayerInfo::name, String.CASE_INSENSITIVE_ORDER);
     }
 
     private static int getTeamAccentColor(String teamName) {
@@ -126,7 +185,20 @@ public final class TdmRoomRosterRenderer {
         return 0xFFB4C1CE;
     }
 
+    private static int scaleAlpha(int color, float factor) {
+        int alpha = (color >>> 24) & 0xFF;
+        int scaledAlpha = clamp((int) (alpha * Math.max(0.0f, Math.min(1.0f, factor))), 0, 255);
+        return (scaledAlpha << 24) | (color & 0x00FFFFFF);
+    }
+
     private static int withAlpha(int color, int alpha) {
-        return (Math.max(0, Math.min(255, alpha)) << 24) | (color & 0x00FFFFFF);
+        return (clamp(alpha, 0, 255) << 24) | (color & 0x00FFFFFF);
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private record RenderResult(int nextY, int nextRowIndex) {
     }
 }
