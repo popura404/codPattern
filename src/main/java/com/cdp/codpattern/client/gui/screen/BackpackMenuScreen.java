@@ -22,6 +22,8 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +38,7 @@ public class BackpackMenuScreen extends Screen {
     public int UNIT_LENGTH = 0;
     private BackpackConfig.PlayerBackpackData playerData;
     private int currentSelectedId;
-    private Map<Integer, BackPackSelectButton> buttonMap = new HashMap<>();
+    private Map<Integer, BackPackSelectButton> buttonMap = new LinkedHashMap<>();
     private boolean loading = true;
 
     // 配置按钮管理（hover时显示"配置"按钮）
@@ -152,10 +154,25 @@ public class BackpackMenuScreen extends Screen {
         Minecraft mc = Minecraft.getInstance();
         int titleX = UNIT_LENGTH * 6;
         int titleY = UNIT_LENGTH * 4;
+        int accentX = Math.max(4, titleX - 10);
+        int accentBottom = titleY + mc.font.lineHeight + 1;
 
+        graphics.fill(accentX, titleY - 1, accentX + 3, accentBottom, CodTheme.HOVER_BORDER);
         graphics.drawString(mc.font, "背包选择", titleX, titleY, CodTheme.TEXT_PRIMARY, true);
         graphics.fill(titleX, titleY + mc.font.lineHeight + 4, this.width - titleX, titleY + mc.font.lineHeight + 5,
                 CodTheme.DIVIDER);
+
+        if (playerData != null) {
+            String counterText = playerData.getBackpackCount() + " / 10";
+            graphics.drawString(
+                    mc.font,
+                    counterText,
+                    titleX + mc.font.width("背包选择") + UNIT_LENGTH,
+                    titleY,
+                    CodTheme.TEXT_HOVER,
+                    false
+            );
+        }
 
         String hint = "[LMB] 选择背包   [RMB] 更多操作";
         int hintWidth = mc.font.width(hint);
@@ -163,16 +180,23 @@ public class BackpackMenuScreen extends Screen {
     }
 
     private void renderBackpackGridBackdrop(GuiGraphics graphics) {
-        int panelLeft = UNIT_LENGTH * 7;
-        int panelTop = SCREEN_HEIGHT - UNIT_LENGTH * 24;
-        int panelRight = this.width - UNIT_LENGTH * 7;
-        int panelBottom = SCREEN_HEIGHT - UNIT_LENGTH * 7;
+        BackpackGridLayout.LayoutMetrics layoutMetrics =
+                BackpackGridLayout.metrics(this.width, SCREEN_HEIGHT, UNIT_LENGTH);
+        BackpackGridLayout.PanelBounds panel = layoutMetrics.panelBounds();
+        int panelLeft = panel.left();
+        int panelTop = panel.top();
+        int panelRight = panel.right();
+        int panelBottom = panel.bottom();
 
         graphics.fillGradient(panelLeft, panelTop, panelRight, panelBottom, 0x2A202020, 0x3A101010);
+        graphics.fillGradient(panelLeft + 1, panelTop + 1, panelRight - 1, panelTop + UNIT_LENGTH + 1,
+                0x1CFFFFFF, 0x02000000);
         graphics.fill(panelLeft, panelTop, panelRight, panelTop + 1, CodTheme.BORDER_SUBTLE);
         graphics.fill(panelLeft, panelBottom - 1, panelRight, panelBottom, CodTheme.BORDER_SUBTLE);
         graphics.fill(panelLeft, panelTop, panelLeft + 1, panelBottom, CodTheme.BORDER_SUBTLE);
         graphics.fill(panelRight - 1, panelTop, panelRight, panelBottom, CodTheme.BORDER_SUBTLE);
+        graphics.fill(panelLeft + UNIT_LENGTH, panelTop + UNIT_LENGTH + 1, panelRight - UNIT_LENGTH, panelTop + UNIT_LENGTH + 2,
+                CodTheme.DIVIDER);
     }
 
     private void renderWeaponDisplay(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -303,14 +327,17 @@ public class BackpackMenuScreen extends Screen {
         if (playerData == null) return;
 
         Map<Integer, BackpackConfig.Backpack> backpacks = playerData.getBackpacks_MAP();
+        int totalButtons = getDisplayedButtonCount();
         int buttonIndex = 0;
-        for (Map.Entry<Integer, BackpackConfig.Backpack> entry : backpacks.entrySet()) {
+        for (Map.Entry<Integer, BackpackConfig.Backpack> entry : backpacks.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(Comparator.naturalOrder()))
+                .toList()) {
             if (buttonIndex >= 10) break;
             int backpackId = entry.getKey();
             BackpackConfig.Backpack backpack = entry.getValue();
             buttonIndex++;
             BackpackGridLayout.ButtonPosition pos = BackpackGridLayout.selectButtonPosition(
-                    buttonIndex, UNIT_LENGTH, SCREEN_HEIGHT);
+                    buttonIndex, totalButtons, this.width, SCREEN_HEIGHT, UNIT_LENGTH);
             BackPackSelectButton button = new BackPackSelectButton(
                     pos.x(), pos.y(),
                     UNIT_LENGTH * 20, UNIT_LENGTH * 5,
@@ -328,11 +355,19 @@ public class BackpackMenuScreen extends Screen {
         if (backpackCount < 10) {
             int buttonPosition = backpackCount + 1;
             BackpackGridLayout.ButtonPosition pos = BackpackGridLayout.selectButtonPosition(
-                    buttonPosition, UNIT_LENGTH, SCREEN_HEIGHT);
+                    buttonPosition, getDisplayedButtonCount(), this.width, SCREEN_HEIGHT, UNIT_LENGTH);
             NewBackpackButton addButton = new NewBackpackButton(
                     pos.x(), pos.y(), UNIT_LENGTH * 20, UNIT_LENGTH * 5, backpackCount);
             addRenderableWidget(addButton);
         }
+    }
+
+    private int getDisplayedButtonCount() {
+        if (playerData == null) {
+            return 0;
+        }
+        int backpackCount = Math.min(playerData.getBackpackCount(), 10);
+        return backpackCount < 10 ? backpackCount + 1 : backpackCount;
     }
 
     @Override

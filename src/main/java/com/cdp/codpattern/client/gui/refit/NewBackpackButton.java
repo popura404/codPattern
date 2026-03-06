@@ -70,6 +70,8 @@ public class NewBackpackButton extends Button {
             focusedTimes = 0;
         }
 
+        renderCardShadow(graphics);
+
         // 根据是否可用渲染不同颜色
         if (this.active) {
             // 可用状态 - cod2022绿色调
@@ -82,6 +84,7 @@ public class NewBackpackButton extends Button {
                     this.getX() + this.width, this.getY() + this.height,
                     CodTheme.DISABLED_BG, 0xE0252525);
         }
+        renderCardFrame(graphics);
 
         // 渲染左侧阴影
         graphics.fill(this.getX() - 3, this.getY(),
@@ -101,6 +104,20 @@ public class NewBackpackButton extends Button {
         renderButtonText(graphics);
     }
 
+    private void renderCardShadow(GuiGraphics graphics) {
+        graphics.fill(this.getX() + 2, this.getY() + 2,
+                this.getX() + this.width + 2, this.getY() + this.height + 2,
+                0x38000000);
+    }
+
+    private void renderCardFrame(GuiGraphics graphics) {
+        graphics.fill(this.getX(), this.getY(), this.getX() + this.width, this.getY() + 1, 0x14FFFFFF);
+        graphics.fill(this.getX(), this.getY(), this.getX() + 1, this.getY() + this.height, 0x10FFFFFF);
+        graphics.fill(this.getX() + 4, this.getY() + 4,
+                this.getX() + Math.max(5, this.width / 4), this.getY() + 5,
+                this.active ? CodTheme.HOVER_BORDER_SEMI : 0x20FFFFFF);
+    }
+
     protected void renderButtonText(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
         String text = this.active ? Component.translatable("screen.codpattern.backpack.add_new").getString()
@@ -108,18 +125,18 @@ public class NewBackpackButton extends Button {
         int textColor = this.active ? (this.isHoveredOrFocused() ? CodTheme.HOVER_BORDER : CodTheme.TEXT_PRIMARY)
                 : CodTheme.DISABLED_TEXT;
 
+        String countText = "已用 " + currentBackpackCount + "/10";
+        int totalTextHeight = minecraft.font.lineHeight * 2 + 2;
+        int baseY = this.getY() + (this.height - totalTextHeight) / 2;
+
         int textWidth = minecraft.font.width(text);
         int textX = this.getX() + (this.width - textWidth) / 2;
-        int textY = this.getY() + (this.height - minecraft.font.lineHeight) / 2;
+        graphics.drawString(minecraft.font, text, textX, baseY, textColor, true);
 
-        graphics.drawString(minecraft.font, text, textX, textY, textColor, true);
-
-        // 显示当前背包数量
-        String countText = "(" + currentBackpackCount + "/10)";
         int countWidth = minecraft.font.width(countText);
         graphics.drawString(minecraft.font, countText,
                 this.getX() + (this.width - countWidth) / 2,
-                this.getY() + this.height - minecraft.font.lineHeight - 2,
+                baseY + minecraft.font.lineHeight + 2,
                 CodTheme.TEXT_SECONDARY, true);
     }
 

@@ -214,10 +214,13 @@ public class BackPackSelectButton extends Button {
             hoverTicks = Math.max(0, hoverTicks - 1);
         }
 
+        renderCardShadow(graphics);
+
         // 渲染基础按钮背景 - MWII 深色风格
         graphics.fillGradient(this.getX(), this.getY(),
                 this.getX() + this.width, this.getY() + this.height,
                 CodTheme.CARD_BG_TOP, CodTheme.CARD_BG_BOTTOM);
+        renderCardFrame(graphics);
 
         // 悬停效果
         if (isHoveredOrFocused()) {
@@ -233,6 +236,23 @@ public class BackPackSelectButton extends Button {
         if (backpack != null) {
             renderBackpackInfo(graphics);
         }
+    }
+
+    private void renderCardShadow(GuiGraphics graphics) {
+        graphics.fill(this.getX() + 2, this.getY() + 2,
+                this.getX() + this.width + 2, this.getY() + this.height + 2,
+                0x38000000);
+        graphics.fillGradient(this.getX(), this.getY() + this.height,
+                this.getX() + this.width, this.getY() + this.height + 2,
+                0x32000000, 0x08000000);
+    }
+
+    private void renderCardFrame(GuiGraphics graphics) {
+        graphics.fill(this.getX(), this.getY(), this.getX() + this.width, this.getY() + 1, 0x14FFFFFF);
+        graphics.fill(this.getX(), this.getY(), this.getX() + 1, this.getY() + this.height, 0x10FFFFFF);
+        graphics.fill(this.getX() + 4, this.getY() + 4,
+                this.getX() + Math.max(5, this.width / 4), this.getY() + 5,
+                isCurrentlySelected ? CodTheme.SELECTED_BORDER : 0x20FFFFFF);
     }
 
     /**
@@ -266,11 +286,14 @@ public class BackPackSelectButton extends Button {
         int idColor = isCurrentlySelected ? CodTheme.SELECTED_TEXT : CodTheme.TEXT_SECONDARY;
         graphics.drawString(minecraft.font, idText, this.getX() + 4, this.getY() + 4, idColor, true);
 
-        // 背包名称（居中）
-        String name = getDisplayNameForWidth(minecraft, getDisplayNameRaw(), this.width - 8);
-        int textWidth = minecraft.font.width(name);
-        int textX = this.getX() + (this.width - textWidth) / 2;
-        int textY = this.getY() + (this.height - minecraft.font.lineHeight) / 2;
+        if (isCurrentlySelected) {
+            renderSelectedChip(graphics, minecraft);
+        }
+
+        String title = getDisplayNameForWidth(minecraft, getDisplayNameRaw(), this.width - 12);
+        String subtitleRaw = getSubtitleRaw();
+        boolean showSubtitle = !subtitleRaw.isBlank() && this.height >= minecraft.font.lineHeight * 2 + 10;
+        String subtitle = showSubtitle ? getDisplayNameForWidth(minecraft, subtitleRaw, this.width - 12) : "";
 
         int textColor;
         if (isCurrentlySelected) {
@@ -281,7 +304,30 @@ public class BackPackSelectButton extends Button {
             textColor = CodTheme.TEXT_PRIMARY;
         }
 
-        graphics.drawString(minecraft.font, name, textX, textY, textColor, true);
+        int totalTextHeight = showSubtitle ? minecraft.font.lineHeight * 2 + 2 : minecraft.font.lineHeight;
+        int textY = this.getY() + (this.height - totalTextHeight) / 2 + (showSubtitle ? -1 : 0);
+        int titleWidth = minecraft.font.width(title);
+        int titleX = this.getX() + (this.width - titleWidth) / 2;
+        graphics.drawString(minecraft.font, title, titleX, textY, textColor, true);
+
+        if (showSubtitle) {
+            int subtitleWidth = minecraft.font.width(subtitle);
+            int subtitleX = this.getX() + (this.width - subtitleWidth) / 2;
+            int subtitleY = textY + minecraft.font.lineHeight + 2;
+            int subtitleColor = this.isHoveredOrFocused() ? 0xFFD6E7C8 : CodTheme.TEXT_SECONDARY;
+            graphics.drawString(minecraft.font, subtitle, subtitleX, subtitleY, subtitleColor, false);
+        }
+    }
+
+    private void renderSelectedChip(GuiGraphics graphics, Minecraft minecraft) {
+        String chipText = "已装备";
+        int chipWidth = minecraft.font.width(chipText) + 10;
+        int chipHeight = minecraft.font.lineHeight + 2;
+        int chipX = this.getX() + this.width - chipWidth - 4;
+        int chipY = this.getY() + 4;
+        graphics.fill(chipX, chipY, chipX + chipWidth, chipY + chipHeight, 0xB05A4310);
+        graphics.fill(chipX, chipY, chipX + 2, chipY + chipHeight, CodTheme.SELECTED_BORDER);
+        graphics.drawString(minecraft.font, chipText, chipX + 5, chipY + 1, 0xFFFFE9A3, false);
     }
 
     /**
@@ -359,6 +405,15 @@ public class BackPackSelectButton extends Button {
             secondary = "空";
         }
         return primary + " + " + secondary;
+    }
+
+    private String getSubtitleRaw() {
+        String customName = getCustomName();
+        String combination = getCombinationNameRaw();
+        if (!customName.isBlank() && !combination.isBlank() && !customName.equals(combination)) {
+            return combination;
+        }
+        return "";
     }
 
     private String getCustomName() {
