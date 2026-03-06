@@ -3,6 +3,7 @@ package com.cdp.codpattern.client.gui.screen;
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.client.gui.refit.WeaponSelectionButton;
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
 import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
@@ -66,7 +67,7 @@ public class WeaponScreen extends Screen {
         super.init();
         SCREEN_WIDTH = this.width;
         SCREEN_HEIGHT = this.height;
-        UNIT_LENGTH = (int) (((float) this.width) / 120f);
+        UNIT_LENGTH = Math.max(1, (int) (((float) this.width) / 120f));
 
         loadWeaponTabs();
         createTabButtons();
@@ -238,12 +239,16 @@ public class WeaponScreen extends Screen {
             public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
                 if (scrollOffset > 0) {
                     super.renderWidget(graphics, mouseX, mouseY, partialTick);
-                    graphics.drawCenteredString(
+                    GuiTextHelper.drawCenteredEllipsizedString(
+                            graphics,
                             Minecraft.getInstance().font,
                             Component.translatable("screen.codpattern.weapon.scroll_left"),
                             this.getX() + this.width / 2,
-                            this.getY() + (this.height - 8) / 2,
-                            0xFFFFFF);
+                            this.getY() + (this.height - Minecraft.getInstance().font.lineHeight) / 2,
+                            this.width - 4,
+                            0xFFFFFF,
+                            false
+                    );
                 }
             }
         });
@@ -257,12 +262,16 @@ public class WeaponScreen extends Screen {
             public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
                 if (scrollOffset < maxScroll) {
                     super.renderWidget(graphics, mouseX, mouseY, partialTick);
-                    graphics.drawCenteredString(
+                    GuiTextHelper.drawCenteredEllipsizedString(
+                            graphics,
                             Minecraft.getInstance().font,
                             Component.translatable("screen.codpattern.weapon.scroll_right"),
                             this.getX() + this.width / 2,
-                            this.getY() + (this.height - 8) / 2,
-                            0xFFFFFF);
+                            this.getY() + (this.height - Minecraft.getInstance().font.lineHeight) / 2,
+                            this.width - 4,
+                            0xFFFFFF,
+                            false
+                    );
                 }
             }
         });
@@ -304,12 +313,16 @@ public class WeaponScreen extends Screen {
             @Override
             public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
                 super.renderWidget(graphics, mouseX, mouseY, partialTick);
-                graphics.drawCenteredString(
+                GuiTextHelper.drawCenteredEllipsizedString(
+                        graphics,
                         Minecraft.getInstance().font,
                         Component.translatable("screen.codpattern.weapon.back"),
                         this.getX() + this.width / 2,
-                        this.getY() + (this.height - 8) / 2,
-                        0xFFFFFF);
+                        this.getY() + (this.height - Minecraft.getInstance().font.lineHeight) / 2,
+                        this.width - 4,
+                        0xFFFFFF,
+                        false
+                );
             }
         });
     }
@@ -347,20 +360,28 @@ public class WeaponScreen extends Screen {
             case "lethal" -> Component.translatable("screen.codpattern.weapon.select_lethal").getString();
             default -> Component.translatable("screen.codpattern.weapon.select_weapon").getString();
         };
-        graphics.drawCenteredString(
+        GuiTextHelper.drawCenteredEllipsizedString(
+                graphics,
                 this.font,
-                Component.literal(title),
+                title,
                 this.width / 2,
                 3 * UNIT_LENGTH,
-                0xFFFFFF);
+                this.width - UNIT_LENGTH * 12,
+                0xFFFFFF,
+                false
+        );
 
         String categoryInfo = getTabDisplayName(currentTab).getString();
-        graphics.drawCenteredString(
+        GuiTextHelper.drawCenteredEllipsizedString(
+                graphics,
                 this.font,
-                Component.literal(categoryInfo),
+                categoryInfo,
                 this.width / 2,
                 17 * UNIT_LENGTH,
-                0xFFFF55);
+                this.width - UNIT_LENGTH * 12,
+                0xFFFF55,
+                false
+        );
     }
 
     private Component getTabDisplayName(String tabName) {
@@ -444,12 +465,16 @@ public class WeaponScreen extends Screen {
                     this.getX() + this.width, this.getY() + this.height + 1,
                     0x7019181A, 0x7019181A);
 
-            graphics.drawCenteredString(
+            GuiTextHelper.drawCenteredEllipsizedString(
+                    graphics,
                     Minecraft.getInstance().font,
                     getMessage(),
                     this.getX() + this.width / 2,
-                    this.getY() + (this.height - 8) / 2,
-                    selected ? 0xFFFFFF : (isHoveredOrFocused() ? 0xFFFF55 : 0xAAAAAA));
+                    this.getY() + (this.height - Minecraft.getInstance().font.lineHeight) / 2,
+                    this.width - 4,
+                    selected ? 0xFFFFFF : (isHoveredOrFocused() ? 0xFFFF55 : 0xAAAAAA),
+                    false
+            );
         }
 
         public void setSelected(boolean selected) {

@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.screen.backpack;
 
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.client.gui.refit.BackPackSelectButton;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
@@ -61,10 +62,18 @@ public final class BackpackWeaponPreviewPanel {
         int tacticalWeaponX = dividerSecTac + panelPadding;
         int lethalWeaponX = dividerTacLeth + panelPadding;
 
-        String displayName = hoveredButton.getDisplayNameRaw();
-        String title = "§e§l" + displayName + " §7#" + hoveredButton.getBAGSERIAL();
+        String title = hoveredButton.getDisplayNameRaw() + "  #" + hoveredButton.getBAGSERIAL();
         int titleY = grayBarTop + (grayBarBottom - grayBarTop - mc.font.lineHeight) / 2;
-        graphics.drawString(mc.font, title, primaryWeaponX, titleY, 0xFFFFFF, true);
+        GuiTextHelper.drawEllipsizedString(
+                graphics,
+                mc.font,
+                title,
+                primaryWeaponX,
+                titleY,
+                Math.max(24, panelRight - primaryWeaponX - panelPadding),
+                0xFFF4DC8A,
+                true
+        );
 
         graphics.fillGradient(dividerX, weaponDisplayY + unitLength,
                 dividerX + 1, panelBottom - unitLength,
@@ -98,6 +107,14 @@ public final class BackpackWeaponPreviewPanel {
                 default -> primaryWeaponX;
             };
             int weaponY = weaponDisplayY + unitLength + 2;
+            int columnRight = switch (type) {
+                case "primary" -> dividerX - panelPadding;
+                case "secondary" -> dividerSecTac - panelPadding;
+                case "tactical" -> dividerTacLeth - panelPadding;
+                case "lethal" -> panelRight - panelPadding;
+                default -> dividerX - panelPadding;
+            };
+            int textMaxWidth = Math.max(16, columnRight - weaponX - 2);
 
             boolean isThrowableSlot = "tactical".equals(type) || "lethal".equals(type);
             boolean drawThrowableDimmed = isThrowableSlot && !throwablesEnabled;
@@ -109,7 +126,16 @@ public final class BackpackWeaponPreviewPanel {
                 case "lethal" -> "§6投掷物 2";
                 default -> type;
             };
-            graphics.drawString(mc.font, typeLabel, weaponX, weaponY, 0xFFFFFF, true);
+            GuiTextHelper.drawEllipsizedString(
+                    graphics,
+                    mc.font,
+                    typeLabel,
+                    weaponX,
+                    weaponY,
+                    textMaxWidth,
+                    0xFFFFFF,
+                    true
+            );
 
             if (drawThrowableDimmed) {
                 RenderSystem.enableBlend();
@@ -150,11 +176,29 @@ public final class BackpackWeaponPreviewPanel {
             }
 
             if (info.weaponName != null) {
-                graphics.drawString(mc.font, info.weaponName, weaponX, nameY, 0xFFFFFFFF, false);
+                GuiTextHelper.drawEllipsizedString(
+                        graphics,
+                        mc.font,
+                        info.weaponName,
+                        weaponX,
+                        nameY,
+                        textMaxWidth,
+                        0xFFFFFFFF,
+                        false
+                );
             }
             if (info.packName != null && !isThrowableSlot) {
                 int packY = weaponY + mc.font.lineHeight * 2 + unitLength * 7 + 6;
-                graphics.drawString(mc.font, info.packName, weaponX, packY, 0xAAFFFFFF, false);
+                GuiTextHelper.drawEllipsizedString(
+                        graphics,
+                        mc.font,
+                        info.packName,
+                        weaponX,
+                        packY,
+                        textMaxWidth,
+                        0xAAFFFFFF,
+                        false
+                );
             }
 
             if (drawThrowableDimmed) {

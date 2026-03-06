@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
 import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -99,15 +100,38 @@ public class FlatColorButton extends Button {
             }
         }
 
+        Minecraft minecraft = Minecraft.getInstance();
+        int textMaxWidth = Math.max(16, this.width - 8);
+        boolean showPackName = weaponPackinfo != null
+                && !hidePackName
+                && this.height >= minecraft.font.lineHeight * 2 + UNIT_LENGTH;
+
         // 渲染包名（如果有，投掷物槽位不显示）
-        if (weaponPackinfo != null && !hidePackName) {
-            graphics.drawString(Minecraft.getInstance().font, this.weaponPackinfo,
-                    this.getX() + 4, this.getY() + 4, CodTheme.TEXT_PRIMARY);
+        if (showPackName) {
+            GuiTextHelper.drawEllipsizedString(
+                    graphics,
+                    minecraft.font,
+                    this.weaponPackinfo,
+                    this.getX() + 4,
+                    this.getY() + 4,
+                    textMaxWidth,
+                    CodTheme.TEXT_PRIMARY,
+                    false
+            );
         }
         // 渲染枪名（如果有）
         if (weaponName != null){
-            graphics.drawString(Minecraft.getInstance().font, this.weaponName,
-                    this.getX() + 4, this.getY() + this.height - UNIT_LENGTH - 2, CodTheme.TEXT_PRIMARY);
+            int weaponNameY = this.getY() + this.height - minecraft.font.lineHeight - 3;
+            GuiTextHelper.drawEllipsizedString(
+                    graphics,
+                    minecraft.font,
+                    this.weaponName,
+                    this.getX() + 4,
+                    weaponNameY,
+                    textMaxWidth,
+                    CodTheme.TEXT_PRIMARY,
+                    false
+            );
         }
     }
 

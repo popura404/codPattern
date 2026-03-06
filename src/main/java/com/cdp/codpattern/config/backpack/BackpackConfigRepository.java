@@ -64,6 +64,7 @@ public final class BackpackConfigRepository {
 
     public static int addCustomBackpack(String uuid) {
         BackpackConfig.PlayerBackpackData playerData = getConfig().getOrCreatePlayerData(uuid);
+        int selectedBeforeAdd = playerData.getSelectedBackpack();
         int id = playerData.getNextAvailableId();
         if (id == 0) {
             return -1;
@@ -76,6 +77,9 @@ public final class BackpackConfigRepository {
         newBackpack.setItem_MAP("lethal", BackpackConfig.getItemDataLethal());
 
         if (playerData.addBackpack(id, newBackpack)) {
+            if (playerData.getBackpacks_MAP().containsKey(selectedBeforeAdd)) {
+                playerData.setSelectedBackpack(selectedBeforeAdd);
+            }
             save();
             return id;
         }

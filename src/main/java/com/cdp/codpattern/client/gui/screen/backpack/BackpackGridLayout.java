@@ -47,21 +47,11 @@ public final class BackpackGridLayout {
             int unitLength) {
         LayoutMetrics metrics = metrics(screenWidth, screenHeight, unitLength);
         int clampedButtonIndex = Math.max(1, Math.min(buttonIndex, MAX_COLUMNS * 2));
-        int clampedTotalButtons = Math.max(1, Math.min(totalButtons, MAX_COLUMNS * 2));
         int rowIndex = clampedButtonIndex <= MAX_COLUMNS ? 0 : 1;
-        int rowCount = buttonsInRow(rowIndex, clampedTotalButtons);
         int indexWithinRow = rowIndex == 0 ? clampedButtonIndex - 1 : clampedButtonIndex - MAX_COLUMNS - 1;
-        int rowWidth = rowCount * metrics.buttonWidth() + Math.max(0, rowCount - 1) * metrics.columnGap();
-        int startX = metrics.panelBounds().left() + Math.max(0, (metrics.panelWidth() - rowWidth) / 2);
+        int startX = metrics.panelBounds().left() + unitLength;
         int x = startX + indexWithinRow * (metrics.buttonWidth() + metrics.columnGap());
         int y = rowIndex == 0 ? metrics.topRowY() : metrics.bottomRowY();
         return new ButtonPosition(x, y);
-    }
-
-    private static int buttonsInRow(int rowIndex, int totalButtons) {
-        if (rowIndex == 0) {
-            return Math.min(totalButtons, MAX_COLUMNS);
-        }
-        return Math.max(0, Math.min(totalButtons - MAX_COLUMNS, MAX_COLUMNS));
     }
 }

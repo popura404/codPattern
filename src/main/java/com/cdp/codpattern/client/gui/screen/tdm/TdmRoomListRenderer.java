@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.Map;
 
 public final class TdmRoomListRenderer {
+    private static final float HIGHLIGHT_APPROACH_STEP = 0.44f;
+    private static final long NEW_ROOM_PULSE_MS = 550L;
+
     private TdmRoomListRenderer() {
     }
 
@@ -88,7 +91,7 @@ public final class TdmRoomListRenderer {
             float currentHighlight = approach(
                     highlightProgress.getOrDefault(mapName, 0.0f),
                     targetHighlight,
-                    0.22f);
+                    HIGHLIGHT_APPROACH_STEP);
             highlightProgress.put(mapName, currentHighlight);
 
             int baseTop = withAlpha(CodTheme.CARD_BG_TOP, 70 + (int) (currentHighlight * 80.0f));
@@ -109,10 +112,10 @@ public final class TdmRoomListRenderer {
             long enteredAt = roomEnteredAtMs.getOrDefault(mapName, 0L);
             if (enteredAt > 0L) {
                 long elapsed = nowMs - enteredAt;
-                if (elapsed >= 1100L) {
+                if (elapsed >= NEW_ROOM_PULSE_MS) {
                     roomEnteredAtMs.remove(mapName);
                 } else {
-                    float pulse = 1.0f - (elapsed / 1100.0f);
+                    float pulse = 1.0f - (elapsed / (float) NEW_ROOM_PULSE_MS);
                     int pulseColor = withAlpha(CodTheme.HOVER_BORDER, Math.max(0, (int) (95.0f * pulse)));
                     graphics.fill(roomListX, y, roomListX + roomListWidth, y + roomItemHeight - 2,
                             scaleAlpha(pulseColor, panelAlphaFactor));

@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
 import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
@@ -286,14 +287,14 @@ public class BackPackSelectButton extends Button {
         int idColor = isCurrentlySelected ? CodTheme.SELECTED_TEXT : CodTheme.TEXT_SECONDARY;
         graphics.drawString(minecraft.font, idText, this.getX() + 4, this.getY() + 4, idColor, true);
 
-        if (isCurrentlySelected) {
+        boolean canRenderChip = isCurrentlySelected
+                && this.width >= minecraft.font.width("已装备") + 18
+                && this.height >= minecraft.font.lineHeight + 8;
+        if (canRenderChip) {
             renderSelectedChip(graphics, minecraft);
         }
 
         String title = getDisplayNameForWidth(minecraft, getDisplayNameRaw(), this.width - 12);
-        String subtitleRaw = getSubtitleRaw();
-        boolean showSubtitle = !subtitleRaw.isBlank() && this.height >= minecraft.font.lineHeight * 2 + 10;
-        String subtitle = showSubtitle ? getDisplayNameForWidth(minecraft, subtitleRaw, this.width - 12) : "";
 
         int textColor;
         if (isCurrentlySelected) {
@@ -304,19 +305,17 @@ public class BackPackSelectButton extends Button {
             textColor = CodTheme.TEXT_PRIMARY;
         }
 
-        int totalTextHeight = showSubtitle ? minecraft.font.lineHeight * 2 + 2 : minecraft.font.lineHeight;
-        int textY = this.getY() + (this.height - totalTextHeight) / 2 + (showSubtitle ? -1 : 0);
-        int titleWidth = minecraft.font.width(title);
-        int titleX = this.getX() + (this.width - titleWidth) / 2;
-        graphics.drawString(minecraft.font, title, titleX, textY, textColor, true);
-
-        if (showSubtitle) {
-            int subtitleWidth = minecraft.font.width(subtitle);
-            int subtitleX = this.getX() + (this.width - subtitleWidth) / 2;
-            int subtitleY = textY + minecraft.font.lineHeight + 2;
-            int subtitleColor = this.isHoveredOrFocused() ? 0xFFD6E7C8 : CodTheme.TEXT_SECONDARY;
-            graphics.drawString(minecraft.font, subtitle, subtitleX, subtitleY, subtitleColor, false);
-        }
+        int textY = this.getY() + (this.height - minecraft.font.lineHeight) / 2;
+        GuiTextHelper.drawCenteredEllipsizedString(
+                graphics,
+                minecraft.font,
+                title,
+                this.getX() + this.width / 2,
+                textY,
+                this.width - 12,
+                textColor,
+                true
+        );
     }
 
     private void renderSelectedChip(GuiGraphics graphics, Minecraft minecraft) {
@@ -388,8 +387,7 @@ public class BackPackSelectButton extends Button {
         if (customName != null && !customName.isBlank()) {
             return customName.trim();
         }
-        String combo = getCombinationNameRaw();
-        return combo == null || combo.isBlank() ? "未配置" : combo;
+        return "未命名背包";
     }
 
     public String getCombinationNameRaw() {
@@ -405,15 +403,6 @@ public class BackPackSelectButton extends Button {
             secondary = "空";
         }
         return primary + " + " + secondary;
-    }
-
-    private String getSubtitleRaw() {
-        String customName = getCustomName();
-        String combination = getCombinationNameRaw();
-        if (!customName.isBlank() && !combination.isBlank() && !customName.equals(combination)) {
-            return combination;
-        }
-        return "";
     }
 
     private String getCustomName() {
@@ -437,23 +426,7 @@ public class BackPackSelectButton extends Button {
     }
 
     private String getDisplayNameForWidth(Minecraft minecraft, String raw, int maxWidth) {
-        if (minecraft.font.width(raw) <= maxWidth) {
-            return raw;
-        }
-        String ellipsis = "...";
-        int maxTextWidth = maxWidth - minecraft.font.width(ellipsis);
-        if (maxTextWidth <= 0) {
-            return ellipsis;
-        }
-        StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < raw.length(); i++) {
-            builder.append(raw.charAt(i));
-            if (minecraft.font.width(builder.toString()) > maxTextWidth) {
-                builder.setLength(builder.length() - 1);
-                break;
-            }
-        }
-        return builder + ellipsis;
+        return GuiTextHelper.ellipsize(minecraft.font, raw, maxWidth);
     }
 
     private void addWrappedTooltipLine(List<Component> tooltipLines, Minecraft minecraft, String prefix, String text, int maxWidth, String continuationPrefix) {

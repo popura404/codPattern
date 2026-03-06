@@ -36,9 +36,9 @@ public class TdmRoomScreen extends Screen {
     private static final int HEADER_HEIGHT = 44;
     private static final int FOOTER_HEIGHT = 50;
     private static final int ROOM_ITEM_HEIGHT = 36;
-    private static final long ENTER_ANIMATION_MS = 260L;
-    private static final long ROOM_LIST_APPLY_DEBOUNCE_MS = 120L;
-    private static final long INFO_CONTENT_FADE_MS = 170L;
+    private static final long ENTER_ANIMATION_MS = 130L;
+    private static final long ROOM_LIST_APPLY_DEBOUNCE_MS = 60L;
+    private static final long INFO_CONTENT_FADE_MS = 85L;
 
     private final TdmRoomSessionState roomState = new TdmRoomSessionState();
     private final TdmRoomUiState uiState = new TdmRoomUiState();

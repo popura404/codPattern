@@ -1,5 +1,6 @@
 package com.cdp.codpattern.client.gui.refit;
 
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
 import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -74,16 +75,37 @@ public class WeaponSelectionButton extends Button {
             graphics.renderTooltip(Minecraft.getInstance().font, weapon.getHoverName(), mouseX, mouseY);
         }
 
+        Minecraft minecraft = Minecraft.getInstance();
+        int textMaxWidth = Math.max(16, this.width - 4);
+
         //显示枪名
-        graphics.drawString(Minecraft.getInstance().font, weapon.getHoverName(), this.getX() + 2 , this.getY() + this.height - UNIT_LENGTH ,0xDDFFFFFF);
+        GuiTextHelper.drawEllipsizedString(
+                graphics,
+                minecraft.font,
+                weapon.getHoverName(),
+                this.getX() + 2,
+                this.getY() + this.height - minecraft.font.lineHeight - 1,
+                textMaxWidth,
+                0xDDFFFFFF,
+                false
+        );
 
         //显示枪包名 / LR Tactical 包名
         Component packName = TaczClientApi.getGunPackName(weapon);
         if (packName == null) {
             packName = LrTacticalClientApi.getLrItemPackName(weapon);
         }
-        if (packName != null) {
-            graphics.drawString(Minecraft.getInstance().font, packName, this.getX() + 2, this.getY() + 2, 0xDDFFFFFF);
+        if (packName != null && this.height >= minecraft.font.lineHeight * 2 + 4) {
+            GuiTextHelper.drawEllipsizedString(
+                    graphics,
+                    minecraft.font,
+                    packName,
+                    this.getX() + 2,
+                    this.getY() + 2,
+                    textMaxWidth,
+                    0xDDFFFFFF,
+                    false
+            );
         }
     }
 }

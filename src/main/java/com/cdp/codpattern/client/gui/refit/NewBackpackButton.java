@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.AddBackpackPacket;
 import net.minecraft.client.Minecraft;
@@ -126,18 +127,35 @@ public class NewBackpackButton extends Button {
                 : CodTheme.DISABLED_TEXT;
 
         String countText = "已用 " + currentBackpackCount + "/10";
-        int totalTextHeight = minecraft.font.lineHeight * 2 + 2;
+        boolean showCount = this.height >= minecraft.font.lineHeight * 2 + 8;
+        int totalTextHeight = showCount ? minecraft.font.lineHeight * 2 + 2 : minecraft.font.lineHeight;
         int baseY = this.getY() + (this.height - totalTextHeight) / 2;
+        int textCenterX = this.getX() + this.width / 2;
+        int textMaxWidth = this.width - 12;
 
-        int textWidth = minecraft.font.width(text);
-        int textX = this.getX() + (this.width - textWidth) / 2;
-        graphics.drawString(minecraft.font, text, textX, baseY, textColor, true);
+        GuiTextHelper.drawCenteredEllipsizedString(
+                graphics,
+                minecraft.font,
+                text,
+                textCenterX,
+                baseY,
+                textMaxWidth,
+                textColor,
+                true
+        );
 
-        int countWidth = minecraft.font.width(countText);
-        graphics.drawString(minecraft.font, countText,
-                this.getX() + (this.width - countWidth) / 2,
-                baseY + minecraft.font.lineHeight + 2,
-                CodTheme.TEXT_SECONDARY, true);
+        if (showCount) {
+            GuiTextHelper.drawCenteredEllipsizedString(
+                    graphics,
+                    minecraft.font,
+                    countText,
+                    textCenterX,
+                    baseY + minecraft.font.lineHeight + 2,
+                    textMaxWidth,
+                    CodTheme.TEXT_SECONDARY,
+                    true
+            );
+        }
     }
 
     protected void renderOnHoveredOrFocused(GuiGraphics graphics) {

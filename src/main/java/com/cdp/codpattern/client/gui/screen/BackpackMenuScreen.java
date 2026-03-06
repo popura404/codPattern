@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.client.gui.refit.BackPackSelectButton;
 import com.cdp.codpattern.client.gui.refit.BackpackActionButton;
 import com.cdp.codpattern.client.gui.refit.NewBackpackButton;
@@ -162,21 +163,37 @@ public class BackpackMenuScreen extends Screen {
         graphics.fill(titleX, titleY + mc.font.lineHeight + 4, this.width - titleX, titleY + mc.font.lineHeight + 5,
                 CodTheme.DIVIDER);
 
+        int hintRightX = this.width - titleX;
+        int hintMaxWidth = Math.max(40, this.width / 3);
+        String hint = this.width < UNIT_LENGTH * 36
+                ? "[LMB] 选  [RMB] 更多"
+                : "[LMB] 选择背包   [RMB] 更多操作";
+        GuiTextHelper.drawRightAlignedEllipsizedString(
+                graphics,
+                mc.font,
+                hint,
+                hintRightX,
+                titleY,
+                hintMaxWidth,
+                CodTheme.TEXT_SECONDARY,
+                false
+        );
+
         if (playerData != null) {
             String counterText = playerData.getBackpackCount() + " / 10";
-            graphics.drawString(
-                    mc.font,
-                    counterText,
-                    titleX + mc.font.width("背包选择") + UNIT_LENGTH,
-                    titleY,
-                    CodTheme.TEXT_HOVER,
-                    false
-            );
+            int counterX = titleX + mc.font.width("背包选择") + UNIT_LENGTH;
+            int counterMaxWidth = hintRightX - hintMaxWidth - counterX - UNIT_LENGTH;
+            if (counterMaxWidth >= mc.font.width(counterText)) {
+                graphics.drawString(
+                        mc.font,
+                        counterText,
+                        counterX,
+                        titleY,
+                        CodTheme.TEXT_HOVER,
+                        false
+                );
+            }
         }
-
-        String hint = "[LMB] 选择背包   [RMB] 更多操作";
-        int hintWidth = mc.font.width(hint);
-        graphics.drawString(mc.font, hint, this.width - titleX - hintWidth, titleY, CodTheme.TEXT_SECONDARY, false);
     }
 
     private void renderBackpackGridBackdrop(GuiGraphics graphics) {

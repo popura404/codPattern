@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.client.gui.refit.AttachmentConfigButton;
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
@@ -70,7 +71,7 @@ public class WeaponMenuScreen extends Screen {
 
     public void init() {
         super.init();
-        UNIT_LENGTH = (int) ( ( ( float ) this.width ) / 120f);
+        UNIT_LENGTH = Math.max(1, (int) (((float) this.width) / 120f));
         TextureandPackInfo();
         addWeaponButtonandTexture();
     }
@@ -146,9 +147,18 @@ public class WeaponMenuScreen extends Screen {
 
         // 背包编号
         String bagInfo = "#" + BAGSERIAL;
-        graphics.drawString(mc.font, bagInfo,
-                titleX + mc.font.width(title) + 10, titleY,
-                CodTheme.TEXT_SECONDARY, false);
+        int bagInfoX = titleX + mc.font.width(title) + 10;
+        int bagInfoMaxWidth = Math.max(16, this.width / 5);
+        GuiTextHelper.drawEllipsizedString(
+                graphics,
+                mc.font,
+                bagInfo,
+                bagInfoX,
+                titleY,
+                bagInfoMaxWidth,
+                CodTheme.TEXT_SECONDARY,
+                false
+        );
 
         // 分隔线
         graphics.fill(titleX, titleY + mc.font.lineHeight + 4,
@@ -170,15 +180,36 @@ public class WeaponMenuScreen extends Screen {
 
         Minecraft mc = Minecraft.getInstance();
         int textY = barY + (barHeight - mc.font.lineHeight) / 2;
+        int leftMaxWidth = Math.max(32, this.width / 2 - UNIT_LENGTH * 4);
+        int rightMaxWidth = Math.max(32, this.width / 3);
 
         // 左侧提示
-        String leftHint = "[LMB] 选择武器    [Hover] 更换配件";
-        graphics.drawString(mc.font, leftHint, UNIT_LENGTH * 2, textY, CodTheme.TEXT_SECONDARY, false);
+        String leftHint = this.width < UNIT_LENGTH * 42
+                ? "[LMB] 选择  [Hover] 配件"
+                : "[LMB] 选择武器    [Hover] 更换配件";
+        GuiTextHelper.drawEllipsizedString(
+                graphics,
+                mc.font,
+                leftHint,
+                UNIT_LENGTH * 2,
+                textY,
+                leftMaxWidth,
+                CodTheme.TEXT_SECONDARY,
+                false
+        );
 
         // 右侧提示
         String rightHint = "[ESC] 返回背包列表";
-        int rightWidth = mc.font.width(rightHint);
-        graphics.drawString(mc.font, rightHint, this.width - UNIT_LENGTH * 2 - rightWidth, textY, CodTheme.TEXT_SECONDARY, false);
+        GuiTextHelper.drawRightAlignedEllipsizedString(
+                graphics,
+                mc.font,
+                rightHint,
+                this.width - UNIT_LENGTH * 2,
+                textY,
+                rightMaxWidth,
+                CodTheme.TEXT_SECONDARY,
+                false
+        );
     }
 
     @Override
