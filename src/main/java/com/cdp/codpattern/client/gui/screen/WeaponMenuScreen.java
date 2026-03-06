@@ -145,21 +145,6 @@ public class WeaponMenuScreen extends Screen {
         // 标题文字
         graphics.drawString(mc.font, title, titleX, titleY, CodTheme.TEXT_PRIMARY, true);
 
-        // 背包编号
-        String bagInfo = "#" + BAGSERIAL;
-        int bagInfoX = titleX + mc.font.width(title) + 10;
-        int bagInfoMaxWidth = Math.max(16, this.width / 5);
-        GuiTextHelper.drawEllipsizedString(
-                graphics,
-                mc.font,
-                bagInfo,
-                bagInfoX,
-                titleY,
-                bagInfoMaxWidth,
-                CodTheme.TEXT_SECONDARY,
-                false
-        );
-
         // 分隔线
         graphics.fill(titleX, titleY + mc.font.lineHeight + 4,
                 this.width - titleX, titleY + mc.font.lineHeight + 5,

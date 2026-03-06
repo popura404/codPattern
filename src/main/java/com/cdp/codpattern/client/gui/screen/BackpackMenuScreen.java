@@ -33,6 +33,8 @@ import java.util.Map;
  * 背包选择菜单
  */
 public class BackpackMenuScreen extends Screen {
+    private static final long SCREEN_REVEAL_MS = 180L;
+    private static final long GRID_REFRESH_PULSE_MS = 420L;
 
     public int SCREEN_HEIGHT = 0;
     public int SCREEN_WIDTH = 0;
@@ -54,6 +56,8 @@ public class BackpackMenuScreen extends Screen {
     // 武器信息显示相关
     private BackPackSelectButton currentHoveredButton = null;
     private Map<String, BackPackSelectButton.WeaponInfo> currentWeaponInfo = null;
+    private long openedAtMs = 0L;
+    private long gridPulseAtMs = 0L;
 
     public BackpackMenuScreen() {
         super(Component.literal("Select your bag"));
@@ -66,6 +70,9 @@ public class BackpackMenuScreen extends Screen {
         this.SCREEN_WIDTH = this.width;
         UNIT_LENGTH = Math.max(1, (int) ((float) this.width / 120.f));
         loading = true;
+        long now = System.currentTimeMillis();
+        openedAtMs = now;
+        gridPulseAtMs = now;
 
         loadPlayerData();
         addSelectBagButton();
@@ -74,13 +81,14 @@ public class BackpackMenuScreen extends Screen {
 
     @Override
     public void render(@NotNull GuiGraphics pGuiGraphics, int pMouseX, int pMouseY, float pPartialTick) {
+        float revealFactor = screenRevealProgress();
         this.renderBackground(pGuiGraphics);
-        renderHeaderBar(pGuiGraphics);
-        renderBackpackGridBackdrop(pGuiGraphics);
+        renderHeaderBar(pGuiGraphics, revealFactor);
+        renderBackpackGridBackdrop(pGuiGraphics, revealFactor);
         super.render(pGuiGraphics, pMouseX, pMouseY, pPartialTick);
 
         // 渲染武器信息
-        renderWeaponDisplay(pGuiGraphics, pMouseX, pMouseY);
+        renderWeaponDisplay(pGuiGraphics, pMouseX, pMouseY, revealFactor);
 
         if (loading) {
             String loadingText = "加载中...";
@@ -89,7 +97,7 @@ public class BackpackMenuScreen extends Screen {
                     Component.literal(loadingText),
                     this.width / 2,
                     this.height / 2,
-                    0xFFFFFF
+                    scaleAlpha(CodTheme.TEXT_PRIMARY, revealFactor)
             );
         }
 
@@ -151,17 +159,18 @@ public class BackpackMenuScreen extends Screen {
         contextMenuCoordinator.render(pGuiGraphics, pMouseX, pMouseY, pPartialTick);
     }
 
-    private void renderHeaderBar(GuiGraphics graphics) {
+    private void renderHeaderBar(GuiGraphics graphics, float revealFactor) {
         Minecraft mc = Minecraft.getInstance();
         int titleX = UNIT_LENGTH * 6;
         int titleY = UNIT_LENGTH * 4;
         int accentX = Math.max(4, titleX - 10);
         int accentBottom = titleY + mc.font.lineHeight + 1;
 
-        graphics.fill(accentX, titleY - 1, accentX + 3, accentBottom, CodTheme.HOVER_BORDER);
-        graphics.drawString(mc.font, "背包选择", titleX, titleY, CodTheme.TEXT_PRIMARY, true);
+        graphics.fill(accentX, titleY - 1, accentX + 3, accentBottom,
+                scaleAlpha(CodTheme.HOVER_BORDER, 0.72f + (0.28f * revealFactor)));
+        graphics.drawString(mc.font, "背包选择", titleX, titleY, scaleAlpha(CodTheme.TEXT_PRIMARY, revealFactor), true);
         graphics.fill(titleX, titleY + mc.font.lineHeight + 4, this.width - titleX, titleY + mc.font.lineHeight + 5,
-                CodTheme.DIVIDER);
+                scaleAlpha(CodTheme.DIVIDER, revealFactor));
 
         int hintRightX = this.width - titleX;
         int hintMaxWidth = Math.max(40, this.width / 3);
@@ -175,7 +184,7 @@ public class BackpackMenuScreen extends Screen {
                 hintRightX,
                 titleY,
                 hintMaxWidth,
-                CodTheme.TEXT_SECONDARY,
+                scaleAlpha(CodTheme.TEXT_SECONDARY, revealFactor),
                 false
         );
 
@@ -189,14 +198,14 @@ public class BackpackMenuScreen extends Screen {
                         counterText,
                         counterX,
                         titleY,
-                        CodTheme.TEXT_HOVER,
+                        scaleAlpha(CodTheme.TEXT_HOVER, revealFactor),
                         false
                 );
             }
         }
     }
 
-    private void renderBackpackGridBackdrop(GuiGraphics graphics) {
+    private void renderBackpackGridBackdrop(GuiGraphics graphics, float revealFactor) {
         BackpackGridLayout.LayoutMetrics layoutMetrics =
                 BackpackGridLayout.metrics(this.width, SCREEN_HEIGHT, UNIT_LENGTH);
         BackpackGridLayout.PanelBounds panel = layoutMetrics.panelBounds();
@@ -204,26 +213,31 @@ public class BackpackMenuScreen extends Screen {
         int panelTop = panel.top();
         int panelRight = panel.right();
         int panelBottom = panel.bottom();
+        float pulseFactor = gridPulseProgress();
 
-        graphics.fillGradient(panelLeft, panelTop, panelRight, panelBottom, 0x2A202020, 0x3A101010);
+        graphics.fillGradient(panelLeft, panelTop, panelRight, panelBottom,
+                scaleAlpha(0x2A202020, revealFactor),
+                scaleAlpha(0x3A101010, revealFactor));
         graphics.fillGradient(panelLeft + 1, panelTop + 1, panelRight - 1, panelTop + UNIT_LENGTH + 1,
-                0x1CFFFFFF, 0x02000000);
-        graphics.fill(panelLeft, panelTop, panelRight, panelTop + 1, CodTheme.BORDER_SUBTLE);
-        graphics.fill(panelLeft, panelBottom - 1, panelRight, panelBottom, CodTheme.BORDER_SUBTLE);
-        graphics.fill(panelLeft, panelTop, panelLeft + 1, panelBottom, CodTheme.BORDER_SUBTLE);
-        graphics.fill(panelRight - 1, panelTop, panelRight, panelBottom, CodTheme.BORDER_SUBTLE);
+                scaleAlpha(0x1CFFFFFF, revealFactor * (0.8f + (0.2f * pulseFactor))),
+                scaleAlpha(0x02000000, revealFactor));
         graphics.fill(panelLeft + UNIT_LENGTH, panelTop + UNIT_LENGTH + 1, panelRight - UNIT_LENGTH, panelTop + UNIT_LENGTH + 2,
-                CodTheme.DIVIDER);
+                scaleAlpha(CodTheme.DIVIDER, revealFactor));
+        if (pulseFactor > 0.0f) {
+            int pulseColor = scaleAlpha(withAlpha(CodTheme.HOVER_BORDER, (int) (34.0f * pulseFactor)), revealFactor);
+            graphics.fill(panelLeft + 1, panelTop + 1, panelRight - 1, panelBottom - 1, pulseColor);
+        }
     }
 
-    private void renderWeaponDisplay(GuiGraphics graphics, int mouseX, int mouseY) {
+    private void renderWeaponDisplay(GuiGraphics graphics, int mouseX, int mouseY, float previewAlphaFactor) {
         BackpackWeaponPreviewPanel.render(
                 graphics,
                 this.width,
                 SCREEN_HEIGHT,
                 UNIT_LENGTH,
                 currentHoveredButton,
-                currentWeaponInfo
+                currentWeaponInfo,
+                previewAlphaFactor
         );
     }
 
@@ -336,6 +350,7 @@ public class BackpackMenuScreen extends Screen {
             if (playerData != null) {
                 currentSelectedId = playerData.getSelectedBackpack();
                 loading = false;
+                markGridPulse();
             }
         }
     }
@@ -419,6 +434,8 @@ public class BackpackMenuScreen extends Screen {
             this.actionButtonMap.clear();
             this.currentActionButtonId = null;
             contextMenuCoordinator.hide();
+            this.currentHoveredButton = null;
+            this.currentWeaponInfo = null;
             this.clearWidgets();
             return;
         }
@@ -428,6 +445,9 @@ public class BackpackMenuScreen extends Screen {
         this.actionButtonMap.clear();
         this.currentActionButtonId = null;
         contextMenuCoordinator.hide();
+        this.currentHoveredButton = null;
+        this.currentWeaponInfo = null;
+        this.gridPulseAtMs = System.currentTimeMillis();
         this.clearWidgets();
         addSelectBagButton();
         addNewBackpackButton();
@@ -437,5 +457,44 @@ public class BackpackMenuScreen extends Screen {
         Minecraft.getInstance().execute(() -> {
             Minecraft.getInstance().setScreen(null);
         });
+    }
+
+    private void markGridPulse() {
+        gridPulseAtMs = System.currentTimeMillis();
+    }
+
+    private float screenRevealProgress() {
+        if (openedAtMs <= 0L) {
+            return 1.0f;
+        }
+        long elapsed = System.currentTimeMillis() - openedAtMs;
+        float raw = Math.min(1.0f, Math.max(0.0f, elapsed / (float) SCREEN_REVEAL_MS));
+        return 0.2f + (raw * 0.8f);
+    }
+
+    private float gridPulseProgress() {
+        if (gridPulseAtMs <= 0L) {
+            return 0.0f;
+        }
+        long elapsed = System.currentTimeMillis() - gridPulseAtMs;
+        if (elapsed >= GRID_REFRESH_PULSE_MS) {
+            return 0.0f;
+        }
+        float raw = 1.0f - (elapsed / (float) GRID_REFRESH_PULSE_MS);
+        return raw * raw;
+    }
+
+    private static int scaleAlpha(int color, float factor) {
+        int alpha = (color >>> 24) & 0xFF;
+        int scaledAlpha = clamp((int) (alpha * Math.max(0.0f, Math.min(1.0f, factor))), 0, 255);
+        return (scaledAlpha << 24) | (color & 0x00FFFFFF);
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (clamp(alpha, 0, 255) << 24) | (color & 0x00FFFFFF);
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 }

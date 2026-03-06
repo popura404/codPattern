@@ -36,7 +36,7 @@ public class TdmRoomScreen extends Screen {
     private static final int HEADER_HEIGHT = 44;
     private static final int FOOTER_HEIGHT = 50;
     private static final int ROOM_ITEM_HEIGHT = 36;
-    private static final long ENTER_ANIMATION_MS = 130L;
+    private static final long ENTER_ANIMATION_MS = 180L;
     private static final long ROOM_LIST_APPLY_DEBOUNCE_MS = 60L;
     private static final long INFO_CONTENT_FADE_MS = 85L;
 
@@ -61,7 +61,6 @@ public class TdmRoomScreen extends Screen {
 
     // 视觉状态
     private long openedAtMs = 0L;
-    private int currentEnterOffsetY = 0;
     private final Map<String, Float> roomHighlightProgress = new HashMap<>();
     private final Map<String, Long> roomEnteredAtMs = new HashMap<>();
     private Map<String, TdmRoomData> pendingRoomListUpdate = null;
@@ -286,20 +285,18 @@ public class TdmRoomScreen extends Screen {
 
         Minecraft mc = Minecraft.getInstance();
         float enterProgress = enterProgress();
-        int enterOffsetY = (int) ((1.0f - enterProgress) * 12.0f);
         int titleColor = withAlpha(0xFFFFFFFF, Math.max(85, (int) (255.0f * enterProgress)));
-        currentEnterOffsetY = enterOffsetY;
 
         graphics.drawCenteredString(
                 mc.font,
                 Component.translatable("screen.codpattern.tdm_room.header"),
                 this.width / 2,
-                20 + enterOffsetY,
+                20,
                 titleColor);
 
-        renderRoomListPanel(graphics, mc, mouseX, mouseY, enterProgress, enterOffsetY);
+        renderRoomListPanel(graphics, mc, mouseX, mouseY, enterProgress);
         refreshInfoContextTransition(false);
-        renderInfoPanel(graphics, mc, enterProgress, enterOffsetY);
+        renderInfoPanel(graphics, mc, enterProgress);
         renderBottomActionStrip(graphics, mc, enterProgress);
 
         super.render(graphics, mouseX, mouseY, partialTick);
@@ -321,8 +318,7 @@ public class TdmRoomScreen extends Screen {
             Minecraft mc,
             int mouseX,
             int mouseY,
-            float enterProgress,
-            int enterOffsetY) {
+            float enterProgress) {
         roomListMaxScrollOffset = Math.max(0, roomState.rooms().size() - visibleRoomCapacity());
         roomListScrollOffset = clamp(roomListScrollOffset, 0, roomListMaxScrollOffset);
 
@@ -330,7 +326,7 @@ public class TdmRoomScreen extends Screen {
                 graphics,
                 mc,
                 roomListX,
-                roomListY + enterOffsetY,
+                roomListY,
                 roomListWidth,
                 roomListHeight,
                 ROOM_ITEM_HEIGHT,
@@ -349,15 +345,15 @@ public class TdmRoomScreen extends Screen {
     /**
      * 渲染右侧信息面板
      */
-    private void renderInfoPanel(GuiGraphics graphics, Minecraft mc, float enterProgress, int enterOffsetY) {
+    private void renderInfoPanel(GuiGraphics graphics, Minecraft mc, float enterProgress) {
         TdmRoomInfoPanelRenderer.render(
                 graphics,
                 mc,
                 rightPanelX,
-                rightPanelY + enterOffsetY,
+                rightPanelY,
                 rightPanelWidth,
                 rightPanelHeight,
-                infoActionBottomY + enterOffsetY,
+                infoActionBottomY,
                 roomState.joinedRoom(),
                 roomState.selectedRoom(),
                 roomState.rooms(),
@@ -373,7 +369,7 @@ public class TdmRoomScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int listTop = roomListY + currentEnterOffsetY;
+        int listTop = roomListY;
         if (button == 0
                 && mouseX >= roomListX
                 && mouseX <= roomListX + roomListWidth
@@ -393,7 +389,7 @@ public class TdmRoomScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        int listTop = roomListY + currentEnterOffsetY;
+        int listTop = roomListY;
         if (mouseX >= roomListX
                 && mouseX <= roomListX + roomListWidth
                 && mouseY >= listTop
@@ -585,7 +581,8 @@ public class TdmRoomScreen extends Screen {
             return 1.0f;
         }
         long elapsed = System.currentTimeMillis() - openedAtMs;
-        return Math.min(1.0f, Math.max(0.0f, elapsed / (float) ENTER_ANIMATION_MS));
+        float raw = Math.min(1.0f, Math.max(0.0f, elapsed / (float) ENTER_ANIMATION_MS));
+        return 0.2f + (raw * 0.8f);
     }
 
     private static int clamp(int value, int min, int max) {

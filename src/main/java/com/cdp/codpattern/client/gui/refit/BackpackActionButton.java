@@ -13,10 +13,14 @@ import org.jetbrains.annotations.NotNull;
  * 背包动作按钮（配置）- COD MWII 2022 风格 - 绿色主题
  */
 public class BackpackActionButton extends Button {
+    private static final long REVEAL_MS = 130L;
+    private static final long HOVER_PULSE_MS = 900L;
 
     private int focusedTimes = 0;
+    private int hoverTicks = 0;
     private final int normalColor;
     private final int hoverColor;
+    private final long createdAtMs = System.currentTimeMillis();
 
     // MWII 绿色主题色
     private static final int GREEN_BG_TOP = 0xE8183018;
@@ -32,6 +36,7 @@ public class BackpackActionButton extends Button {
 
     @Override
     public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        float revealFactor = revealProgress();
         if (this.isHoveredOrFocused() && focusedTimes == 0) {
             Minecraft.getInstance().execute(() -> {
                 if (Minecraft.getInstance().player != null) {
@@ -45,39 +50,77 @@ public class BackpackActionButton extends Button {
         } else if (!this.isHoveredOrFocused()) {
             focusedTimes = 0;
         }
+        if (this.isHoveredOrFocused()) {
+            hoverTicks = Math.min(6, hoverTicks + 1);
+        } else {
+            hoverTicks = Math.max(0, hoverTicks - 1);
+        }
 
         // 基础背景 - 绿色主题
         graphics.fillGradient(this.getX(), this.getY(),
                 this.getX() + this.width, this.getY() + this.height,
-                GREEN_BG_TOP, GREEN_BG_BOTTOM);
+                scaleAlpha(GREEN_BG_TOP, revealFactor),
+                scaleAlpha(GREEN_BG_BOTTOM, revealFactor));
+        graphics.fill(this.getX(), this.getY(), this.getX() + 1, this.getY() + this.height,
+                scaleAlpha(0x18FFFFFF, revealFactor));
 
         if (isHoveredOrFocused()) {
-            renderOnHoveredOrFocused(graphics);
+            renderOnHoveredOrFocused(graphics, revealFactor);
         }
-        renderTitle(graphics);
+        renderTitle(graphics, revealFactor);
     }
 
-    protected void renderOnHoveredOrFocused(GuiGraphics graphics) {
+    protected void renderOnHoveredOrFocused(GuiGraphics graphics, float revealFactor) {
+        float hoverFactor = hoverTicks / 6.0f;
+        float pulse = 0.68f + (0.32f * oscillate(HOVER_PULSE_MS));
         // 悬停背景 - 更亮的绿色
         graphics.fillGradient(this.getX(), this.getY(),
                 this.getX() + this.width, this.getY() + this.height,
-                GREEN_HOVER_TOP, GREEN_HOVER_BOTTOM);
+                scaleAlpha(GREEN_HOVER_TOP, revealFactor * (0.55f + (0.25f * hoverFactor))),
+                scaleAlpha(GREEN_HOVER_BOTTOM, revealFactor * (0.65f + (0.25f * hoverFactor))));
 
         // 顶部荧光绿边框
         graphics.fill(this.getX(), this.getY(),
                 this.getX() + this.width, this.getY() + 1,
-                CodTheme.HOVER_BORDER);
+                scaleAlpha(CodTheme.HOVER_BORDER, revealFactor * pulse));
 
         // 底部荧光绿边框
         graphics.fill(this.getX(), this.getY() + this.height - 1,
                 this.getX() + this.width, this.getY() + this.height,
-                CodTheme.HOVER_BORDER_SEMI);
+                scaleAlpha(CodTheme.HOVER_BORDER_SEMI, revealFactor * pulse));
+        graphics.fill(this.getX(), this.getY(), this.getX() + 2, this.getY() + this.height,
+                scaleAlpha(withAlpha(CodTheme.HOVER_BORDER, (int) (28.0f + (32.0f * hoverFactor))), revealFactor));
     }
 
-    protected void renderTitle(GuiGraphics graphics) {
+    protected void renderTitle(GuiGraphics graphics, float revealFactor) {
         Minecraft minecraft = Minecraft.getInstance();
         int textX = this.getX() + 6;  // 左对齐
         int textY = this.getY() + (this.height - minecraft.font.lineHeight) / 2;
-        graphics.drawString(minecraft.font, this.getMessage(), textX, textY, this.isHoveredOrFocused() ? hoverColor : normalColor, true);
+        int color = this.isHoveredOrFocused() ? hoverColor : normalColor;
+        graphics.drawString(minecraft.font, this.getMessage(), textX, textY, scaleAlpha(color, revealFactor), true);
+    }
+
+    private int withAlpha(int color, int alpha) {
+        return (Math.max(0, Math.min(255, alpha)) << 24) | (color & 0x00FFFFFF);
+    }
+
+    private int scaleAlpha(int color, float factor) {
+        int alpha = (color >>> 24) & 0xFF;
+        int scaled = Math.max(0, Math.min(255, (int) (alpha * Math.max(0.0f, Math.min(1.0f, factor)))));
+        return (scaled << 24) | (color & 0x00FFFFFF);
+    }
+
+    private float revealProgress() {
+        long elapsed = System.currentTimeMillis() - createdAtMs;
+        float raw = Math.min(1.0f, Math.max(0.0f, elapsed / (float) REVEAL_MS));
+        return 0.3f + (raw * 0.7f);
+    }
+
+    private float oscillate(long durationMs) {
+        if (durationMs <= 0L) {
+            return 1.0f;
+        }
+        double phase = ((System.currentTimeMillis() - createdAtMs) % durationMs) / (double) durationMs;
+        return (float) ((Math.sin(phase * Math.PI * 2.0d) + 1.0d) * 0.5d);
     }
 }

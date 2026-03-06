@@ -34,12 +34,16 @@ import java.util.*;
  * 背包选择按钮 - COD2022风格
  */
 public class BackPackSelectButton extends Button {
+    private static final long REVEAL_MS = 170L;
+    private static final long HOVER_PULSE_MS = 900L;
+    private static final long SELECTED_PULSE_MS = 1800L;
 
     private final Integer BAGSERIAL;
     private int focusedtimes = 0;
     private int hoverTicks = 0;
     private final BackpackConfig.Backpack backpack;
     private final boolean isCurrentlySelected;
+    private final long createdAtMs = System.currentTimeMillis();
 
     // 武器信息缓存
     private Map<String, WeaponInfo> weaponInfoCache = new HashMap<>();
@@ -196,6 +200,8 @@ public class BackPackSelectButton extends Button {
 
     @Override
     public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float pPartialTick) {
+        float revealFactor = revealProgress();
+
         // 悬停音效处理
         if (this.isHoveredOrFocused() && focusedtimes == 0) {
             Minecraft.getInstance().execute(() -> {
@@ -215,53 +221,58 @@ public class BackPackSelectButton extends Button {
             hoverTicks = Math.max(0, hoverTicks - 1);
         }
 
-        renderCardShadow(graphics);
+        renderCardShadow(graphics, revealFactor);
 
         // 渲染基础按钮背景 - MWII 深色风格
         graphics.fillGradient(this.getX(), this.getY(),
                 this.getX() + this.width, this.getY() + this.height,
-                CodTheme.CARD_BG_TOP, CodTheme.CARD_BG_BOTTOM);
-        renderCardFrame(graphics);
+                scaleAlpha(CodTheme.CARD_BG_TOP, revealFactor),
+                scaleAlpha(CodTheme.CARD_BG_BOTTOM, revealFactor));
+        renderCardFrame(graphics, revealFactor);
 
         // 悬停效果
         if (isHoveredOrFocused()) {
-            renderOnHoveredOrFocused(graphics);
+            renderOnHoveredOrFocused(graphics, revealFactor);
         }
 
         // 如果是选中的背包，渲染高亮边框
         if (isCurrentlySelected) {
-            renderSelectedHighlight(graphics);
+            renderSelectedHighlight(graphics, revealFactor);
         }
 
         // 渲染背包名称编号
         if (backpack != null) {
-            renderBackpackInfo(graphics);
+            renderBackpackInfo(graphics, revealFactor);
         }
     }
 
-    private void renderCardShadow(GuiGraphics graphics) {
+    private void renderCardShadow(GuiGraphics graphics, float revealFactor) {
         graphics.fill(this.getX() + 2, this.getY() + 2,
                 this.getX() + this.width + 2, this.getY() + this.height + 2,
-                0x38000000);
+                scaleAlpha(0x38000000, revealFactor));
         graphics.fillGradient(this.getX(), this.getY() + this.height,
                 this.getX() + this.width, this.getY() + this.height + 2,
-                0x32000000, 0x08000000);
+                scaleAlpha(0x32000000, revealFactor),
+                scaleAlpha(0x08000000, revealFactor));
     }
 
-    private void renderCardFrame(GuiGraphics graphics) {
-        graphics.fill(this.getX(), this.getY(), this.getX() + this.width, this.getY() + 1, 0x14FFFFFF);
-        graphics.fill(this.getX(), this.getY(), this.getX() + 1, this.getY() + this.height, 0x10FFFFFF);
+    private void renderCardFrame(GuiGraphics graphics, float revealFactor) {
+        graphics.fill(this.getX(), this.getY(), this.getX() + this.width, this.getY() + 1,
+                scaleAlpha(0x14FFFFFF, revealFactor));
+        graphics.fill(this.getX(), this.getY(), this.getX() + 1, this.getY() + this.height,
+                scaleAlpha(0x10FFFFFF, revealFactor));
         graphics.fill(this.getX() + 4, this.getY() + 4,
                 this.getX() + Math.max(5, this.width / 4), this.getY() + 5,
-                isCurrentlySelected ? CodTheme.SELECTED_BORDER : 0x20FFFFFF);
+                scaleAlpha(isCurrentlySelected ? CodTheme.SELECTED_BORDER : 0x20FFFFFF, revealFactor));
     }
 
     /**
      * 渲染选中状态的高亮边框 - MWII 金色
      */
-    protected void renderSelectedHighlight(GuiGraphics graphics) {
+    protected void renderSelectedHighlight(GuiGraphics graphics, float revealFactor) {
         int borderWidth = CodTheme.BORDER_WIDTH;
-        int color = CodTheme.SELECTED_BORDER;
+        float pulse = 0.72f + (0.28f * oscillate(SELECTED_PULSE_MS));
+        int color = scaleAlpha(CodTheme.SELECTED_BORDER, revealFactor * pulse);
         // 上
         graphics.fill(this.getX() - borderWidth, this.getY() - borderWidth,
                 this.getX() + this.width + borderWidth, this.getY(), color);
@@ -274,24 +285,28 @@ public class BackPackSelectButton extends Button {
         // 右
         graphics.fill(this.getX() + this.width, this.getY(),
                 this.getX() + this.width + borderWidth, this.getY() + this.height, color);
+        graphics.fill(this.getX() + 1, this.getY() + 1,
+                this.getX() + this.width - 1, this.getY() + this.height - 1,
+                scaleAlpha(withAlpha(CodTheme.SELECTED_BORDER, 18), revealFactor * pulse));
     }
 
     /**
      * 渲染背包信息
      */
-    protected void renderBackpackInfo(GuiGraphics graphics) {
+    protected void renderBackpackInfo(GuiGraphics graphics, float revealFactor) {
         Minecraft minecraft = Minecraft.getInstance();
 
         // 背包编号（左上角）
         String idText = "#" + BAGSERIAL;
         int idColor = isCurrentlySelected ? CodTheme.SELECTED_TEXT : CodTheme.TEXT_SECONDARY;
-        graphics.drawString(minecraft.font, idText, this.getX() + 4, this.getY() + 4, idColor, true);
+        graphics.drawString(minecraft.font, idText, this.getX() + 4, this.getY() + 4,
+                scaleAlpha(idColor, revealFactor), true);
 
         boolean canRenderChip = isCurrentlySelected
                 && this.width >= minecraft.font.width("已装备") + 18
                 && this.height >= minecraft.font.lineHeight + 8;
         if (canRenderChip) {
-            renderSelectedChip(graphics, minecraft);
+            renderSelectedChip(graphics, minecraft, revealFactor);
         }
 
         String title = getDisplayNameForWidth(minecraft, getDisplayNameRaw(), this.width - 12);
@@ -313,53 +328,79 @@ public class BackPackSelectButton extends Button {
                 this.getX() + this.width / 2,
                 textY,
                 this.width - 12,
-                textColor,
+                scaleAlpha(textColor, revealFactor),
                 true
         );
     }
 
-    private void renderSelectedChip(GuiGraphics graphics, Minecraft minecraft) {
+    private void renderSelectedChip(GuiGraphics graphics, Minecraft minecraft, float revealFactor) {
         String chipText = "已装备";
         int chipWidth = minecraft.font.width(chipText) + 10;
         int chipHeight = minecraft.font.lineHeight + 2;
         int chipX = this.getX() + this.width - chipWidth - 4;
         int chipY = this.getY() + 4;
-        graphics.fill(chipX, chipY, chipX + chipWidth, chipY + chipHeight, 0xB05A4310);
-        graphics.fill(chipX, chipY, chipX + 2, chipY + chipHeight, CodTheme.SELECTED_BORDER);
-        graphics.drawString(minecraft.font, chipText, chipX + 5, chipY + 1, 0xFFFFE9A3, false);
+        graphics.fill(chipX, chipY, chipX + chipWidth, chipY + chipHeight, scaleAlpha(0xB05A4310, revealFactor));
+        graphics.fill(chipX, chipY, chipX + 2, chipY + chipHeight, scaleAlpha(CodTheme.SELECTED_BORDER, revealFactor));
+        graphics.drawString(minecraft.font, chipText, chipX + 5, chipY + 1, scaleAlpha(0xFFFFE9A3, revealFactor), false);
     }
 
     /**
      * 悬停效果 - MWII 风格细边框 + 微亮背景
      */
-    protected void renderOnHoveredOrFocused(GuiGraphics graphics) {
+    protected void renderOnHoveredOrFocused(GuiGraphics graphics, float revealFactor) {
+        float hoverFactor = hoverTicks / 6.0f;
+        float pulse = 0.65f + (0.35f * oscillate(HOVER_PULSE_MS));
         // 微亮背景
         graphics.fillGradient(this.getX(), this.getY(),
                 this.getX() + this.width, this.getY() + this.height,
-                CodTheme.HOVER_BG_TOP, CodTheme.HOVER_BG_BOTTOM);
+                scaleAlpha(CodTheme.HOVER_BG_TOP, revealFactor * (0.45f + (0.2f * hoverFactor))),
+                scaleAlpha(CodTheme.HOVER_BG_BOTTOM, revealFactor * (0.55f + (0.25f * hoverFactor))));
 
         if (hoverTicks > 0) {
             int alphaTop = Math.min(180, 18 * hoverTicks);
             int alphaBottom = Math.min(200, 22 * hoverTicks);
             graphics.fillGradient(this.getX(), this.getY(),
                     this.getX() + this.width, this.getY() + this.height,
-                    withAlpha(CodTheme.HOVER_BG_TOP, alphaTop),
-                    withAlpha(CodTheme.HOVER_BG_BOTTOM, alphaBottom));
+                    scaleAlpha(withAlpha(CodTheme.HOVER_BG_TOP, alphaTop), revealFactor),
+                    scaleAlpha(withAlpha(CodTheme.HOVER_BG_BOTTOM, alphaBottom), revealFactor));
         }
 
         // 顶部荧光绿边框
         graphics.fill(this.getX(), this.getY() - 1,
                 this.getX() + this.width, this.getY(),
-                CodTheme.HOVER_BORDER);
+                scaleAlpha(CodTheme.HOVER_BORDER, revealFactor * pulse));
 
         // 底部荧光绿边框（半透明）
         graphics.fill(this.getX(), this.getY() + this.height,
                 this.getX() + this.width, this.getY() + this.height + 1,
-                CodTheme.HOVER_BORDER_SEMI);
+                scaleAlpha(CodTheme.HOVER_BORDER_SEMI, revealFactor * pulse));
+        graphics.fill(this.getX() + 1, this.getY() + 1,
+                this.getX() + this.width - 1, this.getY() + this.height - 1,
+                scaleAlpha(withAlpha(CodTheme.HOVER_BORDER, (int) (16.0f + (30.0f * hoverFactor))), revealFactor));
     }
 
     private int withAlpha(int color, int alpha) {
         return (Math.max(0, Math.min(255, alpha)) << 24) | (color & 0x00FFFFFF);
+    }
+
+    private int scaleAlpha(int color, float factor) {
+        int alpha = (color >>> 24) & 0xFF;
+        int scaled = Math.max(0, Math.min(255, (int) (alpha * Math.max(0.0f, Math.min(1.0f, factor)))));
+        return (scaled << 24) | (color & 0x00FFFFFF);
+    }
+
+    private float revealProgress() {
+        long elapsed = System.currentTimeMillis() - createdAtMs;
+        float raw = Math.min(1.0f, Math.max(0.0f, elapsed / (float) REVEAL_MS));
+        return 0.25f + (raw * 0.75f);
+    }
+
+    private float oscillate(long durationMs) {
+        if (durationMs <= 0L) {
+            return 1.0f;
+        }
+        double phase = ((System.currentTimeMillis() - createdAtMs) % durationMs) / (double) durationMs;
+        return (float) ((Math.sin(phase * Math.PI * 2.0d) + 1.0d) * 0.5d);
     }
 
     @Override

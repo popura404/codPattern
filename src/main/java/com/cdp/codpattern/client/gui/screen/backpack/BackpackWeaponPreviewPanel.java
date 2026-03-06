@@ -22,8 +22,9 @@ public final class BackpackWeaponPreviewPanel {
             int screenHeight,
             int unitLength,
             BackPackSelectButton hoveredButton,
-            Map<String, BackPackSelectButton.WeaponInfo> weaponInfo) {
-        if (weaponInfo == null || weaponInfo.isEmpty() || hoveredButton == null) {
+            Map<String, BackPackSelectButton.WeaponInfo> weaponInfo,
+            float alphaFactor) {
+        if (weaponInfo == null || weaponInfo.isEmpty() || hoveredButton == null || alphaFactor <= 0.0f) {
             return;
         }
 
@@ -38,18 +39,20 @@ public final class BackpackWeaponPreviewPanel {
 
         int panelRight = screenWidth - weaponDisplayX;
         int panelBottom = weaponDisplayY + unitLength * 13;
+        int panelTop = weaponDisplayY - unitLength - 2;
 
-        graphics.fillGradient(weaponDisplayX, weaponDisplayY - unitLength - 2,
+        graphics.fillGradient(weaponDisplayX, panelTop,
                 panelRight, panelBottom,
-                0x05999988, 0x20AAAAAA);
+                scaleAlpha(0x05999988, alphaFactor),
+                scaleAlpha(0x20AAAAAA, alphaFactor));
 
-        int grayBarTop = weaponDisplayY - unitLength - 2;
+        int grayBarTop = panelTop;
         int grayBarBottom = weaponDisplayY + unitLength;
-        graphics.fill(weaponDisplayX, grayBarTop, panelRight, grayBarBottom, 0x46AAAAAA);
+        graphics.fill(weaponDisplayX, grayBarTop, panelRight, grayBarBottom, scaleAlpha(0x46AAAAAA, alphaFactor));
 
-        graphics.fill(weaponDisplayX, panelBottom - 1, panelRight, panelBottom, 0x2AAAAAAA);
-        graphics.fill(weaponDisplayX, grayBarTop, weaponDisplayX + 1, panelBottom, 0x38AAAAAA);
-        graphics.fill(panelRight - 1, grayBarTop, panelRight, panelBottom, 0x38AAAAAA);
+        graphics.fill(weaponDisplayX, panelBottom - 1, panelRight, panelBottom, scaleAlpha(0x2AAAAAAA, alphaFactor));
+        graphics.fill(weaponDisplayX, grayBarTop, weaponDisplayX + 1, panelBottom, scaleAlpha(0x38AAAAAA, alphaFactor));
+        graphics.fill(panelRight - 1, grayBarTop, panelRight, panelBottom, scaleAlpha(0x38AAAAAA, alphaFactor));
 
         int dividerX = weaponDisplayX + unitLength * 25 - 1;
         int secondaryColumnWidth = unitLength * 25;
@@ -62,7 +65,7 @@ public final class BackpackWeaponPreviewPanel {
         int tacticalWeaponX = dividerSecTac + panelPadding;
         int lethalWeaponX = dividerTacLeth + panelPadding;
 
-        String title = hoveredButton.getDisplayNameRaw() + "  #" + hoveredButton.getBAGSERIAL();
+        String title = hoveredButton.getDisplayNameRaw();
         int titleY = grayBarTop + (grayBarBottom - grayBarTop - mc.font.lineHeight) / 2;
         GuiTextHelper.drawEllipsizedString(
                 graphics,
@@ -71,19 +74,22 @@ public final class BackpackWeaponPreviewPanel {
                 primaryWeaponX,
                 titleY,
                 Math.max(24, panelRight - primaryWeaponX - panelPadding),
-                0xFFF4DC8A,
+                scaleAlpha(0xFFF4DC8A, alphaFactor),
                 true
         );
 
         graphics.fillGradient(dividerX, weaponDisplayY + unitLength,
                 dividerX + 1, panelBottom - unitLength,
-                0x40808080, 0x20404040);
+                scaleAlpha(0x40808080, alphaFactor),
+                scaleAlpha(0x20404040, alphaFactor));
         graphics.fillGradient(dividerSecTac, weaponDisplayY + unitLength,
                 dividerSecTac + 1, panelBottom - unitLength,
-                0x40808080, 0x20404040);
+                scaleAlpha(0x40808080, alphaFactor),
+                scaleAlpha(0x20404040, alphaFactor));
         graphics.fillGradient(dividerTacLeth, weaponDisplayY + unitLength,
                 dividerTacLeth + 1, panelBottom - unitLength,
-                0x40808080, 0x20404040);
+                scaleAlpha(0x40808080, alphaFactor),
+                scaleAlpha(0x20404040, alphaFactor));
 
         WeaponFilterConfig filterConfig = WeaponFilterClientCache.get();
         boolean throwablesEnabled = filterConfig == null || filterConfig.isThrowablesEnabled();
@@ -133,7 +139,7 @@ public final class BackpackWeaponPreviewPanel {
                     weaponX,
                     weaponY,
                     textMaxWidth,
-                    0xFFFFFF,
+                    scaleAlpha(0xFFFFFFFF, alphaFactor),
                     true
             );
 
@@ -180,11 +186,11 @@ public final class BackpackWeaponPreviewPanel {
                         graphics,
                         mc.font,
                         info.weaponName,
-                        weaponX,
-                        nameY,
-                        textMaxWidth,
-                        0xFFFFFFFF,
-                        false
+                    weaponX,
+                    nameY,
+                    textMaxWidth,
+                    scaleAlpha(0xFFFFFFFF, alphaFactor),
+                    false
                 );
             }
             if (info.packName != null && !isThrowableSlot) {
@@ -196,7 +202,7 @@ public final class BackpackWeaponPreviewPanel {
                         weaponX,
                         packY,
                         textMaxWidth,
-                        0xAAFFFFFF,
+                        scaleAlpha(0xAAFFFFFF, alphaFactor),
                         false
                 );
             }
@@ -206,5 +212,20 @@ public final class BackpackWeaponPreviewPanel {
                 RenderSystem.disableBlend();
             }
         }
+
+        if (alphaFactor < 0.999f) {
+            graphics.fill(weaponDisplayX, panelTop, panelRight, panelBottom,
+                    withAlpha(0xFF000000, Math.max(0, Math.min(255, (int) (170.0f * (1.0f - alphaFactor))))));
+        }
+    }
+
+    private static int scaleAlpha(int color, float factor) {
+        int alpha = (color >>> 24) & 0xFF;
+        int scaled = Math.max(0, Math.min(255, (int) (alpha * Math.max(0.0f, Math.min(1.0f, factor)))));
+        return (scaled << 24) | (color & 0x00FFFFFF);
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (Math.max(0, Math.min(255, alpha)) << 24) | (color & 0x00FFFFFF);
     }
 }
