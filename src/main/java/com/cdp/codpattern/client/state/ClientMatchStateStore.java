@@ -5,6 +5,7 @@ import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
@@ -291,7 +292,9 @@ public final class ClientMatchStateStore {
 
     public void setDeathCam(String killer, int duration) {
         dead = true;
-        killerName = (killer == null || killer.isBlank()) ? "Unknown" : killer;
+        killerName = (killer == null || killer.isBlank())
+                ? Component.translatable("common.codpattern.unknown_player").getString()
+                : killer;
         deathCamTicks = Math.max(0, duration);
     }
 

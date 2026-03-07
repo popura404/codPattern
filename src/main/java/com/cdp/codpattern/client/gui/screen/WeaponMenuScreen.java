@@ -64,7 +64,7 @@ public class WeaponMenuScreen extends Screen {
     private static final int MAX_HIDE_DELAY = 10;
 
     public WeaponMenuScreen(BackpackConfig.Backpack backpack, Integer BAGSERIAL) {
-        super(Component.literal("WeaponMenuScreen"));
+        super(Component.translatable("screen.codpattern.weapon_menu.title"));
         this.BAGSERIAL = BAGSERIAL;
         this.backpack = backpack;
     }
@@ -124,7 +124,7 @@ public class WeaponMenuScreen extends Screen {
             GuiTextHelper.drawReferenceString(
                     pGuiGraphics,
                     Minecraft.getInstance().font,
-                    "投掷物 1",
+                    Component.translatable("screen.codpattern.weapon.select_tactical"),
                     tacticalButton.getX(),
                     tacticalButton.getY() - GuiTextHelper.referenceLineHeight(Minecraft.getInstance().font) - 3,
                     CodTheme.TEXT_SECONDARY,
@@ -135,7 +135,7 @@ public class WeaponMenuScreen extends Screen {
             GuiTextHelper.drawReferenceString(
                     pGuiGraphics,
                     Minecraft.getInstance().font,
-                    "投掷物 2",
+                    Component.translatable("screen.codpattern.weapon.select_lethal"),
                     lethalButton.getX(),
                     lethalButton.getY() - GuiTextHelper.referenceLineHeight(Minecraft.getInstance().font) - 3,
                     CodTheme.TEXT_SECONDARY,
@@ -154,7 +154,7 @@ public class WeaponMenuScreen extends Screen {
      */
     private void renderTitle(GuiGraphics graphics) {
         Minecraft mc = Minecraft.getInstance();
-        String title = "武器配置";
+        Component title = Component.translatable("screen.codpattern.weapon_menu.header");
         int titleLineHeight = GuiTextHelper.referenceLineHeight(mc.font);
         int titleX = UNIT_LENGTH * 6;
         int titleY = UNIT_LENGTH * 4;
@@ -187,8 +187,8 @@ public class WeaponMenuScreen extends Screen {
 
         // 左侧提示
         String leftHint = this.width < UNIT_LENGTH * 42
-                ? "[LMB] 选择  [Hover] 配件"
-                : "[LMB] 选择武器    [Hover] 更换配件";
+                ? Component.translatable("screen.codpattern.weapon_menu.hint.compact").getString()
+                : Component.translatable("screen.codpattern.weapon_menu.hint.full").getString();
         GuiTextHelper.drawReferenceEllipsizedString(
                 graphics,
                 mc.font,
@@ -201,7 +201,7 @@ public class WeaponMenuScreen extends Screen {
         );
 
         // 右侧提示
-        String rightHint = "[ESC] 返回背包列表";
+        String rightHint = Component.translatable("screen.codpattern.weapon_menu.hint.back").getString();
         GuiTextHelper.drawReferenceRightAlignedEllipsizedString(
                 graphics,
                 mc.font,

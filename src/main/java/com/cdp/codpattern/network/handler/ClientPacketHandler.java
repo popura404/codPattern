@@ -109,8 +109,7 @@ public class ClientPacketHandler {
         if (success || Minecraft.getInstance().player == null) {
             return;
         }
-        String text = message.isBlank() ? "配装写入被拒绝: " + code : message;
-        Minecraft.getInstance().player.sendSystemMessage(Component.literal("§c" + text));
+        Minecraft.getInstance().player.sendSystemMessage(resolveWeaponUpdateFailure(code, message));
     }
 
     public static void handleRoomListSync(Map<String, RoomInfo> rooms) {
@@ -207,9 +206,12 @@ public class ClientPacketHandler {
             if (screen instanceof TdmRoomScreen tdmRoomScreen) {
                 tdmRoomScreen.handleLeaveResult(success, roomName, reasonCode, reasonMessage);
             }
-            if (!success && Minecraft.getInstance().player != null) {
-                String message = reasonMessage.isBlank() ? "离开房间失败: " + reasonCode : reasonMessage;
-                PopupNoticeHelper.show(Component.literal("§c" + message));
+            if (!success
+                    && !(screen instanceof TdmRoomScreen)
+                    && Minecraft.getInstance().player != null) {
+                PopupNoticeHelper.show(Component.translatable(
+                        "screen.codpattern.tdm_room.error.leave_failed",
+                        resolveRoomActionReason(reasonCode, reasonMessage)));
             }
         });
     }
@@ -291,5 +293,41 @@ public class ClientPacketHandler {
 
         double injectedUpwardVelocity = 10.0 / length;
         return originalMotionY - injectedUpwardVelocity / 10.0;
+    }
+
+    private static Component resolveWeaponUpdateFailure(String code, String message) {
+        if (message != null && !message.isBlank()) {
+            return Component.literal(message);
+        }
+        return switch (code == null ? "" : code) {
+            case "BAG_NOT_FOUND" -> Component.translatable("message.codpattern.weapon_update.error.bag_not_found");
+            case "SLOT_INVALID" -> Component.translatable("message.codpattern.weapon_update.error.slot_invalid");
+            case "ITEM_ID_INVALID" -> Component.translatable("message.codpattern.weapon_update.error.item_id_invalid");
+            case "ITEM_NOT_REGISTERED" -> Component.translatable("message.codpattern.weapon_update.error.item_not_registered");
+            case "NBT_INVALID" -> Component.translatable("message.codpattern.weapon_update.error.nbt_invalid");
+            case "ITEM_NAMESPACE_BLOCKED" -> Component.translatable("message.codpattern.weapon_update.error.item_namespace_blocked");
+            case "ITEM_CATEGORY_INVALID" -> Component.translatable("message.codpattern.weapon_update.error.item_category_invalid");
+            case "THROWABLES_DISABLED" -> Component.translatable("message.codpattern.weapon_update.error.throwables_disabled");
+            default -> Component.translatable("message.codpattern.weapon_update.error.unknown",
+                    code == null || code.isBlank() ? "UNKNOWN" : code);
+        };
+    }
+
+    private static Component resolveRoomActionReason(String reasonCode, String reasonMessage) {
+        if (reasonMessage != null && !reasonMessage.isBlank()) {
+            return Component.literal(reasonMessage);
+        }
+        return switch (reasonCode == null ? "" : reasonCode) {
+            case "MAP_NOT_FOUND" -> Component.translatable("screen.codpattern.tdm_room.error.map_not_found");
+            case "PHASE_LOCKED" -> Component.translatable("screen.codpattern.tdm_room.error.phase_locked");
+            case "MID_JOIN_DISABLED" -> Component.translatable("message.codpattern.room.mid_join_disabled");
+            case "TEAM_NOT_FOUND" -> Component.translatable("screen.codpattern.tdm_room.error.team_not_found");
+            case "TEAM_FULL" -> Component.translatable("screen.codpattern.tdm_room.error.team_full");
+            case "TEAM_BALANCE_EXCEEDED" -> Component.translatable("screen.codpattern.tdm_room.error.team_balance_exceeded");
+            case "NOT_IN_ROOM" -> Component.translatable("screen.codpattern.tdm_room.error.not_in_room");
+            case "NOT_SPECTATOR" -> Component.translatable("screen.codpattern.tdm_room.error.not_spectator");
+            case "UNKNOWN" -> Component.translatable("screen.codpattern.tdm_room.error.unknown");
+            default -> Component.translatable("screen.codpattern.tdm_room.error.unknown");
+        };
     }
 }

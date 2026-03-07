@@ -56,7 +56,8 @@ public final class TdmRoomActionController {
             boolean knownNotPlaying = roomStateNow != null && !"PLAYING".equals(roomStateNow);
             if (leftRoom || knownNotPlaying) {
                 clearPendingAction();
-                showRoomNotice("当前阶段不可加入游戏", CodTheme.TEXT_SECONDARY);
+                showRoomNotice(Component.translatable("screen.codpattern.tdm_room.notice.phase_locked_join_game").getString(),
+                        CodTheme.TEXT_SECONDARY);
                 buttonStateUpdater.run();
             }
         }
@@ -83,9 +84,9 @@ public final class TdmRoomActionController {
         TdmRoomUiState.PendingAction expiredAction = uiState.consumeExpiredPendingAction(now);
         if (expiredAction != TdmRoomUiState.PendingAction.NONE) {
             String timeoutMessage = switch (expiredAction) {
-                case JOINING -> "加入房间请求超时";
-                case LEAVING -> "离开房间请求超时";
-                case JOINING_GAME -> "加入游戏请求超时";
+                case JOINING -> Component.translatable("screen.codpattern.tdm_room.notice.timeout.join_room").getString();
+                case LEAVING -> Component.translatable("screen.codpattern.tdm_room.notice.timeout.leave_room").getString();
+                case JOINING_GAME -> Component.translatable("screen.codpattern.tdm_room.notice.timeout.join_game").getString();
                 default -> "";
             };
             if (!timeoutMessage.isEmpty()) {
@@ -293,7 +294,8 @@ public final class TdmRoomActionController {
                 return;
             }
 
-            showRoomNotice("已离开房间", CodTheme.TEXT_SECONDARY);
+            showRoomNotice(Component.translatable("screen.codpattern.tdm_room.notice.left_room").getString(),
+                    CodTheme.TEXT_SECONDARY);
             clearSwitchFlow();
             if (roomName != null && roomName.equals(roomState.selectedRoom())) {
                 roomState.setSelectedRoom(roomName);
@@ -425,7 +427,8 @@ public final class TdmRoomActionController {
             return;
         }
         if (!isLocalSpectatorInPlaying()) {
-            showRoomNotice("当前阶段不可加入游戏", CodTheme.TEXT_DANGER);
+            showRoomNotice(Component.translatable("screen.codpattern.tdm_room.notice.phase_locked_join_game").getString(),
+                    CodTheme.TEXT_DANGER);
             buttonStateUpdater.run();
             return;
         }
@@ -503,6 +506,7 @@ public final class TdmRoomActionController {
             return switch (code) {
                 case "MAP_NOT_FOUND" -> Component.translatable("screen.codpattern.tdm_room.error.map_not_found").getString();
                 case "PHASE_LOCKED" -> Component.translatable("screen.codpattern.tdm_room.error.phase_locked").getString();
+                case "MID_JOIN_DISABLED" -> Component.translatable("message.codpattern.room.mid_join_disabled").getString();
                 case "TEAM_NOT_FOUND" -> Component.translatable("screen.codpattern.tdm_room.error.team_not_found").getString();
                 case "TEAM_FULL" -> Component.translatable("screen.codpattern.tdm_room.error.team_full").getString();
                 case "TEAM_BALANCE_EXCEEDED" -> Component.translatable("screen.codpattern.tdm_room.error.team_balance_exceeded").getString();

@@ -65,13 +65,13 @@ public class SaveAttachmentPresetPacket {
                         packet.bagId,
                         packet.slot,
                         result.payloadLength());
-            } else if (!result.userMessage().isBlank()) {
-                player.sendSystemMessage(Component.literal(result.userMessage()));
+            } else if (result.userMessage() != null && !result.userMessage().getString().isBlank()) {
+                player.sendSystemMessage(result.userMessage());
                 LOGGER.warn("Attachment preset save failed: player={} bagId={} slot={} message={}",
                         player.getGameProfile().getName(),
                         packet.bagId,
                         packet.slot,
-                        result.userMessage());
+                        result.userMessage().getString());
             }
         });
         ctx.get().setPacketHandled(true);

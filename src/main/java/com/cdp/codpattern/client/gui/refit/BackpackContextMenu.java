@@ -33,16 +33,16 @@ public class BackpackContextMenu implements Renderable, GuiEventListener, Narrat
     private Consumer<BackpackContextMenu> onClose;
 
     public static class MenuItem {
-        public final String label;
+        public final net.minecraft.network.chat.Component label;
         public final Runnable action;
         public final int textColor;
         public final int hoverTextColor;
 
-        public MenuItem(String label, Runnable action) {
+        public MenuItem(net.minecraft.network.chat.Component label, Runnable action) {
             this(label, action, CodTheme.TEXT_PRIMARY, CodTheme.TEXT_HOVER);
         }
 
-        public MenuItem(String label, Runnable action, int textColor, int hoverTextColor) {
+        public MenuItem(net.minecraft.network.chat.Component label, Runnable action, int textColor, int hoverTextColor) {
             this.label = label;
             this.action = action;
             this.textColor = textColor;
@@ -57,7 +57,7 @@ public class BackpackContextMenu implements Renderable, GuiEventListener, Narrat
     /**
      * 添加菜单项
      */
-    public void addItem(String label, Runnable action) {
+    public void addItem(net.minecraft.network.chat.Component label, Runnable action) {
         items.add(new MenuItem(label, action));
         recalculateHeight();
     }
@@ -65,7 +65,7 @@ public class BackpackContextMenu implements Renderable, GuiEventListener, Narrat
     /**
      * 添加带自定义颜色的菜单项
      */
-    public void addItem(String label, Runnable action, int textColor, int hoverTextColor) {
+    public void addItem(net.minecraft.network.chat.Component label, Runnable action, int textColor, int hoverTextColor) {
         items.add(new MenuItem(label, action, textColor, hoverTextColor));
         recalculateHeight();
     }

@@ -6,9 +6,11 @@ import com.cdp.codpattern.client.gui.refit.BackPackSelectButton;
 import com.cdp.codpattern.client.gui.refit.BackpackContextMenu;
 import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
 import com.cdp.codpattern.client.gui.screen.RenameBackpackScreen;
+import com.cdp.codpattern.config.backpack.BackpackNameHelper;
 import com.cdp.codpattern.network.CloneBackpackPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 
@@ -49,10 +51,15 @@ public final class BackpackContextMenuCoordinator {
         beforeShow.run();
         contextMenu.clearItems();
 
-        contextMenu.addItem("重命名", () -> Minecraft.getInstance().setScreen(
-                new RenameBackpackScreen(parent, backpackId, button.getBackpack().getName())));
-        contextMenu.addItem("复制", () -> ModNetworkChannel.sendToServer(new CloneBackpackPacket(backpackId)));
-        contextMenu.addItem("删除", () -> onDeleteClick.accept(backpackId), CodTheme.TEXT_DANGER, CodTheme.TEXT_DANGER);
+        contextMenu.addItem(Component.translatable("screen.codpattern.backpack.context.rename"), () -> Minecraft.getInstance().setScreen(
+                new RenameBackpackScreen(
+                        parent,
+                        backpackId,
+                        BackpackNameHelper.isGeneratedName(button.getBackpack().getName()) ? "" : button.getBackpack().getName())));
+        contextMenu.addItem(Component.translatable("screen.codpattern.backpack.context.clone"),
+                () -> ModNetworkChannel.sendToServer(new CloneBackpackPacket(backpackId)));
+        contextMenu.addItem(Component.translatable("screen.codpattern.backpack.context.delete"),
+                () -> onDeleteClick.accept(backpackId), CodTheme.TEXT_DANGER, CodTheme.TEXT_DANGER);
 
         contextMenu.show(mouseX, mouseY, screenWidth, screenHeight);
         playOpenSound();

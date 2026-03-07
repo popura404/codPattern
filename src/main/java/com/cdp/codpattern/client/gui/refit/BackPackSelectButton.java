@@ -6,6 +6,7 @@ import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
 import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackNameHelper;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
@@ -67,7 +68,7 @@ public class BackPackSelectButton extends Button {
     }
 
     public BackPackSelectButton(int x, int y, int width, int height, int bagserial, BackpackConfig.Backpack backpack, boolean isSelected) {
-        super(x, y, width, height, Component.literal("choose your bag"), button -> {
+        super(x, y, width, height, Component.translatable("screen.codpattern.backpack.select_button"), button -> {
             ModNetworkChannel.sendToServer(new SelectBackpackPacket(bagserial));
             Minecraft.getInstance().execute(() -> {
                 Minecraft.getInstance().setScreen(null);
@@ -172,22 +173,38 @@ public class BackPackSelectButton extends Button {
         int maxWidth = 180;
 
         String displayName = getDisplayNameRaw();
-        tooltipLines.add(Component.literal("§e§l" + displayName + " §7(#" + BAGSERIAL + ")"));
-        tooltipLines.add(Component.literal("§7----------------"));
+        tooltipLines.add(Component.translatable("screen.codpattern.backpack.tooltip.title", displayName, BAGSERIAL));
+        tooltipLines.add(Component.translatable("screen.codpattern.backpack.tooltip.separator"));
         String primaryName = getWeaponDisplayName("primary");
         String secondaryName = getWeaponDisplayName("secondary");
         if (primaryName != null || secondaryName != null) {
-            tooltipLines.add(Component.literal("§7组合:"));
-            addWrappedTooltipLine(tooltipLines, minecraft, "§c主: §f", primaryName == null ? "空" : primaryName, maxWidth, "§7   §f");
-            addWrappedTooltipLine(tooltipLines, minecraft, "§9副: §f", secondaryName == null ? "空" : secondaryName, maxWidth, "§7   §f");
-            tooltipLines.add(Component.literal("§7----------------"));
+            tooltipLines.add(Component.translatable("screen.codpattern.backpack.tooltip.combo"));
+            addWrappedTooltipLine(
+                    tooltipLines,
+                    minecraft,
+                    Component.translatable("screen.codpattern.backpack.tooltip.primary_prefix").getString(),
+                    primaryName == null
+                            ? Component.translatable("screen.codpattern.backpack.tooltip.empty").getString()
+                            : primaryName,
+                    maxWidth,
+                    Component.translatable("screen.codpattern.backpack.tooltip.continuation_prefix").getString());
+            addWrappedTooltipLine(
+                    tooltipLines,
+                    minecraft,
+                    Component.translatable("screen.codpattern.backpack.tooltip.secondary_prefix").getString(),
+                    secondaryName == null
+                            ? Component.translatable("screen.codpattern.backpack.tooltip.empty").getString()
+                            : secondaryName,
+                    maxWidth,
+                    Component.translatable("screen.codpattern.backpack.tooltip.continuation_prefix").getString());
+            tooltipLines.add(Component.translatable("screen.codpattern.backpack.tooltip.separator"));
         }
 
         // 添加右键提示
-        tooltipLines.add(Component.literal("§a右键 §7打开更多选项"));
+        tooltipLines.add(Component.translatable("screen.codpattern.backpack.tooltip.more"));
 
         if (isCurrentlySelected) {
-            tooltipLines.add(Component.literal("§a✔ 当前选中"));
+            tooltipLines.add(Component.translatable("screen.codpattern.backpack.tooltip.selected"));
         }
 
         Component combined = tooltipLines.get(0);
@@ -304,7 +321,8 @@ public class BackPackSelectButton extends Button {
                 scaleAlpha(idColor, revealFactor), true);
 
         boolean canRenderChip = isCurrentlySelected
-                && this.width >= GuiTextHelper.referenceWidth(minecraft.font, "已装备") + 18
+                && this.width >= GuiTextHelper.referenceWidth(minecraft.font,
+                        Component.translatable("screen.codpattern.backpack.chip.equipped")) + 18
                 && this.height >= referenceLineHeight + 8;
         if (canRenderChip) {
             renderSelectedChip(graphics, minecraft, revealFactor);
@@ -335,7 +353,7 @@ public class BackPackSelectButton extends Button {
     }
 
     private void renderSelectedChip(GuiGraphics graphics, Minecraft minecraft, float revealFactor) {
-        String chipText = "已装备";
+        Component chipText = Component.translatable("screen.codpattern.backpack.chip.equipped");
         int chipWidth = GuiTextHelper.referenceWidth(minecraft.font, chipText) + 10;
         int chipHeight = GuiTextHelper.referenceLineHeight(minecraft.font) + 2;
         int chipX = this.getX() + this.width - chipWidth - 4;
@@ -433,11 +451,7 @@ public class BackPackSelectButton extends Button {
     }
 
     public String getDisplayNameRaw() {
-        String customName = getCustomName();
-        if (customName != null && !customName.isBlank()) {
-            return customName.trim();
-        }
-        return "未命名背包";
+        return BackpackNameHelper.displayName(getCustomName(), BAGSERIAL);
     }
 
     public String getCombinationNameRaw() {
@@ -447,10 +461,10 @@ public class BackPackSelectButton extends Button {
             return "";
         }
         if (primary == null) {
-            primary = "空";
+            primary = Component.translatable("screen.codpattern.backpack.tooltip.empty").getString();
         }
         if (secondary == null) {
-            secondary = "空";
+            secondary = Component.translatable("screen.codpattern.backpack.tooltip.empty").getString();
         }
         return primary + " + " + secondary;
     }

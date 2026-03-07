@@ -35,9 +35,10 @@ public class DowntabButton extends Button {
     }
 
     public DowntabButton(BackPackSelectButton button){
-        super(button.getX() , button.getY() + button.getHeight() , button.getWidth() , calcSubHeight(button), Component.literal("change ur backpack") ,pbutton -> {
+        super(button.getX(), button.getY() + button.getHeight(), button.getWidth(), calcSubHeight(button),
+                Component.translatable("screen.codpattern.backpack.action.configure"), pbutton -> {
             Minecraft.getInstance().execute(() -> Minecraft.getInstance().setScreen(new WeaponMenuScreen(button.getBackpack(), button.getBAGSERIAL())));
-        } , DEFAULT_NARRATION);
+        }, DEFAULT_NARRATION);
         this.BAGSERIAL = button.getBAGSERIAL();
         this.backpack = button.getBackpack();
     }
@@ -94,11 +95,10 @@ public class DowntabButton extends Button {
 
     protected void rendertitle(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
-        String idText = "配置";
         int textX = this.getX() + 6;  // 左对齐
         int textY = this.getY() + (this.height - minecraft.font.lineHeight) / 2;
 
-        graphics.drawString(minecraft.font, idText, textX, textY,
+        graphics.drawString(minecraft.font, Component.translatable("screen.codpattern.backpack.action.configure"), textX, textY,
                 this.isHoveredOrFocused() ? CodTheme.HOVER_BORDER : 0xFFFFFF, true);
     }
 }

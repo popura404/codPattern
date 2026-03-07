@@ -70,7 +70,7 @@ public final class BackpackConfigRepository {
             return -1;
         }
 
-        BackpackConfig.Backpack newBackpack = new BackpackConfig.Backpack("自定义背包 #" + id);
+        BackpackConfig.Backpack newBackpack = new BackpackConfig.Backpack("");
         newBackpack.setItem_MAP("primary", BackpackConfig.getItemDataADDP());
         newBackpack.setItem_MAP("secondary", BackpackConfig.getItemDataADDS());
         newBackpack.setItem_MAP("tactical", BackpackConfig.getItemDataTactical());

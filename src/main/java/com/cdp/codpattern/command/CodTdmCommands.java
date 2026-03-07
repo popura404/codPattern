@@ -37,8 +37,8 @@ public class CodTdmCommands {
                                             pos,
                                             pos.offset(10, 10, 10));
 
-                                    source.sendSuccess(() -> Component.literal(
-                                            "§e[已弃用] §a已创建 TDM 地图: " + mapName + "\n§7请使用 §b/fpsm tdm §7命令管理 TDM 地图"),
+                                    source.sendSuccess(
+                                            () -> Component.translatable("command.codpattern.codtdm.deprecated_created", mapName),
                                             true);
                                     return 1;
                                 }))));

@@ -39,14 +39,16 @@ public class FlatColorButton extends Button {
 
     // 普通按钮
     public FlatColorButton(int x, int y, int width, int height, @Nullable Button.OnPress pOnPress) {
-        super(x, y, width, height, Component.literal("choose your bag"), pOnPress, DEFAULT_NARRATION);
+        super(x, y, width, height, Component.translatable("screen.codpattern.backpack.select_button"), pOnPress,
+                DEFAULT_NARRATION);
     }
 
     // 带贴图的按钮
     public FlatColorButton(int pX, int pY, int pWidth, int pHeight, Integer bagserial,
                            ItemStack itemStack,
                            int UNIT_LENGTH, @Nullable Button.OnPress onPress){
-        super(pX, pY, pWidth, pHeight, Component.literal("choose ur weapon"), onPress != null ? onPress : button -> {}, DEFAULT_NARRATION);
+        super(pX, pY, pWidth, pHeight, Component.translatable("screen.codpattern.weapon.select_button"),
+                onPress != null ? onPress : button -> {}, DEFAULT_NARRATION);
         this.isPhotoButton = true;
         this.BAGSERIAL = bagserial;
         this.UNIT_LENGTH = UNIT_LENGTH;

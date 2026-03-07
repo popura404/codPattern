@@ -1,6 +1,7 @@
 package com.cdp.codpattern.network;
 
 import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackNameHelper;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
@@ -55,15 +56,14 @@ public class CloneBackpackPacket {
                 return;
             }
 
-            String baseName = source.getName() == null
-                    ? Component.translatable("message.codpattern.backpack.default_name").getString()
-                    : source.getName().trim();
-            String copySuffix = Component.translatable("message.codpattern.backpack.copy_suffix").getString();
-            String copyName = baseName.isEmpty()
-                    ? Component.translatable("message.codpattern.backpack.default_name").getString() + copySuffix
-                    : baseName + copySuffix;
-            if (copyName.length() > 32) {
-                copyName = copyName.substring(0, 32);
+            String copyName = "";
+            if (!BackpackNameHelper.isGeneratedName(source.getName())) {
+                String baseName = source.getName().trim();
+                String copySuffix = Component.translatable("message.codpattern.backpack.copy_suffix").getString();
+                copyName = baseName + copySuffix;
+                if (copyName.length() > 32) {
+                    copyName = copyName.substring(0, 32);
+                }
             }
             BackpackConfig.Backpack clone = new BackpackConfig.Backpack(copyName);
 

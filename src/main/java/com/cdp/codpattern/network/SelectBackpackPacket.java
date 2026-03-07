@@ -2,6 +2,7 @@ package com.cdp.codpattern.network;
 
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackNameHelper;
 import com.cdp.codpattern.config.path.ConfigPath;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -46,7 +47,9 @@ public class SelectBackpackPacket {
                     BackpackConfigRepository.save();
 
                     // 获取背包名称
-                    String backpackName = playerData.getBackpacks_MAP().get(backpackId).getName();
+                    Component backpackName = BackpackNameHelper.displayNameComponent(
+                            playerData.getBackpacks_MAP().get(backpackId),
+                            backpackId);
 
                     // 发送提示
                     player.connection.send(new ClientboundSetActionBarTextPacket(

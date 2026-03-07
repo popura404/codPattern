@@ -83,7 +83,7 @@ public final class TdmRoomListRenderer {
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,
-                    "§b/fpsm map create cdptdm <名称> <从> <到>",
+                    Component.translatable("screen.codpattern.tdm_room.create_command"),
                     roomListX,
                     roomListY + GuiTextHelper.referenceScaled(10) + (referenceLineHeight + GuiTextHelper.referenceScaled(3)) * 2,
                     scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),

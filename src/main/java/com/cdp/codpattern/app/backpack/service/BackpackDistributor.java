@@ -8,6 +8,7 @@ import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.mojang.logging.LogUtils;
+import com.cdp.codpattern.config.backpack.BackpackNameHelper;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.network.chat.Component;
@@ -123,9 +124,9 @@ public class BackpackDistributor {
         player.inventoryMenu.broadcastChanges();
         player.inventoryMenu.slotsChanged(player.getInventory());
 
-        player.sendSystemMessage(Component.literal(
-                "§6已装备背包: §e" + backpack.getName()
-        ));
+        player.sendSystemMessage(Component.translatable(
+                "message.codpattern.game.equipped_backpack",
+                BackpackNameHelper.displayNameComponent(backpack, playerData.getSelectedBackpack())));
     }
 
     private static BackpackConfig.Backpack resolveBackpack(BackpackConfig.PlayerBackpackData playerData) {

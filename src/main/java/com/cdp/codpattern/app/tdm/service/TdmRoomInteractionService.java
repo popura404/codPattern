@@ -15,12 +15,12 @@ import java.util.Optional;
 public final class TdmRoomInteractionService {
     private static final String CODE_MAP_NOT_FOUND = "MAP_NOT_FOUND";
     private static final String CODE_PHASE_LOCKED = "PHASE_LOCKED";
+    private static final String CODE_MID_JOIN_DISABLED = "MID_JOIN_DISABLED";
     private static final String CODE_TEAM_NOT_FOUND = "TEAM_NOT_FOUND";
     private static final String CODE_TEAM_FULL = "TEAM_FULL";
     private static final String CODE_NOT_SPECTATOR = "NOT_SPECTATOR";
     private static final String CODE_BALANCE_EXCEEDED = "TEAM_BALANCE_EXCEEDED";
     private static final String CODE_UNKNOWN = "UNKNOWN";
-    private static final String MID_MATCH_JOIN_DISABLED_MESSAGE = "对局进行中，当前已暂时禁用中途加入";
 
     private TdmRoomInteractionService() {
     }
@@ -36,7 +36,7 @@ public final class TdmRoomInteractionService {
         Optional<CodTdmReadPort> readPortOptional = gateway.findMapReadPortByName(mapName);
         Optional<CodTdmActionPort> actionPortOptional = gateway.findMapActionPortByName(mapName);
         if (readPortOptional.isEmpty() || actionPortOptional.isEmpty()) {
-            return failJoin(mapName, CODE_MAP_NOT_FOUND, "地图不存在");
+            return failJoin(mapName, CODE_MAP_NOT_FOUND, "");
         }
 
         CodTdmReadPort readPort = readPortOptional.get();
@@ -50,18 +50,18 @@ public final class TdmRoomInteractionService {
         boolean isPlaying = readPort.isPlayingPhase();
         boolean isWaiting = readPort.isWaitingPhase();
         if (isPlaying && isMidMatchJoinTemporarilyDisabled()) {
-            return failJoin(mapName, CODE_PHASE_LOCKED, MID_MATCH_JOIN_DISABLED_MESSAGE);
+            return failJoin(mapName, CODE_MID_JOIN_DISABLED, "");
         }
         if (isPlaying && !config.isAllowJoinDuringPlaying()) {
-            return failJoin(mapName, CODE_PHASE_LOCKED, "对局进行中，当前配置禁止中途加入");
+            return failJoin(mapName, CODE_MID_JOIN_DISABLED, "");
         }
         if (!isPlaying && !isWaiting) {
-            return failJoin(mapName, CODE_PHASE_LOCKED, "当前阶段不可加入房间");
+            return failJoin(mapName, CODE_PHASE_LOCKED, "");
         }
 
         String requestedTeam = normalizeTeam(teamName);
         if (requestedTeam != null && !readPort.hasTeam(requestedTeam)) {
-            return failJoin(mapName, CODE_TEAM_NOT_FOUND, "队伍不存在");
+            return failJoin(mapName, CODE_TEAM_NOT_FOUND, "");
         }
 
         if (isPlaying) {
@@ -90,21 +90,21 @@ public final class TdmRoomInteractionService {
         if (targetTeam == null) {
             Optional<String> autoTeam = readPort.chooseAutoJoinTeam(config.getMaxTeamDiff());
             if (autoTeam.isEmpty()) {
-                return failJoin(mapName, CODE_BALANCE_EXCEEDED, "无法分配队伍：队伍已满或超出人数差限制");
+                return failJoin(mapName, CODE_BALANCE_EXCEEDED, "");
             }
             targetTeam = autoTeam.get();
         } else {
             if (readPort.isTeamFull(targetTeam)) {
-                return failJoin(mapName, CODE_TEAM_FULL, "目标队伍已满");
+                return failJoin(mapName, CODE_TEAM_FULL, "");
             }
             if (!readPort.canJoinWithBalance(targetTeam, config.getMaxTeamDiff())) {
-                return failJoin(mapName, CODE_BALANCE_EXCEEDED, "加入该队伍会超出人数差限制");
+                return failJoin(mapName, CODE_BALANCE_EXCEEDED, "");
             }
         }
 
         actionPort.joinTeam(targetTeam, player);
         if (!readPort.containsJoinedPlayer(player.getUUID())) {
-            return failJoin(mapName, CODE_UNKNOWN, "加入失败，请稍后重试");
+            return failJoin(mapName, CODE_UNKNOWN, "");
         }
 
         actionPort.initializeReadyState(player);
@@ -118,37 +118,37 @@ public final class TdmRoomInteractionService {
         if (roomName.isPresent()) {
             return new LeaveResult(true, roomName.get(), "OK", "");
         }
-        return new LeaveResult(false, "", "NOT_IN_ROOM", "当前不在房间内");
+        return new LeaveResult(false, "", "NOT_IN_ROOM", "");
     }
 
     public static JoinResult joinGameFromSpectator(ServerPlayer player, String mapName) {
         if (mapName == null || mapName.isBlank()) {
-            return failJoin("", CODE_MAP_NOT_FOUND, "地图不存在");
+            return failJoin("", CODE_MAP_NOT_FOUND, "");
         }
 
         var gateway = FpsMatchGatewayProvider.gateway();
         Optional<CodTdmReadPort> readPortOptional = gateway.findMapReadPortByName(mapName);
         Optional<CodTdmActionPort> actionPortOptional = gateway.findMapActionPortByName(mapName);
         if (readPortOptional.isEmpty() || actionPortOptional.isEmpty()) {
-            return failJoin(mapName, CODE_MAP_NOT_FOUND, "地图不存在");
+            return failJoin(mapName, CODE_MAP_NOT_FOUND, "");
         }
 
         CodTdmReadPort readPort = readPortOptional.get();
         CodTdmActionPort actionPort = actionPortOptional.get();
         if (!readPort.containsSpectator(player)) {
-            return failJoin(mapName, CODE_NOT_SPECTATOR, "当前不是旁观状态");
+            return failJoin(mapName, CODE_NOT_SPECTATOR, "");
         }
         if (!readPort.isPlayingPhase()) {
-            return failJoin(mapName, CODE_PHASE_LOCKED, "当前阶段不可加入游戏");
+            return failJoin(mapName, CODE_PHASE_LOCKED, "");
         }
 
         if (isMidMatchJoinTemporarilyDisabled()) {
-            return failJoin(mapName, CODE_PHASE_LOCKED, MID_MATCH_JOIN_DISABLED_MESSAGE);
+            return failJoin(mapName, CODE_MID_JOIN_DISABLED, "");
         }
 
         CodTdmConfig config = CodTdmConfig.getConfig();
         if (!config.isAllowJoinDuringPlaying()) {
-            return failJoin(mapName, CODE_PHASE_LOCKED, "对局进行中，当前配置禁止中途加入");
+            return failJoin(mapName, CODE_MID_JOIN_DISABLED, "");
         }
 
         int maxTeamDiff = config.getMaxTeamDiff();
@@ -157,12 +157,12 @@ public final class TdmRoomInteractionService {
         Optional<String> autoTeam = readPort.chooseAutoJoinTeam(maxTeamDiff);
         String targetTeam = preferredTeam.orElseGet(() -> autoTeam.orElse(null));
         if (targetTeam == null) {
-            return failJoin(mapName, CODE_BALANCE_EXCEEDED, "无法加入游戏：队伍已满或超出人数差限制");
+            return failJoin(mapName, CODE_BALANCE_EXCEEDED, "");
         }
 
         actionPort.joinTeam(targetTeam, player);
         if (!readPort.containsJoinedPlayer(player.getUUID())) {
-            return failJoin(mapName, CODE_UNKNOWN, "加入游戏失败，请稍后重试");
+            return failJoin(mapName, CODE_UNKNOWN, "");
         }
 
         actionPort.initializeReadyState(player);
@@ -237,17 +237,17 @@ public final class TdmRoomInteractionService {
         player.sendSystemMessage(Component.translatable("message.codpattern.game.team_switch_locked"));
     }
 
-    public static String setReadyState(ServerPlayer player, boolean ready) {
+    public static Component setReadyState(ServerPlayer player, boolean ready) {
         Optional<CodTdmActionPort> actionPortOptional = FpsMatchGatewayProvider.gateway()
                 .findPlayerTdmActionPort(player);
         if (actionPortOptional.isEmpty()) {
-            return "§c未加入 TDM 房间";
+            return Component.translatable("message.codpattern.room.not_joined_tdm");
         }
         if (actionPortOptional.get().setPlayerReady(player, ready)) {
-            return ready ? Component.translatable("message.codpattern.room.ready").getString()
-                    : Component.translatable("message.codpattern.room.not_ready").getString();
+            return ready ? Component.translatable("message.codpattern.room.ready")
+                    : Component.translatable("message.codpattern.room.not_ready");
         }
-        return Component.translatable("message.codpattern.room.ready_change_locked").getString();
+        return Component.translatable("message.codpattern.room.ready_change_locked");
     }
 
     public static void initiateStartVote(ServerPlayer player) {

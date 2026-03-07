@@ -9,6 +9,7 @@ import com.cdp.codpattern.compat.taczaddon.TaczAddonRefitCompat;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
@@ -16,9 +17,18 @@ import java.nio.file.Path;
 
 public final class AttachmentPresetSaveService {
     public record Result(boolean success,
-            String userMessage,
+            Component userMessage,
             BackpackConfig.PlayerBackpackData playerData,
             int payloadLength) {
+    }
+
+    private static final class SaveFailureException extends RuntimeException {
+        private final String translationKey;
+
+        private SaveFailureException(String translationKey) {
+            super(translationKey);
+            this.translationKey = translationKey;
+        }
     }
 
     private AttachmentPresetSaveService() {
@@ -27,11 +37,13 @@ public final class AttachmentPresetSaveService {
     public static Result save(ServerPlayer player, int bagId, String slot, String presetPayload, String updatedGunNbtString) {
         AttachmentEditSession session = AttachmentEditSessionManager.getSession(player.getUUID());
         if (session == null) {
-            return new Result(false, "§c配件保存失败：未找到改装会话", null, 0);
+            return new Result(false, Component.translatable("message.codpattern.refit.save_failed_session_missing"), null,
+                    0);
         }
         if (session.getBagId() != bagId || !session.getSlot().equals(slot)) {
             AttachmentEditSessionManager.abortSession(player, "session_mismatch");
-            return new Result(false, "§c配件保存失败：改装会话不匹配", null, 0);
+            return new Result(false, Component.translatable("message.codpattern.refit.save_failed_session_mismatch"),
+                    null, 0);
         }
 
         boolean saved = false;
@@ -43,7 +55,7 @@ public final class AttachmentPresetSaveService {
         try {
             ItemStack gunStack = player.getInventory().getItem(session.getEditHotbarSlot());
             if (!TaczGatewayProvider.gateway().isGun(gunStack)) {
-                throw new IllegalStateException("当前槽位不是枪械");
+                throw new SaveFailureException("message.codpattern.refit.save_failed_not_gun");
             }
 
             TaczAddonRefitCompat.sanitizeGunForBackpackRefitSession(gunStack);
@@ -57,7 +69,7 @@ public final class AttachmentPresetSaveService {
             playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, backpackPath);
             BackpackConfig.Backpack backpack = playerData.getBackpacks_MAP().get(bagId);
             if (backpack == null) {
-                throw new IllegalStateException("目标背包不存在");
+                throw new SaveFailureException("message.codpattern.refit.save_failed_backpack_missing");
             }
 
             AttachmentPresetManager.writePreset(player.server, player.getUUID(), bagId, slot, builtPresetPayload);
@@ -69,7 +81,7 @@ public final class AttachmentPresetSaveService {
 
             saved = true;
             finalPayloadLength = builtPresetPayload.length();
-            return new Result(true, "", playerData, finalPayloadLength);
+            return new Result(true, Component.empty(), playerData, finalPayloadLength);
         } catch (Exception e) {
             if (!saved && mutatedBackpack != null) {
                 if (previousItem == null) {
@@ -78,7 +90,10 @@ public final class AttachmentPresetSaveService {
                     mutatedBackpack.getItem_MAP().put(slot, previousItem);
                 }
             }
-            return new Result(false, "§c配件保存失败，已回滚：" + e.getMessage(), playerData, 0);
+            Component message = e instanceof SaveFailureException saveFailureException
+                    ? Component.translatable(saveFailureException.translationKey)
+                    : Component.translatable("message.codpattern.refit.save_failed_rollback");
+            return new Result(false, message, playerData, 0);
         } finally {
             if (saved) {
                 AttachmentEditSessionManager.endSession(player);

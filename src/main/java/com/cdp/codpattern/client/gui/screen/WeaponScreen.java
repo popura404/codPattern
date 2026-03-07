@@ -55,7 +55,7 @@ public class WeaponScreen extends Screen {
 
     public WeaponScreen(WeaponMenuScreen parent, BackpackConfig.Backpack backpack,
             Integer bagSerial, String slotType) {
-        super(Component.literal("WeaponScreen"));
+        super(Component.translatable("screen.codpattern.weapon.title"));
         this.parentScreen = parent;
         this.BAGSERIAL = bagSerial;
         this.backpack = backpack;
@@ -353,12 +353,12 @@ public class WeaponScreen extends Screen {
         renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
 
-        String title = switch (slotType) {
-            case "primary" -> Component.translatable("screen.codpattern.weapon.select_primary").getString();
-            case "secondary" -> Component.translatable("screen.codpattern.weapon.select_secondary").getString();
-            case "tactical" -> Component.translatable("screen.codpattern.weapon.select_tactical").getString();
-            case "lethal" -> Component.translatable("screen.codpattern.weapon.select_lethal").getString();
-            default -> Component.translatable("screen.codpattern.weapon.select_weapon").getString();
+        Component title = switch (slotType) {
+            case "primary" -> Component.translatable("screen.codpattern.weapon.select_primary");
+            case "secondary" -> Component.translatable("screen.codpattern.weapon.select_secondary");
+            case "tactical" -> Component.translatable("screen.codpattern.weapon.select_tactical");
+            case "lethal" -> Component.translatable("screen.codpattern.weapon.select_lethal");
+            default -> Component.translatable("screen.codpattern.weapon.select_weapon");
         };
         GuiTextHelper.drawReferenceCenteredEllipsizedString(
                 graphics,
@@ -371,11 +371,10 @@ public class WeaponScreen extends Screen {
                 false
         );
 
-        String categoryInfo = getTabDisplayName(currentTab).getString();
         GuiTextHelper.drawReferenceCenteredEllipsizedString(
                 graphics,
                 this.font,
-                categoryInfo,
+                getTabDisplayName(currentTab),
                 this.width / 2,
                 17 * UNIT_LENGTH,
                 this.width - UNIT_LENGTH * 12,

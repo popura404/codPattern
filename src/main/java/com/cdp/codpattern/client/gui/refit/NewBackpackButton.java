@@ -137,12 +137,13 @@ public class NewBackpackButton extends Button {
 
     protected void renderButtonText(GuiGraphics graphics, float revealFactor) {
         Minecraft minecraft = Minecraft.getInstance();
-        String text = this.active ? Component.translatable("screen.codpattern.backpack.add_new").getString()
-                : Component.translatable("screen.codpattern.backpack.limit_reached").getString();
+        Component text = this.active
+                ? Component.translatable("screen.codpattern.backpack.add_new")
+                : Component.translatable("screen.codpattern.backpack.limit_reached");
         int textColor = this.active ? (this.isHoveredOrFocused() ? CodTheme.HOVER_BORDER : CodTheme.TEXT_PRIMARY)
                 : CodTheme.DISABLED_TEXT;
 
-        String countText = "已用 " + currentBackpackCount + "/10";
+        Component countText = Component.translatable("screen.codpattern.backpack.count_used", currentBackpackCount, 10);
         int referenceLineHeight = GuiTextHelper.referenceLineHeight(minecraft.font);
         boolean showCount = this.height >= referenceLineHeight * 2 + 8;
         int totalTextHeight = showCount ? referenceLineHeight * 2 + 2 : referenceLineHeight;

@@ -118,7 +118,7 @@ public class BackpackConfig {
             PlayerBackpackData newData = new PlayerBackpackData();
 
             // 背包1
-            Backpack backpack1 = new Backpack("自定义背包1");
+            Backpack backpack1 = new Backpack("");
             backpack1.setItem_MAP("primary", itemDataP1);
             backpack1.setItem_MAP("secondary", itemDataS1);
             backpack1.setItem_MAP("tactical", itemDataTactical);
@@ -126,7 +126,7 @@ public class BackpackConfig {
             newData.getBackpacks_MAP().put(1, backpack1);
 
             // 背包2
-            Backpack backpack2 = new Backpack("自定义背包2");
+            Backpack backpack2 = new Backpack("");
             backpack2.setItem_MAP("primary", itemDataP2);
             backpack2.setItem_MAP("secondary", itemDataS2);
             backpack2.setItem_MAP("tactical", itemDataTactical);
@@ -134,7 +134,7 @@ public class BackpackConfig {
             newData.getBackpacks_MAP().put(2, backpack2);
 
             // 背包3
-            Backpack backpack3 = new Backpack("自定义背包3");
+            Backpack backpack3 = new Backpack("");
             backpack3.setItem_MAP("primary", itemDataP3);
             backpack3.setItem_MAP("secondary", itemDataS3);
             backpack3.setItem_MAP("tactical", itemDataTactical);

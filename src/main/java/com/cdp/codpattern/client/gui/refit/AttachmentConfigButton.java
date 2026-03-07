@@ -23,7 +23,7 @@ public class AttachmentConfigButton extends Button {
     private int focusedTimes = 0;
 
     public AttachmentConfigButton(int x, int y, int width, int height, int bagId, String slot) {
-        super(x, y, width, height, Component.literal("attachment config"),
+        super(x, y, width, height, Component.translatable("screen.codpattern.attachment_config.button"),
                 button -> {
                     AttachmentRefitClientState.setParentScreen(Minecraft.getInstance().screen);
                     ModNetworkChannel.sendToServer(new RequestAttachmentPresetPacket(bagId, slot));
@@ -70,12 +70,18 @@ public class AttachmentConfigButton extends Button {
 
     protected void renderTitle(GuiGraphics graphics) {
         Minecraft minecraft = Minecraft.getInstance();
-        String idText = "更换配件";
         int textX = this.getX() + 6;
         int textY = this.getY() + (this.height - GuiTextHelper.referenceLineHeight(minecraft.font)) / 2;
 
         int textColor = this.isHoveredOrFocused() ? CodTheme.SELECTED_TEXT : CodTheme.TEXT_PRIMARY;
-        GuiTextHelper.drawReferenceString(graphics, minecraft.font, idText, textX, textY, textColor, true);
+        GuiTextHelper.drawReferenceString(
+                graphics,
+                minecraft.font,
+                Component.translatable("screen.codpattern.attachment_config.button"),
+                textX,
+                textY,
+                textColor,
+                true);
     }
 
     private void renderGoldBorder(GuiGraphics graphics) {

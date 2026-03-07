@@ -4,6 +4,7 @@ import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
+import com.cdp.codpattern.config.backpack.BackpackNameHelper;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
@@ -53,7 +54,8 @@ public final class KitDistributionService {
             }
 
             player.sendSystemMessage(
-                    Component.translatable("message.codpattern.game.equipped_backpack", backpack.getName()));
+                    Component.translatable("message.codpattern.game.equipped_backpack",
+                            BackpackNameHelper.displayNameComponent(backpack, playerData.getSelectedBackpack())));
         }
 
         player.inventoryMenu.broadcastChanges();

@@ -60,7 +60,7 @@ public class BackpackMenuScreen extends Screen {
     private long gridPulseAtMs = 0L;
 
     public BackpackMenuScreen() {
-        super(Component.literal("Select your bag"));
+        super(Component.translatable("screen.codpattern.backpack_menu.title"));
     }
 
     public void init() {
@@ -91,11 +91,10 @@ public class BackpackMenuScreen extends Screen {
         renderWeaponDisplay(pGuiGraphics, pMouseX, pMouseY, revealFactor);
 
         if (loading) {
-            String loadingText = "加载中...";
             GuiTextHelper.drawReferenceCenteredEllipsizedString(
                     pGuiGraphics,
                     Minecraft.getInstance().font,
-                    loadingText,
+                    Component.translatable("screen.codpattern.backpack_menu.loading"),
                     this.width / 2,
                     this.height / 2,
                     this.width - UNIT_LENGTH * 12,
@@ -164,6 +163,7 @@ public class BackpackMenuScreen extends Screen {
 
     private void renderHeaderBar(GuiGraphics graphics, float revealFactor) {
         Minecraft mc = Minecraft.getInstance();
+        Component title = Component.translatable("screen.codpattern.backpack_menu.header");
         int titleLineHeight = GuiTextHelper.referenceLineHeight(mc.font);
         int titleX = UNIT_LENGTH * 6;
         int titleY = UNIT_LENGTH * 4;
@@ -175,7 +175,7 @@ public class BackpackMenuScreen extends Screen {
         GuiTextHelper.drawReferenceString(
                 graphics,
                 mc.font,
-                "背包选择",
+                title,
                 titleX,
                 titleY,
                 scaleAlpha(CodTheme.TEXT_PRIMARY, revealFactor),
@@ -186,9 +186,11 @@ public class BackpackMenuScreen extends Screen {
 
         int hintRightX = this.width - titleX;
         int hintMaxWidth = Math.max(40, this.width / 3);
-        String hint = this.width < UNIT_LENGTH * 36
-                ? "[LMB] 选  [RMB] 更多"
-                : "[LMB] 选择背包   [RMB] 更多操作";
+        String hint = Component.translatable(
+                this.width < UNIT_LENGTH * 36
+                        ? "screen.codpattern.backpack_menu.hint.compact"
+                        : "screen.codpattern.backpack_menu.hint.full")
+                .getString();
         GuiTextHelper.drawReferenceRightAlignedEllipsizedString(
                 graphics,
                 mc.font,
@@ -202,7 +204,7 @@ public class BackpackMenuScreen extends Screen {
 
         if (playerData != null) {
             String counterText = playerData.getBackpackCount() + " / 10";
-            int counterX = titleX + GuiTextHelper.referenceWidth(mc.font, "背包选择") + UNIT_LENGTH;
+            int counterX = titleX + GuiTextHelper.referenceWidth(mc.font, title) + UNIT_LENGTH;
             int counterMaxWidth = hintRightX - hintMaxWidth - counterX - UNIT_LENGTH;
             if (counterMaxWidth >= GuiTextHelper.referenceWidth(mc.font, counterText)) {
                 GuiTextHelper.drawReferenceString(
@@ -272,7 +274,7 @@ public class BackpackMenuScreen extends Screen {
                 baseY,
                 totalWidth,
                 subHeight,
-                Component.literal("配置"),
+                Component.translatable("screen.codpattern.backpack.action.configure"),
                 btn -> Minecraft.getInstance().setScreen(new WeaponMenuScreen(backPackSelectButton.getBackpack(), backPackSelectButton.getBAGSERIAL())),
                 0xFFFFFF,
                 CodTheme.TEXT_HOVER
@@ -345,8 +347,8 @@ public class BackpackMenuScreen extends Screen {
     }
 
     private void openDeleteConfirm(int backpackId) {
-        Component title = Component.literal("删除背包");
-        Component message = Component.literal("确定要删除背包 #" + backpackId + " 吗？");
+        Component title = Component.translatable("screen.codpattern.backpack.delete.title");
+        Component message = Component.translatable("screen.codpattern.backpack.delete.message", backpackId);
         Minecraft.getInstance().setScreen(new ConfirmScreen(confirmed -> {
             Minecraft.getInstance().setScreen(this);
             if (confirmed) {

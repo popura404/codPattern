@@ -36,7 +36,7 @@ public class SetReadyStatePacket {
             if (player == null) {
                 return;
             }
-            player.sendSystemMessage(Component.literal(TdmRoomInteractionService.setReadyState(player, ready)));
+            player.sendSystemMessage(TdmRoomInteractionService.setReadyState(player, ready));
         });
         ctx.get().setPacketHandled(true);
     }

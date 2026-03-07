@@ -57,7 +57,7 @@ public final class PlayerDeathService {
         int respawnDelayTicks = Math.max(1, config.getRespawnDelayTicks());
         boolean hasRealKiller = killer != null && !killer.getUUID().equals(player.getUUID());
         UUID killerId = hasRealKiller ? killer.getUUID() : player.getUUID();
-        String killerName = hasRealKiller ? killer.getGameProfile().getName() : "Unknown";
+        String killerName = hasRealKiller ? killer.getGameProfile().getName() : "";
 
         hooks.sendDeathCamPacket(player, new DeathCamPacket(killerId, killerName, deathCamTicks, respawnDelayTicks));
         hooks.registerDeathCam(player.getUUID(), killerId, deathPos, camPos, deathCamTicks);

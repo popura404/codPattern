@@ -9,6 +9,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.Map;
@@ -126,12 +127,19 @@ public final class BackpackWeaponPreviewPanel {
             boolean isThrowableSlot = "tactical".equals(type) || "lethal".equals(type);
             boolean drawThrowableDimmed = isThrowableSlot && !throwablesEnabled;
 
-            String typeLabel = switch (type) {
-                case "primary" -> "§c主武器";
-                case "secondary" -> "§9副武器";
-                case "tactical" -> "§b投掷物 1";
-                case "lethal" -> "§6投掷物 2";
-                default -> type;
+            Component typeLabel = switch (type) {
+                case "primary" -> Component.translatable("screen.codpattern.backpack.preview.primary");
+                case "secondary" -> Component.translatable("screen.codpattern.backpack.preview.secondary");
+                case "tactical" -> Component.translatable("screen.codpattern.backpack.preview.tactical");
+                case "lethal" -> Component.translatable("screen.codpattern.backpack.preview.lethal");
+                default -> Component.literal(type);
+            };
+            int typeLabelColor = switch (type) {
+                case "primary" -> scaleAlpha(0xFFFF6C6C, alphaFactor);
+                case "secondary" -> scaleAlpha(0xFF74A8FF, alphaFactor);
+                case "tactical" -> scaleAlpha(0xFF7ED6E7, alphaFactor);
+                case "lethal" -> scaleAlpha(0xFFFFC867, alphaFactor);
+                default -> scaleAlpha(0xFFFFFFFF, alphaFactor);
             };
             GuiTextHelper.drawReferenceEllipsizedString(
                     graphics,
@@ -140,7 +148,7 @@ public final class BackpackWeaponPreviewPanel {
                     weaponX,
                     weaponY,
                     textMaxWidth,
-                    scaleAlpha(0xFFFFFFFF, alphaFactor),
+                    typeLabelColor,
                     true
             );
 

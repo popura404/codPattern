@@ -7,6 +7,7 @@ import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.client.player.LocalPlayer;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -167,8 +168,12 @@ public final class TdmRoomRosterRenderer {
         String aliveMark = player.isAlive() ? "● " : "✖ ";
         String readyMark = player.isReady() ? "§a[R] " : "§7[ ] ";
         String kdText = TdmRoomTextFormatter.formatKd(player.kills(), player.deaths());
-        String headline = readyMark + aliveMark + player.name();
-        String scoreText = "K/D " + player.kills() + "/" + player.deaths();
+        String nameText = isLocalPlayer(mc.player, player) ? "§e" + player.name() : player.name();
+        String headline = readyMark + aliveMark + nameText;
+        Component scoreText = Component.translatable(
+                "screen.codpattern.tdm_room.player_score",
+                player.kills(),
+                player.deaths());
         String meta = Component.translatable(
                 "screen.codpattern.tdm_room.player_meta",
                 TdmRoomTextFormatter.shortPlayerId(player.uuid()),
@@ -226,6 +231,10 @@ public final class TdmRoomRosterRenderer {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static boolean isLocalPlayer(LocalPlayer localPlayer, PlayerInfo player) {
+        return localPlayer != null && player != null && player.uuid().equals(localPlayer.getUUID());
     }
 
     private record RenderResult(int nextY, int nextRowIndex) {

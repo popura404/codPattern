@@ -55,7 +55,7 @@ public final class UpdateWeaponService {
                 player.getUUID().toString(), backpackPath);
         BackpackConfig.Backpack backpack = playerData.getBackpacks_MAP().get(backpackId);
         if (backpack == null) {
-            return fail(playerData, weaponSlot, "BAG_NOT_FOUND", "目标背包不存在");
+            return fail(playerData, weaponSlot, "BAG_NOT_FOUND", "");
         }
 
         ValidationResult slotResult = validateSlot(weaponSlot);
@@ -72,7 +72,7 @@ public final class UpdateWeaponService {
         try {
             parsedNbt = parseNbt(nbt);
         } catch (Exception e) {
-            return fail(playerData, weaponSlot, "NBT_INVALID", "NBT 解析失败");
+            return fail(playerData, weaponSlot, "NBT_INVALID", "");
         }
 
         WeaponFilterConfig filterConfig = WeaponFilterConfigRepository.loadOrCreate(filterPath);
@@ -93,7 +93,7 @@ public final class UpdateWeaponService {
 
     private static ValidationResult validateSlot(String slot) {
         if (slot == null || !ALLOWED_SLOTS.contains(slot)) {
-            return ValidationResult.fail("SLOT_INVALID", "非法槽位");
+            return ValidationResult.fail("SLOT_INVALID", "");
         }
         return ValidationResult.ok();
     }
@@ -101,10 +101,10 @@ public final class UpdateWeaponService {
     private static ValidationResult validateItem(String itemId) {
         ResourceLocation resourceLocation = ResourceLocation.tryParse(itemId);
         if (resourceLocation == null) {
-            return ValidationResult.fail("ITEM_ID_INVALID", "物品 ID 非法");
+            return ValidationResult.fail("ITEM_ID_INVALID", "");
         }
         if (resolveRegisteredItem(resourceLocation) == null) {
-            return ValidationResult.fail("ITEM_NOT_REGISTERED", "物品未注册");
+            return ValidationResult.fail("ITEM_NOT_REGISTERED", "");
         }
         return ValidationResult.ok();
     }
@@ -120,7 +120,7 @@ public final class UpdateWeaponService {
         ResourceLocation itemResourceLocation = ResourceLocation.tryParse(itemId);
         Item item = itemResourceLocation == null ? null : resolveRegisteredItem(itemResourceLocation);
         if (item == null) {
-            return ValidationResult.fail("ITEM_NOT_REGISTERED", "物品未注册");
+            return ValidationResult.fail("ITEM_NOT_REGISTERED", "");
         }
 
         ItemStack candidateStack = new ItemStack(item, 1);
@@ -128,32 +128,32 @@ public final class UpdateWeaponService {
             candidateStack.setTag(nbtTag.copy());
         }
         if (BackpackNamespaceFilter.isBlocked(filterConfig, candidateStack, itemResourceLocation)) {
-            return ValidationResult.fail("ITEM_NAMESPACE_BLOCKED", "该枪包已在黑名单中");
+            return ValidationResult.fail("ITEM_NAMESPACE_BLOCKED", "");
         }
 
         if ("primary".equals(slot) || "secondary".equals(slot)) {
             Optional<String> weaponCategoryOpt = resolveWeaponCategory(itemId, candidateStack, nbtTag);
             if (weaponCategoryOpt.isEmpty()) {
-                return ValidationResult.fail("ITEM_CATEGORY_INVALID", "该槽位仅允许武器");
+                return ValidationResult.fail("ITEM_CATEGORY_INVALID", "");
             }
             String weaponCategory = weaponCategoryOpt.get();
             List<String> allowedTypes = "primary".equals(slot)
                     ? filterConfig.getPrimaryWeaponTabs()
                     : filterConfig.getSecondaryWeaponTabs();
             if (allowedTypes != null && !allowedTypes.isEmpty() && !allowedTypes.contains(weaponCategory)) {
-                return ValidationResult.fail("ITEM_CATEGORY_INVALID", "该武器分类不允许写入此槽位");
+                return ValidationResult.fail("ITEM_CATEGORY_INVALID", "");
             }
             return ValidationResult.ok();
         }
 
         if (!filterConfig.isThrowablesEnabled()) {
-            return ValidationResult.fail("THROWABLES_DISABLED", "当前配置禁用投掷物槽位");
+            return ValidationResult.fail("THROWABLES_DISABLED", "");
         }
         if (!THROWABLE_ITEM_ID.equals(itemId)) {
-            return ValidationResult.fail("ITEM_CATEGORY_INVALID", "投掷物槽位物品非法");
+            return ValidationResult.fail("ITEM_CATEGORY_INVALID", "");
         }
         if (nbtTag == null || !nbtTag.contains(THROWABLE_ID_TAG, Tag.TAG_STRING)) {
-            return ValidationResult.fail("NBT_INVALID", "投掷物 NBT 缺少 ThrowableId");
+            return ValidationResult.fail("NBT_INVALID", "");
         }
         return ValidationResult.ok();
     }

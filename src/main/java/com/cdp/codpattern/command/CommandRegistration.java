@@ -19,7 +19,7 @@ public final class CommandRegistration {
                         .executes(context -> {
                             Player player = context.getSource().getPlayer();
                             if (player != null) {
-                                Component message = Component.literal(">>\n");
+                                Component message = Component.translatable("command.codpattern.test.output");
                                 player.sendSystemMessage(message);
                             }
                             return 1;
