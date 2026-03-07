@@ -20,6 +20,7 @@ The project follows a server-authoritative design with client synchronization to
 
 * Supports create/clone/rename/delete/select operations for loadouts, up to `10` per player.
 * Each loadout contains four slots: `primary / secondary / tactical / lethal`.
+* Loadout-related UIs use a fixed text-scaling baseline across different `GUI Scale` settings to keep readability more consistent.
 * On respawn, the selected loadout is distributed automatically (normal flow applies to joined room/match players).
 * Player loadout/filter data is persisted on server side and synced on login.
 * Admin commands can force immediate distribution for all online players or selected targets.
@@ -34,6 +35,7 @@ The project follows a server-authoritative design with client synchronization to
 ### 3) TDM Room and Match Flow (FPSMatch Integration)
 
 * Adds a Team Deathmatch entry in pause menu for room list, join/leave, and team selection.
+* TDM room screens use the same fixed text-scaling baseline across different `GUI Scale` settings for more consistent list/panel/button readability.
 * Supports auto team assignment with balance constraints (`maxTeamDiff`).
 * Supports ready state, start vote, and end vote with threshold and timeout logic.
 * Full phase pipeline: `WAITING -> COUNTDOWN -> WARMUP -> PLAYING -> ENDED`.
@@ -141,7 +143,7 @@ When reporting issues, include:
 
 ## Changelog
 
-Current version: `v0.4.5b-fix`  
+Current version: `v0.5.1b`  
 See `CHANGES.md` for detailed history.
 
 ## License
