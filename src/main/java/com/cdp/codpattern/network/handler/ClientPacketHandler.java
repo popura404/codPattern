@@ -28,6 +28,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 
@@ -154,6 +155,10 @@ public class ClientPacketHandler {
         });
     }
 
+    public static void handleKillFeed(String killerName, String victimName, ItemStack weaponStack, boolean blunder) {
+        Minecraft.getInstance().execute(() -> ClientTdmState.pushKillFeed(killerName, victimName, weaponStack, blunder));
+    }
+
     public static void handleGamePhase(String phase, int remainingTicks) {
         Minecraft.getInstance().execute(() -> ClientTdmState.updatePhase(phase, remainingTicks));
     }
@@ -183,6 +188,9 @@ public class ClientPacketHandler {
 
     public static void handleJoinRoomResult(boolean success, String mapName, String reasonCode, String reasonMessage) {
         Minecraft.getInstance().execute(() -> {
+            if (success) {
+                ClientTdmState.setRoomContext(mapName);
+            }
             Screen screen = Minecraft.getInstance().screen;
             if (screen instanceof TdmRoomScreen tdmRoomScreen) {
                 tdmRoomScreen.handleJoinResult(success, mapName, reasonCode, reasonMessage);
@@ -192,6 +200,9 @@ public class ClientPacketHandler {
 
     public static void handleLeaveRoomResult(boolean success, String roomName, String reasonCode, String reasonMessage) {
         Minecraft.getInstance().execute(() -> {
+            if (success) {
+                ClientTdmState.clearRoomContext();
+            }
             Screen screen = Minecraft.getInstance().screen;
             if (screen instanceof TdmRoomScreen tdmRoomScreen) {
                 tdmRoomScreen.handleLeaveResult(success, roomName, reasonCode, reasonMessage);

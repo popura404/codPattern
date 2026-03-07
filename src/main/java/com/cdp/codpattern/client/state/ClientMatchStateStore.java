@@ -7,6 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,6 +17,9 @@ import java.util.Map;
 public final class ClientMatchStateStore {
     private static final int SCORE_PULSE_DURATION = 12;
     private static final int PHASE_FLASH_DURATION = 20;
+    private static final int KILL_FEED_ENTRY_DURATION = 250;
+    private static final int KILL_FEED_FADE_TICKS = 10;
+    private static final int MAX_KILL_FEED_ENTRIES = 6;
     private static final float FADE_IN_RATIO = 0.4f;
     private static final int FADE_OUT_DURATION = 30;
 
@@ -45,8 +49,10 @@ public final class ClientMatchStateStore {
     private boolean dead = false;
     private String killerName = "";
     private int deathCamTicks = 0;
+    private String roomContextName = "";
     private String syncedMapName = "";
     private final Map<String, List<PlayerInfo>> teamPlayers = new HashMap<>();
+    private final List<ActiveKillFeedEntry> killFeedEntries = new ArrayList<>();
 
     public String currentPhase() {
         return currentPhase;
@@ -122,6 +128,10 @@ public final class ClientMatchStateStore {
         return syncedMapName;
     }
 
+    public boolean hasRoomContext() {
+        return !roomContextName.isBlank() || !syncedMapName.isBlank() || !teamPlayers.isEmpty();
+    }
+
     public Map<String, List<PlayerInfo>> teamPlayersSnapshot() {
         Map<String, List<PlayerInfo>> snapshot = new HashMap<>();
         for (Map.Entry<String, List<PlayerInfo>> entry : teamPlayers.entrySet()) {
@@ -130,8 +140,19 @@ public final class ClientMatchStateStore {
         return snapshot;
     }
 
+    public List<KillFeedEntry> killFeedSnapshot() {
+        List<KillFeedEntry> snapshot = new ArrayList<>(killFeedEntries.size());
+        for (ActiveKillFeedEntry entry : killFeedEntries) {
+            snapshot.add(entry.snapshot());
+        }
+        return snapshot;
+    }
+
     public void updateTeamPlayers(String mapName, Map<String, List<PlayerInfo>> latestTeamPlayers) {
         syncedMapName = mapName == null ? "" : mapName;
+        if (!syncedMapName.isBlank()) {
+            roomContextName = syncedMapName;
+        }
         teamPlayers.clear();
         if (latestTeamPlayers == null || latestTeamPlayers.isEmpty()) {
             return;
@@ -154,6 +175,9 @@ public final class ClientMatchStateStore {
             }
             if (!"PLAYING".equals(phase)) {
                 clearDeathCam();
+            }
+            if (!isKillFeedPhase(phase)) {
+                clearKillFeed();
             }
             phaseFlashTicks = PHASE_FLASH_DURATION;
             triggerPhaseAnnouncement(phase);
@@ -196,6 +220,29 @@ public final class ClientMatchStateStore {
         return teamScores.getOrDefault(teamName, fallback);
     }
 
+    public void pushKillFeed(String killerName, String victimName, ItemStack weaponStack, boolean blunder) {
+        killFeedEntries.add(0, new ActiveKillFeedEntry(killerName, victimName, weaponStack, blunder,
+                KILL_FEED_ENTRY_DURATION));
+        while (killFeedEntries.size() > MAX_KILL_FEED_ENTRIES) {
+            killFeedEntries.remove(killFeedEntries.size() - 1);
+        }
+    }
+
+    public void clearKillFeed() {
+        killFeedEntries.clear();
+    }
+
+    public void setRoomContext(String roomName) {
+        roomContextName = roomName == null ? "" : roomName;
+    }
+
+    public void clearRoomContext() {
+        roomContextName = "";
+        syncedMapName = "";
+        teamPlayers.clear();
+        clearKillFeed();
+    }
+
     public void resetMatchState() {
         currentPhase = "WAITING";
         remainingTimeTicks = 0;
@@ -220,8 +267,10 @@ public final class ClientMatchStateStore {
         announcementTicks = 0;
         announcementTotalTicks = 0;
         endSummaryTicks = 0;
+        roomContextName = "";
         syncedMapName = "";
         teamPlayers.clear();
+        clearKillFeed();
         clearDeathCam();
     }
 
@@ -341,6 +390,7 @@ public final class ClientMatchStateStore {
                 clearDeathCam();
             }
         }
+        tickKillFeed();
 
         switch (blackoutPhase) {
             case FADE_IN -> {
@@ -404,6 +454,16 @@ public final class ClientMatchStateStore {
         blackoutTotalTicks = 0;
     }
 
+    private void tickKillFeed() {
+        for (int i = killFeedEntries.size() - 1; i >= 0; i--) {
+            ActiveKillFeedEntry entry = killFeedEntries.get(i);
+            entry.tick();
+            if (entry.expired()) {
+                killFeedEntries.remove(i);
+            }
+        }
+    }
+
     private void playPendingSounds() {
         LocalPlayer player = Minecraft.getInstance().player;
         if (player == null) {
@@ -448,5 +508,45 @@ public final class ClientMatchStateStore {
     private float smoothstep(float t) {
         t = Math.max(0.0f, Math.min(1.0f, t));
         return t * t * (3.0f - 2.0f * t);
+    }
+
+    private boolean isKillFeedPhase(String phase) {
+        return "WARMUP".equals(phase) || "PLAYING".equals(phase);
+    }
+
+    private static final class ActiveKillFeedEntry {
+        private final String killerName;
+        private final String victimName;
+        private final ItemStack weaponStack;
+        private final boolean blunder;
+        private final int totalTicks;
+        private int ticksRemaining;
+
+        private ActiveKillFeedEntry(String killerName, String victimName, ItemStack weaponStack, boolean blunder, int totalTicks) {
+            this.killerName = killerName;
+            this.victimName = victimName;
+            this.weaponStack = weaponStack == null ? ItemStack.EMPTY : weaponStack.copy();
+            this.blunder = blunder;
+            this.totalTicks = Math.max(1, totalTicks);
+            this.ticksRemaining = this.totalTicks;
+        }
+
+        private void tick() {
+            if (ticksRemaining > 0) {
+                ticksRemaining--;
+            }
+        }
+
+        private boolean expired() {
+            return ticksRemaining <= 0;
+        }
+
+        private KillFeedEntry snapshot() {
+            int fadeTicks = Math.min(KILL_FEED_FADE_TICKS, totalTicks);
+            float alpha = ticksRemaining >= fadeTicks
+                    ? 1.0f
+                    : (float) ticksRemaining / Math.max(1, fadeTicks);
+            return new KillFeedEntry(killerName, victimName, weaponStack, blunder, alpha);
+        }
     }
 }

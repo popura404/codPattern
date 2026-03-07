@@ -1,7 +1,9 @@
 package com.cdp.codpattern.client;
 
 import com.cdp.codpattern.client.state.ClientMatchStateStore;
+import com.cdp.codpattern.client.state.KillFeedEntry;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 import java.util.Map;
@@ -43,6 +45,10 @@ public final class ClientTdmState {
         return STORE.teamPlayersSnapshot();
     }
 
+    public static boolean hasRoomContext() {
+        return STORE.hasRoomContext();
+    }
+
     public static int endSummaryPageIndex() {
         return STORE.endSummaryPageIndex();
     }
@@ -74,6 +80,26 @@ public final class ClientTdmState {
 
     public static void clearDeathCam() {
         STORE.clearDeathCam();
+    }
+
+    public static void pushKillFeed(String killerName, String victimName, ItemStack weaponStack, boolean blunder) {
+        STORE.pushKillFeed(killerName, victimName, weaponStack, blunder);
+    }
+
+    public static List<KillFeedEntry> killFeedSnapshot() {
+        return STORE.killFeedSnapshot();
+    }
+
+    public static void clearKillFeed() {
+        STORE.clearKillFeed();
+    }
+
+    public static void setRoomContext(String roomName) {
+        STORE.setRoomContext(roomName);
+    }
+
+    public static void clearRoomContext() {
+        STORE.clearRoomContext();
     }
 
     public static float getBlackoutAlpha() {

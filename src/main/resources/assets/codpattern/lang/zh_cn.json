@@ -117,6 +117,8 @@
     "hud.codpattern.tdm.death.title": "你已阵亡",
     "hud.codpattern.tdm.death.killer": "击杀者: %s",
     "hud.codpattern.tdm.death.respawn": "%s 秒后复活",
+    "hud.codpattern.tdm.kill_feed.blunder": "酿成大错",
+    "hud.codpattern.tdm.kill_feed.fallback": "kill",
     "message.codpattern.backpack.selected": "已选择背包 # %s [%s] 在下次重生时获得",
     "message.codpattern.backpack.invalid_id": "§c无效的背包ID: %s",
     "message.codpattern.backpack.check_integrity": "前往服务端config检查背包完整性或询问管理员",

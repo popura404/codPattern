@@ -8,6 +8,7 @@ import com.cdp.codpattern.network.tdm.JoinGameFromSpectatorPacket;
 import com.cdp.codpattern.network.tdm.JoinGameResultPacket;
 import com.cdp.codpattern.network.tdm.JoinRoomPacket;
 import com.cdp.codpattern.network.tdm.JoinRoomResultPacket;
+import com.cdp.codpattern.network.tdm.KillFeedPacket;
 import com.cdp.codpattern.network.tdm.LeaveRoomPacket;
 import com.cdp.codpattern.network.tdm.LeaveRoomResultPacket;
 import com.cdp.codpattern.network.tdm.PhysicsMobRetainPacket;
@@ -105,6 +106,12 @@ final class TdmPacketRegistrar {
                 .decoder(DeathCamPacket::decode)
                 .encoder(DeathCamPacket::encode)
                 .consumerMainThread(DeathCamPacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(KillFeedPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(KillFeedPacket::decode)
+                .encoder(KillFeedPacket::encode)
+                .consumerMainThread(KillFeedPacket::handle)
                 .add();
 
         ModNetworkChannel.CHANNEL.messageBuilder(PhysicsMobRetainPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)

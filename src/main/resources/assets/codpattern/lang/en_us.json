@@ -117,6 +117,8 @@
     "hud.codpattern.tdm.death.title": "You Died",
     "hud.codpattern.tdm.death.killer": "Killed by: %s",
     "hud.codpattern.tdm.death.respawn": "Respawn in %s s",
+    "hud.codpattern.tdm.kill_feed.blunder": "blundered",
+    "hud.codpattern.tdm.kill_feed.fallback": "kill",
     "message.codpattern.backpack.selected": "Selected backpack # %s [%s] will be equipped on next respawn",
     "message.codpattern.backpack.invalid_id": "§cInvalid backpack ID: %s",
     "message.codpattern.backpack.check_integrity": "Check server config for backpack integrity or ask admin",

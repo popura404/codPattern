@@ -1,5 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.tdm.service.KillFeedService;
 import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 
 final class CodTdmMapRuntimeBundleBuilder {
@@ -41,6 +42,7 @@ final class CodTdmMapRuntimeBundleBuilder {
                 matchState,
                 playerState,
                 components.scoreServiceHooks(),
+                packet -> components.joinedPlayerBroadcaster().broadcastPacketToJoinedPlayers(packet),
                 components.playerDeathHooks()
         );
         CodTdmPhaseRuntime phaseRuntime = new CodTdmPhaseRuntime(

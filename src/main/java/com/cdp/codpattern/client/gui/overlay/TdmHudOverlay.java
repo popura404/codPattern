@@ -4,7 +4,10 @@ import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.TdmCombatMarkerTracker;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
+import com.cdp.codpattern.client.state.KillFeedEntry;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
+import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.mojang.authlib.GameProfile;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
@@ -18,6 +21,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
@@ -41,6 +45,12 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int INVINCIBILITY_MARKER_SIZE = 8;
     private static final int INVINCIBILITY_MARKER_COLOR = 0xFFF6F6F6;
     private static final int INVINCIBILITY_MARKER_OUTLINE = 0xFFBFC7D0;
+    private static final int KILL_FEED_ICON_BASE_SIZE = 16;
+    private static final int KILL_FEED_TEXTURE_BASE_WIDTH = 28;
+    private static final int KILL_FEED_TEXTURE_BASE_HEIGHT = 8;
+    private static final int KILL_FEED_FALLBACK_BASE_WIDTH = 22;
+    private static final int KILL_FEED_FALLBACK_BASE_HEIGHT = 10;
+    private static final float KILL_FEED_TEXT_SCALE_MULTIPLIER = 0.7f;
     private static final double TEAM_MARKER_HEAD_OFFSET = 0.45D;
     private static final double ENEMY_BAR_HEAD_OFFSET = 0.62D;
     private static final double INVINCIBILITY_MARKER_HEAD_OFFSET = 0.92D;
@@ -68,6 +78,7 @@ public class TdmHudOverlay implements IGuiOverlay {
 
         renderBlackout(graphics, font, screenWidth, screenHeight);
         renderLeftScorePanel(graphics, font, screenWidth, screenHeight);
+        renderKillFeed(graphics, font, screenWidth, screenHeight);
         renderPhaseAnnouncement(graphics, font, centerX, screenHeight);
         renderCountdownFocus(graphics, font, centerX, screenHeight);
         renderCombatMarkers(graphics, partialTick, screenWidth, screenHeight);
@@ -161,6 +172,135 @@ public class TdmHudOverlay implements IGuiOverlay {
         if (pulseAlpha > 0) {
             graphics.fill(x, y, x + width, y + height, (clamp(pulseAlpha, 0, 255) << 24) | 0x00FFD463);
         }
+    }
+
+    private void renderKillFeed(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
+        if (!isKillFeedPhase()) {
+            return;
+        }
+
+        List<KillFeedEntry> entries = ClientTdmState.killFeedSnapshot();
+        if (entries.isEmpty()) {
+            return;
+        }
+
+        int x = 8;
+        int scoreY = screenHeight >= 500 ? 92 : 70;
+        int rowHeight = 18;
+        int rowGap = 3;
+        int timerY = scoreY + (rowHeight * 2) + rowGap + 4;
+        int phaseY = timerY + 10;
+        int contentHeight = Math.max(GuiTextHelper.referenceScaled(KILL_FEED_ICON_BASE_SIZE),
+                killFeedLineHeight(font));
+        int startY = phaseY + font.lineHeight + GuiTextHelper.referenceScaled(20);
+        int maxWidth = Math.min(GuiTextHelper.referenceScaled(236), screenWidth - x - 8);
+        int step = contentHeight + GuiTextHelper.referenceScaled(4);
+        if (maxWidth <= GuiTextHelper.referenceScaled(64)) {
+            return;
+        }
+
+        for (int i = 0; i < entries.size(); i++) {
+            renderKillFeedRow(graphics, font, x, startY + (i * step), maxWidth, contentHeight, entries.get(i));
+        }
+    }
+
+    private void renderKillFeedRow(GuiGraphics graphics, Font font, int x, int y, int width, int contentHeight,
+            KillFeedEntry entry) {
+        int alpha = clamp((int) (entry.alpha() * 255.0f), 0, 255);
+        if (alpha <= 0) {
+            return;
+        }
+
+        int backgroundTop = y - GuiTextHelper.referenceScaled(2);
+        int backgroundBottom = y + contentHeight + GuiTextHelper.referenceScaled(2);
+        graphics.fill(x - GuiTextHelper.referenceScaled(3), backgroundTop, x + width, backgroundBottom,
+                withAlpha(0xFF0E131A, Math.max(34, alpha / 3)));
+
+        int textY = y + Math.max(0, (contentHeight - killFeedLineHeight(font)) / 2);
+        int gap = GuiTextHelper.referenceScaled(6);
+        int killerColor = resolveKillFeedTeamColor(entry.killerName(), 0xFFF3F3F3);
+        int victimColor = resolveKillFeedTeamColor(entry.victimName(), 0xFFE7A5A5);
+
+        if (entry.blunder()) {
+            String blunderText = Component.translatable("hud.codpattern.tdm.kill_feed.blunder").getString();
+            int blunderWidth = killFeedTextWidth(font, blunderText);
+            int killerMaxWidth = Math.max(GuiTextHelper.referenceScaled(48), width - blunderWidth - gap);
+            String fittedKiller = ellipsizeKillFeed(font, entry.killerName(), killerMaxWidth);
+            drawKillFeedString(graphics, font, fittedKiller, x, textY, withAlpha(killerColor, alpha), true);
+            drawKillFeedString(graphics, font, blunderText,
+                    x + killFeedTextWidth(font, fittedKiller) + gap,
+                    textY,
+                    withAlpha(0xFFE39D63, alpha),
+                    true);
+            return;
+        }
+
+        int iconSlotWidth = GuiTextHelper.referenceScaled(36);
+        int availableNameWidth = Math.max(GuiTextHelper.referenceScaled(36), width - iconSlotWidth - (gap * 2));
+        int nameWidth = Math.max(GuiTextHelper.referenceScaled(36), availableNameWidth / 2);
+        int killerX = x;
+        int iconX = killerX + nameWidth + gap;
+        int victimX = iconX + iconSlotWidth + gap;
+
+        drawKillFeedEllipsizedString(graphics, font, entry.killerName(), killerX, textY, nameWidth,
+                withAlpha(killerColor, alpha), true);
+        renderKillFeedWeapon(graphics, font, iconX, y, iconSlotWidth, contentHeight, entry.weaponStack(), alpha);
+        drawKillFeedEllipsizedString(graphics, font, entry.victimName(), victimX, textY, nameWidth,
+                withAlpha(victimColor, alpha), true);
+    }
+
+    private void renderKillFeedWeapon(GuiGraphics graphics, Font font, int x, int y, int slotWidth, int contentHeight,
+            ItemStack weaponStack, int alpha) {
+        if (weaponStack != null && !weaponStack.isEmpty()) {
+            ResourceLocation hudTexture = TaczClientApi.getGunHudTexture(weaponStack);
+            if (hudTexture != null) {
+                float scale = GuiTextHelper.referenceScale();
+                int actualWidth = GuiTextHelper.referenceScaled(KILL_FEED_TEXTURE_BASE_WIDTH);
+                int actualHeight = GuiTextHelper.referenceScaled(KILL_FEED_TEXTURE_BASE_HEIGHT);
+                int drawX = x + Math.max(0, (slotWidth - actualWidth) / 2);
+                int drawY = y + Math.max(0, (contentHeight - actualHeight) / 2);
+                RenderSystem.enableBlend();
+                RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, alpha / 255.0f);
+                graphics.pose().pushPose();
+                graphics.pose().translate(drawX, drawY, 0.0f);
+                graphics.pose().scale(scale, scale, 1.0f);
+                graphics.blit(hudTexture, 0, 0, 0, 0, KILL_FEED_TEXTURE_BASE_WIDTH, KILL_FEED_TEXTURE_BASE_HEIGHT,
+                        KILL_FEED_TEXTURE_BASE_WIDTH, KILL_FEED_TEXTURE_BASE_HEIGHT);
+                graphics.pose().popPose();
+                RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
+                RenderSystem.disableBlend();
+                return;
+            }
+
+            float scale = GuiTextHelper.referenceScale();
+            int actualSize = GuiTextHelper.referenceScaled(KILL_FEED_ICON_BASE_SIZE);
+            int drawX = x + Math.max(0, (slotWidth - actualSize) / 2);
+            int drawY = y + Math.max(0, (contentHeight - actualSize) / 2);
+            graphics.pose().pushPose();
+            graphics.pose().translate(drawX, drawY, 0.0f);
+            graphics.pose().scale(scale, scale, 1.0f);
+            graphics.renderItem(weaponStack, 0, 0);
+            graphics.pose().popPose();
+            return;
+        }
+
+        renderKillFeedFallbackTag(graphics, font, x, y, slotWidth, contentHeight, alpha);
+    }
+
+    private void renderKillFeedFallbackTag(GuiGraphics graphics, Font font, int x, int y, int slotWidth, int contentHeight,
+            int alpha) {
+        String fallbackText = Component.translatable("hud.codpattern.tdm.kill_feed.fallback").getString();
+        int fallbackWidth = Math.max(KILL_FEED_FALLBACK_BASE_WIDTH, font.width(fallbackText) + 6);
+        int actualWidth = GuiTextHelper.referenceScaled(fallbackWidth);
+        int actualHeight = GuiTextHelper.referenceScaled(KILL_FEED_FALLBACK_BASE_HEIGHT);
+        int drawX = x + Math.max(0, (slotWidth - actualWidth) / 2);
+        int drawY = y + Math.max(0, (contentHeight - actualHeight) / 2);
+
+        graphics.fill(drawX, drawY, drawX + actualWidth, drawY + actualHeight,
+                withAlpha(0xFF6A3F38, Math.max(60, alpha / 2)));
+        drawKillFeedCenteredString(graphics, font, fallbackText, drawX + (actualWidth / 2.0f),
+                drawY + Math.max(0, (actualHeight - killFeedLineHeight(font)) / 2.0f),
+                withAlpha(0xFFF6EDE6, alpha), false);
     }
 
     private void renderPhaseAnnouncement(GuiGraphics graphics, Font font, int centerX, int screenHeight) {
@@ -939,6 +1079,80 @@ public class TdmHudOverlay implements IGuiOverlay {
             return teamKey.substring(0, 1).toUpperCase(Locale.ROOT);
         }
         return text;
+    }
+
+    private boolean isKillFeedPhase() {
+        return "WARMUP".equals(ClientTdmState.currentPhase()) || "PLAYING".equals(ClientTdmState.currentPhase());
+    }
+
+    private int resolveKillFeedTeamColor(String playerName, int fallbackColor) {
+        if (playerName == null || playerName.isBlank()) {
+            return fallbackColor;
+        }
+
+        LocalPlayer localPlayer = Minecraft.getInstance().player;
+        if (localPlayer != null && playerName.equals(localPlayer.getGameProfile().getName())) {
+            return 0xFFFFD54A;
+        }
+
+        for (Map.Entry<String, List<PlayerInfo>> entry : ClientTdmState.teamPlayersSnapshot().entrySet()) {
+            for (PlayerInfo player : entry.getValue()) {
+                if (!playerName.equals(player.name())) {
+                    continue;
+                }
+                return switch (entry.getKey().toLowerCase(Locale.ROOT)) {
+                    case TdmTeamNames.KORTAC -> 0xFFE35A5A;
+                    case TdmTeamNames.SPECGRU -> 0xFF66A6FF;
+                    default -> fallbackColor;
+                };
+            }
+        }
+        return fallbackColor;
+    }
+
+    private float killFeedTextScale() {
+        return GuiTextHelper.referenceScale() * KILL_FEED_TEXT_SCALE_MULTIPLIER;
+    }
+
+    private int killFeedLineHeight(Font font) {
+        return Math.max(1, Math.round(font.lineHeight * killFeedTextScale()));
+    }
+
+    private int killFeedTextWidth(Font font, String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        return Math.round(font.width(text) * killFeedTextScale());
+    }
+
+    private String ellipsizeKillFeed(Font font, String text, int maxWidth) {
+        float scale = killFeedTextScale();
+        if (scale <= 0.0f) {
+            return text == null ? "" : text;
+        }
+        return GuiTextHelper.ellipsize(font, text, Math.max(1, (int) Math.floor(maxWidth / scale)));
+    }
+
+    private void drawKillFeedString(GuiGraphics graphics, Font font, String text, float x, float y, int color, boolean shadow) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        float scale = killFeedTextScale();
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 0.0f);
+        graphics.pose().scale(scale, scale, 1.0f);
+        graphics.drawString(font, text, 0, 0, color, shadow);
+        graphics.pose().popPose();
+    }
+
+    private void drawKillFeedCenteredString(GuiGraphics graphics, Font font, String text, float centerX, float y, int color,
+            boolean shadow) {
+        drawKillFeedString(graphics, font, text, centerX - killFeedTextWidth(font, text) / 2.0f, y, color, shadow);
+    }
+
+    private void drawKillFeedEllipsizedString(GuiGraphics graphics, Font font, String text, int x, int y, int maxWidth,
+            int color, boolean shadow) {
+        drawKillFeedString(graphics, font, ellipsizeKillFeed(font, text, maxWidth), x, y, color, shadow);
     }
 
     private int phaseAccentColor() {
