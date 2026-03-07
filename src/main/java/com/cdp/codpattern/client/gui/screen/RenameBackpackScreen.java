@@ -68,6 +68,11 @@ public class RenameBackpackScreen extends Screen {
 
         addRenderableWidget(confirmButton);
         addRenderableWidget(cancelButton);
+
+        nameBox.moveCursorToEnd();
+        nameBox.setFocused(true);
+        this.setInitialFocus(nameBox);
+        this.setFocused(nameBox);
     }
 
     @Override

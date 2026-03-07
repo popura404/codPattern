@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -35,10 +36,11 @@ public final class TdmRoomListRenderer {
             int mouseX,
             int mouseY,
             float panelAlphaFactor) {
-        int panelLeft = roomListX - 5;
-        int panelTop = roomListY - 25;
-        int panelRight = roomListX + roomListWidth + 5;
-        int panelBottom = roomListY + roomListHeight + 5;
+        int referenceLineHeight = GuiTextHelper.referenceLineHeight(mc.font);
+        int panelLeft = roomListX - GuiTextHelper.referenceScaled(5);
+        int panelTop = roomListY - GuiTextHelper.referenceScaled(25);
+        int panelRight = roomListX + roomListWidth + GuiTextHelper.referenceScaled(5);
+        int panelBottom = roomListY + roomListHeight + GuiTextHelper.referenceScaled(5);
 
         graphics.fillGradient(panelLeft, panelTop, panelRight, panelBottom,
                 scaleAlpha(CodTheme.PANEL_BG, panelAlphaFactor),
@@ -48,23 +50,44 @@ public final class TdmRoomListRenderer {
         graphics.fill(panelLeft, panelTop, panelLeft + 1, panelBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
         graphics.fill(panelRight - 1, panelTop, panelRight, panelBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
 
-        graphics.drawString(mc.font,
+        GuiTextHelper.drawReferenceString(
+                graphics,
+                mc.font,
                 Component.translatable("screen.codpattern.tdm_room.available_rooms"),
                 roomListX,
-                roomListY - 20,
-                scaleAlpha(CodTheme.TEXT_PRIMARY, panelAlphaFactor));
+                roomListY - GuiTextHelper.referenceScaled(20),
+                scaleAlpha(CodTheme.TEXT_PRIMARY, panelAlphaFactor),
+                false);
 
         List<String> roomNames = orderedRoomNames(rooms, joinedRoom);
         highlightProgress.keySet().retainAll(roomNames);
         roomEnteredAtMs.keySet().retainAll(roomNames);
 
         if (roomNames.isEmpty()) {
-            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.no_rooms"), roomListX,
-                    roomListY + 10, scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor));
-            graphics.drawString(mc.font, Component.translatable("screen.codpattern.tdm_room.create_hint"), roomListX,
-                    roomListY + 25, scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor));
-            graphics.drawString(mc.font, "§b/fpsm map create cdptdm <名称> <从> <到>", roomListX, roomListY + 40,
-                    scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor));
+            GuiTextHelper.drawReferenceString(
+                    graphics,
+                    mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.no_rooms"),
+                    roomListX,
+                    roomListY + GuiTextHelper.referenceScaled(10),
+                    scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor),
+                    false);
+            GuiTextHelper.drawReferenceString(
+                    graphics,
+                    mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.create_hint"),
+                    roomListX,
+                    roomListY + GuiTextHelper.referenceScaled(10) + referenceLineHeight + GuiTextHelper.referenceScaled(3),
+                    scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
+                    false);
+            GuiTextHelper.drawReferenceString(
+                    graphics,
+                    mc.font,
+                    "§b/fpsm map create cdptdm <名称> <从> <到>",
+                    roomListX,
+                    roomListY + GuiTextHelper.referenceScaled(10) + (referenceLineHeight + GuiTextHelper.referenceScaled(3)) * 2,
+                    scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
+                    false);
             return roomNames;
         }
 
@@ -106,7 +129,9 @@ public final class TdmRoomListRenderer {
 
             int edgeColor = joined ? CodTheme.HOVER_BORDER : (selected ? CodTheme.SELECTED_BORDER : 0);
             if (edgeColor != 0) {
-                graphics.fill(roomListX, y, roomListX + 2, y + roomItemHeight - 2, scaleAlpha(edgeColor, panelAlphaFactor));
+                graphics.fill(roomListX, y, roomListX + GuiTextHelper.referenceScaled(2),
+                        y + roomItemHeight - GuiTextHelper.referenceScaled(2),
+                        scaleAlpha(edgeColor, panelAlphaFactor));
             }
 
             long enteredAt = roomEnteredAtMs.getOrDefault(mapName, 0L);
@@ -132,50 +157,73 @@ public final class TdmRoomListRenderer {
                     ? CodTheme.TEXT_HOVER
                     : (selected ? CodTheme.SELECTED_TEXT : CodTheme.TEXT_PRIMARY);
 
-            graphics.drawString(mc.font, roomText, roomListX + 5, y + 4, scaleAlpha(roomTextColor, panelAlphaFactor));
-            graphics.drawString(mc.font,
+            int primaryTextY = y + GuiTextHelper.referenceScaled(4);
+            GuiTextHelper.drawReferenceString(
+                    graphics,
+                    mc.font,
+                    roomText,
+                    roomListX + GuiTextHelper.referenceScaled(5),
+                    primaryTextY,
+                    scaleAlpha(roomTextColor, panelAlphaFactor),
+                    false);
+            GuiTextHelper.drawReferenceString(
+                    graphics,
+                    mc.font,
                     infoText,
-                    roomListX + roomListWidth - mc.font.width(infoText) - 5,
-                    y + 4,
-                    scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor));
+                    roomListX + roomListWidth - GuiTextHelper.referenceWidth(mc.font, infoText) - GuiTextHelper.referenceScaled(5),
+                    primaryTextY,
+                    scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor),
+                    false);
 
             String statusText = TdmRoomTextFormatter.roomListStatusText(
                     room.state,
                     room.remainingTimeTicks,
                     room.teamScores);
-            graphics.drawString(mc.font, statusText, roomListX + 5, y + 18, scaleAlpha(0xFFAFAFAF, panelAlphaFactor));
+            GuiTextHelper.drawReferenceString(
+                    graphics,
+                    mc.font,
+                    statusText,
+                    roomListX + GuiTextHelper.referenceScaled(5),
+                    primaryTextY + referenceLineHeight + GuiTextHelper.referenceScaled(2),
+                    scaleAlpha(0xFFAFAFAF, panelAlphaFactor),
+                    false);
 
-            int barLeft = roomListX + 5;
-            int barRight = roomListX + roomListWidth - 5;
-            int barY = y + roomItemHeight - 6;
+            int barLeft = roomListX + GuiTextHelper.referenceScaled(5);
+            int barRight = roomListX + roomListWidth - GuiTextHelper.referenceScaled(5);
+            int barY = y + roomItemHeight - GuiTextHelper.referenceScaled(6);
             int barWidth = Math.max(1, barRight - barLeft);
             int fillWidth = Math.min(barWidth,
                     (int) (barWidth * (room.playerCount / (float) Math.max(1, room.maxPlayers))));
-            graphics.fill(barLeft, barY, barRight, barY + 2, scaleAlpha(0x26FFFFFF, panelAlphaFactor));
+            graphics.fill(barLeft, barY, barRight, barY + GuiTextHelper.referenceScaled(2),
+                    scaleAlpha(0x26FFFFFF, panelAlphaFactor));
             if (fillWidth > 0) {
-                graphics.fill(barLeft, barY, barLeft + fillWidth, barY + 2,
+                graphics.fill(barLeft, barY, barLeft + fillWidth, barY + GuiTextHelper.referenceScaled(2),
                         scaleAlpha(withAlpha(joined ? CodTheme.HOVER_BORDER : CodTheme.SELECTED_BORDER, 160), panelAlphaFactor));
             }
         }
 
         if (roomNames.size() > visibleCount) {
-            int trackX = roomListX + roomListWidth - 2;
+            int trackX = roomListX + roomListWidth - GuiTextHelper.referenceScaled(2);
             int trackTop = roomListY;
             int trackBottom = roomListY + roomListHeight;
-            graphics.fill(trackX, trackTop, trackX + 2, trackBottom, scaleAlpha(0x22FFFFFF, panelAlphaFactor));
+            graphics.fill(trackX, trackTop, trackX + GuiTextHelper.referenceScaled(2), trackBottom,
+                    scaleAlpha(0x22FFFFFF, panelAlphaFactor));
 
-            int thumbHeight = Math.max(14, (int) (roomListHeight * (visibleCount / (float) roomNames.size())));
+            int thumbHeight = Math.max(GuiTextHelper.referenceScaled(14),
+                    (int) (roomListHeight * (visibleCount / (float) roomNames.size())));
             int thumbOffsetMax = Math.max(1, roomListHeight - thumbHeight);
             int thumbY = trackTop + (int) (thumbOffsetMax * (effectiveOffset / (float) maxScrollOffset));
-            graphics.fill(trackX, thumbY, trackX + 2, thumbY + thumbHeight,
+            graphics.fill(trackX, thumbY, trackX + GuiTextHelper.referenceScaled(2), thumbY + thumbHeight,
                     scaleAlpha(CodTheme.SELECTED_BORDER, panelAlphaFactor));
 
-            graphics.drawString(
+            GuiTextHelper.drawReferenceString(
+                    graphics,
                     mc.font,
                     Component.translatable("screen.codpattern.tdm_room.scroll_hint"),
                     roomListX,
-                    roomListY + roomListHeight + 8,
-                    scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor));
+                    roomListY + roomListHeight + GuiTextHelper.referenceScaled(8),
+                    scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
+                    false);
         }
 
         return roomNames;

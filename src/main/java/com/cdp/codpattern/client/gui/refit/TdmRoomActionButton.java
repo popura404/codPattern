@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -71,8 +72,16 @@ public class TdmRoomActionButton extends Button {
         }
 
         int textX = x + this.width / 2;
-        int textY = y + (this.height - Minecraft.getInstance().font.lineHeight) / 2;
-        graphics.drawCenteredString(Minecraft.getInstance().font, this.getMessage(), textX, textY, textColor);
+        int textY = y + (this.height - GuiTextHelper.referenceLineHeight(Minecraft.getInstance().font)) / 2;
+        GuiTextHelper.drawReferenceCenteredEllipsizedString(
+                graphics,
+                Minecraft.getInstance().font,
+                this.getMessage(),
+                textX,
+                textY,
+                this.width - GuiTextHelper.referenceScaled(6),
+                textColor,
+                false);
     }
 
     private int withAlpha(int color, int alpha) {

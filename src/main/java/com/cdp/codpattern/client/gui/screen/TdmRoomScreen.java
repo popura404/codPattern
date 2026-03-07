@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.client.gui.refit.TdmRoomActionButton;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomActionController;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomButtonStateBinder;
@@ -31,11 +32,11 @@ import java.util.Set;
  * 显示所有可用房间和房间内的玩家信息
  */
 public class TdmRoomScreen extends Screen {
-    private static final int PAGE_PADDING = 14;
-    private static final int PANEL_GAP = 12;
-    private static final int HEADER_HEIGHT = 44;
-    private static final int FOOTER_HEIGHT = 50;
-    private static final int ROOM_ITEM_HEIGHT = 36;
+    private static final int BASE_PAGE_PADDING = 14;
+    private static final int BASE_PANEL_GAP = 12;
+    private static final int BASE_HEADER_HEIGHT = 44;
+    private static final int BASE_FOOTER_HEIGHT = 50;
+    private static final int BASE_ROOM_ITEM_HEIGHT = 36;
     private static final long ENTER_ANIMATION_MS = 180L;
     private static final long ROOM_LIST_APPLY_DEBOUNCE_MS = 60L;
     private static final long INFO_CONTENT_FADE_MS = 85L;
@@ -91,29 +92,34 @@ public class TdmRoomScreen extends Screen {
     protected void init() {
         super.init();
 
-        int contentTop = HEADER_HEIGHT;
-        int contentBottom = Math.max(contentTop + 140, this.height - FOOTER_HEIGHT);
-        int contentHeight = Math.max(120, contentBottom - contentTop);
+        int pagePadding = scaled(BASE_PAGE_PADDING);
+        int panelGap = scaled(BASE_PANEL_GAP);
+        int headerHeight = scaled(BASE_HEADER_HEIGHT);
+        int footerHeight = scaled(BASE_FOOTER_HEIGHT);
 
-        roomListX = PAGE_PADDING;
+        int contentTop = headerHeight;
+        int contentBottom = Math.max(contentTop + scaled(140), this.height - footerHeight);
+        int contentHeight = Math.max(scaled(120), contentBottom - contentTop);
+
+        roomListX = pagePadding;
         roomListY = contentTop;
         roomListHeight = contentHeight;
 
-        int availableContentWidth = Math.max(280, this.width - PAGE_PADDING * 2 - PANEL_GAP);
-        int minRightPanelWidth = 250;
+        int availableContentWidth = Math.max(scaled(280), this.width - pagePadding * 2 - panelGap);
+        int minRightPanelWidth = scaled(250);
         int desiredLeftWidth = (int) (availableContentWidth * 0.36f);
-        int maxLeftWidth = Math.max(170, availableContentWidth - minRightPanelWidth);
-        roomListWidth = clamp(desiredLeftWidth, 180, maxLeftWidth);
+        int maxLeftWidth = Math.max(scaled(170), availableContentWidth - minRightPanelWidth);
+        roomListWidth = clamp(desiredLeftWidth, scaled(180), maxLeftWidth);
 
-        rightPanelX = roomListX + roomListWidth + PANEL_GAP;
+        rightPanelX = roomListX + roomListWidth + panelGap;
         rightPanelY = contentTop;
-        rightPanelWidth = this.width - rightPanelX - PAGE_PADDING;
+        rightPanelWidth = this.width - rightPanelX - pagePadding;
         rightPanelHeight = contentHeight;
 
         if (rightPanelWidth < minRightPanelWidth) {
-            roomListWidth = Math.max(160, availableContentWidth - minRightPanelWidth);
-            rightPanelX = roomListX + roomListWidth + PANEL_GAP;
-            rightPanelWidth = this.width - rightPanelX - PAGE_PADDING;
+            roomListWidth = Math.max(scaled(160), availableContentWidth - minRightPanelWidth);
+            rightPanelX = roomListX + roomListWidth + panelGap;
+            rightPanelWidth = this.width - rightPanelX - pagePadding;
         }
 
         roomListScrollOffset = 0;
@@ -133,14 +139,14 @@ public class TdmRoomScreen extends Screen {
      * 添加 UI 按钮
      */
     private void addButtons() {
-        int buttonHeight = 20;
-        int spacing = 6;
-        int actionPadding = 8;
+        int buttonHeight = scaled(20);
+        int spacing = scaled(6);
+        int actionPadding = scaled(8);
 
         int actionX = rightPanelX + actionPadding;
-        int actionWidth = Math.max(120, rightPanelWidth - actionPadding * 2);
+        int actionWidth = Math.max(scaled(120), rightPanelWidth - actionPadding * 2);
         int halfWidth = Math.max(1, (actionWidth - spacing) / 2);
-        int teamButtonY = rightPanelY + 88;
+        int teamButtonY = rightPanelY + scaled(88);
 
         // KORTAC 队伍按钮
         kortacButton = addRenderableWidget(new TdmRoomActionButton(
@@ -194,15 +200,16 @@ public class TdmRoomScreen extends Screen {
         infoActionBottomY = voteY + buttonHeight;
 
         // 底部按钮栏
-        int stripOuterPadding = 2;
+        int stripOuterPadding = scaled(2);
         bottomActionBarX = roomListX - stripOuterPadding;
         bottomActionBarWidth = (rightPanelX + rightPanelWidth) - bottomActionBarX + stripOuterPadding;
-        bottomActionBarHeight = 34;
-        bottomActionBarY = this.height - bottomActionBarHeight - 8;
+        bottomActionBarHeight = scaled(34);
+        bottomActionBarY = this.height - bottomActionBarHeight - scaled(8);
 
-        int stripInnerPadding = 8;
-        int buttonWidth = Math.max(80, Math.min(130, (bottomActionBarWidth - stripInnerPadding * 2 - spacing * 3) / 4));
-        int bottomY = bottomActionBarY + 8;
+        int stripInnerPadding = scaled(8);
+        int buttonWidth = Math.max(scaled(80),
+                Math.min(scaled(130), (bottomActionBarWidth - stripInnerPadding * 2 - spacing * 3) / 4));
+        int bottomY = bottomActionBarY + scaled(8);
         int totalWidth = 4 * buttonWidth + 3 * spacing;
         int startX = bottomActionBarX + (bottomActionBarWidth - totalWidth) / 2;
 
@@ -287,12 +294,14 @@ public class TdmRoomScreen extends Screen {
         float enterProgress = enterProgress();
         int titleColor = withAlpha(0xFFFFFFFF, Math.max(85, (int) (255.0f * enterProgress)));
 
-        graphics.drawCenteredString(
+        GuiTextHelper.drawReferenceCenteredString(
+                graphics,
                 mc.font,
                 Component.translatable("screen.codpattern.tdm_room.header"),
                 this.width / 2,
-                20,
-                titleColor);
+                scaled(20),
+                titleColor,
+                false);
 
         renderRoomListPanel(graphics, mc, mouseX, mouseY, enterProgress);
         refreshInfoContextTransition(false);
@@ -329,7 +338,7 @@ public class TdmRoomScreen extends Screen {
                 roomListY,
                 roomListWidth,
                 roomListHeight,
-                ROOM_ITEM_HEIGHT,
+                roomItemHeight(),
                 roomState.rooms(),
                 roomState.selectedRoom(),
                 roomState.joinedRoom(),
@@ -375,8 +384,8 @@ public class TdmRoomScreen extends Screen {
                 && mouseX <= roomListX + roomListWidth
                 && mouseY >= listTop
                 && mouseY < listTop + roomListHeight) {
-
-            int index = roomListScrollOffset + (int) ((mouseY - listTop) / ROOM_ITEM_HEIGHT);
+            int roomItemHeight = roomItemHeight();
+            int index = roomListScrollOffset + (int) ((mouseY - listTop) / roomItemHeight);
             if (index >= 0 && index < roomNames.size()) {
                 roomState.setSelectedRoom(roomNames.get(index));
                 refreshInfoContextTransition(true);
@@ -494,12 +503,15 @@ public class TdmRoomScreen extends Screen {
         graphics.fill(stripRight - 1, stripTop, stripRight, stripBottom, withAlpha(CodTheme.BORDER_SUBTLE, 160));
 
         Component hint = actionHintText();
-        graphics.drawString(
+        GuiTextHelper.drawReferenceEllipsizedString(
+                graphics,
                 mc.font,
                 hint,
-                stripLeft + 8,
-                stripTop - 10,
-                withAlpha(CodTheme.TEXT_SECONDARY, Math.max(70, (int) (230 * enterProgress))));
+                stripLeft + scaled(8),
+                stripTop - GuiTextHelper.referenceLineHeight(mc.font) - scaled(2),
+                stripRight - stripLeft - scaled(16),
+                withAlpha(CodTheme.TEXT_SECONDARY, Math.max(70, (int) (230 * enterProgress))),
+                false);
     }
 
     private Component actionHintText() {
@@ -573,7 +585,7 @@ public class TdmRoomScreen extends Screen {
     }
 
     private int visibleRoomCapacity() {
-        return Math.max(1, roomListHeight / ROOM_ITEM_HEIGHT);
+        return Math.max(1, roomListHeight / roomItemHeight());
     }
 
     private float enterProgress() {
@@ -594,5 +606,13 @@ public class TdmRoomScreen extends Screen {
 
     private static int withAlpha(int color, int alpha) {
         return (Math.max(0, Math.min(255, alpha)) << 24) | (color & 0x00FFFFFF);
+    }
+
+    private static int scaled(int value) {
+        return GuiTextHelper.referenceScaled(value);
+    }
+
+    private static int roomItemHeight() {
+        return scaled(BASE_ROOM_ITEM_HEIGHT);
     }
 }

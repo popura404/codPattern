@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.gui.screen.tdm;
 
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -74,7 +75,8 @@ public final class TdmRoomRosterRenderer {
             float alphaFactor,
             long nowMs) {
         int accent = getTeamAccentColor(teamName);
-        int headerHeight = 14;
+        int headerHeight = GuiTextHelper.referenceScaled(14);
+        int lineHeight = GuiTextHelper.referenceLineHeight(mc.font);
         if (startY + headerHeight > maxY) {
             return new RenderResult(maxY + 1, rowIndex);
         }
@@ -90,34 +92,47 @@ public final class TdmRoomRosterRenderer {
             teamLabel = teamName.toUpperCase(Locale.ROOT);
         }
         String headerText = teamLabel + "  (" + players.size() + ")";
-        graphics.drawString(mc.font, headerText, panelX + 5, startY + 3, scaleAlpha(accent, alphaFactor));
+        GuiTextHelper.drawReferenceString(
+                graphics,
+                mc.font,
+                headerText,
+                panelX + GuiTextHelper.referenceScaled(5),
+                startY + GuiTextHelper.referenceScaled(3),
+                scaleAlpha(accent, alphaFactor),
+                false);
 
-        int y = startY + headerHeight + 3;
+        int y = startY + headerHeight + GuiTextHelper.referenceScaled(3);
         if (players.isEmpty()) {
-            graphics.drawString(mc.font,
+            GuiTextHelper.drawReferenceString(
+                    graphics,
+                    mc.font,
                     Component.translatable("screen.codpattern.tdm_room.no_players"),
-                    panelX + 5,
+                    panelX + GuiTextHelper.referenceScaled(5),
                     y,
-                    scaleAlpha(CodTheme.TEXT_DIM, alphaFactor));
-            return new RenderResult(y + 14, rowIndex);
+                    scaleAlpha(CodTheme.TEXT_DIM, alphaFactor),
+                    false);
+            return new RenderResult(y + lineHeight + GuiTextHelper.referenceScaled(5), rowIndex);
         }
 
-        int rowHeight = 24;
+        int rowHeight = GuiTextHelper.referenceScaled(24);
         int currentIndex = rowIndex;
         for (PlayerInfo player : players) {
             if (y + rowHeight > maxY) {
-                graphics.drawString(mc.font,
+                GuiTextHelper.drawReferenceString(
+                        graphics,
+                        mc.font,
                         "...",
-                        panelX + panelWidth - 14,
-                        Math.max(startY + 2, maxY - 9),
-                        scaleAlpha(CodTheme.TEXT_DIM, alphaFactor));
+                        panelX + panelWidth - GuiTextHelper.referenceWidth(mc.font, "...") - GuiTextHelper.referenceScaled(6),
+                        Math.max(startY + GuiTextHelper.referenceScaled(2), maxY - lineHeight),
+                        scaleAlpha(CodTheme.TEXT_DIM, alphaFactor),
+                        false);
                 return new RenderResult(maxY + 1, currentIndex);
             }
             renderPlayerStatCard(graphics, mc, panelX, panelWidth, y, rowHeight, player, accent, currentIndex, alphaFactor, nowMs);
-            y += rowHeight + 3;
+            y += rowHeight + GuiTextHelper.referenceScaled(3);
             currentIndex++;
         }
-        return new RenderResult(y + 4, currentIndex);
+        return new RenderResult(y + GuiTextHelper.referenceScaled(4), currentIndex);
     }
 
     private static void renderPlayerStatCard(
@@ -132,6 +147,7 @@ public final class TdmRoomRosterRenderer {
             int rowIndex,
             float alphaFactor,
             long nowMs) {
+        int lineHeight = GuiTextHelper.referenceLineHeight(mc.font);
         float alivePulse = player.isAlive()
                 ? (0.75f + 0.25f * (0.5f + 0.5f * (float) Math.sin((nowMs / 185.0) + rowIndex * 0.55)))
                 : 1.0f;
@@ -159,13 +175,26 @@ public final class TdmRoomRosterRenderer {
                 kdText,
                 Math.max(0, player.pingMs())).getString();
 
-        graphics.drawString(mc.font, headline, x + 6, y + 3, scaleAlpha(0xFFF4F4F4, alphaFactor));
-        graphics.drawString(mc.font,
+        int textX = x + GuiTextHelper.referenceScaled(6);
+        int topY = y + GuiTextHelper.referenceScaled(3);
+        GuiTextHelper.drawReferenceString(graphics, mc.font, headline, textX, topY,
+                scaleAlpha(0xFFF4F4F4, alphaFactor), false);
+        GuiTextHelper.drawReferenceString(
+                graphics,
+                mc.font,
                 scoreText,
-                cardRight - mc.font.width(scoreText) - 5,
-                y + 3,
-                scaleAlpha(0xFFCCCCCC, alphaFactor));
-        graphics.drawString(mc.font, meta, x + 6, y + 13, scaleAlpha(0xFFB5B5B5, alphaFactor));
+                cardRight - GuiTextHelper.referenceWidth(mc.font, scoreText) - GuiTextHelper.referenceScaled(5),
+                topY,
+                scaleAlpha(0xFFCCCCCC, alphaFactor),
+                false);
+        GuiTextHelper.drawReferenceString(
+                graphics,
+                mc.font,
+                meta,
+                textX,
+                topY + lineHeight + GuiTextHelper.referenceScaled(1),
+                scaleAlpha(0xFFB5B5B5, alphaFactor),
+                false);
     }
 
     private static Comparator<PlayerInfo> playerComparator() {
