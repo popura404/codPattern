@@ -121,10 +121,26 @@ public class WeaponMenuScreen extends Screen {
 
         // 渲染投掷物槽位标签（左对齐，与主武器/副武器标签风格一致）
         if (tacticalButton != null) {
-            pGuiGraphics.drawString(Minecraft.getInstance().font, "投掷物 1", tacticalButton.getX(), tacticalButton.getY() - 12, CodTheme.TEXT_SECONDARY, false);
+            GuiTextHelper.drawReferenceString(
+                    pGuiGraphics,
+                    Minecraft.getInstance().font,
+                    "投掷物 1",
+                    tacticalButton.getX(),
+                    tacticalButton.getY() - GuiTextHelper.referenceLineHeight(Minecraft.getInstance().font) - 3,
+                    CodTheme.TEXT_SECONDARY,
+                    false
+            );
         }
         if (lethalButton != null) {
-            pGuiGraphics.drawString(Minecraft.getInstance().font, "投掷物 2", lethalButton.getX(), lethalButton.getY() - 12, CodTheme.TEXT_SECONDARY, false);
+            GuiTextHelper.drawReferenceString(
+                    pGuiGraphics,
+                    Minecraft.getInstance().font,
+                    "投掷物 2",
+                    lethalButton.getX(),
+                    lethalButton.getY() - GuiTextHelper.referenceLineHeight(Minecraft.getInstance().font) - 3,
+                    CodTheme.TEXT_SECONDARY,
+                    false
+            );
         }
 
         // 渲染底部操作提示条
@@ -139,15 +155,16 @@ public class WeaponMenuScreen extends Screen {
     private void renderTitle(GuiGraphics graphics) {
         Minecraft mc = Minecraft.getInstance();
         String title = "武器配置";
+        int titleLineHeight = GuiTextHelper.referenceLineHeight(mc.font);
         int titleX = UNIT_LENGTH * 6;
         int titleY = UNIT_LENGTH * 4;
 
         // 标题文字
-        graphics.drawString(mc.font, title, titleX, titleY, CodTheme.TEXT_PRIMARY, true);
+        GuiTextHelper.drawReferenceString(graphics, mc.font, title, titleX, titleY, CodTheme.TEXT_PRIMARY, true);
 
         // 分隔线
-        graphics.fill(titleX, titleY + mc.font.lineHeight + 4,
-                this.width - titleX, titleY + mc.font.lineHeight + 5,
+        graphics.fill(titleX, titleY + titleLineHeight + 4,
+                this.width - titleX, titleY + titleLineHeight + 5,
                 CodTheme.DIVIDER);
     }
 
@@ -164,7 +181,7 @@ public class WeaponMenuScreen extends Screen {
         graphics.fill(0, barY, this.width, barY + 1, CodTheme.BORDER_SUBTLE);
 
         Minecraft mc = Minecraft.getInstance();
-        int textY = barY + (barHeight - mc.font.lineHeight) / 2;
+        int textY = barY + (barHeight - GuiTextHelper.referenceLineHeight(mc.font)) / 2;
         int leftMaxWidth = Math.max(32, this.width / 2 - UNIT_LENGTH * 4);
         int rightMaxWidth = Math.max(32, this.width / 3);
 
@@ -172,7 +189,7 @@ public class WeaponMenuScreen extends Screen {
         String leftHint = this.width < UNIT_LENGTH * 42
                 ? "[LMB] 选择  [Hover] 配件"
                 : "[LMB] 选择武器    [Hover] 更换配件";
-        GuiTextHelper.drawEllipsizedString(
+        GuiTextHelper.drawReferenceEllipsizedString(
                 graphics,
                 mc.font,
                 leftHint,
@@ -185,7 +202,7 @@ public class WeaponMenuScreen extends Screen {
 
         // 右侧提示
         String rightHint = "[ESC] 返回背包列表";
-        GuiTextHelper.drawRightAlignedEllipsizedString(
+        GuiTextHelper.drawReferenceRightAlignedEllipsizedString(
                 graphics,
                 mc.font,
                 rightHint,

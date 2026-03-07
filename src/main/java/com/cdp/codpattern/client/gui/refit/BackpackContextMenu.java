@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Renderable;
@@ -50,7 +51,7 @@ public class BackpackContextMenu implements Renderable, GuiEventListener, Narrat
     }
 
     public BackpackContextMenu() {
-        this.width = CodTheme.MENU_WIDTH;
+        this.width = menuWidth();
     }
 
     /**
@@ -78,7 +79,8 @@ public class BackpackContextMenu implements Renderable, GuiEventListener, Narrat
     }
 
     private void recalculateHeight() {
-        this.height = items.size() * CodTheme.MENU_ITEM_HEIGHT + 4;
+        this.width = menuWidth();
+        this.height = items.size() * menuItemHeight() + menuPadding() * 2;
     }
 
     /**
@@ -127,6 +129,8 @@ public class BackpackContextMenu implements Renderable, GuiEventListener, Narrat
         if (!visible || items.isEmpty()) return;
 
         Minecraft minecraft = Minecraft.getInstance();
+        int itemHeight = menuItemHeight();
+        int padding = menuPadding();
 
         // 更新悬停状态
         updateHoveredIndex(mouseX, mouseY);
@@ -141,32 +145,33 @@ public class BackpackContextMenu implements Renderable, GuiEventListener, Narrat
         graphics.fill(x + width - 1, y, x + width, y + height, CodTheme.MENU_BORDER);
 
         // 绘制菜单项
-        int itemY = y + 2;
+        int itemY = y + padding;
         for (int i = 0; i < items.size(); i++) {
             MenuItem item = items.get(i);
             boolean isHovered = (i == hoveredIndex);
 
             // 悬停背景
             if (isHovered) {
-                graphics.fill(x + 2, itemY, x + width - 2, itemY + CodTheme.MENU_ITEM_HEIGHT, CodTheme.MENU_ITEM_HOVER);
+                graphics.fill(x + padding, itemY, x + width - padding, itemY + itemHeight, CodTheme.MENU_ITEM_HOVER);
                 // 左侧高亮条
-                graphics.fill(x + 2, itemY, x + 4, itemY + CodTheme.MENU_ITEM_HEIGHT, CodTheme.MENU_ITEM_HOVER_BAR);
+                graphics.fill(x + padding, itemY, x + padding + GuiTextHelper.referenceScaled(2), itemY + itemHeight,
+                        CodTheme.MENU_ITEM_HOVER_BAR);
             }
 
             // 绘制分隔线（除了最后一项）
             if (i < items.size() - 1) {
-                graphics.fill(x + 8, itemY + CodTheme.MENU_ITEM_HEIGHT - 1,
-                        x + width - 8, itemY + CodTheme.MENU_ITEM_HEIGHT,
+                graphics.fill(x + GuiTextHelper.referenceScaled(8), itemY + itemHeight - 1,
+                        x + width - GuiTextHelper.referenceScaled(8), itemY + itemHeight,
                         CodTheme.DIVIDER);
             }
 
             // 绘制文本
             int textColor = isHovered ? item.hoverTextColor : item.textColor;
-            int textX = x + 10;
-            int textY = itemY + (CodTheme.MENU_ITEM_HEIGHT - minecraft.font.lineHeight) / 2;
-            graphics.drawString(minecraft.font, item.label, textX, textY, textColor, false);
+            int textX = x + GuiTextHelper.referenceScaled(10);
+            int textY = itemY + (itemHeight - GuiTextHelper.referenceLineHeight(minecraft.font)) / 2;
+            GuiTextHelper.drawReferenceString(graphics, minecraft.font, item.label, textX, textY, textColor, false);
 
-            itemY += CodTheme.MENU_ITEM_HEIGHT;
+            itemY += itemHeight;
         }
     }
 
@@ -182,8 +187,8 @@ public class BackpackContextMenu implements Renderable, GuiEventListener, Narrat
             return;
         }
 
-        int relativeY = mouseY - y - 2;
-        int index = relativeY / CodTheme.MENU_ITEM_HEIGHT;
+        int relativeY = mouseY - y - menuPadding();
+        int index = relativeY / menuItemHeight();
         if (index >= 0 && index < items.size()) {
             if (hoveredIndex != index) {
                 // 切换到新的菜单项时播放音效
@@ -249,6 +254,18 @@ public class BackpackContextMenu implements Renderable, GuiEventListener, Narrat
     @Override
     public boolean isMouseOver(double mouseX, double mouseY) {
         return visible && mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+    }
+
+    private static int menuItemHeight() {
+        return GuiTextHelper.referenceScaled(CodTheme.MENU_ITEM_HEIGHT);
+    }
+
+    private static int menuWidth() {
+        return GuiTextHelper.referenceScaled(CodTheme.MENU_WIDTH);
+    }
+
+    private static int menuPadding() {
+        return GuiTextHelper.referenceScaled(2);
     }
 
     @Override

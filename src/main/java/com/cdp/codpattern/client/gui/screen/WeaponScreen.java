@@ -239,12 +239,12 @@ public class WeaponScreen extends Screen {
             public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
                 if (scrollOffset > 0) {
                     super.renderWidget(graphics, mouseX, mouseY, partialTick);
-                    GuiTextHelper.drawCenteredEllipsizedString(
+                    GuiTextHelper.drawReferenceCenteredEllipsizedString(
                             graphics,
                             Minecraft.getInstance().font,
                             Component.translatable("screen.codpattern.weapon.scroll_left"),
                             this.getX() + this.width / 2,
-                            this.getY() + (this.height - Minecraft.getInstance().font.lineHeight) / 2,
+                            this.getY() + (this.height - GuiTextHelper.referenceLineHeight(Minecraft.getInstance().font)) / 2,
                             this.width - 4,
                             0xFFFFFF,
                             false
@@ -262,12 +262,12 @@ public class WeaponScreen extends Screen {
             public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
                 if (scrollOffset < maxScroll) {
                     super.renderWidget(graphics, mouseX, mouseY, partialTick);
-                    GuiTextHelper.drawCenteredEllipsizedString(
+                    GuiTextHelper.drawReferenceCenteredEllipsizedString(
                             graphics,
                             Minecraft.getInstance().font,
                             Component.translatable("screen.codpattern.weapon.scroll_right"),
                             this.getX() + this.width / 2,
-                            this.getY() + (this.height - Minecraft.getInstance().font.lineHeight) / 2,
+                            this.getY() + (this.height - GuiTextHelper.referenceLineHeight(Minecraft.getInstance().font)) / 2,
                             this.width - 4,
                             0xFFFFFF,
                             false
@@ -313,12 +313,12 @@ public class WeaponScreen extends Screen {
             @Override
             public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
                 super.renderWidget(graphics, mouseX, mouseY, partialTick);
-                GuiTextHelper.drawCenteredEllipsizedString(
+                GuiTextHelper.drawReferenceCenteredEllipsizedString(
                         graphics,
                         Minecraft.getInstance().font,
                         Component.translatable("screen.codpattern.weapon.back"),
                         this.getX() + this.width / 2,
-                        this.getY() + (this.height - Minecraft.getInstance().font.lineHeight) / 2,
+                        this.getY() + (this.height - GuiTextHelper.referenceLineHeight(Minecraft.getInstance().font)) / 2,
                         this.width - 4,
                         0xFFFFFF,
                         false
@@ -360,7 +360,7 @@ public class WeaponScreen extends Screen {
             case "lethal" -> Component.translatable("screen.codpattern.weapon.select_lethal").getString();
             default -> Component.translatable("screen.codpattern.weapon.select_weapon").getString();
         };
-        GuiTextHelper.drawCenteredEllipsizedString(
+        GuiTextHelper.drawReferenceCenteredEllipsizedString(
                 graphics,
                 this.font,
                 title,
@@ -372,7 +372,7 @@ public class WeaponScreen extends Screen {
         );
 
         String categoryInfo = getTabDisplayName(currentTab).getString();
-        GuiTextHelper.drawCenteredEllipsizedString(
+        GuiTextHelper.drawReferenceCenteredEllipsizedString(
                 graphics,
                 this.font,
                 categoryInfo,
@@ -465,12 +465,12 @@ public class WeaponScreen extends Screen {
                     this.getX() + this.width, this.getY() + this.height + 1,
                     0x7019181A, 0x7019181A);
 
-            GuiTextHelper.drawCenteredEllipsizedString(
+            GuiTextHelper.drawReferenceCenteredEllipsizedString(
                     graphics,
                     Minecraft.getInstance().font,
                     getMessage(),
                     this.getX() + this.width / 2,
-                    this.getY() + (this.height - Minecraft.getInstance().font.lineHeight) / 2,
+                    this.getY() + (this.height - GuiTextHelper.referenceLineHeight(Minecraft.getInstance().font)) / 2,
                     this.width - 4,
                     selected ? 0xFFFFFF : (isHoveredOrFocused() ? 0xFFFF55 : 0xAAAAAA),
                     false

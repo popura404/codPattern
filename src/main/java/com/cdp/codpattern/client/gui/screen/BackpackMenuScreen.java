@@ -92,12 +92,15 @@ public class BackpackMenuScreen extends Screen {
 
         if (loading) {
             String loadingText = "加载中...";
-            pGuiGraphics.drawCenteredString(
+            GuiTextHelper.drawReferenceCenteredEllipsizedString(
+                    pGuiGraphics,
                     Minecraft.getInstance().font,
-                    Component.literal(loadingText),
+                    loadingText,
                     this.width / 2,
                     this.height / 2,
-                    scaleAlpha(CodTheme.TEXT_PRIMARY, revealFactor)
+                    this.width - UNIT_LENGTH * 12,
+                    scaleAlpha(CodTheme.TEXT_PRIMARY, revealFactor),
+                    false
             );
         }
 
@@ -161,15 +164,24 @@ public class BackpackMenuScreen extends Screen {
 
     private void renderHeaderBar(GuiGraphics graphics, float revealFactor) {
         Minecraft mc = Minecraft.getInstance();
+        int titleLineHeight = GuiTextHelper.referenceLineHeight(mc.font);
         int titleX = UNIT_LENGTH * 6;
         int titleY = UNIT_LENGTH * 4;
         int accentX = Math.max(4, titleX - 10);
-        int accentBottom = titleY + mc.font.lineHeight + 1;
+        int accentBottom = titleY + titleLineHeight + 1;
 
         graphics.fill(accentX, titleY - 1, accentX + 3, accentBottom,
                 scaleAlpha(CodTheme.HOVER_BORDER, 0.72f + (0.28f * revealFactor)));
-        graphics.drawString(mc.font, "背包选择", titleX, titleY, scaleAlpha(CodTheme.TEXT_PRIMARY, revealFactor), true);
-        graphics.fill(titleX, titleY + mc.font.lineHeight + 4, this.width - titleX, titleY + mc.font.lineHeight + 5,
+        GuiTextHelper.drawReferenceString(
+                graphics,
+                mc.font,
+                "背包选择",
+                titleX,
+                titleY,
+                scaleAlpha(CodTheme.TEXT_PRIMARY, revealFactor),
+                true
+        );
+        graphics.fill(titleX, titleY + titleLineHeight + 4, this.width - titleX, titleY + titleLineHeight + 5,
                 scaleAlpha(CodTheme.DIVIDER, revealFactor));
 
         int hintRightX = this.width - titleX;
@@ -177,7 +189,7 @@ public class BackpackMenuScreen extends Screen {
         String hint = this.width < UNIT_LENGTH * 36
                 ? "[LMB] 选  [RMB] 更多"
                 : "[LMB] 选择背包   [RMB] 更多操作";
-        GuiTextHelper.drawRightAlignedEllipsizedString(
+        GuiTextHelper.drawReferenceRightAlignedEllipsizedString(
                 graphics,
                 mc.font,
                 hint,
@@ -190,10 +202,11 @@ public class BackpackMenuScreen extends Screen {
 
         if (playerData != null) {
             String counterText = playerData.getBackpackCount() + " / 10";
-            int counterX = titleX + mc.font.width("背包选择") + UNIT_LENGTH;
+            int counterX = titleX + GuiTextHelper.referenceWidth(mc.font, "背包选择") + UNIT_LENGTH;
             int counterMaxWidth = hintRightX - hintMaxWidth - counterX - UNIT_LENGTH;
-            if (counterMaxWidth >= mc.font.width(counterText)) {
-                graphics.drawString(
+            if (counterMaxWidth >= GuiTextHelper.referenceWidth(mc.font, counterText)) {
+                GuiTextHelper.drawReferenceString(
+                        graphics,
                         mc.font,
                         counterText,
                         counterX,

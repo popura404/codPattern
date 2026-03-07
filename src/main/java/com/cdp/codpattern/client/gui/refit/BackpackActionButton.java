@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -95,9 +96,17 @@ public class BackpackActionButton extends Button {
     protected void renderTitle(GuiGraphics graphics, float revealFactor) {
         Minecraft minecraft = Minecraft.getInstance();
         int textX = this.getX() + 6;  // 左对齐
-        int textY = this.getY() + (this.height - minecraft.font.lineHeight) / 2;
+        int textY = this.getY() + (this.height - GuiTextHelper.referenceLineHeight(minecraft.font)) / 2;
         int color = this.isHoveredOrFocused() ? hoverColor : normalColor;
-        graphics.drawString(minecraft.font, this.getMessage(), textX, textY, scaleAlpha(color, revealFactor), true);
+        GuiTextHelper.drawReferenceString(
+                graphics,
+                minecraft.font,
+                this.getMessage(),
+                textX,
+                textY,
+                scaleAlpha(color, revealFactor),
+                true
+        );
     }
 
     private int withAlpha(int color, int alpha) {

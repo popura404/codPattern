@@ -77,14 +77,15 @@ public class WeaponSelectionButton extends Button {
 
         Minecraft minecraft = Minecraft.getInstance();
         int textMaxWidth = Math.max(16, this.width - 4);
+        int referenceLineHeight = GuiTextHelper.referenceLineHeight(minecraft.font);
 
         //显示枪名
-        GuiTextHelper.drawEllipsizedString(
+        GuiTextHelper.drawReferenceEllipsizedString(
                 graphics,
                 minecraft.font,
                 weapon.getHoverName(),
                 this.getX() + 2,
-                this.getY() + this.height - minecraft.font.lineHeight - 1,
+                this.getY() + this.height - referenceLineHeight - 1,
                 textMaxWidth,
                 0xDDFFFFFF,
                 false
@@ -95,8 +96,8 @@ public class WeaponSelectionButton extends Button {
         if (packName == null) {
             packName = LrTacticalClientApi.getLrItemPackName(weapon);
         }
-        if (packName != null && this.height >= minecraft.font.lineHeight * 2 + 4) {
-            GuiTextHelper.drawEllipsizedString(
+        if (packName != null && this.height >= referenceLineHeight * 2 + 4) {
+            GuiTextHelper.drawReferenceEllipsizedString(
                     graphics,
                     minecraft.font,
                     packName,

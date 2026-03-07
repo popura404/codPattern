@@ -29,6 +29,7 @@ public final class BackpackWeaponPreviewPanel {
         }
 
         Minecraft mc = Minecraft.getInstance();
+        int referenceLineHeight = GuiTextHelper.referenceLineHeight(mc.font);
         int panelPadding = unitLength;
         int weaponDisplayX = unitLength * 6;
         int weaponDisplayY = screenHeight - unitLength * 22 - unitLength * 4 - unitLength * 12;
@@ -66,8 +67,8 @@ public final class BackpackWeaponPreviewPanel {
         int lethalWeaponX = dividerTacLeth + panelPadding;
 
         String title = hoveredButton.getDisplayNameRaw();
-        int titleY = grayBarTop + (grayBarBottom - grayBarTop - mc.font.lineHeight) / 2;
-        GuiTextHelper.drawEllipsizedString(
+        int titleY = grayBarTop + (grayBarBottom - grayBarTop - referenceLineHeight) / 2;
+        GuiTextHelper.drawReferenceEllipsizedString(
                 graphics,
                 mc.font,
                 title,
@@ -132,7 +133,7 @@ public final class BackpackWeaponPreviewPanel {
                 case "lethal" -> "§6投掷物 2";
                 default -> type;
             };
-            GuiTextHelper.drawEllipsizedString(
+            GuiTextHelper.drawReferenceEllipsizedString(
                     graphics,
                     mc.font,
                     typeLabel,
@@ -149,14 +150,14 @@ public final class BackpackWeaponPreviewPanel {
             }
             float scale = isThrowableSlot ? 2f : 3f;
             int slotContentHeight = isThrowableSlot ? unitLength * 5 : unitLength * 7;
-            int nameY = weaponY + mc.font.lineHeight + (isThrowableSlot ? unitLength * 7 : slotContentHeight) + 2;
+            int nameY = weaponY + referenceLineHeight + (isThrowableSlot ? unitLength * 7 : slotContentHeight) + 2;
 
             if (info.texture != null && !isThrowableSlot) {
                 RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
                 int textureWidth = unitLength * 18;
                 int textureHeight = unitLength * 6;
                 int textureX = weaponX;
-                int textureY = weaponY + mc.font.lineHeight + 2;
+                int textureY = weaponY + referenceLineHeight + 2;
                 graphics.blit(info.texture, textureX, textureY,
                         0, 0, textureWidth, textureHeight,
                         textureWidth, textureHeight);
@@ -166,12 +167,12 @@ public final class BackpackWeaponPreviewPanel {
                 int itemX = weaponX + Math.max(0, (maxSlotWidth - itemSize) / 2);
                 int itemY;
                 if (isThrowableSlot) {
-                    int contentTop = weaponY + mc.font.lineHeight + 2;
+                    int contentTop = weaponY + referenceLineHeight + 2;
                     int contentBottom = nameY - 2;
                     int contentHeight = Math.max(1, contentBottom - contentTop);
                     itemY = contentTop + (contentHeight - itemSize) / 2;
                 } else {
-                    itemY = weaponY + mc.font.lineHeight + 2;
+                    itemY = weaponY + referenceLineHeight + 2;
                 }
 
                 graphics.pose().pushPose();
@@ -182,7 +183,7 @@ public final class BackpackWeaponPreviewPanel {
             }
 
             if (info.weaponName != null) {
-                GuiTextHelper.drawEllipsizedString(
+                GuiTextHelper.drawReferenceEllipsizedString(
                         graphics,
                         mc.font,
                         info.weaponName,
@@ -194,8 +195,8 @@ public final class BackpackWeaponPreviewPanel {
                 );
             }
             if (info.packName != null && !isThrowableSlot) {
-                int packY = weaponY + mc.font.lineHeight * 2 + unitLength * 7 + 6;
-                GuiTextHelper.drawEllipsizedString(
+                int packY = weaponY + referenceLineHeight * 2 + unitLength * 7 + 6;
+                GuiTextHelper.drawReferenceEllipsizedString(
                         graphics,
                         mc.font,
                         info.packName,

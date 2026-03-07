@@ -295,16 +295,17 @@ public class BackPackSelectButton extends Button {
      */
     protected void renderBackpackInfo(GuiGraphics graphics, float revealFactor) {
         Minecraft minecraft = Minecraft.getInstance();
+        int referenceLineHeight = GuiTextHelper.referenceLineHeight(minecraft.font);
 
         // 背包编号（左上角）
         String idText = "#" + BAGSERIAL;
         int idColor = isCurrentlySelected ? CodTheme.SELECTED_TEXT : CodTheme.TEXT_SECONDARY;
-        graphics.drawString(minecraft.font, idText, this.getX() + 4, this.getY() + 4,
+        GuiTextHelper.drawReferenceString(graphics, minecraft.font, idText, this.getX() + 4, this.getY() + 4,
                 scaleAlpha(idColor, revealFactor), true);
 
         boolean canRenderChip = isCurrentlySelected
-                && this.width >= minecraft.font.width("已装备") + 18
-                && this.height >= minecraft.font.lineHeight + 8;
+                && this.width >= GuiTextHelper.referenceWidth(minecraft.font, "已装备") + 18
+                && this.height >= referenceLineHeight + 8;
         if (canRenderChip) {
             renderSelectedChip(graphics, minecraft, revealFactor);
         }
@@ -320,8 +321,8 @@ public class BackPackSelectButton extends Button {
             textColor = CodTheme.TEXT_PRIMARY;
         }
 
-        int textY = this.getY() + (this.height - minecraft.font.lineHeight) / 2;
-        GuiTextHelper.drawCenteredEllipsizedString(
+        int textY = this.getY() + (this.height - referenceLineHeight) / 2;
+        GuiTextHelper.drawReferenceCenteredEllipsizedString(
                 graphics,
                 minecraft.font,
                 title,
@@ -335,13 +336,21 @@ public class BackPackSelectButton extends Button {
 
     private void renderSelectedChip(GuiGraphics graphics, Minecraft minecraft, float revealFactor) {
         String chipText = "已装备";
-        int chipWidth = minecraft.font.width(chipText) + 10;
-        int chipHeight = minecraft.font.lineHeight + 2;
+        int chipWidth = GuiTextHelper.referenceWidth(minecraft.font, chipText) + 10;
+        int chipHeight = GuiTextHelper.referenceLineHeight(minecraft.font) + 2;
         int chipX = this.getX() + this.width - chipWidth - 4;
         int chipY = this.getY() + 4;
         graphics.fill(chipX, chipY, chipX + chipWidth, chipY + chipHeight, scaleAlpha(0xB05A4310, revealFactor));
         graphics.fill(chipX, chipY, chipX + 2, chipY + chipHeight, scaleAlpha(CodTheme.SELECTED_BORDER, revealFactor));
-        graphics.drawString(minecraft.font, chipText, chipX + 5, chipY + 1, scaleAlpha(0xFFFFE9A3, revealFactor), false);
+        GuiTextHelper.drawReferenceString(
+                graphics,
+                minecraft.font,
+                chipText,
+                chipX + 5,
+                chipY + 1,
+                scaleAlpha(0xFFFFE9A3, revealFactor),
+                false
+        );
     }
 
     /**

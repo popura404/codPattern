@@ -143,13 +143,14 @@ public class NewBackpackButton extends Button {
                 : CodTheme.DISABLED_TEXT;
 
         String countText = "已用 " + currentBackpackCount + "/10";
-        boolean showCount = this.height >= minecraft.font.lineHeight * 2 + 8;
-        int totalTextHeight = showCount ? minecraft.font.lineHeight * 2 + 2 : minecraft.font.lineHeight;
+        int referenceLineHeight = GuiTextHelper.referenceLineHeight(minecraft.font);
+        boolean showCount = this.height >= referenceLineHeight * 2 + 8;
+        int totalTextHeight = showCount ? referenceLineHeight * 2 + 2 : referenceLineHeight;
         int baseY = this.getY() + (this.height - totalTextHeight) / 2;
         int textCenterX = this.getX() + this.width / 2;
         int textMaxWidth = this.width - 12;
 
-        GuiTextHelper.drawCenteredEllipsizedString(
+        GuiTextHelper.drawReferenceCenteredEllipsizedString(
                 graphics,
                 minecraft.font,
                 text,
@@ -161,12 +162,12 @@ public class NewBackpackButton extends Button {
         );
 
         if (showCount) {
-            GuiTextHelper.drawCenteredEllipsizedString(
+            GuiTextHelper.drawReferenceCenteredEllipsizedString(
                     graphics,
                     minecraft.font,
                     countText,
                     textCenterX,
-                    baseY + minecraft.font.lineHeight + 2,
+                    baseY + referenceLineHeight + 2,
                     textMaxWidth,
                     scaleAlpha(CodTheme.TEXT_SECONDARY, revealFactor),
                     true

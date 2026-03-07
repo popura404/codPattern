@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.client.refit.AttachmentRefitClientState;
 import com.cdp.codpattern.network.RequestAttachmentPresetPacket;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
@@ -71,10 +72,10 @@ public class AttachmentConfigButton extends Button {
         Minecraft minecraft = Minecraft.getInstance();
         String idText = "更换配件";
         int textX = this.getX() + 6;
-        int textY = this.getY() + (this.height - minecraft.font.lineHeight) / 2;
+        int textY = this.getY() + (this.height - GuiTextHelper.referenceLineHeight(minecraft.font)) / 2;
 
         int textColor = this.isHoveredOrFocused() ? CodTheme.SELECTED_TEXT : CodTheme.TEXT_PRIMARY;
-        graphics.drawString(minecraft.font, idText, textX, textY, textColor, true);
+        GuiTextHelper.drawReferenceString(graphics, minecraft.font, idText, textX, textY, textColor, true);
     }
 
     private void renderGoldBorder(GuiGraphics graphics) {

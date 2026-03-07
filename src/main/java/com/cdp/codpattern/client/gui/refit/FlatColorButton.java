@@ -104,11 +104,11 @@ public class FlatColorButton extends Button {
         int textMaxWidth = Math.max(16, this.width - 8);
         boolean showPackName = weaponPackinfo != null
                 && !hidePackName
-                && this.height >= minecraft.font.lineHeight * 2 + UNIT_LENGTH;
+                && this.height >= GuiTextHelper.referenceLineHeight(minecraft.font) * 2 + UNIT_LENGTH;
 
         // 渲染包名（如果有，投掷物槽位不显示）
         if (showPackName) {
-            GuiTextHelper.drawEllipsizedString(
+            GuiTextHelper.drawReferenceEllipsizedString(
                     graphics,
                     minecraft.font,
                     this.weaponPackinfo,
@@ -121,8 +121,8 @@ public class FlatColorButton extends Button {
         }
         // 渲染枪名（如果有）
         if (weaponName != null){
-            int weaponNameY = this.getY() + this.height - minecraft.font.lineHeight - 3;
-            GuiTextHelper.drawEllipsizedString(
+            int weaponNameY = this.getY() + this.height - GuiTextHelper.referenceLineHeight(minecraft.font) - 3;
+            GuiTextHelper.drawReferenceEllipsizedString(
                     graphics,
                     minecraft.font,
                     this.weaponName,

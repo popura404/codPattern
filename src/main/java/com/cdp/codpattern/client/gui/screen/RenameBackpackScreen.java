@@ -1,10 +1,12 @@
 package com.cdp.codpattern.client.gui.screen;
 
+import com.cdp.codpattern.client.gui.CodTheme;
+import com.cdp.codpattern.client.gui.GuiTextHelper;
+import com.cdp.codpattern.client.gui.refit.BackpackActionButton;
 import com.cdp.codpattern.network.RenameBackpackPacket;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -16,7 +18,7 @@ public class RenameBackpackScreen extends Screen {
     private final int backpackId;
     private final String currentName;
     private EditBox nameBox;
-    private Button confirmButton;
+    private BackpackActionButton confirmButton;
 
     public RenameBackpackScreen(BackpackMenuScreen parent, int backpackId, String currentName) {
         super(Component.translatable("screen.codpattern.rename_backpack.title"));
@@ -41,15 +43,28 @@ public class RenameBackpackScreen extends Screen {
         addRenderableWidget(nameBox);
         setInitialFocus(nameBox);
 
-        confirmButton = Button.builder(Component.translatable("screen.codpattern.common.confirm"), btn -> submit())
-                .bounds(centerX - boxWidth / 2, centerY + 10, 98, 20)
-                .build();
+        confirmButton = new BackpackActionButton(
+                centerX - boxWidth / 2,
+                centerY + 10,
+                98,
+                20,
+                Component.translatable("screen.codpattern.common.confirm"),
+                btn -> submit(),
+                CodTheme.TEXT_PRIMARY,
+                CodTheme.TEXT_HOVER
+        );
         confirmButton.active = !currentName.trim().isEmpty();
 
-        Button cancelButton = Button
-                .builder(Component.translatable("screen.codpattern.common.cancel"), btn -> onClose())
-                .bounds(centerX - boxWidth / 2 + 102, centerY + 10, 98, 20)
-                .build();
+        BackpackActionButton cancelButton = new BackpackActionButton(
+                centerX - boxWidth / 2 + 102,
+                centerY + 10,
+                98,
+                20,
+                Component.translatable("screen.codpattern.common.cancel"),
+                btn -> onClose(),
+                CodTheme.TEXT_PRIMARY,
+                CodTheme.TEXT_HOVER
+        );
 
         addRenderableWidget(confirmButton);
         addRenderableWidget(cancelButton);
@@ -66,11 +81,24 @@ public class RenameBackpackScreen extends Screen {
     public void render(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(graphics);
         super.render(graphics, mouseX, mouseY, partialTick);
-        graphics.drawCenteredString(this.font,
-                Component.translatable("screen.codpattern.rename_backpack.header", backpackId), this.width / 2,
-                this.height / 2 - 50, 0xFFFFFF);
-        graphics.drawCenteredString(this.font, Component.translatable("screen.codpattern.rename_backpack.prompt"),
-                this.width / 2, this.height / 2 - 35, 0xAAAAAA);
+        GuiTextHelper.drawReferenceCenteredString(
+                graphics,
+                this.font,
+                Component.translatable("screen.codpattern.rename_backpack.header", backpackId),
+                this.width / 2,
+                this.height / 2 - 50,
+                0xFFFFFF,
+                false
+        );
+        GuiTextHelper.drawReferenceCenteredString(
+                graphics,
+                this.font,
+                Component.translatable("screen.codpattern.rename_backpack.prompt"),
+                this.width / 2,
+                this.height / 2 - 35,
+                0xAAAAAA,
+                false
+        );
     }
 
     private void submit() {
