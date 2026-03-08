@@ -11,6 +11,7 @@ COD Pattern is an add-on mod built for **TaCZ + FPSMatch**, providing a COD-like
 * Loadout presets and respawn equipment distribution
 * In-match weapon refit with attachment presets
 * TDM room lifecycle and match flow
+* Localized UI and system messages (`zh_cn / zh_tw / en_us / ja_jp`)
 
 The project follows a server-authoritative design with client synchronization to keep multiplayer state consistent.
 
@@ -21,6 +22,7 @@ The project follows a server-authoritative design with client synchronization to
 * Supports create/clone/rename/delete/select operations for loadouts, up to `10` per player.
 * Each loadout contains four slots: `primary / secondary / tactical / lethal`.
 * Loadout-related UIs use a fixed text-scaling baseline across different `GUI Scale` settings to keep readability more consistent.
+* Default loadout names, clone suffixes, and equipped notifications are now localized by client language.
 * On respawn, the selected loadout is distributed automatically (normal flow applies to joined room/match players).
 * Player loadout/filter data is persisted on server side and synced on login.
 * Admin commands can force immediate distribution for all online players or selected targets.
@@ -39,16 +41,17 @@ The project follows a server-authoritative design with client synchronization to
 * Supports auto team assignment with balance constraints (`maxTeamDiff`).
 * Supports ready state, start vote, and end vote with threshold and timeout logic.
 * Full phase pipeline: `WAITING -> COUNTDOWN -> WARMUP -> PLAYING -> ENDED`.
-* Includes score tracking, respawn delay, invincibility frames, death cam, HUD phase feedback, and match summary.
+* Includes kill feed, score tracking, respawn delay, invincibility frames, death cam, HUD phase feedback, and match summary.
 * Exports JSON match records automatically when a match ends.
 
-### 4) Filtering and Compatibility Features
+### 4) Filtering, Compatibility, and Localization
 
 * Primary/secondary category filtering via `primaryWeaponTabs` and `secondaryWeaponTabs`.
 * Gunpack namespace blocking via `blockedItemNamespaces`.
 * Throwable and ammo multiplier controls via `throwablesEnabled` and `ammunitionPerMagazineMultiple`.
 * Optional integrations for LR Tactical and Physics Mod with graceful fallback when absent.
 * Includes compatibility handling for `tacz-addon 1.1.6` in backpack refit flow to prevent unload-button lockups.
+* Bundles `zh_cn / zh_tw / en_us / ja_jp` language resources for core UI, notices, and error messages.
 
 ## Commands and Entrypoints
 
@@ -143,7 +146,7 @@ When reporting issues, include:
 
 ## Changelog
 
-Current version: `v0.5.1b`  
+Current version: `v0.5.5b`  
 See `CHANGES.md` for detailed history.
 
 ## License
