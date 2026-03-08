@@ -45,12 +45,21 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int INVINCIBILITY_MARKER_SIZE = 8;
     private static final int INVINCIBILITY_MARKER_COLOR = 0xFFF6F6F6;
     private static final int INVINCIBILITY_MARKER_OUTLINE = 0xFFBFC7D0;
-    private static final int KILL_FEED_ICON_BASE_SIZE = 16;
+    private static final int KILL_FEED_ICON_BASE_SIZE = 14;
     private static final int KILL_FEED_TEXTURE_BASE_WIDTH = 28;
     private static final int KILL_FEED_TEXTURE_BASE_HEIGHT = 8;
     private static final int KILL_FEED_FALLBACK_BASE_WIDTH = 22;
-    private static final int KILL_FEED_FALLBACK_BASE_HEIGHT = 10;
-    private static final float KILL_FEED_TEXT_SCALE_MULTIPLIER = 0.7f;
+    private static final int KILL_FEED_FALLBACK_BASE_HEIGHT = 9;
+    private static final int KILL_FEED_MIN_ROW_HEIGHT = 14;
+    private static final int KILL_FEED_MAX_WIDTH = 248;
+    private static final int KILL_FEED_START_OFFSET = 42;
+    private static final int KILL_FEED_ROW_GAP = 1;
+    private static final int KILL_FEED_BACKGROUND_LEFT_PADDING = 4;
+    private static final int KILL_FEED_BACKGROUND_VERTICAL_PADDING = 1;
+    private static final int KILL_FEED_ICON_SLOT_WIDTH = 32;
+    private static final int KILL_FEED_TEXT_GAP = 5;
+    private static final int KILL_FEED_BACKGROUND_SEGMENTS = 18;
+    private static final float KILL_FEED_TEXT_SCALE_MULTIPLIER = 1.0f;
     private static final double TEAM_MARKER_HEAD_OFFSET = 0.45D;
     private static final double ENEMY_BAR_HEAD_OFFSET = 0.62D;
     private static final double INVINCIBILITY_MARKER_HEAD_OFFSET = 0.92D;
@@ -190,11 +199,12 @@ public class TdmHudOverlay implements IGuiOverlay {
         int rowGap = 3;
         int timerY = scoreY + (rowHeight * 2) + rowGap + 4;
         int phaseY = timerY + 10;
-        int contentHeight = Math.max(GuiTextHelper.referenceScaled(KILL_FEED_ICON_BASE_SIZE),
-                killFeedLineHeight(font));
-        int startY = phaseY + font.lineHeight + GuiTextHelper.referenceScaled(20);
-        int maxWidth = Math.min(GuiTextHelper.referenceScaled(236), screenWidth - x - 8);
-        int step = contentHeight + GuiTextHelper.referenceScaled(4);
+        int contentHeight = Math.max(GuiTextHelper.referenceScaled(KILL_FEED_MIN_ROW_HEIGHT),
+                Math.max(GuiTextHelper.referenceScaled(KILL_FEED_ICON_BASE_SIZE), killFeedLineHeight(font)));
+        int verticalPadding = GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_VERTICAL_PADDING);
+        int startY = phaseY + font.lineHeight + GuiTextHelper.referenceScaled(KILL_FEED_START_OFFSET);
+        int maxWidth = Math.min(GuiTextHelper.referenceScaled(KILL_FEED_MAX_WIDTH), screenWidth - x - 8);
+        int step = contentHeight + (verticalPadding * 2) + GuiTextHelper.referenceScaled(KILL_FEED_ROW_GAP);
         if (maxWidth <= GuiTextHelper.referenceScaled(64)) {
             return;
         }
@@ -211,13 +221,14 @@ public class TdmHudOverlay implements IGuiOverlay {
             return;
         }
 
-        int backgroundTop = y - GuiTextHelper.referenceScaled(2);
-        int backgroundBottom = y + contentHeight + GuiTextHelper.referenceScaled(2);
-        graphics.fill(x - GuiTextHelper.referenceScaled(3), backgroundTop, x + width, backgroundBottom,
-                withAlpha(0xFF0E131A, Math.max(34, alpha / 3)));
+        int backgroundLeft = x - GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_LEFT_PADDING);
+        int backgroundTop = y - GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_VERTICAL_PADDING);
+        int backgroundBottom = y + contentHeight + GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_VERTICAL_PADDING);
+        drawKillFeedBackground(graphics, backgroundLeft, backgroundTop, x + width, backgroundBottom,
+                0xFF0E131A, Math.max(42, alpha / 2));
 
         int textY = y + Math.max(0, (contentHeight - killFeedLineHeight(font)) / 2);
-        int gap = GuiTextHelper.referenceScaled(6);
+        int gap = GuiTextHelper.referenceScaled(KILL_FEED_TEXT_GAP);
         int killerColor = resolveKillFeedTeamColor(entry.killerName(), 0xFFF3F3F3);
         int victimColor = resolveKillFeedTeamColor(entry.victimName(), 0xFFE7A5A5);
 
@@ -235,7 +246,7 @@ public class TdmHudOverlay implements IGuiOverlay {
             return;
         }
 
-        int iconSlotWidth = GuiTextHelper.referenceScaled(36);
+        int iconSlotWidth = GuiTextHelper.referenceScaled(KILL_FEED_ICON_SLOT_WIDTH);
         int availableNameWidth = Math.max(GuiTextHelper.referenceScaled(36), width - iconSlotWidth - (gap * 2));
         int nameWidth = Math.max(GuiTextHelper.referenceScaled(36), availableNameWidth / 2);
         int killerX = x;
@@ -301,6 +312,31 @@ public class TdmHudOverlay implements IGuiOverlay {
         drawKillFeedCenteredString(graphics, font, fallbackText, drawX + (actualWidth / 2.0f),
                 drawY + Math.max(0, (actualHeight - killFeedLineHeight(font)) / 2.0f),
                 withAlpha(0xFFF6EDE6, alpha), false);
+    }
+
+    private void drawKillFeedBackground(GuiGraphics graphics, int left, int top, int right, int bottom, int color,
+            int leftAlpha) {
+        int width = right - left;
+        if (width <= 0 || bottom <= top) {
+            return;
+        }
+
+        // Approximate a left-to-right alpha fade with narrow strips; this keeps the HUD code simple
+        // while matching the requested 100 -> 0 transparency ramp.
+        int segments = Math.max(1, Math.min(KILL_FEED_BACKGROUND_SEGMENTS, width));
+        for (int i = 0; i < segments; i++) {
+            int segmentLeft = left + (width * i) / segments;
+            int segmentRight = left + (width * (i + 1)) / segments;
+            if (segmentRight <= segmentLeft) {
+                continue;
+            }
+            float t = (segments == 1) ? 0.0f : (float) i / (segments - 1);
+            int segmentAlpha = clamp(Math.round(leftAlpha * (1.0f - t)), 0, 255);
+            if (segmentAlpha <= 0) {
+                continue;
+            }
+            graphics.fill(segmentLeft, top, segmentRight, bottom, withAlpha(color, segmentAlpha));
+        }
     }
 
     private void renderPhaseAnnouncement(GuiGraphics graphics, Font font, int centerX, int screenHeight) {
