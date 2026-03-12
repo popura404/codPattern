@@ -14,7 +14,7 @@ import java.util.Locale;
 
 /**
  * COD Team Deathmatch 配置文件
- * 存储于 serverconfig/codpattern/tdmconfig/config.json
+ * 存储于 serverconfig/codpattern/tdm_rules/config.json
  */
 public class CodTdmConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(CodTdmConfig.class);

@@ -87,6 +87,7 @@ public class BackpackConfig {
             private String item;
             private int count;
             private String nbt; // 可选的NBT数据
+            private String attachmentPreset; // 可选的配件预设SNBT
 
             public ItemData(String item, int count) {
                 this.item = item;
@@ -94,15 +95,21 @@ public class BackpackConfig {
             }
 
             public ItemData(String item, int count, String nbt) {
+                this(item, count, nbt, null);
+            }
+
+            public ItemData(String item, int count, String nbt, String attachmentPreset) {
                 this.item = item;
                 this.count = count;
                 this.nbt = nbt;
+                this.attachmentPreset = attachmentPreset;
             }
 
             // Getters and setters
             public String getItem() { return item; }
             public int getCount() { return count; }
             public String getNbt() { return nbt; }
+            public String getAttachmentPreset() { return attachmentPreset; }
         }
 
         // Getters and setters

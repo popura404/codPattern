@@ -1,6 +1,5 @@
 package com.cdp.codpattern.app.refit.service;
 
-import com.cdp.codpattern.config.AttachmentPreset.AttachmentPresetManager;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
@@ -72,11 +71,11 @@ public final class AttachmentPresetSaveService {
                 throw new SaveFailureException("message.codpattern.refit.save_failed_backpack_missing");
             }
 
-            AttachmentPresetManager.writePreset(player.server, player.getUUID(), bagId, slot, builtPresetPayload);
-
             mutatedBackpack = backpack;
             previousItem = backpack.getItem_MAP().get(slot);
-            backpack.getItem_MAP().put(slot, new BackpackConfig.Backpack.ItemData(itemId, 1, nbtString));
+            String normalizedPreset = builtPresetPayload.isBlank() ? null : builtPresetPayload;
+            backpack.getItem_MAP().put(slot,
+                    new BackpackConfig.Backpack.ItemData(itemId, 1, nbtString, normalizedPreset));
             BackpackConfigRepository.save();
 
             saved = true;

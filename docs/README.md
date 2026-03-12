@@ -73,29 +73,30 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
 
 服务端配置目录位于世界存档下 `serverconfig/codpattern/`：
 
-* `backpackconfig`
-  * 玩家背包数据（JSON，文件名无扩展名）。
-* `filterconfig`
-  * 武器筛选配置（JSON，文件名无扩展名）。
+* `backpack_rules/backpack_config.json`
+  * 玩家背包数据（JSON）。
+  * 配件预设现已直接并入每个背包槽位的 `attachmentPreset` 字段。
+* `backpack_rules/weapon_filter.json`
+  * 武器筛选配置（JSON）。
   * 关键字段：
     * `primaryWeaponTabs` / `secondaryWeaponTabs`
     * `blockedItemNamespaces`
     * `throwablesEnabled`
     * `ammunitionPerMagazineMultiple`
-* `attachment_preset/`
-  * 配件预设（按玩家 UUID 与背包槽位保存 `.snbt` 文件）。
-* `tdmconfig/config.json`
+* `tdm_rules/config.json`
   * TDM 流程参数（时间、分数、复活、投票、加入策略、平衡策略等）。
 * `tdm_match_records/`
   * 对局结束后导出的战绩记录（`.json`）。
+* 旧路径 `backpackconfig` / `filterconfig` / `attachment_preset/` / `tdmconfig/`
+  * 已废弃，当前版本不再兼容读取，旧存档需要人工迁移。
 
-### `tdmconfig/config.json` 默认参数
+### `tdm_rules/config.json` 默认参数
 
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
 | `timeLimitSeconds` | `420` | 对局时长（秒） |
 | `scoreLimit` | `75` | 胜利击杀数 |
-| `invincibilityTicks` | `10` | 复活无敌帧（tick） |
+| `invincibilityTicks` | `30` | 复活无敌帧（tick） |
 | `respawnDelayTicks` | `40` | 复活延迟（tick） |
 | `warmupTimeTicks` | `400` | 热身阶段时长（tick） |
 | `preGameCountdownTicks` | `200` | 开局倒计时（tick） |
@@ -120,7 +121,7 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
 * **Java:** `17`
 * **必需依赖:**
   * TaCZ `1.1.6+`
-  * FPSMatch `1.2.5+`
+  * FPSMatch `1.2.5`
 * **可选联动:**
   * LR Tactical（投掷物/近战资源）
   * Physics Mod（死亡实体物理表现）
@@ -132,8 +133,8 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
 * 若地图未设置 TDM 结束传送点，结算阶段会提示但不会自动回传。
 * 若启用 `tacz-addon` 并在改装界面出现卸载异常，建议确认：`/gamerule liberateAttachment false`。
 * 上线前建议完成以下检查：
-  * `tdmconfig/config.json` 是否符合服务器节奏
-  * `filterconfig` 是否符合枪包筛选策略
+  * `tdm_rules/config.json` 是否符合服务器节奏
+  * `backpack_rules/weapon_filter.json` 是否符合枪包筛选策略
   * 地图是否已配置队伍出生点与结束传送点
 
 ## 问题反馈

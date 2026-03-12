@@ -73,29 +73,30 @@ The project follows a server-authoritative design with client synchronization to
 
 Server configuration is stored under world save path: `serverconfig/codpattern/`
 
-* `backpackconfig`
-  * Player loadout data (JSON, no extension by design).
-* `filterconfig`
-  * Weapon filter config (JSON, no extension by design).
+* `backpack_rules/backpack_config.json`
+  * Player loadout data (JSON).
+  * Attachment presets are now embedded on each loadout slot via the `attachmentPreset` field.
+* `backpack_rules/weapon_filter.json`
+  * Weapon filter config (JSON).
   * Key fields:
     * `primaryWeaponTabs` / `secondaryWeaponTabs`
     * `blockedItemNamespaces`
     * `throwablesEnabled`
     * `ammunitionPerMagazineMultiple`
-* `attachment_preset/`
-  * Attachment presets stored as `.snbt` by player UUID and loadout slot.
-* `tdmconfig/config.json`
+* `tdm_rules/config.json`
   * TDM runtime parameters (time, score, respawn, voting, join policy, balance policy).
 * `tdm_match_records/`
   * Exported match records (`.json`) after each match.
+* Legacy paths `backpackconfig` / `filterconfig` / `attachment_preset/` / `tdmconfig/`
+  * Deprecated and no longer read by this version; existing worlds require manual migration.
 
-### Default Parameters in `tdmconfig/config.json`
+### Default Parameters in `tdm_rules/config.json`
 
 | Field | Default | Description |
 |---|---:|---|
 | `timeLimitSeconds` | `420` | Match duration in seconds |
 | `scoreLimit` | `75` | Kill score to win |
-| `invincibilityTicks` | `10` | Post-respawn invincibility ticks |
+| `invincibilityTicks` | `30` | Post-respawn invincibility ticks |
 | `respawnDelayTicks` | `40` | Respawn delay ticks |
 | `warmupTimeTicks` | `400` | Warmup duration ticks |
 | `preGameCountdownTicks` | `200` | Pre-game countdown ticks |
@@ -132,8 +133,8 @@ Server configuration is stored under world save path: `serverconfig/codpattern/`
 * If no match-end teleport point is configured, end phase warns but does not auto-teleport back.
 * If `tacz-addon` is enabled and attachment unload behaves abnormally in refit UI, ensure `/gamerule liberateAttachment false`.
 * Before production rollout, verify:
-  * `tdmconfig/config.json` values match your server pacing
-  * `filterconfig` matches your gunpack filtering policy
+  * `tdm_rules/config.json` values match your server pacing
+  * `backpack_rules/weapon_filter.json` matches your gunpack filtering policy
   * maps include team spawn points and a match-end teleport point
 
 ## Issue Reporting

@@ -71,7 +71,11 @@ public class CloneBackpackPacket {
                 BackpackConfig.Backpack.ItemData item = entry.getValue();
                 if (item != null) {
                     clone.setItem_MAP(entry.getKey(),
-                            new BackpackConfig.Backpack.ItemData(item.getItem(), item.getCount(), item.getNbt()));
+                            new BackpackConfig.Backpack.ItemData(
+                                    item.getItem(),
+                                    item.getCount(),
+                                    item.getNbt(),
+                                    item.getAttachmentPreset()));
                 }
             }
 

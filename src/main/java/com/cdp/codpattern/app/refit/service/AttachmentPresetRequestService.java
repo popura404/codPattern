@@ -1,6 +1,5 @@
 package com.cdp.codpattern.app.refit.service;
 
-import com.cdp.codpattern.config.AttachmentPreset.AttachmentPresetManager;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
@@ -23,7 +22,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 public final class AttachmentPresetRequestService {
     public record Result(SyncAttachmentPresetPacket packet, boolean presetLoaded, int sandboxAttachmentCount,
@@ -64,8 +62,10 @@ public final class AttachmentPresetRequestService {
 
         TaczAddonRefitCompat.sanitizeGunForBackpackRefitSession(gunStack);
 
-        UUID playerId = player.getUUID();
-        Optional<String> presetPayload = AttachmentPresetManager.readPreset(player.server, playerId, bagId, slot);
+        String storedPreset = itemData.getAttachmentPreset();
+        Optional<String> presetPayload = storedPreset == null || storedPreset.isBlank()
+                ? Optional.empty()
+                : Optional.of(storedPreset);
         CompoundTag presetTag = presetPayload.map(AttachmentPresetUtil::parsePresetString).orElseGet(CompoundTag::new);
         if (!presetTag.isEmpty()) {
             AttachmentPresetUtil.applyPresetToGun(gunStack, presetTag);
