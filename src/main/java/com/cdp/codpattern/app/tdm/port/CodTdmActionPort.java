@@ -8,6 +8,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface CodTdmActionPort {
+    void onPlayerDamaged(ServerPlayer player);
+
     void onPlayerKill(ServerPlayer killer, ServerPlayer victim);
 
     void onPlayerDead(ServerPlayer player, ServerPlayer killer);

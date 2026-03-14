@@ -18,6 +18,7 @@ final class CodTdmPlayerRuntimeState {
     private final Map<UUID, Integer> playerDeaths = new HashMap<>();
     private final Map<UUID, Integer> currentKillStreaks = new HashMap<>();
     private final Map<UUID, Integer> maxKillStreaks = new HashMap<>();
+    private final Map<UUID, Integer> combatRegenCooldowns = new HashMap<>();
     private final Map<UUID, Boolean> readyStates = new HashMap<>();
     private final Map<UUID, String> spectatorPreferredJoinTeams = new HashMap<>();
 
@@ -53,6 +54,10 @@ final class CodTdmPlayerRuntimeState {
         return maxKillStreaks;
     }
 
+    Map<UUID, Integer> combatRegenCooldowns() {
+        return combatRegenCooldowns;
+    }
+
     Map<UUID, Boolean> readyStates() {
         return readyStates;
     }
@@ -81,6 +86,7 @@ final class CodTdmPlayerRuntimeState {
     void clearRoundTransientState() {
         deathCamPlayers.clear();
         respawnTimers.clear();
+        combatRegenCooldowns.clear();
     }
 
     void clearAll() {
@@ -100,6 +106,7 @@ final class CodTdmPlayerRuntimeState {
         invinciblePlayers.remove(playerId);
         invincibilityTimers.remove(playerId);
         deathCamPlayers.remove(playerId);
+        combatRegenCooldowns.remove(playerId);
         spectatorPreferredJoinTeams.remove(playerId);
     }
 

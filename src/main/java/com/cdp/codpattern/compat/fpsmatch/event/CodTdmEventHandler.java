@@ -71,6 +71,16 @@ public class CodTdmEventHandler {
         if (!readPort.canDealDamage()) {
             event.setAmount(0);
             // 不取消事件，击退效果由 Minecraft 原生处理
+            return;
+        }
+
+        if (event.getAmount() <= 0) {
+            return;
+        }
+
+        Optional<CodTdmActionPort> actionPortOptional = FpsMatchGatewayProvider.gateway().findPlayerTdmActionPort(player);
+        if (actionPortOptional.isPresent()) {
+            actionPortOptional.get().onPlayerDamaged(player);
         }
     }
 

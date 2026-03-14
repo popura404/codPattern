@@ -31,7 +31,7 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
 
 * 支持在背包配置界面中编辑主武器、副武器与投掷物槽位。
 * 基于 TaCZ 的枪械能力执行配件改装，由服务端完成校验与落盘。
-* 支持按“玩家 UUID + 背包编号 + 槽位”管理配件预设（`.snbt`）。
+* 配件预设现直接并入背包配置，通过背包编号与槽位进行管理。
 * 支持改装结果回写与异常回滚，降低客户端与服务端状态偏差。
 
 ### 3) TDM 房间与对局流程（FPSMatch 适配）
@@ -41,7 +41,7 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
 * 支持自动分队与人数差约束（`maxTeamDiff`）。
 * 支持准备状态、开始投票、结束投票（含通过阈值与超时机制）。
 * 对局阶段完整流转：`WAITING -> COUNTDOWN -> WARMUP -> PLAYING -> ENDED`。
-* 支持击杀播报、击杀计分、复活延迟、无敌帧、死亡视角、阶段 HUD 与结算页。
+* 支持击杀播报、击杀计分、复活延迟、无敌帧、呼吸回血、死亡视角、阶段 HUD 与结算页。
 * 结算信息包含 MVP/SVP 与全员战绩展示，并自动导出 JSON 战绩记录。
 
 ### 4) 筛选、兼容与本地化
@@ -105,6 +105,8 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
 | `minPlayersToStart` | `1` | 最低开局人数 |
 | `votePercentageToStart` | `60` | 开始投票通过阈值（%） |
 | `votePercentageToEnd` | `75` | 结束投票通过阈值（%） |
+| `combatRegenDelayTicks` | `120` | 受伤后开始回血前的等待时间（tick） |
+| `combatRegenHalfHeartsPerSecond` | `5.0` | 每秒回复的半颗心数量 |
 | `allowJoinDuringPlaying` | `true` | 进行中是否允许加入 |
 | `joinAsSpectatorWhenPlaying` | `true` | 进行中加入是否先以旁观进入 |
 | `maxTeamDiff` | `1` | 队伍人数允许最大差值 |
@@ -147,7 +149,7 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
 
 ## 更新日志
 
-当前版本：`v0.5.5b`  
+当前版本：`v0.5.7b`  
 详细更新请参阅 `CHANGES.md`。
 
 ## 许可证

@@ -40,6 +40,11 @@ final class CodTdmMapActions {
     ) implements CodTdmActionPort {
 
         @Override
+        public void onPlayerDamaged(ServerPlayer player) {
+            combatRuntime.onPlayerDamaged(player);
+        }
+
+        @Override
         public void onPlayerKill(ServerPlayer killer, ServerPlayer victim) {
             combatRuntime.onPlayerKill(killer, victim);
         }

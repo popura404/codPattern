@@ -43,7 +43,8 @@ final class CodTdmMapRuntimeBundleBuilder {
                 playerState,
                 components.scoreServiceHooks(),
                 packet -> components.joinedPlayerBroadcaster().broadcastPacketToJoinedPlayers(packet),
-                components.playerDeathHooks()
+                components.playerDeathHooks(),
+                () -> CodTdmMapTeamViews.joinedPlayers(map)
         );
         CodTdmPhaseRuntime phaseRuntime = new CodTdmPhaseRuntime(
                 matchState,
@@ -59,7 +60,8 @@ final class CodTdmMapRuntimeBundleBuilder {
                 voteRuntime::tickVoteSession,
                 respawnRuntime::tickDeathCam,
                 respawnRuntime::tickRespawn,
-                respawnRuntime::tickInvincibility
+                respawnRuntime::tickInvincibility,
+                combatRuntime::tickCombatRegen
         );
         CodTdmMapMutationRuntime mapMutationRuntime = new CodTdmMapMutationRuntime(
                 (teamName, player) -> {

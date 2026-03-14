@@ -51,12 +51,10 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int KILL_FEED_FALLBACK_BASE_WIDTH = 22;
     private static final int KILL_FEED_FALLBACK_BASE_HEIGHT = 9;
     private static final int KILL_FEED_MIN_ROW_HEIGHT = 14;
-    private static final int KILL_FEED_MAX_WIDTH = 248;
     private static final int KILL_FEED_START_OFFSET = 42;
     private static final int KILL_FEED_ROW_GAP = 1;
     private static final int KILL_FEED_BACKGROUND_LEFT_PADDING = 4;
     private static final int KILL_FEED_BACKGROUND_VERTICAL_PADDING = 1;
-    private static final int KILL_FEED_ICON_SLOT_WIDTH = 32;
     private static final int KILL_FEED_TEXT_GAP = 5;
     private static final int KILL_FEED_BACKGROUND_SEGMENTS = 18;
     private static final float KILL_FEED_TEXT_SCALE_MULTIPLIER = 1.0f;
@@ -74,6 +72,9 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private record ScreenProjection(int x, int y, double depth) {
+    }
+
+    private record KillFeedRowLayout(int killerMaxWidth, int centerWidth, int victimMaxWidth, int firstGap, int secondGap) {
     }
 
     @Override
@@ -203,7 +204,7 @@ public class TdmHudOverlay implements IGuiOverlay {
                 Math.max(GuiTextHelper.referenceScaled(KILL_FEED_ICON_BASE_SIZE), killFeedLineHeight(font)));
         int verticalPadding = GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_VERTICAL_PADDING);
         int startY = phaseY + font.lineHeight + GuiTextHelper.referenceScaled(KILL_FEED_START_OFFSET);
-        int maxWidth = Math.min(GuiTextHelper.referenceScaled(KILL_FEED_MAX_WIDTH), screenWidth - x - 8);
+        int maxWidth = screenWidth - x - 8;
         int step = contentHeight + (verticalPadding * 2) + GuiTextHelper.referenceScaled(KILL_FEED_ROW_GAP);
         if (maxWidth <= GuiTextHelper.referenceScaled(64)) {
             return;
@@ -221,46 +222,65 @@ public class TdmHudOverlay implements IGuiOverlay {
             return;
         }
 
-        int backgroundLeft = x - GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_LEFT_PADDING);
-        int backgroundTop = y - GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_VERTICAL_PADDING);
-        int backgroundBottom = y + contentHeight + GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_VERTICAL_PADDING);
-        drawKillFeedBackground(graphics, backgroundLeft, backgroundTop, x + width, backgroundBottom,
-                0xFF0E131A, Math.max(42, alpha / 2));
-
         int textY = y + Math.max(0, (contentHeight - killFeedLineHeight(font)) / 2);
-        int gap = GuiTextHelper.referenceScaled(KILL_FEED_TEXT_GAP);
         int killerColor = resolveKillFeedTeamColor(entry.killerName(), 0xFFF3F3F3);
         int victimColor = resolveKillFeedTeamColor(entry.victimName(), 0xFFE7A5A5);
+        KillFeedRowLayout layout = measureKillFeedRow(font, entry, width);
 
         if (entry.blunder()) {
             String blunderText = Component.translatable("hud.codpattern.tdm.kill_feed.blunder").getString();
-            int blunderWidth = killFeedTextWidth(font, blunderText);
-            int killerMaxWidth = Math.max(GuiTextHelper.referenceScaled(48), width - blunderWidth - gap);
-            String fittedKiller = ellipsizeKillFeed(font, entry.killerName(), killerMaxWidth);
+            String fittedKiller = ellipsizeKillFeed(font, entry.killerName(), layout.killerMaxWidth());
+            String fittedBlunder = ellipsizeKillFeed(font, blunderText, layout.centerWidth());
+            int killerWidth = killFeedTextWidth(font, fittedKiller);
+            int blunderWidth = killFeedTextWidth(font, fittedBlunder);
+            int gap = killerWidth > 0 && blunderWidth > 0 ? layout.firstGap() : 0;
+            int rowWidth = killerWidth + gap + blunderWidth;
+            if (rowWidth <= 0) {
+                return;
+            }
+
+            int backgroundLeft = x - GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_LEFT_PADDING);
+            int backgroundTop = y - GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_VERTICAL_PADDING);
+            int backgroundBottom = y + contentHeight + GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_VERTICAL_PADDING);
+            drawKillFeedBackground(graphics, backgroundLeft, backgroundTop, x + rowWidth, backgroundBottom,
+                    0xFF0E131A, Math.max(42, alpha / 2));
+
             drawKillFeedString(graphics, font, fittedKiller, x, textY, withAlpha(killerColor, alpha), true);
-            drawKillFeedString(graphics, font, blunderText,
-                    x + killFeedTextWidth(font, fittedKiller) + gap,
+            drawKillFeedString(graphics, font, fittedBlunder,
+                    x + killerWidth + gap,
                     textY,
                     withAlpha(0xFFE39D63, alpha),
                     true);
             return;
         }
 
-        int iconSlotWidth = GuiTextHelper.referenceScaled(KILL_FEED_ICON_SLOT_WIDTH);
-        int availableNameWidth = Math.max(GuiTextHelper.referenceScaled(36), width - iconSlotWidth - (gap * 2));
-        int nameWidth = Math.max(GuiTextHelper.referenceScaled(36), availableNameWidth / 2);
-        int killerX = x;
-        int iconX = killerX + nameWidth + gap;
-        int victimX = iconX + iconSlotWidth + gap;
+        String fittedKiller = ellipsizeKillFeed(font, entry.killerName(), layout.killerMaxWidth());
+        String fittedVictim = ellipsizeKillFeed(font, entry.victimName(), layout.victimMaxWidth());
+        int killerWidth = killFeedTextWidth(font, fittedKiller);
+        int victimWidth = killFeedTextWidth(font, fittedVictim);
+        int firstGap = killerWidth > 0 && layout.centerWidth() > 0 ? layout.firstGap() : 0;
+        int secondGap = victimWidth > 0 && layout.centerWidth() > 0 ? layout.secondGap() : 0;
+        int rowWidth = killerWidth + firstGap + layout.centerWidth() + secondGap + victimWidth;
+        if (rowWidth <= 0) {
+            return;
+        }
 
-        drawKillFeedEllipsizedString(graphics, font, entry.killerName(), killerX, textY, nameWidth,
-                withAlpha(killerColor, alpha), true);
-        renderKillFeedWeapon(graphics, font, iconX, y, iconSlotWidth, contentHeight, entry.weaponStack(), alpha);
-        drawKillFeedEllipsizedString(graphics, font, entry.victimName(), victimX, textY, nameWidth,
-                withAlpha(victimColor, alpha), true);
+        int backgroundLeft = x - GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_LEFT_PADDING);
+        int backgroundTop = y - GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_VERTICAL_PADDING);
+        int backgroundBottom = y + contentHeight + GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_VERTICAL_PADDING);
+        drawKillFeedBackground(graphics, backgroundLeft, backgroundTop, x + rowWidth, backgroundBottom,
+                0xFF0E131A, Math.max(42, alpha / 2));
+
+        int killerX = x;
+        int iconX = killerX + killerWidth + firstGap;
+        int victimX = iconX + layout.centerWidth() + secondGap;
+
+        drawKillFeedString(graphics, font, fittedKiller, killerX, textY, withAlpha(killerColor, alpha), true);
+        renderKillFeedWeapon(graphics, font, iconX, y, layout.centerWidth(), contentHeight, entry.weaponStack(), alpha);
+        drawKillFeedString(graphics, font, fittedVictim, victimX, textY, withAlpha(victimColor, alpha), true);
     }
 
-    private void renderKillFeedWeapon(GuiGraphics graphics, Font font, int x, int y, int slotWidth, int contentHeight,
+    private void renderKillFeedWeapon(GuiGraphics graphics, Font font, int x, int y, int width, int contentHeight,
             ItemStack weaponStack, int alpha) {
         if (weaponStack != null && !weaponStack.isEmpty()) {
             ResourceLocation hudTexture = TaczClientApi.getGunHudTexture(weaponStack);
@@ -268,7 +288,7 @@ public class TdmHudOverlay implements IGuiOverlay {
                 float scale = GuiTextHelper.referenceScale();
                 int actualWidth = GuiTextHelper.referenceScaled(KILL_FEED_TEXTURE_BASE_WIDTH);
                 int actualHeight = GuiTextHelper.referenceScaled(KILL_FEED_TEXTURE_BASE_HEIGHT);
-                int drawX = x + Math.max(0, (slotWidth - actualWidth) / 2);
+                int drawX = x + Math.max(0, (width - actualWidth) / 2);
                 int drawY = y + Math.max(0, (contentHeight - actualHeight) / 2);
                 RenderSystem.enableBlend();
                 RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, alpha / 255.0f);
@@ -285,7 +305,7 @@ public class TdmHudOverlay implements IGuiOverlay {
 
             float scale = GuiTextHelper.referenceScale();
             int actualSize = GuiTextHelper.referenceScaled(KILL_FEED_ICON_BASE_SIZE);
-            int drawX = x + Math.max(0, (slotWidth - actualSize) / 2);
+            int drawX = x + Math.max(0, (width - actualSize) / 2);
             int drawY = y + Math.max(0, (contentHeight - actualSize) / 2);
             graphics.pose().pushPose();
             graphics.pose().translate(drawX, drawY, 0.0f);
@@ -295,16 +315,16 @@ public class TdmHudOverlay implements IGuiOverlay {
             return;
         }
 
-        renderKillFeedFallbackTag(graphics, font, x, y, slotWidth, contentHeight, alpha);
+        renderKillFeedFallbackTag(graphics, font, x, y, width, contentHeight, alpha);
     }
 
-    private void renderKillFeedFallbackTag(GuiGraphics graphics, Font font, int x, int y, int slotWidth, int contentHeight,
+    private void renderKillFeedFallbackTag(GuiGraphics graphics, Font font, int x, int y, int width, int contentHeight,
             int alpha) {
         String fallbackText = Component.translatable("hud.codpattern.tdm.kill_feed.fallback").getString();
         int fallbackWidth = Math.max(KILL_FEED_FALLBACK_BASE_WIDTH, font.width(fallbackText) + 6);
         int actualWidth = GuiTextHelper.referenceScaled(fallbackWidth);
         int actualHeight = GuiTextHelper.referenceScaled(KILL_FEED_FALLBACK_BASE_HEIGHT);
-        int drawX = x + Math.max(0, (slotWidth - actualWidth) / 2);
+        int drawX = x + Math.max(0, (width - actualWidth) / 2);
         int drawY = y + Math.max(0, (contentHeight - actualHeight) / 2);
 
         graphics.fill(drawX, drawY, drawX + actualWidth, drawY + actualHeight,
@@ -1162,11 +1182,94 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private String ellipsizeKillFeed(Font font, String text, int maxWidth) {
+        if (maxWidth <= 0) {
+            return "";
+        }
         float scale = killFeedTextScale();
         if (scale <= 0.0f) {
             return text == null ? "" : text;
         }
         return GuiTextHelper.ellipsize(font, text, Math.max(1, (int) Math.floor(maxWidth / scale)));
+    }
+
+    private KillFeedRowLayout measureKillFeedRow(Font font, KillFeedEntry entry, int maxWidth) {
+        return entry.blunder()
+                ? measureKillFeedBlunderRow(font, entry, maxWidth)
+                : measureKillFeedStandardRow(font, entry, maxWidth);
+    }
+
+    private KillFeedRowLayout measureKillFeedBlunderRow(Font font, KillFeedEntry entry, int maxWidth) {
+        int gap = GuiTextHelper.referenceScaled(KILL_FEED_TEXT_GAP);
+        int killerWidth = killFeedTextWidth(font, entry.killerName());
+        int blunderWidth = killFeedTextWidth(font, Component.translatable("hud.codpattern.tdm.kill_feed.blunder").getString());
+        if (killerWidth + gap + blunderWidth <= maxWidth) {
+            return new KillFeedRowLayout(killerWidth, blunderWidth, 0, gap, 0);
+        }
+
+        int[] widths = allocateKillFeedTextWidths(Math.max(0, maxWidth - gap), killerWidth, blunderWidth);
+        return new KillFeedRowLayout(widths[0], widths[1], 0, gap, 0);
+    }
+
+    private KillFeedRowLayout measureKillFeedStandardRow(Font font, KillFeedEntry entry, int maxWidth) {
+        int gap = GuiTextHelper.referenceScaled(KILL_FEED_TEXT_GAP);
+        int killerWidth = killFeedTextWidth(font, entry.killerName());
+        int victimWidth = killFeedTextWidth(font, entry.victimName());
+        int centerWidth = killFeedWeaponWidth(font, entry.weaponStack());
+        if (killerWidth + gap + centerWidth + gap + victimWidth <= maxWidth) {
+            return new KillFeedRowLayout(killerWidth, centerWidth, victimWidth, gap, gap);
+        }
+
+        int[] widths = allocateKillFeedTextWidths(Math.max(0, maxWidth - centerWidth - (gap * 2)), killerWidth, victimWidth);
+        return new KillFeedRowLayout(widths[0], centerWidth, widths[1], gap, gap);
+    }
+
+    private int[] allocateKillFeedTextWidths(int availableWidth, int firstDesiredWidth, int secondDesiredWidth) {
+        if (availableWidth <= 0) {
+            return new int[] { 0, 0 };
+        }
+        if (firstDesiredWidth + secondDesiredWidth <= availableWidth) {
+            return new int[] { firstDesiredWidth, secondDesiredWidth };
+        }
+
+        int minReadableWidth = Math.min(GuiTextHelper.referenceScaled(24), availableWidth / 2);
+        int firstWidth = Math.min(firstDesiredWidth, minReadableWidth);
+        int secondWidth = Math.min(secondDesiredWidth, minReadableWidth);
+        int remainingWidth = Math.max(0, availableWidth - firstWidth - secondWidth);
+
+        int firstNeed = Math.max(0, firstDesiredWidth - firstWidth);
+        int secondNeed = Math.max(0, secondDesiredWidth - secondWidth);
+        int totalNeed = firstNeed + secondNeed;
+        if (remainingWidth > 0 && totalNeed > 0) {
+            int firstExtra = Math.min(firstNeed, Math.round(remainingWidth * (firstNeed / (float) totalNeed)));
+            firstWidth += firstExtra;
+            remainingWidth -= firstExtra;
+
+            int secondExtra = Math.min(secondNeed, remainingWidth);
+            secondWidth += secondExtra;
+            remainingWidth -= secondExtra;
+
+            if (remainingWidth > 0) {
+                int firstRemainder = Math.min(firstDesiredWidth - firstWidth, remainingWidth);
+                firstWidth += firstRemainder;
+                remainingWidth -= firstRemainder;
+            }
+            if (remainingWidth > 0) {
+                secondWidth += Math.min(secondDesiredWidth - secondWidth, remainingWidth);
+            }
+        }
+
+        return new int[] { firstWidth, secondWidth };
+    }
+
+    private int killFeedWeaponWidth(Font font, ItemStack weaponStack) {
+        if (weaponStack != null && !weaponStack.isEmpty()) {
+            return TaczClientApi.getGunHudTexture(weaponStack) != null
+                    ? GuiTextHelper.referenceScaled(KILL_FEED_TEXTURE_BASE_WIDTH)
+                    : GuiTextHelper.referenceScaled(KILL_FEED_ICON_BASE_SIZE);
+        }
+        String fallbackText = Component.translatable("hud.codpattern.tdm.kill_feed.fallback").getString();
+        int fallbackWidth = Math.max(KILL_FEED_FALLBACK_BASE_WIDTH, font.width(fallbackText) + 6);
+        return GuiTextHelper.referenceScaled(fallbackWidth);
     }
 
     private void drawKillFeedString(GuiGraphics graphics, Font font, String text, float x, float y, int color, boolean shadow) {
@@ -1184,11 +1287,6 @@ public class TdmHudOverlay implements IGuiOverlay {
     private void drawKillFeedCenteredString(GuiGraphics graphics, Font font, String text, float centerX, float y, int color,
             boolean shadow) {
         drawKillFeedString(graphics, font, text, centerX - killFeedTextWidth(font, text) / 2.0f, y, color, shadow);
-    }
-
-    private void drawKillFeedEllipsizedString(GuiGraphics graphics, Font font, String text, int x, int y, int maxWidth,
-            int color, boolean shadow) {
-        drawKillFeedString(graphics, font, ellipsizeKillFeed(font, text, maxWidth), x, y, color, shadow);
     }
 
     private int phaseAccentColor() {

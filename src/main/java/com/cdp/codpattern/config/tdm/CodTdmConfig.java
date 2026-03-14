@@ -35,6 +35,8 @@ public class CodTdmConfig {
     private int minPlayersToStart = 1; // 最少1人开始(测试用途)
     private int votePercentageToStart = 60; // 60%投票开始
     private int votePercentageToEnd = 75; // 75%投票结束
+    private int combatRegenDelayTicks = 120; // 受伤后多久开始回血
+    private float combatRegenHalfHeartsPerSecond = 5.0f; // 每秒回复多少半颗心
     private boolean allowJoinDuringPlaying = true; // 对局进行中是否允许加入
     private boolean joinAsSpectatorWhenPlaying = true; // 对局中加入是否旁观
     private int maxTeamDiff = 1; // 自动分队允许的最大人数差
@@ -91,6 +93,14 @@ public class CodTdmConfig {
 
     public int getVotePercentageToEnd() {
         return votePercentageToEnd;
+    }
+
+    public int getCombatRegenDelayTicks() {
+        return combatRegenDelayTicks;
+    }
+
+    public float getCombatRegenHalfHeartsPerSecond() {
+        return combatRegenHalfHeartsPerSecond;
     }
 
     public boolean isAllowJoinDuringPlaying() {
@@ -172,6 +182,14 @@ public class CodTdmConfig {
 
     public void setVotePercentageToEnd(int value) {
         this.votePercentageToEnd = value;
+    }
+
+    public void setCombatRegenDelayTicks(int value) {
+        this.combatRegenDelayTicks = value;
+    }
+
+    public void setCombatRegenHalfHeartsPerSecond(float value) {
+        this.combatRegenHalfHeartsPerSecond = value;
     }
 
     public void setAllowJoinDuringPlaying(boolean value) {

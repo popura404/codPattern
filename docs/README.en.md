@@ -31,7 +31,7 @@ The project follows a server-authoritative design with client synchronization to
 
 * Supports slot-level editing for primary, secondary, and throwable slots from the loadout UI.
 * Uses TaCZ weapon capabilities, with server-side validation and persistence.
-* Supports attachment preset storage by `player UUID + loadout id + slot` in `.snbt`.
+* Attachment presets are now stored directly inside the loadout config by loadout id and slot.
 * Supports result feedback and rollback handling to reduce client/server state drift.
 
 ### 3) TDM Room and Match Flow (FPSMatch Integration)
@@ -41,7 +41,7 @@ The project follows a server-authoritative design with client synchronization to
 * Supports auto team assignment with balance constraints (`maxTeamDiff`).
 * Supports ready state, start vote, and end vote with threshold and timeout logic.
 * Full phase pipeline: `WAITING -> COUNTDOWN -> WARMUP -> PLAYING -> ENDED`.
-* Includes kill feed, score tracking, respawn delay, invincibility frames, death cam, HUD phase feedback, and match summary.
+* Includes kill feed, score tracking, respawn delay, invincibility frames, combat regen, death cam, HUD phase feedback, and match summary.
 * Exports JSON match records automatically when a match ends.
 
 ### 4) Filtering, Compatibility, and Localization
@@ -105,6 +105,8 @@ Server configuration is stored under world save path: `serverconfig/codpattern/`
 | `minPlayersToStart` | `1` | Minimum players required to start |
 | `votePercentageToStart` | `60` | Start vote pass threshold (%) |
 | `votePercentageToEnd` | `75` | End vote pass threshold (%) |
+| `combatRegenDelayTicks` | `120` | Delay before regen starts after taking damage (ticks) |
+| `combatRegenHalfHeartsPerSecond` | `5.0` | Half-hearts restored per second while regenerating |
 | `allowJoinDuringPlaying` | `true` | Allow joining during active match |
 | `joinAsSpectatorWhenPlaying` | `true` | Join as spectator during active match |
 | `maxTeamDiff` | `1` | Max allowed team size difference |
@@ -147,7 +149,7 @@ When reporting issues, include:
 
 ## Changelog
 
-Current version: `v0.5.5b`  
+Current version: `v0.5.7b`  
 See `CHANGES.md` for detailed history.
 
 ## License

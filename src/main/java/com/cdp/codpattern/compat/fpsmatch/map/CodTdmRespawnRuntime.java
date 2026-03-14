@@ -1,5 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.tdm.service.CombatRegenService;
 import com.cdp.codpattern.app.tdm.service.DeathCamService;
 import com.cdp.codpattern.app.tdm.service.RespawnService;
 import com.cdp.codpattern.config.tdm.CodTdmConfig;
@@ -57,6 +58,7 @@ final class CodTdmRespawnRuntime {
     }
 
     private void respawnPlayer(ServerPlayer player) {
+        CombatRegenService.clearPlayerCooldown(playerState.combatRegenCooldowns(), player.getUUID());
         RespawnService.respawnPlayer(
                 player,
                 teleportPlayerToRespawnAction,
