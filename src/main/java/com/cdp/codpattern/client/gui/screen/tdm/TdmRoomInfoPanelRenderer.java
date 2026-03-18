@@ -11,6 +11,16 @@ import java.util.List;
 import java.util.Map;
 
 public final class TdmRoomInfoPanelRenderer {
+    private static final int BASE_FRAME_INSET = 5;
+    private static final int BASE_CONTENT_PADDING = 10;
+    private static final int BASE_HEADER_TOP_PADDING = 4;
+    private static final int BASE_HEADER_BLOCK_HEIGHT = 26;
+    private static final int BASE_OVERVIEW_GAP = 8;
+    private static final int BASE_ACTIONS_LABEL_GAP = 10;
+    private static final int BASE_DIVIDER_GAP = 4;
+    private static final int BASE_INFO_BLOCK_GAP = 8;
+    private static final int BASE_BOTTOM_HINT_PADDING = 18;
+
     private TdmRoomInfoPanelRenderer() {
     }
 
@@ -34,10 +44,12 @@ public final class TdmRoomInfoPanelRenderer {
             float panelAlphaFactor,
             float contentAlphaFactor) {
         int referenceLineHeight = GuiTextHelper.referenceLineHeight(mc.font);
-        int frameLeft = panelX - GuiTextHelper.referenceScaled(5);
-        int frameTop = panelY - GuiTextHelper.referenceScaled(5);
-        int frameRight = panelX + panelWidth + GuiTextHelper.referenceScaled(5);
-        int frameBottom = panelY + panelHeight + GuiTextHelper.referenceScaled(5);
+        int frameInset = GuiTextHelper.referenceScaled(BASE_FRAME_INSET);
+        int contentPadding = GuiTextHelper.referenceScaled(BASE_CONTENT_PADDING);
+        int frameLeft = panelX - frameInset;
+        int frameTop = panelY - frameInset;
+        int frameRight = panelX + panelWidth + frameInset;
+        int frameBottom = panelY + panelHeight + frameInset;
         float contentFactor = Math.max(0.0f, Math.min(1.0f, panelAlphaFactor * contentAlphaFactor));
 
         graphics.fillGradient(frameLeft, frameTop, frameRight, frameBottom,
@@ -48,30 +60,35 @@ public final class TdmRoomInfoPanelRenderer {
         graphics.fill(frameLeft, frameTop, frameLeft + 1, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
         graphics.fill(frameRight - 1, frameTop, frameRight, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
 
-        int contentX = panelX + GuiTextHelper.referenceScaled(8);
-        int contentWidth = Math.max(GuiTextHelper.referenceScaled(40), panelWidth - GuiTextHelper.referenceScaled(16));
+        int contentX = panelX + contentPadding;
+        int contentWidth = Math.max(GuiTextHelper.referenceScaled(40), panelWidth - contentPadding * 2);
+        int headerY = panelY + GuiTextHelper.referenceScaled(BASE_HEADER_TOP_PADDING);
+        int overviewY = headerY + GuiTextHelper.referenceScaled(BASE_HEADER_BLOCK_HEIGHT);
+        int overviewHeight = GuiTextHelper.referenceScaled(42);
+        int actionsLabelY = overviewY + overviewHeight + GuiTextHelper.referenceScaled(BASE_ACTIONS_LABEL_GAP);
+        int dividerY = actionsLabelY + referenceLineHeight + GuiTextHelper.referenceScaled(BASE_DIVIDER_GAP);
 
-        renderHeader(graphics, mc, contentX, panelY, joinedRoom, selectedRoom, contentFactor);
+        renderHeader(graphics, mc, contentX, headerY, joinedRoom, selectedRoom, contentFactor);
 
         TdmRoomData activeRoom = joinedRoom != null ? rooms.get(joinedRoom)
                 : (selectedRoom != null ? rooms.get(selectedRoom) : null);
-        renderOverviewCard(graphics, mc, contentX, panelY + GuiTextHelper.referenceScaled(28), contentWidth, activeRoom,
-                contentFactor);
+        renderOverviewCard(graphics, mc, contentX, overviewY, contentWidth, activeRoom, contentFactor);
 
         GuiTextHelper.drawReferenceString(
                 graphics,
                 mc.font,
                 Component.translatable("screen.codpattern.tdm_room.room_actions"),
                 contentX,
-                panelY + GuiTextHelper.referenceScaled(76),
+                actionsLabelY,
                 scaleAlpha(CodTheme.TEXT_SECONDARY, contentFactor),
                 false);
         int dividerEndX = contentX + Math.max(GuiTextHelper.referenceScaled(24),
                 Math.min(GuiTextHelper.referenceScaled(220), contentWidth - GuiTextHelper.referenceScaled(8)));
-        graphics.fill(contentX, panelY + GuiTextHelper.referenceScaled(85), dividerEndX, panelY + GuiTextHelper.referenceScaled(86),
-                scaleAlpha(CodTheme.DIVIDER, contentFactor));
+        graphics.fill(contentX, dividerY, dividerEndX, dividerY + 1, scaleAlpha(CodTheme.DIVIDER, contentFactor));
 
-        int infoY = Math.max(panelY + GuiTextHelper.referenceScaled(90), infoActionBottomY + GuiTextHelper.referenceScaled(12));
+        int infoY = Math.max(
+                dividerY + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP + 6),
+                infoActionBottomY + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP));
         if (joinedRoom != null) {
             TdmRoomData joined = rooms.get(joinedRoom);
             if (joined != null) {
@@ -93,7 +110,7 @@ public final class TdmRoomInfoPanelRenderer {
                         infoY + referenceLineHeight + GuiTextHelper.referenceScaled(3),
                         scaleAlpha(0xFFB0B0B0, contentFactor),
                         false);
-                infoY += referenceLineHeight * 2 + GuiTextHelper.referenceScaled(8);
+                infoY += referenceLineHeight * 2 + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP);
             }
         }
 
@@ -114,12 +131,15 @@ public final class TdmRoomInfoPanelRenderer {
                     infoY + referenceLineHeight + GuiTextHelper.referenceScaled(3),
                     scaleAlpha(0xFFAA55, contentFactor),
                     false);
-            infoY += referenceLineHeight * 2 + GuiTextHelper.referenceScaled(6);
+            infoY += referenceLineHeight * 2 + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP);
         }
 
         int hintLines = (leavePending ? 1 : 0) + (joinGamePending ? 1 : 0) + (hasRoomNotice ? 1 : 0);
-        int rosterTop = Math.max(infoActionBottomY + GuiTextHelper.referenceScaled(18), infoY + GuiTextHelper.referenceScaled(8));
-        int rosterBottom = panelY + panelHeight - GuiTextHelper.referenceScaled(24)
+        int rosterTop = Math.max(
+                infoActionBottomY + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP + 8),
+                infoY + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP + 2));
+        int hintPadding = GuiTextHelper.referenceScaled(BASE_BOTTOM_HINT_PADDING);
+        int rosterBottom = panelY + panelHeight - hintPadding
                 - (hintLines * (referenceLineHeight + GuiTextHelper.referenceScaled(3)));
         if (joinedRoom != null && rosterTop < rosterBottom) {
             GuiTextHelper.drawReferenceString(
@@ -127,7 +147,7 @@ public final class TdmRoomInfoPanelRenderer {
                     mc.font,
                     Component.translatable("screen.codpattern.tdm_room.roster_title"),
                     contentX,
-                    rosterTop - referenceLineHeight - GuiTextHelper.referenceScaled(2),
+                    rosterTop - referenceLineHeight - GuiTextHelper.referenceScaled(3),
                     scaleAlpha(CodTheme.TEXT_SECONDARY, contentFactor),
                     false);
             TdmRoomRosterRenderer.render(
@@ -142,7 +162,7 @@ public final class TdmRoomInfoPanelRenderer {
                     System.currentTimeMillis());
         }
 
-        int hintY = panelY + panelHeight - GuiTextHelper.referenceScaled(24);
+        int hintY = panelY + panelHeight - hintPadding;
         if (leavePending) {
             GuiTextHelper.drawReferenceString(
                     graphics,
@@ -166,8 +186,14 @@ public final class TdmRoomInfoPanelRenderer {
             hintY -= referenceLineHeight + GuiTextHelper.referenceScaled(3);
         }
         if (hasRoomNotice) {
-            GuiTextHelper.drawReferenceString(graphics, mc.font, roomNoticeText, contentX, hintY,
-                    scaleAlpha(roomNoticeColor, contentFactor), false);
+            GuiTextHelper.drawReferenceString(
+                    graphics,
+                    mc.font,
+                    roomNoticeText,
+                    contentX,
+                    hintY,
+                    scaleAlpha(roomNoticeColor, contentFactor),
+                    false);
         }
     }
 
@@ -175,18 +201,18 @@ public final class TdmRoomInfoPanelRenderer {
             GuiGraphics graphics,
             Minecraft mc,
             int x,
-            int panelY,
+            int headerY,
             String joinedRoom,
             String selectedRoom,
             float alphaFactor) {
-        int secondaryY = panelY + GuiTextHelper.referenceLineHeight(mc.font) + GuiTextHelper.referenceScaled(4);
+        int secondaryY = headerY + GuiTextHelper.referenceLineHeight(mc.font) + GuiTextHelper.referenceScaled(4);
         if (joinedRoom != null) {
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,
                     Component.translatable("screen.codpattern.tdm_room.current_room", joinedRoom),
                     x,
-                    panelY,
+                    headerY,
                     scaleAlpha(CodTheme.TEXT_PRIMARY, alphaFactor),
                     false);
             GuiTextHelper.drawReferenceString(
@@ -206,7 +232,7 @@ public final class TdmRoomInfoPanelRenderer {
                     mc.font,
                     Component.translatable("screen.codpattern.tdm_room.selected_room", selectedRoom),
                     x,
-                    panelY,
+                    headerY,
                     scaleAlpha(CodTheme.TEXT_PRIMARY, alphaFactor),
                     false);
             GuiTextHelper.drawReferenceString(
@@ -225,7 +251,7 @@ public final class TdmRoomInfoPanelRenderer {
                 mc.font,
                 Component.translatable("screen.codpattern.tdm_room.select_hint"),
                 x,
-                panelY,
+                headerY,
                 scaleAlpha(CodTheme.TEXT_SECONDARY, alphaFactor),
                 false);
     }

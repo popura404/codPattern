@@ -27,7 +27,7 @@
     "screen.codpattern.tdm_room.current_phase": "§7当前阶段: %s",
     "screen.codpattern.tdm_room.room_actions": "房间操作",
     "screen.codpattern.tdm_room.selected_room": "§e选中房间: §f%s",
-    "screen.codpattern.tdm_room.join_hint": "§7点击\"加入房间\"进入",
+    "screen.codpattern.tdm_room.join_hint": "§7点击房间右侧按钮进入",
     "screen.codpattern.tdm_room.select_hint": "§7请从左侧列表选择一个房间",
     "screen.codpattern.tdm_room.no_players": "  §7(无玩家)",
     "screen.codpattern.tdm_room.roster_title": "队伍成员",

@@ -27,7 +27,7 @@
     "screen.codpattern.tdm_room.current_phase": "§7現在フェーズ: %s",
     "screen.codpattern.tdm_room.room_actions": "ルーム操作",
     "screen.codpattern.tdm_room.selected_room": "§e選択中のルーム: §f%s",
-    "screen.codpattern.tdm_room.join_hint": "§7「ルーム参加」をクリックして入室",
+    "screen.codpattern.tdm_room.join_hint": "§7ルーム右側のボタンをクリックして入室",
     "screen.codpattern.tdm_room.select_hint": "§7左の一覧からルームを選択してください",
     "screen.codpattern.tdm_room.no_players": "  §7(プレイヤーなし)",
     "screen.codpattern.tdm_room.roster_title": "チームメンバー",

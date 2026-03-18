@@ -27,7 +27,7 @@
     "screen.codpattern.tdm_room.current_phase": "§7Current Phase: %s",
     "screen.codpattern.tdm_room.room_actions": "Room Actions",
     "screen.codpattern.tdm_room.selected_room": "§eSelected Room: §f%s",
-    "screen.codpattern.tdm_room.join_hint": "§7Click \"Join Room\" to enter",
+    "screen.codpattern.tdm_room.join_hint": "§7Click the room button on the right to enter",
     "screen.codpattern.tdm_room.select_hint": "§7Select a room from the left list",
     "screen.codpattern.tdm_room.no_players": "  §7(No players)",
     "screen.codpattern.tdm_room.roster_title": "Team Roster",

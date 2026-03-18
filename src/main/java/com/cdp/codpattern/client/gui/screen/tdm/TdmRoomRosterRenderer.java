@@ -115,7 +115,7 @@ public final class TdmRoomRosterRenderer {
             return new RenderResult(y + lineHeight + GuiTextHelper.referenceScaled(5), rowIndex);
         }
 
-        int rowHeight = GuiTextHelper.referenceScaled(24);
+        int rowHeight = GuiTextHelper.referenceScaled(14);
         int currentIndex = rowIndex;
         for (PlayerInfo player : players) {
             if (y + rowHeight > maxY) {
@@ -148,7 +148,6 @@ public final class TdmRoomRosterRenderer {
             int rowIndex,
             float alphaFactor,
             long nowMs) {
-        int lineHeight = GuiTextHelper.referenceLineHeight(mc.font);
         float alivePulse = player.isAlive()
                 ? (0.75f + 0.25f * (0.5f + 0.5f * (float) Math.sin((nowMs / 185.0) + rowIndex * 0.55)))
                 : 1.0f;
@@ -165,39 +164,36 @@ public final class TdmRoomRosterRenderer {
                 scaleAlpha(cardBottom, alphaFactor));
         graphics.fill(x, y, x + 2, y + height, scaleAlpha(lifeColor, alphaFactor));
 
-        String aliveMark = player.isAlive() ? "● " : "✖ ";
-        String readyMark = player.isReady() ? "§a[R] " : "§7[ ] ";
-        String kdText = TdmRoomTextFormatter.formatKd(player.kills(), player.deaths());
+        String aliveMark = player.isAlive() ? "●" : "■";
+        String readyMark = player.isReady() ? "§a[R]" : "§7[ ]";
         String nameText = isLocalPlayer(mc.player, player) ? "§e" + player.name() : player.name();
-        String headline = readyMark + aliveMark + nameText;
-        Component scoreText = Component.translatable(
-                "screen.codpattern.tdm_room.player_score",
+        String headline = readyMark + " " + aliveMark + " " + nameText;
+        String meta = String.format("§c%d§7/§f%d  §8|  §b%dms",
                 player.kills(),
-                player.deaths());
-        String meta = Component.translatable(
-                "screen.codpattern.tdm_room.player_meta",
-                TdmRoomTextFormatter.shortPlayerId(player.uuid()),
-                kdText,
-                Math.max(0, player.pingMs())).getString();
+                player.deaths(),
+                Math.max(0, player.pingMs()));
 
         int textX = x + GuiTextHelper.referenceScaled(6);
-        int topY = y + GuiTextHelper.referenceScaled(3);
-        GuiTextHelper.drawReferenceString(graphics, mc.font, headline, textX, topY,
-                scaleAlpha(0xFFF4F4F4, alphaFactor), false);
-        GuiTextHelper.drawReferenceString(
+        int rightPadding = GuiTextHelper.referenceScaled(5);
+        int topY = y + Math.max(1, (height - GuiTextHelper.referenceLineHeight(mc.font)) / 2);
+        int metaWidth = GuiTextHelper.referenceWidth(mc.font, meta);
+        int nameMaxWidth = Math.max(GuiTextHelper.referenceScaled(28), width - metaWidth - GuiTextHelper.referenceScaled(18));
+        GuiTextHelper.drawReferenceEllipsizedString(
                 graphics,
                 mc.font,
-                scoreText,
-                cardRight - GuiTextHelper.referenceWidth(mc.font, scoreText) - GuiTextHelper.referenceScaled(5),
+                headline,
+                textX,
                 topY,
-                scaleAlpha(0xFFCCCCCC, alphaFactor),
+                nameMaxWidth,
+                scaleAlpha(0xFFF4F4F4, alphaFactor),
                 false);
-        GuiTextHelper.drawReferenceString(
+        GuiTextHelper.drawReferenceRightAlignedEllipsizedString(
                 graphics,
                 mc.font,
                 meta,
-                textX,
-                topY + lineHeight + GuiTextHelper.referenceScaled(1),
+                cardRight - rightPadding,
+                topY,
+                Math.max(GuiTextHelper.referenceScaled(28), width / 2),
                 scaleAlpha(0xFFB5B5B5, alphaFactor),
                 false);
     }
