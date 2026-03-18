@@ -149,7 +149,7 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
 
 ## 更新日志
 
-当前版本：`v0.5.7b`  
+当前版本：`v0.5.8b`  
 详细更新请参阅 `CHANGES.md`。
 
 ## 许可证

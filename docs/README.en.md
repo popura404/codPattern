@@ -149,7 +149,7 @@ When reporting issues, include:
 
 ## Changelog
 
-Current version: `v0.5.7b`  
+Current version: `v0.5.8b`  
 See `CHANGES.md` for detailed history.
 
 ## License
