@@ -17,25 +17,42 @@ public final class BackpackNamespaceFilter {
         if (filterConfig == null) {
             return false;
         }
-        List<String> blocked = filterConfig.getBlockedItemNamespaces();
-        if (blocked == null || blocked.isEmpty()) {
+        Optional<ResourceLocation> gunId = resolveGunId(stack, fallbackItemId);
+        if (gunId.isEmpty()) {
             return false;
         }
+        ResourceLocation resolvedGunId = gunId.get();
+        return isNamespaceBlocked(filterConfig.getBlockedItemNamespaces(), resolvedGunId)
+                || isWeaponIdBlocked(filterConfig.getBlockedWeaponIds(), resolvedGunId);
+    }
 
-        Optional<String> namespace = resolveNamespace(stack, fallbackItemId);
-        if (namespace.isEmpty()) {
+    private static boolean isNamespaceBlocked(List<String> blockedNamespaces, ResourceLocation gunId) {
+        if (blockedNamespaces == null || blockedNamespaces.isEmpty()) {
             return false;
         }
-        String normalized = namespace.get().toLowerCase(Locale.ROOT);
-        for (String value : blocked) {
-            if (value != null && normalized.equals(value.trim().toLowerCase(Locale.ROOT))) {
+        String normalizedNamespace = gunId.getNamespace().toLowerCase(Locale.ROOT);
+        for (String value : blockedNamespaces) {
+            if (value != null && normalizedNamespace.equals(value.trim().toLowerCase(Locale.ROOT))) {
                 return true;
             }
         }
         return false;
     }
 
-    private static Optional<String> resolveNamespace(ItemStack stack, ResourceLocation ignoredFallbackItemId) {
+    private static boolean isWeaponIdBlocked(List<String> blockedWeaponIds, ResourceLocation gunId) {
+        if (blockedWeaponIds == null || blockedWeaponIds.isEmpty()) {
+            return false;
+        }
+        String normalizedGunId = gunId.toString().toLowerCase(Locale.ROOT);
+        for (String value : blockedWeaponIds) {
+            if (value != null && normalizedGunId.equals(value.trim().toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Optional<ResourceLocation> resolveGunId(ItemStack stack, ResourceLocation ignoredFallbackItemId) {
         if (stack == null || stack.isEmpty() || !TaczGatewayProvider.gateway().isGun(stack)) {
             return Optional.empty();
         }
@@ -43,10 +60,10 @@ public final class BackpackNamespaceFilter {
         if (gunId.isEmpty()) {
             return Optional.empty();
         }
-        ResourceLocation gunResource = ResourceLocation.tryParse(gunId.get());
-        if (gunResource == null) {
+        ResourceLocation gunResourceLocation = ResourceLocation.tryParse(gunId.get());
+        if (gunResourceLocation == null) {
             return Optional.empty();
         }
-        return Optional.of(gunResource.getNamespace());
+        return Optional.of(gunResourceLocation);
     }
 }

@@ -246,6 +246,7 @@
     "message.codpattern.weapon_update.error.item_id_invalid": "§cロードアウト更新を拒否しました: 無効なアイテム ID です",
     "message.codpattern.weapon_update.error.item_not_registered": "§cロードアウト更新を拒否しました: アイテムが未登録です",
     "message.codpattern.weapon_update.error.nbt_invalid": "§cロードアウト更新を拒否しました: NBT データが不正です",
+    "message.codpattern.weapon_update.error.item_blocked": "§cロードアウト更新を拒否しました: この武器はブラックリストで禁止されています",
     "message.codpattern.weapon_update.error.item_namespace_blocked": "§cロードアウト更新を拒否しました: このアイテム名前空間はブロックされています",
     "message.codpattern.weapon_update.error.item_category_invalid": "§cロードアウト更新を拒否しました: このスロットには設定できないアイテムです",
     "message.codpattern.weapon_update.error.throwables_disabled": "§cロードアウト更新を拒否しました: 投擲物スロットは無効です",

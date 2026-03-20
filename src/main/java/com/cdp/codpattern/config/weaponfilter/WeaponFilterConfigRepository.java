@@ -20,14 +20,21 @@ public final class WeaponFilterConfigRepository {
         serverConfigPath = path;
         try {
             if (Files.exists(path)) {
-                WeaponFilterConfig loaded = GSON.fromJson(Files.readString(path), WeaponFilterConfig.class);
+                String configJson = Files.readString(path);
+                WeaponFilterConfig loaded = GSON.fromJson(configJson, WeaponFilterConfig.class);
                 serverConfig = loaded != null ? loaded : new WeaponFilterConfig();
+                serverConfig.normalize();
+                String normalizedJson = GSON.toJson(serverConfig);
+                if (!normalizedJson.equals(configJson)) {
+                    save(serverConfig);
+                }
                 return serverConfig;
             }
         } catch (IOException ignored) {
         }
 
         serverConfig = new WeaponFilterConfig();
+        serverConfig.normalize();
         save(serverConfig);
         return serverConfig;
     }

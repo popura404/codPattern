@@ -11,6 +11,7 @@ public class WeaponFilterConfig {
     private List<String> primaryWeaponTabs = defaultPrimaryWeaponTabs();
     private List<String> secondaryWeaponTabs = defaultSecondaryWeaponTabs();
     private List<String> blockedItemNamespaces = defaultBlockedItemNamespaces();
+    private List<String> blockedWeaponIds = defaultBlockedWeaponIds();
 
     /** null 或旧配置无此键时视为 true */
     private Boolean throwablesEnabled = true;
@@ -46,17 +47,22 @@ public class WeaponFilterConfig {
             this.blockedItemNamespaces = defaultBlockedItemNamespaces();
             return;
         }
-        List<String> normalized = new ArrayList<>();
-        for (String namespace : blockedItemNamespaces) {
-            if (namespace == null) {
-                continue;
-            }
-            String value = namespace.trim().toLowerCase(Locale.ROOT);
-            if (!value.isEmpty() && !normalized.contains(value)) {
-                normalized.add(value);
-            }
+        this.blockedItemNamespaces = normalizeStringList(blockedItemNamespaces);
+    }
+
+    public List<String> getBlockedWeaponIds() {
+        if (blockedWeaponIds == null) {
+            return defaultBlockedWeaponIds();
         }
-        this.blockedItemNamespaces = normalized;
+        return blockedWeaponIds;
+    }
+
+    public void setBlockedWeaponIds(List<String> blockedWeaponIds) {
+        if (blockedWeaponIds == null) {
+            this.blockedWeaponIds = defaultBlockedWeaponIds();
+            return;
+        }
+        this.blockedWeaponIds = normalizeStringList(blockedWeaponIds);
     }
 
     public Integer getAmmunitionPerMagazineMultiple() {
@@ -73,6 +79,19 @@ public class WeaponFilterConfig {
 
     public void setThrowablesEnabled(boolean value) {
         this.throwablesEnabled = value;
+    }
+
+    public void normalize() {
+        setPrimaryWeaponTabs(primaryWeaponTabs);
+        setSecondaryWeaponTabs(secondaryWeaponTabs);
+        setBlockedItemNamespaces(blockedItemNamespaces);
+        setBlockedWeaponIds(blockedWeaponIds);
+        if (throwablesEnabled == null) {
+            throwablesEnabled = true;
+        }
+        if (ammunitionPerMagazineMultiple == null) {
+            ammunitionPerMagazineMultiple = 6;
+        }
     }
 
     private static List<String> defaultPrimaryWeaponTabs() {
@@ -97,5 +116,25 @@ public class WeaponFilterConfig {
         List<String> namespaces = new ArrayList<>();
         namespaces.add("example_gunpack");
         return namespaces;
+    }
+
+    private static List<String> defaultBlockedWeaponIds() {
+        List<String> weaponIds = new ArrayList<>();
+        weaponIds.add("namespace:gunid");
+        return weaponIds;
+    }
+
+    private static List<String> normalizeStringList(List<String> values) {
+        List<String> normalized = new ArrayList<>();
+        for (String value : values) {
+            if (value == null) {
+                continue;
+            }
+            String normalizedValue = value.trim().toLowerCase(Locale.ROOT);
+            if (!normalizedValue.isEmpty() && !normalized.contains(normalizedValue)) {
+                normalized.add(normalizedValue);
+            }
+        }
+        return normalized;
     }
 }

@@ -305,6 +305,7 @@ public class ClientPacketHandler {
             case "ITEM_ID_INVALID" -> Component.translatable("message.codpattern.weapon_update.error.item_id_invalid");
             case "ITEM_NOT_REGISTERED" -> Component.translatable("message.codpattern.weapon_update.error.item_not_registered");
             case "NBT_INVALID" -> Component.translatable("message.codpattern.weapon_update.error.nbt_invalid");
+            case "ITEM_BLOCKED" -> Component.translatable("message.codpattern.weapon_update.error.item_blocked");
             case "ITEM_NAMESPACE_BLOCKED" -> Component.translatable("message.codpattern.weapon_update.error.item_namespace_blocked");
             case "ITEM_CATEGORY_INVALID" -> Component.translatable("message.codpattern.weapon_update.error.item_category_invalid");
             case "THROWABLES_DISABLED" -> Component.translatable("message.codpattern.weapon_update.error.throwables_disabled");

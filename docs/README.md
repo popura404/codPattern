@@ -47,7 +47,7 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
 ### 4) 筛选、兼容与本地化
 
 * 武器筛选支持主副武器标签控制（`primaryWeaponTabs` / `secondaryWeaponTabs`）。
-* 支持枪包命名空间黑名单过滤（`blockedItemNamespaces`）。
+* 支持枪包命名空间黑名单与精确武器黑名单过滤（`blockedItemNamespaces` / `blockedWeaponIds`）。
 * 支持投掷物开关与弹药倍率配置（`throwablesEnabled` / `ammunitionPerMagazineMultiple`）。
 * 支持 LR Tactical 与 Physics Mod 联动；未加载时保持主流程可用。
 * 已适配 `tacz-addon 1.1.6` 在背包改装场景下的卸载冲突，避免“卸载按钮卡住/无法拆卸”的问题。
@@ -81,6 +81,7 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
   * 关键字段：
     * `primaryWeaponTabs` / `secondaryWeaponTabs`
     * `blockedItemNamespaces`
+    * `blockedWeaponIds`（格式：`namespace:gunid`）
     * `throwablesEnabled`
     * `ammunitionPerMagazineMultiple`
 * `tdm_rules/config.json`
@@ -149,7 +150,7 @@ COD Pattern 是一个面向 **TaCZ + FPSMatch** 的附属模组，提供 COD 风
 
 ## 更新日志
 
-当前版本：`v0.5.8b`  
+当前版本：`v0.5.9b`  
 详细更新请参阅 `CHANGES.md`。
 
 ## 许可证

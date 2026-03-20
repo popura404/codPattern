@@ -47,7 +47,7 @@ The project follows a server-authoritative design with client synchronization to
 ### 4) Filtering, Compatibility, and Localization
 
 * Primary/secondary category filtering via `primaryWeaponTabs` and `secondaryWeaponTabs`.
-* Gunpack namespace blocking via `blockedItemNamespaces`.
+* Gunpack namespace blocking and exact weapon blacklist support via `blockedItemNamespaces` / `blockedWeaponIds`.
 * Throwable and ammo multiplier controls via `throwablesEnabled` and `ammunitionPerMagazineMultiple`.
 * Optional integrations for LR Tactical and Physics Mod with graceful fallback when absent.
 * Includes compatibility handling for `tacz-addon 1.1.6` in backpack refit flow to prevent unload-button lockups.
@@ -81,6 +81,7 @@ Server configuration is stored under world save path: `serverconfig/codpattern/`
   * Key fields:
     * `primaryWeaponTabs` / `secondaryWeaponTabs`
     * `blockedItemNamespaces`
+    * `blockedWeaponIds` (format: `namespace:gunid`)
     * `throwablesEnabled`
     * `ammunitionPerMagazineMultiple`
 * `tdm_rules/config.json`
@@ -149,7 +150,7 @@ When reporting issues, include:
 
 ## Changelog
 
-Current version: `v0.5.8b`  
+Current version: `v0.5.9b`  
 See `CHANGES.md` for detailed history.
 
 ## License

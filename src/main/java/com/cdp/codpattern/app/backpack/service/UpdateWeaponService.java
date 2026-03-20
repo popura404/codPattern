@@ -128,7 +128,7 @@ public final class UpdateWeaponService {
             candidateStack.setTag(nbtTag.copy());
         }
         if (BackpackNamespaceFilter.isBlocked(filterConfig, candidateStack, itemResourceLocation)) {
-            return ValidationResult.fail("ITEM_NAMESPACE_BLOCKED", "");
+            return ValidationResult.fail("ITEM_BLOCKED", "");
         }
 
         if ("primary".equals(slot) || "secondary".equals(slot)) {

@@ -246,6 +246,7 @@
     "message.codpattern.weapon_update.error.item_id_invalid": "§c配裝寫入被拒絕：物品 ID 無效",
     "message.codpattern.weapon_update.error.item_not_registered": "§c配裝寫入被拒絕：物品尚未註冊",
     "message.codpattern.weapon_update.error.nbt_invalid": "§c配裝寫入被拒絕：NBT 資料無效",
+    "message.codpattern.weapon_update.error.item_blocked": "§c配裝寫入被拒絕：該武器已被黑名單禁用",
     "message.codpattern.weapon_update.error.item_namespace_blocked": "§c配裝寫入被拒絕：該物品命名空間已被封鎖",
     "message.codpattern.weapon_update.error.item_category_invalid": "§c配裝寫入被拒絕：該物品不能寫入此槽位",
     "message.codpattern.weapon_update.error.throwables_disabled": "§c配裝寫入被拒絕：投擲物槽位已禁用",

@@ -246,6 +246,7 @@
     "message.codpattern.weapon_update.error.item_id_invalid": "§cLoadout update rejected: invalid item ID",
     "message.codpattern.weapon_update.error.item_not_registered": "§cLoadout update rejected: item is not registered",
     "message.codpattern.weapon_update.error.nbt_invalid": "§cLoadout update rejected: invalid NBT data",
+    "message.codpattern.weapon_update.error.item_blocked": "§cLoadout update rejected: weapon is blacklisted",
     "message.codpattern.weapon_update.error.item_namespace_blocked": "§cLoadout update rejected: item namespace is blocked",
     "message.codpattern.weapon_update.error.item_category_invalid": "§cLoadout update rejected: item is invalid for this slot",
     "message.codpattern.weapon_update.error.throwables_disabled": "§cLoadout update rejected: throwable slots are disabled",
