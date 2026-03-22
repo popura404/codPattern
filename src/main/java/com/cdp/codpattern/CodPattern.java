@@ -1,6 +1,7 @@
 package com.cdp.codpattern;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
+import com.phasetranscrystal.fpsmatch.common.item.FPSMItemRegister;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -11,7 +12,9 @@ public class CodPattern {
     public static final String MODID = "codpattern";
 
     public CodPattern() {
-        FMLJavaModLoadingContext.get().getModEventBus().addListener(this::setup);
+        var modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+        modEventBus.addListener(this::setup);
+        FPSMItemRegister.ITEMS.register(modEventBus);
         MinecraftForge.EVENT_BUS.register(this);
     }
 

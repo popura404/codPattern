@@ -7,7 +7,7 @@ import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class ModNetworkChannel {
-    private static final String PROTOCOL_VERSION = "7";
+    private static final String PROTOCOL_VERSION = "8";
     static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation("codpattern", "main"),
             () -> PROTOCOL_VERSION,
@@ -28,6 +28,7 @@ public final class ModNetworkChannel {
         BackpackPacketRegistrar.register();
         RefitPacketRegistrar.register();
         TdmPacketRegistrar.register();
+        FpsmPacketRegistrar.register();
     }
 
     public static <MSG> void sendToServer(MSG message) {

@@ -8,6 +8,8 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 
+import java.util.Objects;
+
 public class SpawnPointData {
     public static final Codec<SpawnPointData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("Dimension").forGetter(data -> data.getDimension().location().toString()),
@@ -42,6 +44,10 @@ public class SpawnPointData {
         return position;
     }
 
+    public BlockPos getBlockPos() {
+        return position;
+    }
+
     public float getYaw() {
         return yaw;
     }
@@ -60,6 +66,22 @@ public class SpawnPointData {
 
     public int getZ() {
         return position.getZ();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof SpawnPointData other)) {
+            return false;
+        }
+        return Objects.equals(dimension, other.dimension)
+                && Objects.equals(position, other.position)
+                && Float.compare(yaw, other.yaw) == 0
+                && Float.compare(pitch, other.pitch) == 0;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(dimension, position, yaw, pitch);
     }
 
     @Override

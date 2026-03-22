@@ -7,6 +7,7 @@ import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMSaveDataEvent;
 import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMapEvent;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -51,10 +52,38 @@ public class FPSMCore {
         return INSTANCE != null;
     }
 
+    public boolean isRegistered(BaseMap map) {
+        if (map == null) {
+            return false;
+        }
+        return isRegistered(map.getGameType(), map.getMapName());
+    }
+
+    public boolean isRegistered(String type) {
+        return registry.containsKey(type);
+    }
+
+    public boolean isRegistered(String type, String name) {
+        return registry.containsKey(type)
+                && games.containsKey(type)
+                && getMapNamesWithType(type).contains(name);
+    }
+
     public Optional<BaseMap> getMapByPlayer(Player player) {
         for (List<BaseMap> maps : games.values()) {
             for (BaseMap map : maps) {
                 if (map.checkGameHasPlayer(player)) {
+                    return Optional.of(map);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    public Optional<BaseMap> getMapByPlayer(UUID playerId) {
+        for (List<BaseMap> maps : games.values()) {
+            for (BaseMap map : maps) {
+                if (map.checkGameHasPlayer(playerId)) {
                     return Optional.of(map);
                 }
             }
@@ -74,7 +103,19 @@ public class FPSMCore {
     }
 
     public void registerMap(String type, BaseMap map) {
+        if (!registry.containsKey(type) || map == null || isRegistered(type, map.getMapName())) {
+            return;
+        }
         games.computeIfAbsent(type, key -> new ArrayList<>()).add(map);
+    }
+
+    public Optional<BaseMap> getMapByTypeWithName(String type, String name) {
+        if (!checkGameType(type)) {
+            return Optional.empty();
+        }
+        return games.getOrDefault(type, List.of()).stream()
+                .filter(map -> map.getMapName().equals(name))
+                .findFirst();
     }
 
     public Optional<BaseMap> getMapByName(String name) {
@@ -84,9 +125,49 @@ public class FPSMCore {
                 .findFirst();
     }
 
+    public List<String> getMapNames() {
+        return games.values().stream()
+                .flatMap(List::stream)
+                .map(BaseMap::getMapName)
+                .toList();
+    }
+
+    public List<String> getMapNamesWithType(String type) {
+        return games.getOrDefault(type, List.of()).stream()
+                .map(BaseMap::getMapName)
+                .toList();
+    }
+
+    public List<String> getMapNames(String type) {
+        return getMapNamesWithType(type);
+    }
+
+    public Optional<BaseMap> getMapByPosition(ServerLevel level, BlockPos pos) {
+        if (level == null || pos == null) {
+            return Optional.empty();
+        }
+        return games.values().stream()
+                .flatMap(List::stream)
+                .filter(map -> map.getServerLevel().dimension().equals(level.dimension()))
+                .filter(map -> map.getMapArea().isBlockPosInArea(pos))
+                .findFirst();
+    }
+
     public void registerGameType(String typeName, Function3<ServerLevel, String, AreaData, BaseMap> mapFactory) {
         registry.put(typeName, mapFactory);
         games.computeIfAbsent(typeName, key -> new ArrayList<>());
+    }
+
+    public boolean checkGameType(String typeName) {
+        return registry.containsKey(typeName);
+    }
+
+    public Function3<ServerLevel, String, AreaData, BaseMap> getPreBuildGame(String typeName) {
+        return registry.get(typeName);
+    }
+
+    public List<String> getGameTypes() {
+        return List.copyOf(registry.keySet());
     }
 
     public Map<String, List<BaseMap>> getAllMaps() {

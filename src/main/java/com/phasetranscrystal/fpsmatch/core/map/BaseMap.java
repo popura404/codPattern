@@ -9,6 +9,7 @@ import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -94,19 +95,31 @@ public abstract class BaseMap {
     }
 
     public void teleportPlayerToReSpawnPoint(ServerPlayer player) {
-        mapTeams.getTeamByPlayer(player)
-                .flatMap(team -> team.getPlayerData(player.getUUID()))
-                .map(data -> data.getSpawnPointsData())
-                .ifPresent(point -> {
-                    player.setRespawnPosition(point.getDimension(), point.getPosition(), point.getYaw(), true, false);
-                    teleportToPoint(player, point);
-                });
+        mapTeams.getTeamByPlayer(player).ifPresent(team ->
+                team.getPlayerData(player.getUUID()).ifPresent(playerData -> {
+                    SpawnPointData currentPoint = playerData.getSpawnPointsData();
+                    if (currentPoint == null) {
+                        currentPoint = team.assignNextSpawnPoint(player.getUUID()).orElse(null);
+                    }
+                    if (currentPoint == null) {
+                        return;
+                    }
+
+                    player.setRespawnPosition(currentPoint.getDimension(), currentPoint.getPosition(),
+                            currentPoint.getYaw(), true, false);
+                    if (teleportToPoint(player, currentPoint)) {
+                        team.assignNextSpawnPoint(player.getUUID());
+                    }
+                }));
     }
 
-    public void teleportToPoint(ServerPlayer player, SpawnPointData data) {
+    public boolean teleportToPoint(ServerPlayer player, SpawnPointData data) {
+        if (!Level.isInSpawnableBounds(data.getPosition())) {
+            return false;
+        }
         ServerLevel targetLevel = serverLevel.getServer().getLevel(data.getDimension());
         if (targetLevel == null) {
-            return;
+            return false;
         }
         player.teleportTo(
                 targetLevel,
@@ -118,6 +131,7 @@ public abstract class BaseMap {
         );
         player.setDeltaMovement(player.getDeltaMovement().multiply(1.0D, 0.0D, 1.0D));
         player.setOnGround(true);
+        return true;
     }
 
     public void clearPlayerInventory(UUID uuid, Predicate<ItemStack> inventoryPredicate) {
