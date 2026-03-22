@@ -15,7 +15,7 @@ plugins {
     id 'idea'
     id 'maven-publish'
     id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
-    id 'org.parchmentmc.librarian.forgegradle' version '1.+'
+    id 'org.parchmentmc.librarian.forgegradle' version '1.2.0.7-dev-SNAPSHOT'
 }
 
 apply plugin: 'org.spongepowered.mixin'
@@ -99,8 +99,7 @@ dependencies {
     implementation fg.deobf("curse.maven:timeless-and-classics-zero-1028108:6654541-sources-6654543")
     implementation fg.deobf("maven.modrinth:lr-tactical:0.3.0")
     //implementation fg.deobf("maven.modrinth:cloth-config:11.1.136+forge")
-    implementation fg.deobf("maven.modrinth:fpsmatch:1.2.5")
-    implementation fg.deobf("maven.modrinth:physicsmod:JkM3OTEl")
+    runtimeOnly fg.deobf("maven.modrinth:physicsmod:JkM3OTEl")
     implementation fg.deobf("maven.modrinth:taczaddon:1.1.6")
     //runtimeOnly fg.deobf("curse.maven:embeddium-908741:5175031")
     //runtimeOnly fg.deobf("curse.maven:oculus-581495:5299671")

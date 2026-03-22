@@ -6,7 +6,7 @@
 
 ## Overview
 
-COD Pattern is an add-on mod built for **TaCZ + FPSMatch**, providing a COD-like workflow for:
+COD Pattern is built around **TaCZ + an embedded FPSM-compatible core**, providing a COD-like workflow for:
 
 * Loadout presets and respawn equipment distribution
 * In-match weapon refit with attachment presets
@@ -34,7 +34,7 @@ The project follows a server-authoritative design with client synchronization to
 * Attachment presets are now stored directly inside the loadout config by loadout id and slot.
 * Supports result feedback and rollback handling to reduce client/server state drift.
 
-### 3) TDM Room and Match Flow (FPSMatch Integration)
+### 3) TDM Room and Match Flow (Embedded FPSM Compatibility Layer)
 
 * Adds a Team Deathmatch entry in pause menu for room list, join/leave, and team selection.
 * TDM room screens use the same fixed text-scaling baseline across different `GUI Scale` settings for more consistent list/panel/button readability.
@@ -124,7 +124,8 @@ Server configuration is stored under world save path: `serverconfig/codpattern/`
 * **Java:** `17`
 * **Required Dependencies:**
   * TaCZ `1.1.6+`
-  * FPSMatch `1.2.5+`
+* **Embedded Component:**
+  * FPSM-compatible core (no external `fpsmatch.jar` required)
 * **Optional Integrations:**
   * LR Tactical (throwable/melee content path)
   * Physics Mod (ragdoll/retained death entity presentation)
@@ -155,7 +156,7 @@ See `CHANGES.md` for detailed history.
 
 ## License
 
-Licensed under **GPLv3**. See `LICENSE.txt` for details.
+Licensed under **GPL-3.0-only**. See `LICENSE.txt` for details.
 
 ## Author
 

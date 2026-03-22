@@ -44,13 +44,6 @@ versionRange="[1.1.6,)"
 ordering="AFTER"
 side="BOTH"
 
-[[dependencies."${mod_id}"]]
-modId="fpsmatch"
-mandatory=true
-versionRange="[1.2.5,)"
-ordering="AFTER"
-side="BOTH"
-
 #[[dependencies."${mod_id}"]]
 #modId="lrtactical"
 #mandatory=true
