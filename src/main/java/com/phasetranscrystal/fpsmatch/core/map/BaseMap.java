@@ -18,6 +18,7 @@ import net.minecraftforge.fml.common.Mod;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -122,9 +123,7 @@ public abstract class BaseMap {
                             ? playerData.getSpawnPointsData()
                             : null;
                     if (currentPoint == null) {
-                        currentPoint = pointKind == SpawnPointKind.INITIAL
-                                ? team.assignNextSpawnPoint(player.getUUID(), pointKind).orElse(null)
-                                : team.selectSpawnPoint(player.getUUID(), pointKind).orElse(null);
+                        currentPoint = resolveSpawnPointForTeleport(player, team, pointKind).orElse(null);
                     }
                     if (currentPoint == null) {
                         return false;
@@ -141,6 +140,13 @@ public abstract class BaseMap {
                     }
                     return true;
                 })).orElse(false);
+    }
+
+    private Optional<SpawnPointData> resolveSpawnPointForTeleport(ServerPlayer player, BaseTeam team, SpawnPointKind pointKind) {
+        if (pointKind == SpawnPointKind.DYNAMIC_CANDIDATE) {
+            return DynamicRespawnSelector.selectBestSpawnPoint(player, team, mapTeams);
+        }
+        return team.assignNextSpawnPoint(player.getUUID(), pointKind);
     }
 
     public boolean teleportToPoint(ServerPlayer player, SpawnPointData data) {
