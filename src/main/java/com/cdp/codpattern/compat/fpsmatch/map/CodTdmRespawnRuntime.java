@@ -8,25 +8,31 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.UUID;
-import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 final class CodTdmRespawnRuntime {
     private final CodTdmPlayerRuntimeState playerState;
     private final Supplier<ServerLevel> serverLevelSupplier;
-    private final Consumer<ServerPlayer> teleportPlayerToRespawnAction;
-    private final Consumer<ServerPlayer> givePlayerKitsAction;
+    private final Predicate<ServerPlayer> teleportPlayerToRespawnAction;
+    private final java.util.function.Consumer<ServerPlayer> givePlayerKitsAction;
+    private final Supplier<Integer> respawnRetryTicksSupplier;
+    private final Supplier<Integer> invincibilityTicksSupplier;
 
     CodTdmRespawnRuntime(
             CodTdmPlayerRuntimeState playerState,
             Supplier<ServerLevel> serverLevelSupplier,
-            Consumer<ServerPlayer> teleportPlayerToRespawnAction,
-            Consumer<ServerPlayer> givePlayerKitsAction
+            Predicate<ServerPlayer> teleportPlayerToRespawnAction,
+            java.util.function.Consumer<ServerPlayer> givePlayerKitsAction,
+            Supplier<Integer> respawnRetryTicksSupplier,
+            Supplier<Integer> invincibilityTicksSupplier
     ) {
         this.playerState = playerState;
         this.serverLevelSupplier = serverLevelSupplier;
         this.teleportPlayerToRespawnAction = teleportPlayerToRespawnAction;
         this.givePlayerKitsAction = givePlayerKitsAction;
+        this.respawnRetryTicksSupplier = respawnRetryTicksSupplier;
+        this.invincibilityTicksSupplier = invincibilityTicksSupplier;
     }
 
     void tickDeathCam() {
@@ -42,7 +48,12 @@ final class CodTdmRespawnRuntime {
     }
 
     void tickRespawn() {
-        RespawnService.tickRespawn(playerState.respawnTimers(), serverLevelSupplier.get(), this::respawnPlayer);
+        RespawnService.tickRespawn(
+                playerState.respawnTimers(),
+                serverLevelSupplier.get(),
+                this::respawnPlayer,
+                respawnRetryTicksSupplier.get()
+        );
     }
 
     void tickInvincibility() {
@@ -53,17 +64,17 @@ final class CodTdmRespawnRuntime {
         return playerState.isInvincible(playerId);
     }
 
-    void respawnPlayerNow(ServerPlayer player) {
-        respawnPlayer(player);
+    boolean respawnPlayerNow(ServerPlayer player) {
+        return respawnPlayer(player);
     }
 
-    private void respawnPlayer(ServerPlayer player) {
+    private boolean respawnPlayer(ServerPlayer player) {
         CombatRegenService.clearPlayerCooldown(playerState.combatRegenCooldowns(), player.getUUID());
-        RespawnService.respawnPlayer(
+        return RespawnService.respawnPlayer(
                 player,
                 teleportPlayerToRespawnAction,
                 givePlayerKitsAction,
-                CodTdmConfig.getConfig().getInvincibilityTicks(),
+                invincibilityTicksSupplier.get(),
                 playerState.invinciblePlayers(),
                 playerState.invincibilityTimers()
         );

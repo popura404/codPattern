@@ -12,21 +12,21 @@ import java.util.function.Supplier;
  * C→S: 加入房间数据包
  */
 public class JoinRoomPacket {
-    private final String mapName;
+    private final String roomKey;
     private final String teamName; // 可选，null表示自动分配
 
-    public JoinRoomPacket(String mapName, String teamName) {
-        this.mapName = mapName;
+    public JoinRoomPacket(String roomKey, String teamName) {
+        this.roomKey = roomKey;
         this.teamName = teamName;
     }
 
     public JoinRoomPacket(FriendlyByteBuf buf) {
-        this.mapName = buf.readUtf();
+        this.roomKey = buf.readUtf();
         this.teamName = buf.readBoolean() ? buf.readUtf() : null;
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeUtf(mapName);
+        buf.writeUtf(roomKey);
         buf.writeBoolean(teamName != null);
         if (teamName != null) {
             buf.writeUtf(teamName);
@@ -43,15 +43,15 @@ public class JoinRoomPacket {
             if (player == null) {
                 return;
             }
-            TdmRoomInteractionService.JoinResult result = TdmRoomInteractionService.joinRoom(player, mapName, teamName);
-            sendResult(player, result.success(), result.mapName(), result.code(), result.message());
+            TdmRoomInteractionService.JoinResult result = TdmRoomInteractionService.joinRoom(player, roomKey, teamName);
+            sendResult(player, result.success(), result.roomKey(), result.code(), result.message());
         });
         ctx.get().setPacketHandled(true);
     }
 
-    private static void sendResult(ServerPlayer player, boolean success, String mapName, String code, String message) {
+    private static void sendResult(ServerPlayer player, boolean success, String roomKey, String code, String message) {
         CodTdmRoomManager.getInstance().markRoomListDirty();
-        JoinRoomResultPacket packet = new JoinRoomResultPacket(success, mapName, code, message);
+        JoinRoomResultPacket packet = new JoinRoomResultPacket(success, roomKey, code, message);
         com.cdp.codpattern.adapter.forge.network.ModNetworkChannel.sendToPlayer(packet, player);
     }
 }

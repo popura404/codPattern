@@ -1,13 +1,28 @@
 package com.cdp.codpattern.app.tdm.port;
 
+import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
+import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
+import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
 import net.minecraft.server.level.ServerPlayer;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface CodTdmActionPort {
+public interface CodTdmActionPort extends ModeRoomActionPort {
+    @Override
+    default RoomId roomId() {
+        return RoomId.of(gameType(), mapName());
+    }
+
+    @Override
+    default String gameType() {
+        return TdmGameTypes.CDP_TDM;
+    }
+
+    String mapName();
+
     void onPlayerDamaged(ServerPlayer player);
 
     void onPlayerKill(ServerPlayer killer, ServerPlayer victim);
@@ -26,7 +41,7 @@ public interface CodTdmActionPort {
 
     void syncToClient();
 
-    void applyTeamSpawnData(String teamName, int playerLimit, List<SpawnPointData> spawnPoints);
+    void applyTeamSpawnProfile(String teamName, int playerLimit, TeamSpawnProfile spawnProfile);
 
     void setMatchEndTeleportPoint(SpawnPointData point);
 

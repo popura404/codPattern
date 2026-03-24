@@ -1,10 +1,9 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
-import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
+import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
 import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import net.minecraft.server.level.ServerPlayer;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -43,8 +42,8 @@ final class CodTdmMapMutationRuntime {
         syncToClientAction.run();
     }
 
-    void applyTeamSpawnData(String teamName, int playerLimit, List<SpawnPointData> spawnPoints) {
+    void applyTeamSpawnProfile(String teamName, int playerLimit, TeamSpawnProfile spawnProfile) {
         addTeamAction.accept(teamName, playerLimit);
-        findTeamByNameAction.apply(teamName).ifPresent(team -> team.addAllSpawnPointData(spawnPoints));
+        findTeamByNameAction.apply(teamName).ifPresent(team -> team.setSpawnProfile(spawnProfile));
     }
 }

@@ -1,6 +1,7 @@
 package com.cdp.codpattern.network.handler;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
+import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.TdmCombatMarkerTracker;
 import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
@@ -112,15 +113,17 @@ public class ClientPacketHandler {
         Minecraft.getInstance().player.sendSystemMessage(resolveWeaponUpdateFailure(code, message));
     }
 
-    public static void handleRoomListSync(Map<String, RoomInfo> rooms) {
+    public static void handleRoomListSync(Map<RoomId, RoomInfo> rooms) {
         Minecraft.getInstance().execute(() -> {
             Screen screen = Minecraft.getInstance().screen;
             if (screen instanceof TdmRoomScreen tdmScreen) {
                 Map<String, TdmRoomData> roomDataMap = new HashMap<>();
-                for (Map.Entry<String, RoomInfo> entry : rooms.entrySet()) {
+                for (Map.Entry<RoomId, RoomInfo> entry : rooms.entrySet()) {
+                    RoomId roomId = entry.getKey();
                     RoomInfo info = entry.getValue();
-                    roomDataMap.put(entry.getKey(), new TdmRoomData(
-                            entry.getKey(),
+                    roomDataMap.put(roomId.encode(), new TdmRoomData(
+                            roomId.gameType(),
+                            roomId.mapName(),
                             info.state,
                             info.playerCount,
                             info.maxPlayers,
@@ -134,12 +137,12 @@ public class ClientPacketHandler {
         });
     }
 
-    public static void handleTeamPlayerList(String mapName, Map<String, List<PlayerInfo>> teamPlayers) {
+    public static void handleTeamPlayerList(String roomKey, Map<String, List<PlayerInfo>> teamPlayers) {
         Minecraft.getInstance().execute(() -> {
-            ClientTdmState.updateTeamPlayers(mapName, teamPlayers);
+            ClientTdmState.updateTeamPlayers(roomKey, teamPlayers);
             Screen screen = Minecraft.getInstance().screen;
             if (screen instanceof TdmRoomScreen tdmScreen) {
-                tdmScreen.updatePlayerList(mapName, teamPlayers);
+                tdmScreen.updatePlayerList(roomKey, teamPlayers);
             }
         });
     }
@@ -185,26 +188,26 @@ public class ClientPacketHandler {
                 barVisibleGraceTicks));
     }
 
-    public static void handleJoinRoomResult(boolean success, String mapName, String reasonCode, String reasonMessage) {
+    public static void handleJoinRoomResult(boolean success, String roomKey, String reasonCode, String reasonMessage) {
         Minecraft.getInstance().execute(() -> {
             if (success) {
-                ClientTdmState.setRoomContext(mapName);
+                ClientTdmState.setRoomContext(roomKey);
             }
             Screen screen = Minecraft.getInstance().screen;
             if (screen instanceof TdmRoomScreen tdmRoomScreen) {
-                tdmRoomScreen.handleJoinResult(success, mapName, reasonCode, reasonMessage);
+                tdmRoomScreen.handleJoinResult(success, roomKey, reasonCode, reasonMessage);
             }
         });
     }
 
-    public static void handleLeaveRoomResult(boolean success, String roomName, String reasonCode, String reasonMessage) {
+    public static void handleLeaveRoomResult(boolean success, String roomKey, String reasonCode, String reasonMessage) {
         Minecraft.getInstance().execute(() -> {
             if (success) {
                 ClientTdmState.clearRoomContext();
             }
             Screen screen = Minecraft.getInstance().screen;
             if (screen instanceof TdmRoomScreen tdmRoomScreen) {
-                tdmRoomScreen.handleLeaveResult(success, roomName, reasonCode, reasonMessage);
+                tdmRoomScreen.handleLeaveResult(success, roomKey, reasonCode, reasonMessage);
             }
             if (!success
                     && !(screen instanceof TdmRoomScreen)
@@ -219,13 +222,13 @@ public class ClientPacketHandler {
     public static void handleJoinGameResult(
             boolean success,
             long requestId,
-            String mapName,
+            String roomKey,
             String reasonCode,
             String reasonMessage) {
         Minecraft.getInstance().execute(() -> {
             Screen screen = Minecraft.getInstance().screen;
             if (screen instanceof TdmRoomScreen tdmRoomScreen) {
-                tdmRoomScreen.handleJoinGameResult(success, requestId, mapName, reasonCode, reasonMessage);
+                tdmRoomScreen.handleJoinGameResult(success, requestId, roomKey, reasonCode, reasonMessage);
             }
         });
     }

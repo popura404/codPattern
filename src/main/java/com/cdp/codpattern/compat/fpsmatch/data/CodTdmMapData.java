@@ -11,6 +11,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
+import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
 import com.phasetranscrystal.fpsmatch.core.data.save.FPSMDataManager;
 import com.phasetranscrystal.fpsmatch.core.data.save.SaveHolder;
 import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMSaveDataEvent;
@@ -61,12 +62,42 @@ public class CodTdmMapData {
     public record TeamData(
             String name,
             int playerLimit,
-            List<SpawnPointData> spawnPoints) {
+            List<SpawnPointData> initialSpawnPoints,
+            List<SpawnPointData> dynamicSpawnCandidates) {
         public static final Codec<TeamData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.STRING.fieldOf("name").forGetter(TeamData::name),
                 Codec.INT.fieldOf("playerLimit").forGetter(TeamData::playerLimit),
-                SpawnPointData.CODEC.listOf().fieldOf("spawnPoints").forGetter(TeamData::spawnPoints))
-                .apply(instance, TeamData::new));
+                SpawnPointData.CODEC.listOf().optionalFieldOf("initialSpawnPoints", List.of()).forGetter(TeamData::initialSpawnPoints),
+                SpawnPointData.CODEC.listOf().optionalFieldOf("dynamicSpawnCandidates", List.of()).forGetter(TeamData::dynamicSpawnCandidates),
+                SpawnPointData.CODEC.listOf().optionalFieldOf("spawnPoints", List.of()).forGetter(data -> List.of()))
+                .apply(instance, TeamData::fromCodec));
+
+        private static TeamData fromCodec(
+                String name,
+                int playerLimit,
+                List<SpawnPointData> initialSpawnPoints,
+                List<SpawnPointData> dynamicSpawnCandidates,
+                List<SpawnPointData> legacySpawnPoints
+        ) {
+            List<SpawnPointData> resolvedInitial = (initialSpawnPoints == null || initialSpawnPoints.isEmpty())
+                    ? legacySpawnPoints
+                    : initialSpawnPoints;
+            return new TeamData(
+                    name,
+                    playerLimit,
+                    resolvedInitial == null ? List.of() : resolvedInitial,
+                    dynamicSpawnCandidates == null ? List.of() : dynamicSpawnCandidates
+            );
+        }
+
+        public TeamSpawnProfile toSpawnProfile() {
+            return new TeamSpawnProfile(initialSpawnPoints, dynamicSpawnCandidates);
+        }
+
+        public static TeamData fromSpawnProfile(String name, int playerLimit, TeamSpawnProfile spawnProfile) {
+            TeamSpawnProfile profile = spawnProfile == null ? TeamSpawnProfile.empty() : spawnProfile;
+            return new TeamData(name, playerLimit, profile.initialSpawnPoints(), profile.dynamicSpawnCandidates());
+        }
     }
 
     /**
@@ -112,7 +143,7 @@ public class CodTdmMapData {
             // 添加队伍和复活点
             for (Map.Entry<String, TeamData> entry : data.teams().entrySet()) {
                 TeamData teamData = entry.getValue();
-                actionPort.applyTeamSpawnData(teamData.name(), teamData.playerLimit(), teamData.spawnPoints());
+                actionPort.applyTeamSpawnProfile(teamData.name(), teamData.playerLimit(), teamData.toSpawnProfile());
             }
             data.matchEndTeleportPoint().ifPresent(actionPort::setMatchEndTeleportPoint);
 
@@ -140,7 +171,7 @@ public class CodTdmMapData {
         Map<String, TeamData> teams = new HashMap<>();
 
         for (CodTdmTeamPersistenceSnapshot team : readPort.teamPersistenceSnapshots()) {
-            teams.put(team.name(), new TeamData(team.name(), team.playerLimit(), team.spawnPoints()));
+            teams.put(team.name(), TeamData.fromSpawnProfile(team.name(), team.playerLimit(), team.spawnProfile()));
         }
 
         return new MapData(

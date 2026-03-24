@@ -38,7 +38,8 @@ final class CodTdmMapAssemblyOutputBuilder {
                 runtimeBundle.mapMutationRuntime(),
                 endTeleportRuntime,
                 runtimeBundle.voteRuntime(),
-                respawnRuntime
+                respawnRuntime,
+                mapNameSupplier
         );
         CodTdmMapReadRuntime readRuntime = new CodTdmMapReadRuntime(
                 matchState,

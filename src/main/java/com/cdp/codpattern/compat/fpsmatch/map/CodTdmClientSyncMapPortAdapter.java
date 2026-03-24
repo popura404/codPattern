@@ -8,15 +8,15 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 final record CodTdmClientSyncMapPortAdapter(
-        Supplier<String> mapNameSupplier,
+        Supplier<String> roomKeySupplier,
         Supplier<Map<String, List<PlayerInfo>>> teamPlayersSupplier,
         Supplier<List<ServerPlayer>> joinedPlayersSupplier,
         Supplier<List<ServerPlayer>> spectatorPlayersSupplier
 ) implements CodTdmClientSyncPort {
 
     @Override
-    public String mapName() {
-        return mapNameSupplier.get();
+    public String roomKey() {
+        return roomKeySupplier.get();
     }
 
     @Override

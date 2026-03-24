@@ -20,7 +20,7 @@ final class CodTdmRoundLifecycleCoordinator {
             port.getJoinedPlayers().forEach(player -> player.sendSystemMessage(
                     Component.translatable("message.codpattern.game.warning_no_spawn", teamName)));
         }
-        port.getJoinedPlayers().forEach(port::teleportPlayerToReSpawnPoint);
+        port.getJoinedPlayers().forEach(port::teleportPlayerToRoundStartPoint);
     }
 
     void giveAllPlayersKits() {

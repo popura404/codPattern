@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 interface CodTdmClientSyncPort {
-    String mapName();
+    String roomKey();
 
     Map<String, List<PlayerInfo>> getTeamPlayers();
 

@@ -13,27 +13,27 @@ import java.util.function.Supplier;
  */
 public class LeaveRoomResultPacket {
     private final boolean success;
-    private final String roomName;
+    private final String roomKey;
     private final String reasonCode;
     private final String reasonMessage;
 
-    public LeaveRoomResultPacket(boolean success, String roomName, String reasonCode, String reasonMessage) {
+    public LeaveRoomResultPacket(boolean success, String roomKey, String reasonCode, String reasonMessage) {
         this.success = success;
-        this.roomName = roomName == null ? "" : roomName;
+        this.roomKey = roomKey == null ? "" : roomKey;
         this.reasonCode = reasonCode == null ? "" : reasonCode;
         this.reasonMessage = reasonMessage == null ? "" : reasonMessage;
     }
 
     public LeaveRoomResultPacket(FriendlyByteBuf buf) {
         this.success = buf.readBoolean();
-        this.roomName = buf.readUtf();
+        this.roomKey = buf.readUtf();
         this.reasonCode = buf.readUtf();
         this.reasonMessage = buf.readUtf();
     }
 
     public void encode(FriendlyByteBuf buf) {
         buf.writeBoolean(success);
-        buf.writeUtf(roomName);
+        buf.writeUtf(roomKey);
         buf.writeUtf(reasonCode);
         buf.writeUtf(reasonMessage);
     }
@@ -44,7 +44,7 @@ public class LeaveRoomResultPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                () -> () -> ClientPacketHandler.handleLeaveRoomResult(success, roomName, reasonCode, reasonMessage)));
+                () -> () -> ClientPacketHandler.handleLeaveRoomResult(success, roomKey, reasonCode, reasonMessage)));
         ctx.get().setPacketHandled(true);
     }
 }

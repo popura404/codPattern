@@ -1,5 +1,6 @@
 package com.cdp.codpattern.network.tdm;
 
+import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.network.handler.ClientPacketHandler;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.api.distmarker.Dist;
@@ -14,9 +15,9 @@ import java.util.function.Supplier;
  * S→C: 同步房间列表数据包
  */
 public class RoomListSyncPacket {
-    private final Map<String, RoomInfo> rooms;
+    private final Map<RoomId, RoomInfo> rooms;
 
-    public RoomListSyncPacket(Map<String, RoomInfo> rooms) {
+    public RoomListSyncPacket(Map<RoomId, RoomInfo> rooms) {
         this.rooms = rooms;
     }
 
@@ -24,16 +25,16 @@ public class RoomListSyncPacket {
         int size = buf.readInt();
         this.rooms = new HashMap<>();
         for (int i = 0; i < size; i++) {
-            String mapName = buf.readUtf();
+            RoomId roomId = RoomId.read(buf);
             RoomInfo info = RoomInfo.read(buf);
-            rooms.put(mapName, info);
+            rooms.put(roomId, info);
         }
     }
 
     public void encode(FriendlyByteBuf buf) {
         buf.writeInt(rooms.size());
-        for (Map.Entry<String, RoomInfo> entry : rooms.entrySet()) {
-            buf.writeUtf(entry.getKey());
+        for (Map.Entry<RoomId, RoomInfo> entry : rooms.entrySet()) {
+            entry.getKey().write(buf);
             entry.getValue().write(buf);
         }
     }

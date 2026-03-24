@@ -11,21 +11,21 @@ import java.util.function.Supplier;
  * C→S: 选择队伍数据包
  */
 public class SelectTeamPacket {
-    private final String mapName;
+    private final String roomKey;
     private final String teamName;
 
-    public SelectTeamPacket(String mapName, String teamName) {
-        this.mapName = mapName;
+    public SelectTeamPacket(String roomKey, String teamName) {
+        this.roomKey = roomKey;
         this.teamName = teamName;
     }
 
     public SelectTeamPacket(FriendlyByteBuf buf) {
-        this.mapName = buf.readUtf();
+        this.roomKey = buf.readUtf();
         this.teamName = buf.readUtf();
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeUtf(mapName);
+        buf.writeUtf(roomKey);
         buf.writeUtf(teamName);
     }
 
@@ -37,7 +37,7 @@ public class SelectTeamPacket {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
-                TdmRoomInteractionService.selectTeamInRoom(player, mapName, teamName);
+                TdmRoomInteractionService.selectTeamInRoom(player, roomKey, teamName);
             }
         });
         ctx.get().setPacketHandled(true);

@@ -39,7 +39,7 @@ public class LeaveRoomPacket {
                 CodTdmRoomManager.getInstance().markRoomListDirty();
             }
             ModNetworkChannel.sendToPlayer(
-                    new LeaveRoomResultPacket(result.success(), result.roomName(), result.code(), result.message()),
+                    new LeaveRoomResultPacket(result.success(), result.roomKey(), result.code(), result.message()),
                     player);
         });
         ctx.get().setPacketHandled(true);

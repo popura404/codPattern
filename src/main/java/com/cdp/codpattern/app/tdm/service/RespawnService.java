@@ -11,7 +11,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public final class RespawnService {
     private RespawnService() {
@@ -24,8 +24,12 @@ public final class RespawnService {
         respawnTimers.put(player.getUUID(), Math.max(1, respawnDelayTicks));
     }
 
-    public static void tickRespawn(Map<UUID, Integer> respawnTimers, ServerLevel serverLevel,
-            Consumer<ServerPlayer> respawnAction) {
+    public static void tickRespawn(
+            Map<UUID, Integer> respawnTimers,
+            ServerLevel serverLevel,
+            Predicate<ServerPlayer> respawnAction,
+            int respawnRetryTicks
+    ) {
         Iterator<Map.Entry<UUID, Integer>> iterator = respawnTimers.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<UUID, Integer> entry = iterator.next();
@@ -35,7 +39,12 @@ public final class RespawnService {
                 UUID playerId = entry.getKey();
                 Player player = serverLevel.getPlayerByUUID(playerId);
                 if (player instanceof ServerPlayer serverPlayer) {
-                    respawnAction.accept(serverPlayer);
+                    if (respawnAction.test(serverPlayer)) {
+                        iterator.remove();
+                    } else {
+                        entry.setValue(Math.max(1, respawnRetryTicks));
+                    }
+                    continue;
                 }
                 iterator.remove();
             } else {
@@ -44,11 +53,17 @@ public final class RespawnService {
         }
     }
 
-    public static void respawnPlayer(ServerPlayer player, Consumer<ServerPlayer> teleportToSpawn,
-            Consumer<ServerPlayer> givePlayerKits, int invincibilityTicks,
+    public static boolean respawnPlayer(ServerPlayer player, Predicate<ServerPlayer> teleportToSpawn,
+            java.util.function.Consumer<ServerPlayer> givePlayerKits, int invincibilityTicks,
             Set<UUID> invinciblePlayers, Map<UUID, Integer> invincibilityTimers) {
+        if (player == null) {
+            return false;
+        }
+        if (!teleportToSpawn.test(player)) {
+            player.setGameMode(GameType.SPECTATOR);
+            return false;
+        }
         player.setGameMode(GameType.ADVENTURE);
-        teleportToSpawn.accept(player);
         player.setHealth(player.getMaxHealth());
         player.getFoodData().setFoodLevel(20);
         player.removeAllEffects();
@@ -57,6 +72,7 @@ public final class RespawnService {
         invinciblePlayers.add(player.getUUID());
         invincibilityTimers.put(player.getUUID(), Math.max(0, invincibilityTicks));
         ModNetworkChannel.sendToPlayer(DeathCamPacket.clear(), player);
+        return true;
     }
 
     public static void tickInvincibility(Map<UUID, Integer> invincibilityTimers, Set<UUID> invinciblePlayers) {

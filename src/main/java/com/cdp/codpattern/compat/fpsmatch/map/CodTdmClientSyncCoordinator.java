@@ -1,6 +1,7 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
 import com.cdp.codpattern.app.tdm.model.TdmGamePhase;
+import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.config.tdm.CodTdmConfig;
 import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
@@ -48,7 +49,7 @@ final class CodTdmClientSyncCoordinator {
 
         GamePhasePacket phasePacket = new GamePhasePacket(phase.name(), remainingTime);
         ScoreUpdatePacket scorePacket = new ScoreUpdatePacket(teamScores, gameTimeTicks);
-        TeamPlayerListPacket playerListPacket = new TeamPlayerListPacket(port.mapName(), port.getTeamPlayers());
+        TeamPlayerListPacket playerListPacket = new TeamPlayerListPacket(port.roomKey(), port.getTeamPlayers());
         CombatMarkerConfigPacket markerConfigPacket = new CombatMarkerConfigPacket(
                 config.isEnemyMarkerHealthBar(),
                 config.getMarkerFocusHalfAngleDegrees(),

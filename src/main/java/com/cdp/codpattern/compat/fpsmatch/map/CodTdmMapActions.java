@@ -2,10 +2,11 @@ package com.cdp.codpattern.compat.fpsmatch.map;
 
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
+import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
 import net.minecraft.server.level.ServerPlayer;
 
-import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.UUID;
 
 final class CodTdmMapActions {
@@ -18,7 +19,8 @@ final class CodTdmMapActions {
             CodTdmMapMutationRuntime mapMutationRuntime,
             CodTdmEndTeleportRuntime endTeleportRuntime,
             CodTdmVoteRuntime voteRuntime,
-            CodTdmRespawnRuntime respawnRuntime
+            CodTdmRespawnRuntime respawnRuntime,
+            Supplier<String> mapNameSupplier
     ) {
         return new MapActionPort(
                 combatRuntime,
@@ -26,7 +28,8 @@ final class CodTdmMapActions {
                 mapMutationRuntime,
                 endTeleportRuntime,
                 voteRuntime,
-                respawnRuntime
+                respawnRuntime,
+                mapNameSupplier
         );
     }
 
@@ -36,8 +39,14 @@ final class CodTdmMapActions {
             CodTdmMapMutationRuntime mapMutationRuntime,
             CodTdmEndTeleportRuntime endTeleportRuntime,
             CodTdmVoteRuntime voteRuntime,
-            CodTdmRespawnRuntime respawnRuntime
+            CodTdmRespawnRuntime respawnRuntime,
+            Supplier<String> mapNameSupplier
     ) implements CodTdmActionPort {
+
+        @Override
+        public String mapName() {
+            return mapNameSupplier.get();
+        }
 
         @Override
         public void onPlayerDamaged(ServerPlayer player) {
@@ -85,8 +94,8 @@ final class CodTdmMapActions {
         }
 
         @Override
-        public void applyTeamSpawnData(String teamName, int playerLimit, List<SpawnPointData> spawnPoints) {
-            mapMutationRuntime.applyTeamSpawnData(teamName, playerLimit, spawnPoints);
+        public void applyTeamSpawnProfile(String teamName, int playerLimit, TeamSpawnProfile spawnProfile) {
+            mapMutationRuntime.applyTeamSpawnProfile(teamName, playerLimit, spawnProfile);
         }
 
         @Override

@@ -2,10 +2,13 @@ package com.phasetranscrystal.fpsmatch.core.map;
 
 import com.phasetranscrystal.fpsmatch.core.data.PlayerData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
+import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
+import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.scores.PlayerTeam;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
@@ -25,7 +28,7 @@ public class BaseTeam {
     private final int playerLimit;
     private final PlayerTeam playerTeam;
     private final Map<UUID, PlayerData> players = new LinkedHashMap<>();
-    private final List<SpawnPointData> spawnPointsData = new ArrayList<>();
+    private final EnumMap<SpawnPointKind, List<SpawnPointData>> spawnPointsData = new EnumMap<>(SpawnPointKind.class);
     private int scores;
 
     public BaseTeam(String gameType, String mapName, String name, int playerLimit, PlayerTeam playerTeam) {
@@ -34,6 +37,9 @@ public class BaseTeam {
         this.name = name;
         this.playerLimit = playerLimit;
         this.playerTeam = playerTeam;
+        for (SpawnPointKind kind : SpawnPointKind.values()) {
+            spawnPointsData.put(kind, new ArrayList<>());
+        }
     }
 
     public void join(ServerPlayer player) {
@@ -44,7 +50,7 @@ public class BaseTeam {
         PlayerData data = new PlayerData(player);
         data.setLiving(true);
         players.put(player.getUUID(), data);
-        assignNextSpawnPoint(player.getUUID());
+        assignNextSpawnPoint(player.getUUID(), SpawnPointKind.INITIAL);
     }
 
     public void leave(ServerPlayer player) {
@@ -76,47 +82,89 @@ public class BaseTeam {
     }
 
     public boolean randomSpawnPoints() {
-        return assignNextSpawnPoints();
+        return assignNextSpawnPoints(SpawnPointKind.INITIAL);
     }
 
     public void addSpawnPointData(SpawnPointData data) {
-        spawnPointsData.add(data);
+        if (data == null) {
+            return;
+        }
+        spawnPoints(data.getKind()).add(data);
     }
 
     public boolean addSpawnPointDataIfAbsent(SpawnPointData data) {
-        if (data == null || spawnPointsData.contains(data)) {
+        if (data == null || spawnPoints(data.getKind()).contains(data)) {
             return false;
         }
-        spawnPointsData.add(data);
+        spawnPoints(data.getKind()).add(data);
         return true;
     }
 
     public void addAllSpawnPointData(List<SpawnPointData> data) {
-        spawnPointsData.addAll(data);
+        if (data == null) {
+            return;
+        }
+        data.forEach(this::addSpawnPointData);
+    }
+
+    public void setSpawnProfile(TeamSpawnProfile profile) {
+        resetSpawnPointData();
+        if (profile == null) {
+            return;
+        }
+        addAllSpawnPointData(profile.initialSpawnPoints());
+        addAllSpawnPointData(profile.dynamicSpawnCandidates());
     }
 
     public boolean removeSpawnPointData(SpawnPointData data) {
-        return spawnPointsData.remove(data);
+        if (data == null) {
+            return false;
+        }
+        return spawnPoints(data.getKind()).remove(data);
     }
 
     public Optional<SpawnPointData> removeSpawnPointData(int index) {
-        if (index < 0 || index >= spawnPointsData.size()) {
+        return removeSpawnPointData(SpawnPointKind.INITIAL, index);
+    }
+
+    public Optional<SpawnPointData> removeSpawnPointData(SpawnPointKind kind, int index) {
+        List<SpawnPointData> points = spawnPoints(kind);
+        if (index < 0 || index >= points.size()) {
             return Optional.empty();
         }
-        return Optional.of(spawnPointsData.remove(index));
+        return Optional.of(points.remove(index));
     }
 
     public void resetSpawnPointData() {
-        spawnPointsData.clear();
+        for (List<SpawnPointData> points : spawnPointsData.values()) {
+            points.clear();
+        }
+    }
+
+    public void resetSpawnPointData(SpawnPointKind kind) {
+        spawnPoints(kind).clear();
     }
 
     public void setAllSpawnPointData(List<SpawnPointData> spawnPointsData) {
-        this.spawnPointsData.clear();
-        this.spawnPointsData.addAll(spawnPointsData);
+        resetSpawnPointData(SpawnPointKind.INITIAL);
+        if (spawnPointsData != null) {
+            spawnPointsData.forEach(point -> addSpawnPointData(point == null ? null : point.withKind(SpawnPointKind.INITIAL)));
+        }
     }
 
     public List<SpawnPointData> getSpawnPointsData() {
-        return new ArrayList<>(spawnPointsData);
+        return getSpawnPointsData(SpawnPointKind.INITIAL);
+    }
+
+    public List<SpawnPointData> getSpawnPointsData(SpawnPointKind kind) {
+        return new ArrayList<>(spawnPoints(kind));
+    }
+
+    public TeamSpawnProfile getSpawnProfile() {
+        return new TeamSpawnProfile(
+                getSpawnPointsData(SpawnPointKind.INITIAL),
+                getSpawnPointsData(SpawnPointKind.DYNAMIC_CANDIDATE)
+        );
     }
 
     public void clearPlayerSpawnPointAssignments() {
@@ -124,23 +172,45 @@ public class BaseTeam {
     }
 
     public Optional<SpawnPointData> assignNextSpawnPoint(UUID playerId) {
+        return assignNextSpawnPoint(playerId, SpawnPointKind.INITIAL);
+    }
+
+    public Optional<SpawnPointData> assignNextSpawnPoint(UUID playerId, SpawnPointKind kind) {
+        Optional<SpawnPointData> nextPoint = selectSpawnPoint(playerId, kind);
+        nextPoint.ifPresent(point -> {
+            PlayerData playerData = players.get(playerId);
+            if (playerData != null) {
+                playerData.setSpawnPointsData(point);
+            }
+        });
+        return nextPoint;
+    }
+
+    public Optional<SpawnPointData> selectSpawnPoint(UUID playerId, SpawnPointKind kind) {
         PlayerData playerData = players.get(playerId);
         if (playerData == null) {
             return Optional.empty();
         }
 
-        List<SpawnPointData> uniquePoints = getUniqueSpawnPoints();
+        List<SpawnPointData> uniquePoints = getUniqueSpawnPoints(kind);
         if (uniquePoints.isEmpty()) {
             return Optional.empty();
         }
 
-        SpawnPointData previousPoint = playerData.getSpawnPointsData();
+        SpawnPointData previousPoint = playerData.getLastSpawnPoint();
+        if (previousPoint == null) {
+            previousPoint = playerData.getSpawnPointsData();
+        }
+        final SpawnPointData previousPointFinal = previousPoint;
         Set<SpawnPointData> reservedByTeammates = new HashSet<>();
         for (PlayerData teammate : players.values()) {
             if (playerId.equals(teammate.getOwner())) {
                 continue;
             }
             SpawnPointData point = teammate.getSpawnPointsData();
+            if (point == null && kind == SpawnPointKind.DYNAMIC_CANDIDATE) {
+                point = teammate.getLastSpawnPoint();
+            }
             if (point != null) {
                 reservedByTeammates.add(point);
             }
@@ -150,31 +220,45 @@ public class BaseTeam {
                 .filter(point -> !reservedByTeammates.contains(point))
                 .toList();
 
-        SpawnPointData nextPoint = pickSpawnPoint(exclusivePoints, previousPoint)
-                .or(() -> pickSpawnPoint(uniquePoints, previousPoint))
+        SpawnPointData nextPoint = pickSpawnPoint(exclusivePoints, previousPointFinal)
+                .or(() -> pickSpawnPoint(uniquePoints, previousPointFinal))
                 .orElse(null);
         if (nextPoint == null) {
             return Optional.empty();
         }
 
-        playerData.setSpawnPointsData(nextPoint);
         return Optional.of(nextPoint);
     }
 
     public boolean assignNextSpawnPoints() {
-        if (spawnPointsData.isEmpty()) {
+        return assignNextSpawnPoints(SpawnPointKind.INITIAL);
+    }
+
+    public boolean assignNextSpawnPoints(SpawnPointKind kind) {
+        if (spawnPoints(kind).isEmpty()) {
             return false;
         }
 
         boolean success = true;
         for (UUID playerId : new ArrayList<>(players.keySet())) {
-            success &= assignNextSpawnPoint(playerId).isPresent();
+            success &= assignNextSpawnPoint(playerId, kind).isPresent();
         }
         return success;
     }
 
-    private List<SpawnPointData> getUniqueSpawnPoints() {
-        return new ArrayList<>(new LinkedHashSet<>(spawnPointsData));
+    public void markSpawnUsed(UUID playerId, SpawnPointData point) {
+        PlayerData playerData = players.get(playerId);
+        if (playerData == null) {
+            return;
+        }
+        playerData.setLastSpawnPoint(point);
+        if (Objects.equals(playerData.getSpawnPointsData(), point)) {
+            playerData.setSpawnPointsData(null);
+        }
+    }
+
+    private List<SpawnPointData> getUniqueSpawnPoints(SpawnPointKind kind) {
+        return new ArrayList<>(new LinkedHashSet<>(spawnPoints(kind)));
     }
 
     private Optional<SpawnPointData> pickSpawnPoint(List<SpawnPointData> points, SpawnPointData previousPoint) {
@@ -213,5 +297,12 @@ public class BaseTeam {
 
     public void setScores(int scores) {
         this.scores = scores;
+    }
+
+    private List<SpawnPointData> spawnPoints(SpawnPointKind kind) {
+        return spawnPointsData.computeIfAbsent(
+                kind == null ? SpawnPointKind.INITIAL : kind,
+                ignored -> new ArrayList<>()
+        );
     }
 }

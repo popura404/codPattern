@@ -10,6 +10,7 @@ import com.phasetranscrystal.fpsmatch.common.packet.RemoveDebugDataByPrefixS2CPa
 import com.phasetranscrystal.fpsmatch.common.packet.SpawnPointToolActionC2SPacket;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
+import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import com.phasetranscrystal.fpsmatch.util.PreviewColorUtil;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 
 public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
+    private static final String KIND_TAG = "SelectedSpawnPointKind";
     private static final String HELD_PREVIEW_STATE_TAG = "HeldSpawnPointPreviewState";
     private static final int HELD_PREVIEW_REFRESH_INTERVAL = 10;
 
@@ -48,6 +50,7 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
                     getSelectedType(stack),
                     getSelectedMap(stack),
                     getSelectedTeam(stack),
+                    getSelectedKind(stack),
                     0
             );
             case RIGHT_CLICK_BLOCK -> {
@@ -58,6 +61,7 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
     public void syncHeldPreview(ServerPlayer player, ItemStack stack) {
         String selectedType = getSelectedType(stack).trim();
         String selectedMap = getSelectedMap(stack).trim();
+        SpawnPointKind selectedKind = SpawnPointKind.fromSerializedName(getSelectedKind(stack));
         if (selectedType.isBlank() || selectedMap.isBlank()) {
             clearHeldPreview(player);
             return;
@@ -71,7 +75,11 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
         }
 
         BaseMap map = mapOptional.get();
-        String signatureWithPoints = buildHeldPreviewSignature(selectedType + "|" + selectedMap, map);
+        String signatureWithPoints = buildHeldPreviewSignature(
+                selectedType + "|" + selectedMap + "|" + selectedKind.serializedName(),
+                map,
+                selectedKind
+        );
         String previousSignature = player.getPersistentData().getString(HELD_PREVIEW_STATE_TAG);
         if (signatureWithPoints.equals(previousSignature) && player.tickCount % HELD_PREVIEW_REFRESH_INTERVAL != 0) {
             return;
@@ -89,7 +97,7 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
         for (int teamIndex = 0; teamIndex < orderedTeams.size(); teamIndex++) {
             BaseTeam team = orderedTeams.get(teamIndex);
             int pointColor = PreviewColorUtil.getPointPreviewColor(selectedType, teamIndex);
-            List<SpawnPointData> spawnPoints = team.getSpawnPointsData();
+            List<SpawnPointData> spawnPoints = team.getSpawnPointsData(selectedKind);
             for (int i = 0; i < spawnPoints.size(); i++) {
                 SpawnPointData data = spawnPoints.get(i);
                 FPSMatch.sendToPlayer(player, new AddPointDataS2CPacket(
@@ -125,11 +133,11 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
         return getHeldPreviewPrefix(player) + teamName + ":" + index;
     }
 
-    private static String buildHeldPreviewSignature(String baseSignature, BaseMap map) {
+    private static String buildHeldPreviewSignature(String baseSignature, BaseMap map, SpawnPointKind selectedKind) {
         StringBuilder builder = new StringBuilder(baseSignature);
         for (BaseTeam team : getOrderedNormalTeams(map)) {
             builder.append('|').append(team.name);
-            for (SpawnPointData point : team.getSpawnPointsData()) {
+            for (SpawnPointData point : team.getSpawnPointsData(selectedKind)) {
                 builder.append('|')
                         .append(point.getDimension().location())
                         .append('@')
@@ -153,6 +161,7 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
         String selectedType = getSelectedType(stack);
         String selectedMap = getSelectedMap(stack);
         String selectedTeam = getSelectedTeam(stack);
+        SpawnPointKind selectedKind = SpawnPointKind.fromSerializedName(getSelectedKind(stack));
         if (selectedType.isBlank() || selectedMap.isBlank() || selectedTeam.isBlank()) {
             player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.missing_selection"), false);
             return;
@@ -185,14 +194,15 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
                 player.serverLevel().dimension(),
                 clickedPos.above(),
                 player.getYRot(),
-                player.getXRot()
+                player.getXRot(),
+                selectedKind
         );
         if (!team.addSpawnPointDataIfAbsent(spawnPointData)) {
             player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.duplicate"), false);
             return;
         }
-        if (map.isStart) {
-            team.assignNextSpawnPoints();
+        if (map.isStart && selectedKind == SpawnPointKind.INITIAL) {
+            team.assignNextSpawnPoints(SpawnPointKind.INITIAL);
         }
 
         player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.added",
@@ -223,6 +233,15 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
         return getStringTag(stack, TEAM_TAG);
     }
 
+    public static void setSelectedKind(ItemStack stack, String selectedKind) {
+        setStringTag(stack, KIND_TAG, selectedKind);
+    }
+
+    public static String getSelectedKind(ItemStack stack) {
+        String stored = getStringTag(stack, KIND_TAG);
+        return stored.isBlank() ? SpawnPointKind.INITIAL.serializedName() : stored;
+    }
+
     @Override
     public void appendHoverText(ItemStack stack, Level level, List<Component> tooltip, TooltipFlag isAdvanced) {
         super.appendHoverText(stack, level, tooltip, isAdvanced);
@@ -242,6 +261,9 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
                 .append(Component.literal(getSelectedTeam(stack).isBlank()
                         ? Component.translatable("tooltip.fpsm.none").getString()
                         : getSelectedTeam(stack)).withStyle(ChatFormatting.YELLOW)));
+        tooltip.add(Component.translatable("tooltip.fpsm.spawn_point_tool.selected.kind")
+                .append(": ")
+                .append(Component.literal(getSelectedKind(stack)).withStyle(ChatFormatting.GOLD)));
         tooltip.add(Component.translatable("tooltip.fpsm.separator").withStyle(ChatFormatting.GOLD));
         tooltip.add(Component.translatable("tooltip.fpsm.spawn_point_tool.left_click"));
         tooltip.add(Component.translatable("tooltip.fpsm.spawn_point_tool.ctrl_right_click"));

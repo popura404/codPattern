@@ -3,6 +3,8 @@ package com.phasetranscrystal.fpsmatch.core.map;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
+import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
+import com.phasetranscrystal.fpsmatch.core.data.SpawnSelectionReason;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
@@ -85,7 +87,7 @@ public abstract class BaseMap {
         player.setGameMode(GameType.SPECTATOR);
         mapTeams.leaveTeam(player);
         mapTeams.getSpectatorTeam().join(player);
-        mapTeams.getSpectatorTeam().getSpawnPointsData().stream().findFirst()
+        mapTeams.getSpectatorTeam().getSpawnPointsData(SpawnPointKind.INITIAL).stream().findFirst()
                 .ifPresent(point -> teleportToPoint(player, point));
     }
 
@@ -94,23 +96,51 @@ public abstract class BaseMap {
         player.setGameMode(GameType.ADVENTURE);
     }
 
-    public void teleportPlayerToReSpawnPoint(ServerPlayer player) {
-        mapTeams.getTeamByPlayer(player).ifPresent(team ->
-                team.getPlayerData(player.getUUID()).ifPresent(playerData -> {
-                    SpawnPointData currentPoint = playerData.getSpawnPointsData();
+    public boolean teleportPlayerToRoundStartPoint(ServerPlayer player) {
+        return teleportPlayerToSpawnPoint(player, SpawnSelectionReason.ROUND_START);
+    }
+
+    public boolean teleportPlayerToReSpawnPoint(ServerPlayer player) {
+        return teleportPlayerToSpawnPoint(player, SpawnSelectionReason.RESPAWN);
+    }
+
+    public boolean teleportPlayerToMidMatchJoinPoint(ServerPlayer player) {
+        return teleportPlayerToSpawnPoint(player, SpawnSelectionReason.MID_MATCH_JOIN);
+    }
+
+    public boolean teleportPlayerToSpawnPoint(ServerPlayer player, SpawnSelectionReason reason) {
+        return teleportPlayerToSpawnPoint(player, resolveSpawnPointKind(reason));
+    }
+
+    protected boolean teleportPlayerToSpawnPoint(ServerPlayer player, SpawnPointKind pointKind) {
+        if (player == null) {
+            return false;
+        }
+        return mapTeams.getTeamByPlayer(player).flatMap(team ->
+                team.getPlayerData(player.getUUID()).map(playerData -> {
+                    SpawnPointData currentPoint = pointKind == SpawnPointKind.INITIAL
+                            ? playerData.getSpawnPointsData()
+                            : null;
                     if (currentPoint == null) {
-                        currentPoint = team.assignNextSpawnPoint(player.getUUID()).orElse(null);
+                        currentPoint = pointKind == SpawnPointKind.INITIAL
+                                ? team.assignNextSpawnPoint(player.getUUID(), pointKind).orElse(null)
+                                : team.selectSpawnPoint(player.getUUID(), pointKind).orElse(null);
                     }
                     if (currentPoint == null) {
-                        return;
+                        return false;
                     }
 
                     player.setRespawnPosition(currentPoint.getDimension(), currentPoint.getPosition(),
                             currentPoint.getYaw(), true, false);
-                    if (teleportToPoint(player, currentPoint)) {
-                        team.assignNextSpawnPoint(player.getUUID());
+                    if (!teleportToPoint(player, currentPoint)) {
+                        return false;
                     }
-                }));
+                    team.markSpawnUsed(player.getUUID(), currentPoint);
+                    if (pointKind == SpawnPointKind.INITIAL) {
+                        team.assignNextSpawnPoint(player.getUUID(), SpawnPointKind.INITIAL);
+                    }
+                    return true;
+                })).orElse(false);
     }
 
     public boolean teleportToPoint(ServerPlayer player, SpawnPointData data) {
@@ -119,6 +149,9 @@ public abstract class BaseMap {
         }
         ServerLevel targetLevel = serverLevel.getServer().getLevel(data.getDimension());
         if (targetLevel == null) {
+            return false;
+        }
+        if (!SpawnSafetyValidator.isSafe(targetLevel, player, data)) {
             return false;
         }
         player.teleportTo(
@@ -132,6 +165,10 @@ public abstract class BaseMap {
         player.setDeltaMovement(player.getDeltaMovement().multiply(1.0D, 0.0D, 1.0D));
         player.setOnGround(true);
         return true;
+    }
+
+    protected SpawnPointKind resolveSpawnPointKind(SpawnSelectionReason reason) {
+        return SpawnPointKind.INITIAL;
     }
 
     public void clearPlayerInventory(UUID uuid, Predicate<ItemStack> inventoryPredicate) {

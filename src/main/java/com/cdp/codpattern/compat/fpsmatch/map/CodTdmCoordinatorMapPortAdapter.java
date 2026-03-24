@@ -23,11 +23,12 @@ final record CodTdmCoordinatorMapPortAdapter(
         Function<ServerPlayer, Optional<String>> findTeamNameByPlayerFunction,
         Consumer<ServerPlayer> leaveTeamAction,
         BiConsumer<String, ServerPlayer> joinTeamAction,
+        Supplier<String> gameTypeSupplier,
         Supplier<ServerLevel> serverLevelSupplier,
         Supplier<List<ServerPlayer>> joinedPlayersSupplier,
         Supplier<List<ServerPlayer>> spectatorPlayersSupplier,
         Supplier<List<String>> missingSpawnTeamsSupplier,
-        Consumer<ServerPlayer> teleportPlayerToRespawnAction,
+        Predicate<ServerPlayer> teleportPlayerToRoundStartAction,
         Consumer<ServerPlayer> givePlayerKitsAction,
         Supplier<List<TeamPlayerSnapshotService.TeamRoster>> teamRostersSupplier
 ) implements CodTdmCoordinatorComposition.MapPort {
@@ -73,6 +74,11 @@ final record CodTdmCoordinatorMapPortAdapter(
     }
 
     @Override
+    public String gameType() {
+        return gameTypeSupplier.get();
+    }
+
+    @Override
     public ServerLevel serverLevel() {
         return serverLevelSupplier.get();
     }
@@ -93,8 +99,8 @@ final record CodTdmCoordinatorMapPortAdapter(
     }
 
     @Override
-    public void teleportPlayerToRespawn(ServerPlayer player) {
-        teleportPlayerToRespawnAction.accept(player);
+    public boolean teleportPlayerToRoundStartPoint(ServerPlayer player) {
+        return teleportPlayerToRoundStartAction.test(player);
     }
 
     @Override

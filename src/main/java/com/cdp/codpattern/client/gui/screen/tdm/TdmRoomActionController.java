@@ -2,7 +2,6 @@ package com.cdp.codpattern.client.gui.screen.tdm;
 
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.gui.CodTheme;
-import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.tdm.JoinGameFromSpectatorPacket;
@@ -149,7 +148,7 @@ public final class TdmRoomActionController {
             showRoomNotice(Component.translatable("message.codpattern.game.team_switch_locked").getString(), CodTheme.TEXT_DANGER);
             return;
         }
-        if (!TdmTeamNames.KORTAC.equals(teamName) && !TdmTeamNames.SPECGRU.equals(teamName)) {
+        if (teamName == null || teamName.isBlank()) {
             return;
         }
         ModNetworkChannel.sendToServer(new SelectTeamPacket(roomState.joinedRoom(), teamName));
@@ -215,12 +214,12 @@ public final class TdmRoomActionController {
         buttonStateUpdater.run();
     }
 
-    public void updatePlayerList(String mapName, Map<String, List<PlayerInfo>> teamPlayers) {
-        roomState.setJoinedRoom(mapName);
+    public void updatePlayerList(String roomKey, Map<String, List<PlayerInfo>> teamPlayers) {
+        roomState.setJoinedRoom(roomKey);
         roomState.setTeamPlayers(teamPlayers);
         if (uiState.pendingAction() == TdmRoomUiState.PendingAction.JOINING
-                && mapName != null
-                && mapName.equals(uiState.pendingRoomName())) {
+                && roomKey != null
+                && roomKey.equals(uiState.pendingRoomName())) {
             clearPendingAction();
         } else if (uiState.pendingAction() == TdmRoomUiState.PendingAction.JOINING_GAME) {
             UUID localPlayerId = Minecraft.getInstance().player == null ? null : Minecraft.getInstance().player.getUUID();
@@ -231,16 +230,16 @@ public final class TdmRoomActionController {
         buttonStateUpdater.run();
     }
 
-    public void setJoinedRoom(String roomName) {
-        roomState.setJoinedRoom(roomName);
-        roomState.setSelectedRoom(roomName);
+    public void setJoinedRoom(String roomKey) {
+        roomState.setJoinedRoom(roomKey);
+        roomState.setSelectedRoom(roomKey);
         clearPendingJoinGame();
         clearSwitchFlow();
         clearPendingAction();
         buttonStateUpdater.run();
     }
 
-    public void handleJoinResult(boolean success, String mapName, String reasonCode, String reasonMessage) {
+    public void handleJoinResult(boolean success, String roomKey, String reasonCode, String reasonMessage) {
         String pendingRoom = uiState.pendingRoomName();
         boolean switchJoinAttempt = isSwitchJoinAttempt(pendingRoom);
         if (uiState.pendingAction() == TdmRoomUiState.PendingAction.JOINING) {
@@ -249,12 +248,12 @@ public final class TdmRoomActionController {
         clearPendingJoinGame();
         if (success) {
             roomState.clearTeamPlayers();
-            roomState.setJoinedRoom(mapName);
-            roomState.setSelectedRoom(mapName);
+            roomState.setJoinedRoom(roomKey);
+            roomState.setSelectedRoom(roomKey);
             clearRoomNotice();
-            if (switchJoinAttempt && mapName != null && !mapName.isBlank()) {
+            if (switchJoinAttempt && roomKey != null && !roomKey.isBlank()) {
                 showRoomNotice(
-                        Component.translatable("screen.codpattern.tdm_room.switch_success", mapName).getString(),
+                        Component.translatable("screen.codpattern.tdm_room.switch_success", roomLabel(roomKey)).getString(),
                         CodTheme.TEXT_SECONDARY);
             }
             clearSwitchFlow();
@@ -273,7 +272,7 @@ public final class TdmRoomActionController {
         buttonStateUpdater.run();
     }
 
-    public void handleLeaveResult(boolean success, String roomName, String reasonCode, String reasonMessage) {
+    public void handleLeaveResult(boolean success, String roomKey, String reasonCode, String reasonMessage) {
         if (uiState.pendingAction() == TdmRoomUiState.PendingAction.LEAVING) {
             clearPendingAction();
         }
@@ -297,8 +296,8 @@ public final class TdmRoomActionController {
             showRoomNotice(Component.translatable("screen.codpattern.tdm_room.notice.left_room").getString(),
                     CodTheme.TEXT_SECONDARY);
             clearSwitchFlow();
-            if (roomName != null && roomName.equals(roomState.selectedRoom())) {
-                roomState.setSelectedRoom(roomName);
+            if (roomKey != null && roomKey.equals(roomState.selectedRoom())) {
+                roomState.setSelectedRoom(roomKey);
             }
         } else {
             String reason = resolveReasonText(reasonCode, reasonMessage);
@@ -311,7 +310,7 @@ public final class TdmRoomActionController {
         buttonStateUpdater.run();
     }
 
-    public void handleJoinGameResult(boolean success, long requestId, String mapName, String reasonCode, String reasonMessage) {
+    public void handleJoinGameResult(boolean success, long requestId, String roomKey, String reasonCode, String reasonMessage) {
         if (uiState.pendingAction() != TdmRoomUiState.PendingAction.JOINING_GAME) {
             return;
         }
@@ -319,7 +318,7 @@ public final class TdmRoomActionController {
             return;
         }
         String pendingRoom = uiState.pendingRoomName();
-        if (pendingRoom != null && mapName != null && !mapName.isBlank() && !pendingRoom.equals(mapName)) {
+        if (pendingRoom != null && roomKey != null && !roomKey.isBlank() && !pendingRoom.equals(roomKey)) {
             return;
         }
         clearPendingAction();
@@ -529,5 +528,13 @@ public final class TdmRoomActionController {
 
     private boolean isMidMatchJoinTemporarilyDisabled() {
         return true;
+    }
+
+    private String roomLabel(String roomKey) {
+        TdmRoomData room = roomKey == null ? null : roomState.rooms().get(roomKey);
+        if (room == null || room.mapName == null || room.mapName.isBlank()) {
+            return roomKey == null ? "" : roomKey;
+        }
+        return room.mapName;
     }
 }

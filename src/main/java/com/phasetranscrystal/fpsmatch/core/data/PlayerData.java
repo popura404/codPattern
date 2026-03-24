@@ -16,6 +16,7 @@ public class PlayerData {
     private final Map<UUID, Float> damageData = new HashMap<>();
     private boolean living = true;
     private SpawnPointData spawnPointsData;
+    private SpawnPointData lastSpawnPoint;
 
     public PlayerData(Player owner) {
         this(owner.getUUID(), owner.getDisplayName());
@@ -50,6 +51,14 @@ public class PlayerData {
 
     public SpawnPointData getSpawnPointsData() {
         return spawnPointsData;
+    }
+
+    public void setLastSpawnPoint(SpawnPointData lastSpawnPoint) {
+        this.lastSpawnPoint = lastSpawnPoint;
+    }
+
+    public SpawnPointData getLastSpawnPoint() {
+        return lastSpawnPoint;
     }
 
     public void setLiving(boolean living) {

@@ -13,21 +13,21 @@ import java.util.function.Supplier;
  * C→S: 旁观状态下申请加入进行中对局
  */
 public class JoinGameFromSpectatorPacket {
-    private final String mapName;
+    private final String roomKey;
     private final long requestId;
 
-    public JoinGameFromSpectatorPacket(String mapName, long requestId) {
-        this.mapName = mapName == null ? "" : mapName;
+    public JoinGameFromSpectatorPacket(String roomKey, long requestId) {
+        this.roomKey = roomKey == null ? "" : roomKey;
         this.requestId = requestId;
     }
 
     public JoinGameFromSpectatorPacket(FriendlyByteBuf buf) {
-        this.mapName = buf.readUtf();
+        this.roomKey = buf.readUtf();
         this.requestId = buf.readLong();
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeUtf(mapName);
+        buf.writeUtf(roomKey);
         buf.writeLong(requestId);
     }
 
@@ -42,7 +42,7 @@ public class JoinGameFromSpectatorPacket {
                 return;
             }
             TdmRoomInteractionService.JoinResult result =
-                    TdmRoomInteractionService.joinGameFromSpectator(player, mapName);
+                    TdmRoomInteractionService.joinGameFromSpectator(player, roomKey);
             if (result.success()) {
                 CodTdmRoomManager.getInstance().markRoomListDirty();
             }
@@ -50,7 +50,7 @@ public class JoinGameFromSpectatorPacket {
                     new JoinGameResultPacket(
                             result.success(),
                             requestId,
-                            result.mapName(),
+                            result.roomKey(),
                             result.code(),
                             result.message()),
                     player);

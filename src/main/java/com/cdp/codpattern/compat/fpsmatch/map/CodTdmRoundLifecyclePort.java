@@ -11,7 +11,7 @@ interface CodTdmRoundLifecyclePort {
 
     List<String> randomizeAllTeamSpawnsAndCollectMissingTeams();
 
-    void teleportPlayerToReSpawnPoint(ServerPlayer player);
+    void teleportPlayerToRoundStartPoint(ServerPlayer player);
 
     void givePlayerKits(ServerPlayer player);
 

@@ -1,5 +1,6 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
+import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
@@ -68,10 +69,9 @@ public final class TdmRoomInfoPanelRenderer {
         int actionsLabelY = overviewY + overviewHeight + GuiTextHelper.referenceScaled(BASE_ACTIONS_LABEL_GAP);
         int dividerY = actionsLabelY + referenceLineHeight + GuiTextHelper.referenceScaled(BASE_DIVIDER_GAP);
 
-        renderHeader(graphics, mc, contentX, headerY, joinedRoom, selectedRoom, contentFactor);
-
         TdmRoomData activeRoom = joinedRoom != null ? rooms.get(joinedRoom)
                 : (selectedRoom != null ? rooms.get(selectedRoom) : null);
+        renderHeader(graphics, mc, contentX, headerY, joinedRoom, selectedRoom, rooms, contentFactor);
         renderOverviewCard(graphics, mc, contentX, overviewY, contentWidth, activeRoom, contentFactor);
 
         GuiTextHelper.drawReferenceString(
@@ -204,13 +204,15 @@ public final class TdmRoomInfoPanelRenderer {
             int headerY,
             String joinedRoom,
             String selectedRoom,
+            Map<String, TdmRoomData> rooms,
             float alphaFactor) {
         int secondaryY = headerY + GuiTextHelper.referenceLineHeight(mc.font) + GuiTextHelper.referenceScaled(4);
         if (joinedRoom != null) {
+            TdmRoomData joined = rooms.get(joinedRoom);
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,
-                    Component.translatable("screen.codpattern.tdm_room.current_room", joinedRoom),
+                    Component.translatable("screen.codpattern.tdm_room.current_room", joined == null ? joinedRoom : joined.mapName),
                     x,
                     headerY,
                     scaleAlpha(CodTheme.TEXT_PRIMARY, alphaFactor),
@@ -227,10 +229,11 @@ public final class TdmRoomInfoPanelRenderer {
         }
 
         if (selectedRoom != null) {
+            TdmRoomData selected = rooms.get(selectedRoom);
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,
-                    Component.translatable("screen.codpattern.tdm_room.selected_room", selectedRoom),
+                    Component.translatable("screen.codpattern.tdm_room.selected_room", selected == null ? selectedRoom : selected.mapName),
                     x,
                     headerY,
                     scaleAlpha(CodTheme.TEXT_PRIMARY, alphaFactor),
@@ -279,7 +282,14 @@ public final class TdmRoomInfoPanelRenderer {
         GuiTextHelper.drawReferenceString(
                 graphics,
                 mc.font,
-                Component.translatable("screen.codpattern.tdm_room.overview"),
+                activeRoom == null
+                        ? Component.translatable("screen.codpattern.tdm_room.overview")
+                        : Component.literal(
+                                Component.translatable("screen.codpattern.tdm_room.overview").getString()
+                                        + " · "
+                                        + Component.translatable(
+                                                GameModeRegistry.getOrDefault(activeRoom.gameType).displayNameKey())
+                                                .getString()),
                 x + GuiTextHelper.referenceScaled(6),
                 y + GuiTextHelper.referenceScaled(4),
                 scaleAlpha(CodTheme.TEXT_SECONDARY, alphaFactor),

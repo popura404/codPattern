@@ -1,5 +1,8 @@
 package com.cdp.codpattern.app.tdm.service;
 
+import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
+import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
@@ -25,43 +28,47 @@ public final class TdmRoomInteractionService {
     private TdmRoomInteractionService() {
     }
 
-    public record JoinResult(boolean success, String mapName, String code, String message) {
+    public record JoinResult(boolean success, String roomKey, String code, String message) {
     }
 
-    public record LeaveResult(boolean success, String roomName, String code, String message) {
+    public record LeaveResult(boolean success, String roomKey, String code, String message) {
     }
 
-    public static JoinResult joinRoom(ServerPlayer player, String mapName, String teamName) {
+    public static JoinResult joinRoom(ServerPlayer player, String roomKey, String teamName) {
+        RoomId roomId = decodeRoomId(roomKey);
+        if (roomId == null) {
+            return failJoin("", CODE_MAP_NOT_FOUND, "");
+        }
         var gateway = FpsMatchGatewayProvider.gateway();
-        Optional<CodTdmReadPort> readPortOptional = gateway.findMapReadPortByName(mapName);
-        Optional<CodTdmActionPort> actionPortOptional = gateway.findMapActionPortByName(mapName);
+        Optional<ModeRoomReadPort> readPortOptional = gateway.findRoomReadPort(roomId);
+        Optional<ModeRoomActionPort> actionPortOptional = gateway.findRoomActionPort(roomId);
         if (readPortOptional.isEmpty() || actionPortOptional.isEmpty()) {
-            return failJoin(mapName, CODE_MAP_NOT_FOUND, "");
+            return failJoin(roomId.encode(), CODE_MAP_NOT_FOUND, "");
         }
 
-        CodTdmReadPort readPort = readPortOptional.get();
-        CodTdmActionPort actionPort = actionPortOptional.get();
+        ModeRoomReadPort readPort = readPortOptional.get();
+        ModeRoomActionPort actionPort = actionPortOptional.get();
         CodTdmConfig config = CodTdmConfig.getConfig();
 
         if (readPort.containsJoinedPlayer(player.getUUID()) || readPort.containsSpectator(player)) {
-            return okJoin(mapName, "ALREADY_JOINED", "");
+            return okJoin(roomId.encode(), "ALREADY_JOINED", "");
         }
 
         boolean isPlaying = readPort.isPlayingPhase();
         boolean isWaiting = readPort.isWaitingPhase();
         if (isPlaying && isMidMatchJoinTemporarilyDisabled()) {
-            return failJoin(mapName, CODE_MID_JOIN_DISABLED, "");
+            return failJoin(roomId.encode(), CODE_MID_JOIN_DISABLED, "");
         }
         if (isPlaying && !config.isAllowJoinDuringPlaying()) {
-            return failJoin(mapName, CODE_MID_JOIN_DISABLED, "");
+            return failJoin(roomId.encode(), CODE_MID_JOIN_DISABLED, "");
         }
         if (!isPlaying && !isWaiting) {
-            return failJoin(mapName, CODE_PHASE_LOCKED, "");
+            return failJoin(roomId.encode(), CODE_PHASE_LOCKED, "");
         }
 
         String requestedTeam = normalizeTeam(teamName);
         if (requestedTeam != null && !readPort.hasTeam(requestedTeam)) {
-            return failJoin(mapName, CODE_TEAM_NOT_FOUND, "");
+            return failJoin(roomId.encode(), CODE_TEAM_NOT_FOUND, "");
         }
 
         if (isPlaying) {
@@ -83,72 +90,77 @@ public final class TdmRoomInteractionService {
 
             warnIfMissingEndTeleport(player, readPort);
             actionPort.syncToClient();
-            return okJoin(mapName, "SPECTATOR", "");
+            return okJoin(roomId.encode(), "SPECTATOR", "");
         }
 
         String targetTeam = requestedTeam;
         if (targetTeam == null) {
             Optional<String> autoTeam = readPort.chooseAutoJoinTeam(config.getMaxTeamDiff());
             if (autoTeam.isEmpty()) {
-                return failJoin(mapName, CODE_BALANCE_EXCEEDED, "");
+                return failJoin(roomId.encode(), CODE_BALANCE_EXCEEDED, "");
             }
             targetTeam = autoTeam.get();
         } else {
             if (readPort.isTeamFull(targetTeam)) {
-                return failJoin(mapName, CODE_TEAM_FULL, "");
+                return failJoin(roomId.encode(), CODE_TEAM_FULL, "");
             }
             if (!readPort.canJoinWithBalance(targetTeam, config.getMaxTeamDiff())) {
-                return failJoin(mapName, CODE_BALANCE_EXCEEDED, "");
+                return failJoin(roomId.encode(), CODE_BALANCE_EXCEEDED, "");
             }
         }
 
         actionPort.joinTeam(targetTeam, player);
         if (!readPort.containsJoinedPlayer(player.getUUID())) {
-            return failJoin(mapName, CODE_UNKNOWN, "");
+            return failJoin(roomId.encode(), CODE_UNKNOWN, "");
         }
 
         actionPort.initializeReadyState(player);
         warnIfMissingEndTeleport(player, readPort);
         actionPort.syncToClient();
-        return okJoin(mapName, "OK", "");
+        return okJoin(roomId.encode(), "OK", "");
     }
 
     public static LeaveResult leaveRoom(ServerPlayer player) {
-        Optional<String> roomName = FpsMatchGatewayProvider.gateway().leaveCurrentMapIncludingSpectator(player);
-        if (roomName.isPresent()) {
-            return new LeaveResult(true, roomName.get(), "OK", "");
+        var gateway = FpsMatchGatewayProvider.gateway();
+        Optional<ModeRoomReadPort> readPortOptional = gateway.findPlayerRoomReadPort(player);
+        Optional<ModeRoomActionPort> actionPortOptional = gateway.findPlayerRoomActionPort(player);
+        if (readPortOptional.isPresent() && actionPortOptional.isPresent()) {
+            String roomKey = readPortOptional.get().roomId().encode();
+            actionPortOptional.get().leaveRoom(player);
+            return new LeaveResult(true, roomKey, "OK", "");
         }
         return new LeaveResult(false, "", "NOT_IN_ROOM", "");
     }
 
-    public static JoinResult joinGameFromSpectator(ServerPlayer player, String mapName) {
-        if (mapName == null || mapName.isBlank()) {
+    public static JoinResult joinGameFromSpectator(ServerPlayer player, String roomKey) {
+        RoomId roomId = decodeRoomId(roomKey);
+        if (roomId == null) {
             return failJoin("", CODE_MAP_NOT_FOUND, "");
         }
 
         var gateway = FpsMatchGatewayProvider.gateway();
-        Optional<CodTdmReadPort> readPortOptional = gateway.findMapReadPortByName(mapName);
-        Optional<CodTdmActionPort> actionPortOptional = gateway.findMapActionPortByName(mapName);
+        Optional<ModeRoomReadPort> readPortOptional = gateway.findRoomReadPort(roomId);
+        Optional<ModeRoomActionPort> actionPortOptional = gateway.findRoomActionPort(roomId);
         if (readPortOptional.isEmpty() || actionPortOptional.isEmpty()) {
-            return failJoin(mapName, CODE_MAP_NOT_FOUND, "");
+            return failJoin(roomId.encode(), CODE_MAP_NOT_FOUND, "");
         }
 
-        CodTdmReadPort readPort = readPortOptional.get();
-        CodTdmActionPort actionPort = actionPortOptional.get();
+        ModeRoomReadPort readPort = readPortOptional.get();
+        ModeRoomActionPort actionPort = actionPortOptional.get();
         if (!readPort.containsSpectator(player)) {
-            return failJoin(mapName, CODE_NOT_SPECTATOR, "");
+            return failJoin(roomId.encode(), CODE_NOT_SPECTATOR, "");
         }
         if (!readPort.isPlayingPhase()) {
-            return failJoin(mapName, CODE_PHASE_LOCKED, "");
+            return failJoin(roomId.encode(), CODE_PHASE_LOCKED, "");
         }
 
         if (isMidMatchJoinTemporarilyDisabled()) {
-            return failJoin(mapName, CODE_MID_JOIN_DISABLED, "");
+            return failJoin(roomId.encode(), CODE_MID_JOIN_DISABLED, "");
         }
 
         CodTdmConfig config = CodTdmConfig.getConfig();
         if (!config.isAllowJoinDuringPlaying()) {
-            return failJoin(mapName, CODE_MID_JOIN_DISABLED, "");
+            return failJoin(roomId.encode(), CODE_MID_JOIN_DISABLED, "");
         }
 
         int maxTeamDiff = config.getMaxTeamDiff();
@@ -157,38 +169,39 @@ public final class TdmRoomInteractionService {
         Optional<String> autoTeam = readPort.chooseAutoJoinTeam(maxTeamDiff);
         String targetTeam = preferredTeam.orElseGet(() -> autoTeam.orElse(null));
         if (targetTeam == null) {
-            return failJoin(mapName, CODE_BALANCE_EXCEEDED, "");
+            return failJoin(roomId.encode(), CODE_BALANCE_EXCEEDED, "");
         }
 
         actionPort.joinTeam(targetTeam, player);
         if (!readPort.containsJoinedPlayer(player.getUUID())) {
-            return failJoin(mapName, CODE_UNKNOWN, "");
+            return failJoin(roomId.encode(), CODE_UNKNOWN, "");
         }
 
         actionPort.initializeReadyState(player);
         actionPort.respawnPlayerNow(player);
         actionPort.syncToClient();
-        return okJoin(mapName, "OK", "");
+        return okJoin(roomId.encode(), "OK", "");
     }
 
     public static void switchTeam(ServerPlayer player, String teamName) {
         FpsMatchGatewayProvider.gateway()
-                .findPlayerTdmActionPort(player)
+                .findPlayerRoomActionPort(player)
                 .ifPresent(port -> port.switchTeam(player, teamName));
     }
 
-    public static void selectTeamInRoom(ServerPlayer player, String mapName, String teamName) {
-        if (mapName == null || mapName.isBlank() || teamName == null || teamName.isBlank()) {
+    public static void selectTeamInRoom(ServerPlayer player, String roomKey, String teamName) {
+        RoomId roomId = decodeRoomId(roomKey);
+        if (roomId == null || teamName == null || teamName.isBlank()) {
             return;
         }
         var gateway = FpsMatchGatewayProvider.gateway();
-        Optional<CodTdmReadPort> readPortOptional = gateway.findMapReadPortByName(mapName);
-        Optional<CodTdmActionPort> actionPortOptional = gateway.findMapActionPortByName(mapName);
+        Optional<ModeRoomReadPort> readPortOptional = gateway.findRoomReadPort(roomId);
+        Optional<ModeRoomActionPort> actionPortOptional = gateway.findRoomActionPort(roomId);
         if (readPortOptional.isEmpty() || actionPortOptional.isEmpty()) {
             return;
         }
-        CodTdmReadPort readPort = readPortOptional.get();
-        CodTdmActionPort actionPort = actionPortOptional.get();
+        ModeRoomReadPort readPort = readPortOptional.get();
+        ModeRoomActionPort actionPort = actionPortOptional.get();
 
         // 安全校验：只允许房间内成员（正式队员/旁观）触发队伍操作。
         boolean inJoinedTeam = readPort.containsJoinedPlayer(player.getUUID());
@@ -238,8 +251,8 @@ public final class TdmRoomInteractionService {
     }
 
     public static Component setReadyState(ServerPlayer player, boolean ready) {
-        Optional<CodTdmActionPort> actionPortOptional = FpsMatchGatewayProvider.gateway()
-                .findPlayerTdmActionPort(player);
+        Optional<ModeRoomActionPort> actionPortOptional = FpsMatchGatewayProvider.gateway()
+                .findPlayerRoomActionPort(player);
         if (actionPortOptional.isEmpty()) {
             return Component.translatable("message.codpattern.room.not_joined_tdm");
         }
@@ -252,28 +265,28 @@ public final class TdmRoomInteractionService {
 
     public static void initiateStartVote(ServerPlayer player) {
         FpsMatchGatewayProvider.gateway()
-                .findPlayerTdmActionPort(player)
+                .findPlayerRoomActionPort(player)
                 .ifPresent(port -> port.initiateStartVote(player.getUUID()));
     }
 
     public static void initiateEndVote(ServerPlayer player) {
         FpsMatchGatewayProvider.gateway()
-                .findPlayerTdmActionPort(player)
+                .findPlayerRoomActionPort(player)
                 .ifPresent(port -> port.initiateEndVote(player.getUUID()));
     }
 
     public static void submitVoteResponse(ServerPlayer player, long voteId, boolean accepted) {
         FpsMatchGatewayProvider.gateway()
-                .findPlayerTdmActionPort(player)
+                .findPlayerRoomActionPort(player)
                 .ifPresent(port -> port.submitVoteResponse(player.getUUID(), voteId, accepted));
     }
 
-    private static JoinResult okJoin(String mapName, String code, String message) {
-        return new JoinResult(true, mapName, code, message);
+    private static JoinResult okJoin(String roomKey, String code, String message) {
+        return new JoinResult(true, roomKey, code, message);
     }
 
-    private static JoinResult failJoin(String mapName, String code, String message) {
-        return new JoinResult(false, mapName, code, message);
+    private static JoinResult failJoin(String roomKey, String code, String message) {
+        return new JoinResult(false, roomKey, code, message);
     }
 
     private static String normalizeTeam(String team) {
@@ -283,7 +296,7 @@ public final class TdmRoomInteractionService {
         return team.trim();
     }
 
-    private static Optional<String> resolvePlayableTeam(CodTdmReadPort readPort, String requestedTeam, int maxTeamDiff) {
+    private static Optional<String> resolvePlayableTeam(ModeRoomReadPort readPort, String requestedTeam, int maxTeamDiff) {
         if (requestedTeam != null) {
             if (canJoinTeam(readPort, requestedTeam, maxTeamDiff)) {
                 return Optional.of(requestedTeam);
@@ -293,7 +306,7 @@ public final class TdmRoomInteractionService {
         return readPort.chooseAutoJoinTeam(maxTeamDiff);
     }
 
-    private static boolean canJoinTeam(CodTdmReadPort readPort, String teamName, int maxTeamDiff) {
+    private static boolean canJoinTeam(ModeRoomReadPort readPort, String teamName, int maxTeamDiff) {
         if (teamName == null || teamName.isBlank()) {
             return false;
         }
@@ -306,7 +319,7 @@ public final class TdmRoomInteractionService {
         return readPort.canJoinWithBalance(teamName, maxTeamDiff);
     }
 
-    private static void warnIfMissingEndTeleport(ServerPlayer player, CodTdmReadPort readPort) {
+    private static void warnIfMissingEndTeleport(ServerPlayer player, ModeRoomReadPort readPort) {
         if (!readPort.hasMatchEndTeleportPoint()) {
             player.sendSystemMessage(
                     Component.translatable("message.codpattern.game.warning_no_end_teleport", readPort.mapName()));
@@ -315,5 +328,16 @@ public final class TdmRoomInteractionService {
 
     private static boolean isMidMatchJoinTemporarilyDisabled() {
         return true;
+    }
+
+    private static RoomId decodeRoomId(String roomKey) {
+        if (roomKey == null || roomKey.isBlank()) {
+            return null;
+        }
+        try {
+            return RoomId.decode(roomKey);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 }

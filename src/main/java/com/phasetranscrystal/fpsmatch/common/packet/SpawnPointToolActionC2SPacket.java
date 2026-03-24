@@ -4,6 +4,7 @@ import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.SpawnPointTool;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
+import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import net.minecraft.network.FriendlyByteBuf;
@@ -28,14 +29,16 @@ public class SpawnPointToolActionC2SPacket {
     private final String selectedType;
     private final String selectedMap;
     private final String selectedTeam;
+    private final String selectedKind;
     private final int selectedIndex;
 
     public SpawnPointToolActionC2SPacket(Action action, String selectedType, String selectedMap, String selectedTeam,
-            int selectedIndex) {
+            String selectedKind, int selectedIndex) {
         this.action = action;
         this.selectedType = selectedType;
         this.selectedMap = selectedMap;
         this.selectedTeam = selectedTeam;
+        this.selectedKind = selectedKind;
         this.selectedIndex = selectedIndex;
     }
 
@@ -44,6 +47,7 @@ public class SpawnPointToolActionC2SPacket {
         buf.writeUtf(selectedType);
         buf.writeUtf(selectedMap);
         buf.writeUtf(selectedTeam);
+        buf.writeUtf(selectedKind);
         buf.writeVarInt(selectedIndex);
     }
 
@@ -53,13 +57,21 @@ public class SpawnPointToolActionC2SPacket {
                 buf.readUtf(),
                 buf.readUtf(),
                 buf.readUtf(),
+                buf.readUtf(),
                 buf.readVarInt()
         );
     }
 
     public static void sendScreen(ServerPlayer player, ItemStack stack, String requestedType, String requestedMap,
-            String requestedTeam, int requestedIndex) {
-        SelectionSnapshot snapshot = resolveSelection(stack, requestedType, requestedMap, requestedTeam, requestedIndex);
+            String requestedTeam, String requestedKind, int requestedIndex) {
+        SelectionSnapshot snapshot = resolveSelection(
+                stack,
+                requestedType,
+                requestedMap,
+                requestedTeam,
+                requestedKind,
+                requestedIndex
+        );
         FPSMatch.sendToPlayer(player, new OpenSpawnPointToolScreenS2CPacket(
                 snapshot.availableTypes(),
                 snapshot.selectedType(),
@@ -67,6 +79,8 @@ public class SpawnPointToolActionC2SPacket {
                 snapshot.selectedMap(),
                 snapshot.availableTeams(),
                 snapshot.selectedTeam(),
+                snapshot.availableKinds(),
+                snapshot.selectedKind(),
                 snapshot.selectedIndex(),
                 snapshot.spawnPoints()
         ));
@@ -85,8 +99,8 @@ public class SpawnPointToolActionC2SPacket {
             }
 
             switch (action) {
-                case REFRESH -> sendScreen(player, stack, selectedType, selectedMap, selectedTeam, selectedIndex);
-                case SAVE_SELECTIONS -> resolveSelection(stack, selectedType, selectedMap, selectedTeam, selectedIndex);
+                case REFRESH -> sendScreen(player, stack, selectedType, selectedMap, selectedTeam, selectedKind, selectedIndex);
+                case SAVE_SELECTIONS -> resolveSelection(stack, selectedType, selectedMap, selectedTeam, selectedKind, selectedIndex);
                 case DELETE_SELECTED -> deleteSelected(player, stack);
                 case CLEAR_TEAM -> clearTeam(player, stack);
             }
@@ -95,40 +109,78 @@ public class SpawnPointToolActionC2SPacket {
     }
 
     private void deleteSelected(ServerPlayer player, ItemStack stack) {
-        SelectionSnapshot snapshot = resolveSelection(stack, selectedType, selectedMap, selectedTeam, selectedIndex);
+        SelectionSnapshot snapshot = resolveSelection(
+                stack,
+                selectedType,
+                selectedMap,
+                selectedTeam,
+                selectedKind,
+                selectedIndex
+        );
         if (snapshot.team().isEmpty()) {
             player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.team_not_found", snapshot.selectedTeam()), false);
             return;
         }
         if (snapshot.selectedIndex() < 0 || snapshot.selectedIndex() >= snapshot.spawnPoints().size()) {
-            sendScreen(player, stack, snapshot.selectedType(), snapshot.selectedMap(), snapshot.selectedTeam(), -1);
+            sendScreen(
+                    player,
+                    stack,
+                    snapshot.selectedType(),
+                    snapshot.selectedMap(),
+                    snapshot.selectedTeam(),
+                    snapshot.selectedKind(),
+                    -1
+            );
             return;
         }
 
         BaseTeam team = snapshot.team().get();
-        team.removeSpawnPointData(snapshot.selectedIndex());
+        team.removeSpawnPointData(snapshot.spawnPointKind(), snapshot.selectedIndex());
         team.clearPlayerSpawnPointAssignments();
-        if (!team.getSpawnPointsData().isEmpty()) {
-            team.assignNextSpawnPoints();
+        if (snapshot.spawnPointKind() == SpawnPointKind.INITIAL && !team.getSpawnPointsData().isEmpty()) {
+            team.assignNextSpawnPoints(SpawnPointKind.INITIAL);
         }
-        sendScreen(player, stack, snapshot.selectedType(), snapshot.selectedMap(), snapshot.selectedTeam(), snapshot.selectedIndex());
+        sendScreen(
+                player,
+                stack,
+                snapshot.selectedType(),
+                snapshot.selectedMap(),
+                snapshot.selectedTeam(),
+                snapshot.selectedKind(),
+                snapshot.selectedIndex()
+        );
     }
 
     private void clearTeam(ServerPlayer player, ItemStack stack) {
-        SelectionSnapshot snapshot = resolveSelection(stack, selectedType, selectedMap, selectedTeam, selectedIndex);
+        SelectionSnapshot snapshot = resolveSelection(
+                stack,
+                selectedType,
+                selectedMap,
+                selectedTeam,
+                selectedKind,
+                selectedIndex
+        );
         if (snapshot.team().isEmpty()) {
             player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.team_not_found", snapshot.selectedTeam()), false);
             return;
         }
 
         BaseTeam team = snapshot.team().get();
-        team.resetSpawnPointData();
+        team.resetSpawnPointData(snapshot.spawnPointKind());
         team.clearPlayerSpawnPointAssignments();
-        sendScreen(player, stack, snapshot.selectedType(), snapshot.selectedMap(), snapshot.selectedTeam(), -1);
+        sendScreen(
+                player,
+                stack,
+                snapshot.selectedType(),
+                snapshot.selectedMap(),
+                snapshot.selectedTeam(),
+                snapshot.selectedKind(),
+                -1
+        );
     }
 
     private static SelectionSnapshot resolveSelection(ItemStack stack, String requestedType, String requestedMap,
-            String requestedTeam, int requestedIndex) {
+            String requestedTeam, String requestedKind, int requestedIndex) {
         FPSMCore core = FPSMCore.getInstance();
         List<String> availableTypes = core.getGameTypes();
         String selectedType = availableTypes.contains(requestedType) ? requestedType : firstOrBlank(availableTypes);
@@ -142,11 +194,22 @@ public class SpawnPointToolActionC2SPacket {
                 .toList()).orElse(List.of());
         String selectedTeam = availableTeams.contains(requestedTeam) ? requestedTeam : firstOrBlank(availableTeams);
         Optional<BaseTeam> team = map.flatMap(baseMap -> baseMap.getMapTeams().getTeamByName(selectedTeam));
-        List<SpawnPointData> spawnPoints = team.map(BaseTeam::getSpawnPointsData).map(List::copyOf).orElse(List.of());
+        List<String> availableKinds = List.of(
+                SpawnPointKind.INITIAL.serializedName(),
+                SpawnPointKind.DYNAMIC_CANDIDATE.serializedName()
+        );
+        String selectedKind = availableKinds.contains(requestedKind)
+                ? requestedKind
+                : SpawnPointKind.INITIAL.serializedName();
+        SpawnPointKind spawnPointKind = SpawnPointKind.fromSerializedName(selectedKind);
+        List<SpawnPointData> spawnPoints = team.map(baseTeam -> baseTeam.getSpawnPointsData(spawnPointKind))
+                .map(List::copyOf)
+                .orElse(List.of());
 
         SpawnPointTool.setSelectedType(stack, selectedType);
         SpawnPointTool.setSelectedMap(stack, selectedMap);
         SpawnPointTool.setSelectedTeam(stack, selectedTeam);
+        SpawnPointTool.setSelectedKind(stack, selectedKind);
 
         int normalizedIndex = spawnPoints.isEmpty()
                 ? -1
@@ -159,8 +222,11 @@ public class SpawnPointToolActionC2SPacket {
                 selectedMap,
                 availableTeams,
                 selectedTeam,
+                availableKinds,
+                selectedKind,
                 normalizedIndex,
                 spawnPoints,
+                spawnPointKind,
                 map,
                 team
         );
@@ -177,8 +243,11 @@ public class SpawnPointToolActionC2SPacket {
             String selectedMap,
             List<String> availableTeams,
             String selectedTeam,
+            List<String> availableKinds,
+            String selectedKind,
             int selectedIndex,
             List<SpawnPointData> spawnPoints,
+            SpawnPointKind spawnPointKind,
             Optional<BaseMap> map,
             Optional<BaseTeam> team
     ) {

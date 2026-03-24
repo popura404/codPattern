@@ -3,16 +3,16 @@ package com.cdp.codpattern.compat.fpsmatch.map;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
-import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 final record CodTdmRoundLifecycleMapPortAdapter(
         Supplier<List<ServerPlayer>> joinedPlayersSupplier,
         Supplier<List<ServerPlayer>> spectatorPlayersSupplier,
         Supplier<List<String>> missingSpawnTeamsSupplier,
-        Consumer<ServerPlayer> teleportToRespawnAction,
-        Consumer<ServerPlayer> givePlayerKitsAction,
-        Consumer<ServerPlayer> clearPlayerInventoryAction
+        Predicate<ServerPlayer> teleportToRoundStartAction,
+        java.util.function.Consumer<ServerPlayer> givePlayerKitsAction,
+        java.util.function.Consumer<ServerPlayer> clearPlayerInventoryAction
 ) implements CodTdmRoundLifecyclePort {
 
     @Override
@@ -31,8 +31,8 @@ final record CodTdmRoundLifecycleMapPortAdapter(
     }
 
     @Override
-    public void teleportPlayerToReSpawnPoint(ServerPlayer player) {
-        teleportToRespawnAction.accept(player);
+    public void teleportPlayerToRoundStartPoint(ServerPlayer player) {
+        teleportToRoundStartAction.test(player);
     }
 
     @Override

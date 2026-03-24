@@ -1,5 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.tdm.model.TdmGamePhase;
 import com.cdp.codpattern.app.tdm.service.TeamBalanceService;
 import com.cdp.codpattern.app.tdm.service.TeamPlayerSnapshotService;
@@ -43,6 +44,8 @@ final class CodTdmCoordinatorComposition {
 
         void joinTeam(String teamName, ServerPlayer player);
 
+        String gameType();
+
         ServerLevel serverLevel();
 
         List<ServerPlayer> joinedPlayers();
@@ -51,7 +54,7 @@ final class CodTdmCoordinatorComposition {
 
         List<String> randomizeAllTeamSpawnsAndCollectMissingTeams();
 
-        void teleportPlayerToRespawn(ServerPlayer player);
+        boolean teleportPlayerToRoundStartPoint(ServerPlayer player);
 
         void givePlayerKits(ServerPlayer player);
 
@@ -112,7 +115,7 @@ final class CodTdmCoordinatorComposition {
                         mapPort::joinedPlayers,
                         mapPort::spectatorPlayers,
                         mapPort::randomizeAllTeamSpawnsAndCollectMissingTeams,
-                        mapPort::teleportPlayerToRespawn,
+                        mapPort::teleportPlayerToRoundStartPoint,
                         mapPort::givePlayerKits,
                         clearPlayerInventoryAction
                 )
@@ -120,7 +123,7 @@ final class CodTdmCoordinatorComposition {
 
         CodTdmClientSyncCoordinator clientSyncCoordinator = new CodTdmClientSyncCoordinator(
                 new CodTdmClientSyncMapPortAdapter(
-                        mapNameSupplier,
+                        () -> RoomId.of(mapPort.gameType(), mapNameSupplier.get()).encode(),
                         () -> TeamPlayerSnapshotService.buildTeamPlayers(
                                 mapPort.teamRosters(),
                                 uuid -> mapPort.serverLevel().getPlayerByUUID(uuid),

@@ -1,5 +1,8 @@
 package com.cdp.codpattern.compat.fpsmatch;
 
+import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
+import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
 import net.minecraft.core.BlockPos;
@@ -12,6 +15,16 @@ import java.util.UUID;
 
 public interface FpsMatchGateway {
     boolean isInMatch(UUID playerId);
+
+    Optional<ModeRoomActionPort> findRoomActionPort(RoomId roomId);
+
+    Optional<ModeRoomActionPort> findPlayerRoomActionPort(ServerPlayer player);
+
+    Optional<ModeRoomReadPort> findRoomReadPort(RoomId roomId);
+
+    Optional<ModeRoomReadPort> findPlayerRoomReadPort(ServerPlayer player);
+
+    List<ModeRoomReadPort> listRoomReadPorts();
 
     Optional<CodTdmActionPort> findMapActionPortByName(String mapName);
 

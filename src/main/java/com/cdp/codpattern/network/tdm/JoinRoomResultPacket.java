@@ -13,27 +13,27 @@ import java.util.function.Supplier;
  */
 public class JoinRoomResultPacket {
     private final boolean success;
-    private final String mapName;
+    private final String roomKey;
     private final String reasonCode;
     private final String reasonMessage;
 
-    public JoinRoomResultPacket(boolean success, String mapName, String reasonCode, String reasonMessage) {
+    public JoinRoomResultPacket(boolean success, String roomKey, String reasonCode, String reasonMessage) {
         this.success = success;
-        this.mapName = mapName == null ? "" : mapName;
+        this.roomKey = roomKey == null ? "" : roomKey;
         this.reasonCode = reasonCode == null ? "" : reasonCode;
         this.reasonMessage = reasonMessage == null ? "" : reasonMessage;
     }
 
     public JoinRoomResultPacket(FriendlyByteBuf buf) {
         this.success = buf.readBoolean();
-        this.mapName = buf.readUtf();
+        this.roomKey = buf.readUtf();
         this.reasonCode = buf.readUtf();
         this.reasonMessage = buf.readUtf();
     }
 
     public void encode(FriendlyByteBuf buf) {
         buf.writeBoolean(success);
-        buf.writeUtf(mapName);
+        buf.writeUtf(roomKey);
         buf.writeUtf(reasonCode);
         buf.writeUtf(reasonMessage);
     }
@@ -44,7 +44,7 @@ public class JoinRoomResultPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                () -> () -> ClientPacketHandler.handleJoinRoomResult(success, mapName, reasonCode, reasonMessage)));
+                () -> () -> ClientPacketHandler.handleJoinRoomResult(success, roomKey, reasonCode, reasonMessage)));
         ctx.get().setPacketHandled(true);
     }
 }

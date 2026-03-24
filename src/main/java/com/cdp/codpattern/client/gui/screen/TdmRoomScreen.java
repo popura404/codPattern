@@ -78,7 +78,7 @@ public class TdmRoomScreen extends Screen {
     private int infoActionBottomY;
 
     public TdmRoomScreen() {
-        super(Component.translatable("screen.codpattern.tdm_room.title"));
+        super(Component.translatable("screen.codpattern.room.title"));
         this.actionController = new TdmRoomActionController(roomState, uiState, this::updateButtonStates);
     }
 
@@ -235,7 +235,7 @@ public class TdmRoomScreen extends Screen {
         GuiTextHelper.drawReferenceCenteredString(
                 graphics,
                 mc.font,
-                Component.translatable("screen.codpattern.tdm_room.header"),
+                Component.translatable("screen.codpattern.room.header"),
                 this.width / 2,
                 scaled(20),
                 titleColor,
@@ -412,21 +412,21 @@ public class TdmRoomScreen extends Screen {
     /**
      * 设置已加入的房间
      */
-    public void setJoinedRoom(String roomName) {
-        actionController.setJoinedRoom(roomName);
+    public void setJoinedRoom(String roomKey) {
+        actionController.setJoinedRoom(roomKey);
     }
 
-    public void handleJoinResult(boolean success, String mapName, String reasonCode, String reasonMessage) {
-        actionController.handleJoinResult(success, mapName, reasonCode, reasonMessage);
+    public void handleJoinResult(boolean success, String roomKey, String reasonCode, String reasonMessage) {
+        actionController.handleJoinResult(success, roomKey, reasonCode, reasonMessage);
     }
 
-    public void handleLeaveResult(boolean success, String roomName, String reasonCode, String reasonMessage) {
-        actionController.handleLeaveResult(success, roomName, reasonCode, reasonMessage);
+    public void handleLeaveResult(boolean success, String roomKey, String reasonCode, String reasonMessage) {
+        actionController.handleLeaveResult(success, roomKey, reasonCode, reasonMessage);
     }
 
-    public void handleJoinGameResult(boolean success, long requestId, String mapName, String reasonCode,
+    public void handleJoinGameResult(boolean success, long requestId, String roomKey, String reasonCode,
             String reasonMessage) {
-        actionController.handleJoinGameResult(success, requestId, mapName, reasonCode, reasonMessage);
+        actionController.handleJoinGameResult(success, requestId, roomKey, reasonCode, reasonMessage);
     }
 
     @Override

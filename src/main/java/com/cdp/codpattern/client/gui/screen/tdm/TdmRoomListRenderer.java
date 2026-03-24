@@ -1,5 +1,7 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
+import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.model.ModeDescriptor;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import net.minecraft.client.Minecraft;
@@ -146,7 +148,7 @@ public final class TdmRoomListRenderer {
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,
-                    Component.translatable("screen.codpattern.tdm_room.create_hint"),
+                    Component.translatable("screen.codpattern.room.create_hint"),
                     roomListX + panelPadding,
                     emptyY + referenceLineHeight + GuiTextHelper.referenceScaled(3),
                     scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
@@ -154,7 +156,7 @@ public final class TdmRoomListRenderer {
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,
-                    Component.translatable("screen.codpattern.tdm_room.create_command"),
+                    Component.translatable("screen.codpattern.room.create_command"),
                     roomListX + panelPadding,
                     emptyY + (referenceLineHeight + GuiTextHelper.referenceScaled(3)) * 2,
                     scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
@@ -170,25 +172,25 @@ public final class TdmRoomListRenderer {
         for (int index = effectiveOffset; index < endIndex; index++) {
             int visibleIndex = index - effectiveOffset;
             int y = listTop + visibleIndex * roomItemHeight;
-            String mapName = roomNames.get(index);
-            TdmRoomData room = rooms.get(mapName);
+            String roomKey = roomNames.get(index);
+            TdmRoomData room = rooms.get(roomKey);
             if (room == null) {
                 continue;
             }
 
-            roomHitboxes.add(new RoomHitbox(mapName, roomListX, y, roomListWidth, roomItemHeight));
+            roomHitboxes.add(new RoomHitbox(roomKey, roomListX, y, roomListWidth, roomItemHeight));
 
             boolean hovered = mouseX >= roomListX && mouseX <= roomListX + roomListWidth
                     && mouseY >= y && mouseY < y + roomItemHeight;
-            boolean selected = mapName.equals(selectedRoom);
-            boolean joined = mapName.equals(joinedRoom);
+            boolean selected = roomKey.equals(selectedRoom);
+            boolean joined = roomKey.equals(joinedRoom);
 
             float targetHighlight = joined ? 1.0f : (selected ? 0.85f : (hovered ? 0.45f : 0.0f));
             float currentHighlight = approach(
-                    highlightProgress.getOrDefault(mapName, 0.0f),
+                    highlightProgress.getOrDefault(roomKey, 0.0f),
                     targetHighlight,
                     HIGHLIGHT_APPROACH_STEP);
-            highlightProgress.put(mapName, currentHighlight);
+            highlightProgress.put(roomKey, currentHighlight);
 
             int rowBottom = y + roomItemHeight - 1;
             int baseTop = withAlpha(CodTheme.CARD_BG_TOP, 74 + (int) (currentHighlight * 84.0f));
@@ -216,11 +218,11 @@ public final class TdmRoomListRenderer {
                         scaleAlpha(edgeColor, panelAlphaFactor));
             }
 
-            long enteredAt = roomEnteredAtMs.getOrDefault(mapName, 0L);
+            long enteredAt = roomEnteredAtMs.getOrDefault(roomKey, 0L);
             if (enteredAt > 0L) {
                 long elapsed = nowMs - enteredAt;
                 if (elapsed >= NEW_ROOM_PULSE_MS) {
-                    roomEnteredAtMs.remove(mapName);
+                    roomEnteredAtMs.remove(roomKey);
                 } else {
                     float pulse = 1.0f - (elapsed / (float) NEW_ROOM_PULSE_MS);
                     int pulseColor = withAlpha(CodTheme.HOVER_BORDER, Math.max(0, (int) (95.0f * pulse)));
@@ -229,7 +231,7 @@ public final class TdmRoomListRenderer {
                 }
             }
 
-            ActionType actionType = resolveActionType(joinedRoom, mapName, hovered);
+            ActionType actionType = resolveActionType(joinedRoom, roomKey, hovered);
             boolean showAction = actionType != null;
             int contentLeft = roomListX + panelPadding;
             int contentRight = roomListX + roomListWidth - panelPadding;
@@ -245,7 +247,7 @@ public final class TdmRoomListRenderer {
             int textRight = showAction ? actionX - actionGap : contentRight;
 
             String statusIcon = TdmRoomTextFormatter.statusIcon(room.state);
-            String roomText = statusIcon + " " + mapName;
+            String roomText = statusIcon + " " + room.mapName;
             if (!room.hasMatchEndTeleportPoint) {
                 roomText += " §c!";
             }
@@ -257,6 +259,8 @@ public final class TdmRoomListRenderer {
             int roomTextMaxWidth = Math.max(
                     GuiTextHelper.referenceScaled(34),
                     textRight - contentLeft);
+            ModeDescriptor descriptor = GameModeRegistry.getOrDefault(room.gameType);
+            String modeText = Component.translatable(descriptor.displayNameKey()).getString();
             GuiTextHelper.drawReferenceEllipsizedString(
                     graphics,
                     mc.font,
@@ -273,7 +277,7 @@ public final class TdmRoomListRenderer {
             GuiTextHelper.drawReferenceEllipsizedString(
                     graphics,
                     mc.font,
-                    playerText,
+                    modeText + "  " + playerText,
                     contentLeft,
                     playerTextY,
                     Math.max(GuiTextHelper.referenceScaled(24), textRight - contentLeft),
@@ -305,7 +309,7 @@ public final class TdmRoomListRenderer {
 
             if (showAction) {
                 boolean enabled = !hasPendingAction;
-                actionHitboxes.add(new ActionHitbox(mapName, actionType, actionX, actionY, actionSize, actionSize, enabled));
+                actionHitboxes.add(new ActionHitbox(roomKey, actionType, actionX, actionY, actionSize, actionSize, enabled));
                 renderActionButton(graphics, mc, actionX, actionY, actionSize, actionType, actionHovered, enabled,
                         leavePending && actionType == ActionType.LEAVE, panelAlphaFactor);
             }
@@ -439,17 +443,21 @@ public final class TdmRoomListRenderer {
 
     private static Comparator<Map.Entry<String, TdmRoomData>> roomComparator(String joinedRoom) {
         return (left, right) -> {
-            String leftName = left.getKey();
-            String rightName = right.getKey();
-            if (leftName.equals(joinedRoom) && !rightName.equals(joinedRoom)) {
+            String leftRoomKey = left.getKey();
+            String rightRoomKey = right.getKey();
+            if (leftRoomKey.equals(joinedRoom) && !rightRoomKey.equals(joinedRoom)) {
                 return -1;
             }
-            if (rightName.equals(joinedRoom) && !leftName.equals(joinedRoom)) {
+            if (rightRoomKey.equals(joinedRoom) && !leftRoomKey.equals(joinedRoom)) {
                 return 1;
             }
 
             TdmRoomData leftData = left.getValue();
             TdmRoomData rightData = right.getValue();
+            int modeCompare = leftData.gameType.compareToIgnoreCase(rightData.gameType);
+            if (modeCompare != 0) {
+                return modeCompare;
+            }
             int stateCompare = Integer.compare(statePriority(leftData.state), statePriority(rightData.state));
             if (stateCompare != 0) {
                 return stateCompare;
@@ -460,7 +468,7 @@ public final class TdmRoomListRenderer {
                 return playerCompare;
             }
 
-            return leftName.compareToIgnoreCase(rightName);
+            return leftData.mapName.compareToIgnoreCase(rightData.mapName);
         };
     }
 

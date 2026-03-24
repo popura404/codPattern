@@ -14,14 +14,14 @@ import java.util.function.Supplier;
 public class JoinGameResultPacket {
     private final boolean success;
     private final long requestId;
-    private final String mapName;
+    private final String roomKey;
     private final String reasonCode;
     private final String reasonMessage;
 
-    public JoinGameResultPacket(boolean success, long requestId, String mapName, String reasonCode, String reasonMessage) {
+    public JoinGameResultPacket(boolean success, long requestId, String roomKey, String reasonCode, String reasonMessage) {
         this.success = success;
         this.requestId = requestId;
-        this.mapName = mapName == null ? "" : mapName;
+        this.roomKey = roomKey == null ? "" : roomKey;
         this.reasonCode = reasonCode == null ? "" : reasonCode;
         this.reasonMessage = reasonMessage == null ? "" : reasonMessage;
     }
@@ -29,7 +29,7 @@ public class JoinGameResultPacket {
     public JoinGameResultPacket(FriendlyByteBuf buf) {
         this.success = buf.readBoolean();
         this.requestId = buf.readLong();
-        this.mapName = buf.readUtf();
+        this.roomKey = buf.readUtf();
         this.reasonCode = buf.readUtf();
         this.reasonMessage = buf.readUtf();
     }
@@ -37,7 +37,7 @@ public class JoinGameResultPacket {
     public void encode(FriendlyByteBuf buf) {
         buf.writeBoolean(success);
         buf.writeLong(requestId);
-        buf.writeUtf(mapName);
+        buf.writeUtf(roomKey);
         buf.writeUtf(reasonCode);
         buf.writeUtf(reasonMessage);
     }
@@ -51,7 +51,7 @@ public class JoinGameResultPacket {
                 () -> () -> ClientPacketHandler.handleJoinGameResult(
                         success,
                         requestId,
-                        mapName,
+                        roomKey,
                         reasonCode,
                         reasonMessage)));
         ctx.get().setPacketHandled(true);

@@ -4,6 +4,7 @@ import com.cdp.codpattern.app.tdm.model.TdmTeamDefaults;
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
+import com.cdp.codpattern.config.tdm.CodTdmConfig;
 import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.scores.Team;
@@ -41,7 +42,9 @@ final class CodTdmMapRuntimeAssembly {
                 playerState,
                 map::getServerLevel,
                 map::teleportPlayerToReSpawnPoint,
-                map::givePlayerKits
+                map::givePlayerKits,
+                () -> Math.max(1, CodTdmConfig.getConfig().getRespawnDelayTicks()),
+                () -> Math.max(0, CodTdmConfig.getConfig().getInvincibilityTicks())
         );
         CodTdmMapAssemblyOutput assemblyResult = assemble(
                 map,

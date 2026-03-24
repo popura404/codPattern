@@ -5,4 +5,5 @@ public final class TdmGameTypes {
     }
 
     public static final String CDP_TDM = "cdptdm";
+    public static final String CDP_TACTICAL_TDM = "cdptacticaltdm";
 }

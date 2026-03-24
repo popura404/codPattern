@@ -5,7 +5,9 @@ import com.cdp.codpattern.app.tdm.service.PlayerDeathService;
 import com.cdp.codpattern.app.tdm.service.ScoreService;
 import com.cdp.codpattern.app.tdm.service.VoteService;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.MinecraftServer;
 
+import java.nio.file.Path;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -40,7 +42,8 @@ final class CodTdmMapComposition {
             Supplier<Iterable<ServerPlayer>> joinedPlayersSupplier,
             Runnable startGameAction,
             Runnable transitionToEndedAction,
-            Runnable resetGameAction
+            Runnable resetGameAction,
+            Function<MinecraftServer, Path> matchRecordDirResolver
     ) {
         CodTdmHooksComposition.SupportHooksBundle supportHooks = CodTdmHooksComposition.createSupportHooks(
                 playerState,
@@ -66,7 +69,8 @@ final class CodTdmMapComposition {
                 coordinatorMapPort,
                 matchState,
                 playerState,
-                mapNameSupplier
+                mapNameSupplier,
+                matchRecordDirResolver
         );
         PhaseStateMachine.Hooks phaseStateHooks = CodTdmHooksComposition.createPhaseStateHooks(
                 playerState,

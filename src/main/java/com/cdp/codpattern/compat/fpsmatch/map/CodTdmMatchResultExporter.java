@@ -7,6 +7,7 @@ import com.google.gson.GsonBuilder;
 import com.mojang.logging.LogUtils;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
 
 import java.nio.charset.StandardCharsets;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.function.Function;
 
 final class CodTdmMatchResultExporter {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -33,17 +35,20 @@ final class CodTdmMatchResultExporter {
     private final CodTdmMatchRuntimeState matchState;
     private final CodTdmPlayerRuntimeState playerState;
     private final Supplier<String> mapNameSupplier;
+    private final Function<MinecraftServer, Path> exportDirResolver;
 
     CodTdmMatchResultExporter(
             CodTdmCoordinatorComposition.MapPort mapPort,
             CodTdmMatchRuntimeState matchState,
             CodTdmPlayerRuntimeState playerState,
-            Supplier<String> mapNameSupplier
+            Supplier<String> mapNameSupplier,
+            Function<MinecraftServer, Path> exportDirResolver
     ) {
         this.mapPort = mapPort;
         this.matchState = matchState;
         this.playerState = playerState;
         this.mapNameSupplier = mapNameSupplier;
+        this.exportDirResolver = exportDirResolver;
     }
 
     void exportOnMatchEnded() {
@@ -112,7 +117,7 @@ final class CodTdmMatchResultExporter {
         );
 
         try {
-            Path exportDir = ConfigPath.SERVER_TDM_MATCH_RECORDS.getPath(serverLevel.getServer());
+            Path exportDir = exportDirResolver.apply(serverLevel.getServer());
             Files.createDirectories(exportDir);
 
             String fileName = endedAt

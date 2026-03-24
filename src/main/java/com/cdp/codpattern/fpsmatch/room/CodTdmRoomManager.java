@@ -1,8 +1,9 @@
 package com.cdp.codpattern.fpsmatch.room;
 
 import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
+import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
-import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.tdm.RoomListSyncPacket;
 import net.minecraft.server.level.ServerPlayer;
@@ -15,8 +16,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * TDM 房间管理器（单例）
- * 从 FPSMCore 获取 TDM 类型的地图
+ * 房间管理器（单例）
+ * 从 FPSMCore 获取已注册模式的房间摘要
  */
 @Mod.EventBusSubscriber(modid = CodPattern.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class CodTdmRoomManager {
@@ -49,10 +50,10 @@ public class CodTdmRoomManager {
         ModNetworkChannel.sendToPlayer(new RoomListSyncPacket(buildRoomInfos()), player);
     }
 
-    private Map<String, RoomListSyncPacket.RoomInfo> buildRoomInfos() {
-        Map<String, RoomListSyncPacket.RoomInfo> roomInfos = new HashMap<>();
+    private Map<RoomId, RoomListSyncPacket.RoomInfo> buildRoomInfos() {
+        Map<RoomId, RoomListSyncPacket.RoomInfo> roomInfos = new HashMap<>();
 
-        for (CodTdmReadPort readPort : FpsMatchGatewayProvider.gateway().listTdmReadPorts()) {
+        for (ModeRoomReadPort readPort : FpsMatchGatewayProvider.gateway().listRoomReadPorts()) {
             Map<String, Integer> teamPlayerCounts = readPort.getTeamPlayerCountsSnapshot();
             int playerCount = teamPlayerCounts.values().stream().mapToInt(Integer::intValue).sum();
             int maxPlayers = readPort.getMaxPlayerCapacity();
@@ -67,7 +68,7 @@ public class CodTdmRoomManager {
                     teamScores,
                     remainingTimeTicks,
                     readPort.hasMatchEndTeleportPoint());
-            roomInfos.put(readPort.mapName(), info);
+            roomInfos.put(readPort.roomId(), info);
         }
         return roomInfos;
     }

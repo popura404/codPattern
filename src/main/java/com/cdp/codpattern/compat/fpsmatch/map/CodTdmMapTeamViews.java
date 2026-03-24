@@ -75,7 +75,7 @@ final class CodTdmMapTeamViews {
             snapshots.add(new CodTdmTeamPersistenceSnapshot(
                     team.name,
                     team.getPlayerLimit(),
-                    List.copyOf(team.getSpawnPointsData())
+                    team.getSpawnProfile()
             ));
         }
         return snapshots;

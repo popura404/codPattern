@@ -17,16 +17,16 @@ import java.util.function.Supplier;
  * S→C: 同步队伍玩家列表数据包
  */
 public class TeamPlayerListPacket {
-    private final String mapName;
+    private final String roomKey;
     private final Map<String, List<PlayerInfo>> teamPlayers;
 
-    public TeamPlayerListPacket(String mapName, Map<String, List<PlayerInfo>> teamPlayers) {
-        this.mapName = mapName;
+    public TeamPlayerListPacket(String roomKey, Map<String, List<PlayerInfo>> teamPlayers) {
+        this.roomKey = roomKey;
         this.teamPlayers = teamPlayers;
     }
 
     public TeamPlayerListPacket(FriendlyByteBuf buf) {
-        this.mapName = buf.readUtf();
+        this.roomKey = buf.readUtf();
         int teamCount = buf.readInt();
         this.teamPlayers = new HashMap<>();
         for (int i = 0; i < teamCount; i++) {
@@ -41,7 +41,7 @@ public class TeamPlayerListPacket {
     }
 
     public void encode(FriendlyByteBuf buf) {
-        buf.writeUtf(mapName);
+        buf.writeUtf(roomKey);
         buf.writeInt(teamPlayers.size());
         for (Map.Entry<String, List<PlayerInfo>> entry : teamPlayers.entrySet()) {
             buf.writeUtf(entry.getKey());
@@ -59,7 +59,7 @@ public class TeamPlayerListPacket {
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
             DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                    () -> () -> ClientPacketHandler.handleTeamPlayerList(mapName, teamPlayers));
+                    () -> () -> ClientPacketHandler.handleTeamPlayerList(roomKey, teamPlayers));
         });
         ctx.get().setPacketHandled(true);
     }

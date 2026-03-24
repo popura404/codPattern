@@ -15,25 +15,32 @@ public class SpawnPointData {
             Codec.STRING.fieldOf("Dimension").forGetter(data -> data.getDimension().location().toString()),
             BlockPos.CODEC.optionalFieldOf("Position", BlockPos.ZERO).forGetter(SpawnPointData::getPosition),
             Codec.FLOAT.fieldOf("Yaw").forGetter(SpawnPointData::getYaw),
-            Codec.FLOAT.fieldOf("Pitch").forGetter(SpawnPointData::getPitch)
-    ).apply(instance, (dimensionId, position, yaw, pitch) -> {
+            Codec.FLOAT.fieldOf("Pitch").forGetter(SpawnPointData::getPitch),
+            SpawnPointKind.CODEC.optionalFieldOf("Kind", SpawnPointKind.INITIAL).forGetter(SpawnPointData::getKind)
+    ).apply(instance, (dimensionId, position, yaw, pitch, kind) -> {
         ResourceLocation location = ResourceLocation.tryParse(dimensionId);
         if (location == null) {
             location = Level.OVERWORLD.location();
         }
-        return new SpawnPointData(ResourceKey.create(Registries.DIMENSION, location), position, yaw, pitch);
+        return new SpawnPointData(ResourceKey.create(Registries.DIMENSION, location), position, yaw, pitch, kind);
     }));
 
     private final ResourceKey<Level> dimension;
     private final BlockPos position;
     private final float yaw;
     private final float pitch;
+    private final SpawnPointKind kind;
 
     public SpawnPointData(ResourceKey<Level> dimension, BlockPos position, float yaw, float pitch) {
+        this(dimension, position, yaw, pitch, SpawnPointKind.INITIAL);
+    }
+
+    public SpawnPointData(ResourceKey<Level> dimension, BlockPos position, float yaw, float pitch, SpawnPointKind kind) {
         this.dimension = dimension;
         this.position = position;
         this.yaw = yaw;
         this.pitch = pitch;
+        this.kind = kind == null ? SpawnPointKind.INITIAL : kind;
     }
 
     public ResourceKey<Level> getDimension() {
@@ -56,6 +63,10 @@ public class SpawnPointData {
         return pitch;
     }
 
+    public SpawnPointKind getKind() {
+        return kind;
+    }
+
     public int getX() {
         return position.getX();
     }
@@ -68,6 +79,14 @@ public class SpawnPointData {
         return position.getZ();
     }
 
+    public SpawnPointData withKind(SpawnPointKind newKind) {
+        SpawnPointKind normalizedKind = newKind == null ? SpawnPointKind.INITIAL : newKind;
+        if (kind == normalizedKind) {
+            return this;
+        }
+        return new SpawnPointData(dimension, position, yaw, pitch, normalizedKind);
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (!(obj instanceof SpawnPointData other)) {
@@ -76,16 +95,17 @@ public class SpawnPointData {
         return Objects.equals(dimension, other.dimension)
                 && Objects.equals(position, other.position)
                 && Float.compare(yaw, other.yaw) == 0
-                && Float.compare(pitch, other.pitch) == 0;
+                && Float.compare(pitch, other.pitch) == 0
+                && kind == other.kind;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(dimension, position, yaw, pitch);
+        return Objects.hash(dimension, position, yaw, pitch, kind);
     }
 
     @Override
     public String toString() {
-        return dimension.location() + " " + position;
+        return kind.serializedName() + " " + dimension.location() + " " + position;
     }
 }

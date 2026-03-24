@@ -14,7 +14,7 @@ import java.util.List;
 
 public class SpawnPointToolScreen extends Screen {
     private static final int PANEL_WIDTH = 326;
-    private static final int PANEL_HEIGHT = 220;
+    private static final int PANEL_HEIGHT = 248;
     private static final int SCREEN_OVERLAY = 0x5A000000;
     private static final int PANEL_BACKGROUND = 0xD0191D22;
     private static final int PANEL_BORDER = 0xFFB58A42;
@@ -22,15 +22,18 @@ public class SpawnPointToolScreen extends Screen {
     private List<String> availableTypes;
     private List<String> availableMaps;
     private List<String> availableTeams;
+    private List<String> availableKinds;
     private List<SpawnPointData> spawnPoints;
     private String selectedType;
     private String selectedMap;
     private String selectedTeam;
+    private String selectedKind;
     private int selectedIndex;
 
     private Button typeButton;
     private Button mapButton;
     private Button teamButton;
+    private Button kindButton;
     private Button prevButton;
     private Button nextButton;
     private Button deleteButton;
@@ -41,10 +44,12 @@ public class SpawnPointToolScreen extends Screen {
         this.availableTypes = new ArrayList<>(data.availableTypes());
         this.availableMaps = new ArrayList<>(data.availableMaps());
         this.availableTeams = new ArrayList<>(data.availableTeams());
+        this.availableKinds = new ArrayList<>(data.availableKinds());
         this.spawnPoints = new ArrayList<>(data.spawnPoints());
         this.selectedType = data.selectedType();
         this.selectedMap = data.selectedMap();
         this.selectedTeam = data.selectedTeam();
+        this.selectedKind = data.selectedKind();
         this.selectedIndex = data.selectedIndex();
     }
 
@@ -65,30 +70,34 @@ public class SpawnPointToolScreen extends Screen {
                 .pos(left + 124, top + 84)
                 .size(184, 20)
                 .build());
+        this.kindButton = this.addRenderableWidget(new Button.Builder(Component.empty(), button -> cycleKind())
+                .pos(left + 124, top + 114)
+                .size(184, 20)
+                .build());
 
         this.prevButton = this.addRenderableWidget(new Button.Builder(Component.literal("<"), button -> stepIndex(-1))
-                .pos(left + 124, top + 114)
+                .pos(left + 124, top + 144)
                 .size(24, 20)
                 .build());
         this.nextButton = this.addRenderableWidget(new Button.Builder(Component.literal(">"), button -> stepIndex(1))
-                .pos(left + 284, top + 114)
+                .pos(left + 284, top + 144)
                 .size(24, 20)
                 .build());
 
         this.deleteButton = this.addRenderableWidget(new Button.Builder(
                 Component.translatable("gui.fpsm.spawn_point_tool.delete"),
                 button -> sendAction(SpawnPointToolActionC2SPacket.Action.DELETE_SELECTED))
-                .pos(left + 18, top + 170)
+                .pos(left + 18, top + 198)
                 .size(140, 20)
                 .build());
         this.clearButton = this.addRenderableWidget(new Button.Builder(
                 Component.translatable("gui.fpsm.spawn_point_tool.clear"),
                 button -> sendAction(SpawnPointToolActionC2SPacket.Action.CLEAR_TEAM))
-                .pos(left + 168, top + 170)
+                .pos(left + 168, top + 198)
                 .size(140, 20)
                 .build());
         this.addRenderableWidget(new Button.Builder(Component.translatable("gui.fpsm.close"), button -> onClose())
-                .pos(left + 18, top + 194)
+                .pos(left + 18, top + 222)
                 .size(290, 20)
                 .build());
 
@@ -99,10 +108,12 @@ public class SpawnPointToolScreen extends Screen {
         this.availableTypes = new ArrayList<>(data.availableTypes());
         this.availableMaps = new ArrayList<>(data.availableMaps());
         this.availableTeams = new ArrayList<>(data.availableTeams());
+        this.availableKinds = new ArrayList<>(data.availableKinds());
         this.spawnPoints = new ArrayList<>(data.spawnPoints());
         this.selectedType = data.selectedType();
         this.selectedMap = data.selectedMap();
         this.selectedTeam = data.selectedTeam();
+        this.selectedKind = data.selectedKind();
         this.selectedIndex = data.selectedIndex();
         updateButtonLabels();
     }
@@ -133,9 +144,10 @@ public class SpawnPointToolScreen extends Screen {
         guiGraphics.drawString(this.font, Component.translatable("gui.fpsm.spawn_point_tool.type"), left + 12, top + 30, 0xF1D9B0, false);
         guiGraphics.drawString(this.font, Component.translatable("gui.fpsm.spawn_point_tool.map"), left + 12, top + 60, 0xF1D9B0, false);
         guiGraphics.drawString(this.font, Component.translatable("gui.fpsm.spawn_point_tool.team"), left + 12, top + 90, 0xF1D9B0, false);
-        guiGraphics.drawString(this.font, Component.translatable("gui.fpsm.spawn_point_tool.count", this.spawnPoints.size()), left + 12, top + 120, 0xFFFFFF, false);
-        guiGraphics.drawString(this.font, currentPointLabel(), left + 160, top + 120, 0xD7E3EA, false);
-        guiGraphics.drawString(this.font, currentPointDetail(), left + 12, top + 144, 0xA4C4D3, false);
+        guiGraphics.drawString(this.font, Component.translatable("gui.fpsm.spawn_point_tool.kind"), left + 12, top + 120, 0xF1D9B0, false);
+        guiGraphics.drawString(this.font, Component.translatable("gui.fpsm.spawn_point_tool.count", this.spawnPoints.size()), left + 12, top + 150, 0xFFFFFF, false);
+        guiGraphics.drawString(this.font, currentPointLabel(), left + 160, top + 150, 0xD7E3EA, false);
+        guiGraphics.drawString(this.font, currentPointDetail(), left + 12, top + 174, 0xA4C4D3, false);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
@@ -173,6 +185,16 @@ public class SpawnPointToolScreen extends Screen {
         sendAction(SpawnPointToolActionC2SPacket.Action.REFRESH);
     }
 
+    private void cycleKind() {
+        if (availableKinds.isEmpty()) {
+            return;
+        }
+        int currentIndex = availableKinds.indexOf(selectedKind);
+        int nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % availableKinds.size();
+        this.selectedKind = availableKinds.get(nextIndex);
+        sendAction(SpawnPointToolActionC2SPacket.Action.REFRESH);
+    }
+
     private void stepIndex(int offset) {
         if (spawnPoints.isEmpty()) {
             selectedIndex = -1;
@@ -190,6 +212,7 @@ public class SpawnPointToolScreen extends Screen {
         this.typeButton.setMessage(Component.literal(selectedType.isBlank() ? "-" : selectedType));
         this.mapButton.setMessage(Component.literal(selectedMap.isBlank() ? "-" : selectedMap));
         this.teamButton.setMessage(Component.literal(selectedTeam.isBlank() ? "-" : selectedTeam));
+        this.kindButton.setMessage(Component.literal(selectedKind.isBlank() ? "-" : selectedKind));
         boolean hasPoints = !spawnPoints.isEmpty();
         this.prevButton.active = hasPoints;
         this.nextButton.active = hasPoints;
@@ -221,6 +244,7 @@ public class SpawnPointToolScreen extends Screen {
                 this.selectedType,
                 this.selectedMap,
                 this.selectedTeam,
+                this.selectedKind,
                 this.selectedIndex
         ));
     }

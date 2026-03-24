@@ -1,8 +1,11 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
+import com.cdp.codpattern.app.match.model.RoomId;
+
 import java.util.Map;
 
 public class TdmRoomData {
+    public String gameType;
     public String mapName;
     public String state;
     public int playerCount;
@@ -12,7 +15,8 @@ public class TdmRoomData {
     public int remainingTimeTicks;
     public boolean hasMatchEndTeleportPoint;
 
-    public TdmRoomData(String mapName,
+    public TdmRoomData(String gameType,
+            String mapName,
             String state,
             int playerCount,
             int maxPlayers,
@@ -20,6 +24,7 @@ public class TdmRoomData {
             Map<String, Integer> teamScores,
             int remainingTimeTicks,
             boolean hasMatchEndTeleportPoint) {
+        this.gameType = gameType;
         this.mapName = mapName;
         this.state = state;
         this.playerCount = playerCount;
@@ -28,5 +33,13 @@ public class TdmRoomData {
         this.teamScores = teamScores;
         this.remainingTimeTicks = remainingTimeTicks;
         this.hasMatchEndTeleportPoint = hasMatchEndTeleportPoint;
+    }
+
+    public RoomId roomId() {
+        return RoomId.of(gameType, mapName);
+    }
+
+    public String roomKey() {
+        return roomId().encode();
     }
 }
