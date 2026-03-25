@@ -109,6 +109,14 @@ public class FPSMCore {
         games.computeIfAbsent(type, key -> new ArrayList<>()).add(map);
     }
 
+    public boolean unregisterMap(BaseMap map) {
+        if (map == null) {
+            return false;
+        }
+        List<BaseMap> maps = games.get(map.getGameType());
+        return maps != null && maps.remove(map);
+    }
+
     public Optional<BaseMap> getMapByTypeWithName(String type, String name) {
         if (!checkGameType(type)) {
             return Optional.empty();

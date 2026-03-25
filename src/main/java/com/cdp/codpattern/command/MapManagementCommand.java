@@ -1,6 +1,8 @@
 package com.cdp.codpattern.command;
 
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.compat.fpsmatch.data.CodTacticalTdmMapData;
+import com.cdp.codpattern.compat.fpsmatch.data.CodTdmMapData;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -8,6 +10,7 @@ import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
+import com.phasetranscrystal.fpsmatch.core.data.save.FPSMDataManager;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import com.phasetranscrystal.fpsmatch.common.item.MapCreatorTool;
@@ -16,11 +19,13 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec2;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
 public final class MapManagementCommand {
     private MapManagementCommand() {
@@ -46,6 +51,13 @@ public final class MapManagementCommand {
                                                                 StringArgumentType.getString(context, "map"),
                                                                 BlockPosArgument.getLoadedBlockPos(context, "from"),
                                                                 BlockPosArgument.getLoadedBlockPos(context, "to"))))))))
+                .then(Commands.literal("delete")
+                        .then(Commands.argument("type", StringArgumentType.word())
+                                .then(Commands.argument("map", StringArgumentType.string())
+                                        .executes(context -> deleteMap(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "type"),
+                                                StringArgumentType.getString(context, "map"))))))
                 .then(Commands.literal("spawn")
                         .then(Commands.literal("list")
                                 .then(Commands.argument("type", StringArgumentType.word())
@@ -168,6 +180,38 @@ public final class MapManagementCommand {
         BaseMap newMap = factory.apply(source.getLevel(), mapName, new AreaData(from, to));
         core.registerMap(type, newMap);
         source.sendSuccess(() -> Component.translatable("commands.fpsm.create.success", mapName), true);
+        return 1;
+    }
+
+    private static int deleteMap(CommandSourceStack source, String rawType, String mapName) {
+        BaseMap map = requireMap(source, rawType, mapName);
+        if (map == null) {
+            return 0;
+        }
+
+        FPSMDataManager.DeleteStatus deleteStatus = deletePersistedMapData(map.getGameType(), map.getMapName());
+        if (deleteStatus == FPSMDataManager.DeleteStatus.FAILED) {
+            source.sendFailure(Component.translatable(
+                    "command.codpattern.map.delete.save_failed",
+                    map.getGameType(),
+                    map.getMapName()));
+            return 0;
+        }
+
+        int removedPlayerCount = removePlayersFromMap(map);
+        map.resetGame();
+        if (!FPSMCore.getInstance().unregisterMap(map)) {
+            source.sendFailure(Component.translatable(
+                    "command.codpattern.map.delete.unregister_failed",
+                    map.getGameType(),
+                    map.getMapName()));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.translatable(
+                "command.codpattern.map.delete.success",
+                map.getGameType(),
+                map.getMapName(),
+                removedPlayerCount), true);
         return 1;
     }
 
@@ -423,6 +467,28 @@ public final class MapManagementCommand {
             return false;
         }
         return true;
+    }
+
+    private static FPSMDataManager.DeleteStatus deletePersistedMapData(String type, String mapName) {
+        FPSMDataManager manager = FPSMCore.getInstance().getFPSMDataManager();
+        if (TdmGameTypes.isTeamDeathMatch(type)) {
+            return manager.deleteData(CodTacticalTdmMapData.MapData.class, mapName);
+        }
+        return manager.deleteData(CodTdmMapData.MapData.class, mapName);
+    }
+
+    private static int removePlayersFromMap(BaseMap map) {
+        int removedCount = 0;
+        List<UUID> joinedPlayers = List.copyOf(map.getMapTeams().getJoinedPlayersWithSpec());
+        for (UUID playerId : joinedPlayers) {
+            Optional<ServerPlayer> player = FPSMCore.getInstance().getPlayerByUUID(playerId);
+            if (player.isEmpty()) {
+                continue;
+            }
+            map.leave(player.get());
+            removedCount++;
+        }
+        return removedCount;
     }
 
     private static Optional<SpawnPointData> readMatchEndTeleportPoint(BaseMap map) {

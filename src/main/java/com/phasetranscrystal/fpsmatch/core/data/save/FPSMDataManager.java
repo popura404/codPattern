@@ -14,6 +14,12 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public class FPSMDataManager {
+    public enum DeleteStatus {
+        DELETED,
+        NOT_FOUND,
+        FAILED
+    }
+
     private final Map<Class<?>, Pair<String, ISavePort<?>>> registry = new HashMap<>();
     private final List<Consumer<FPSMDataManager>> writeActions = new ArrayList<>();
     private final File levelData;
@@ -51,6 +57,23 @@ public class FPSMDataManager {
 
     public <T> void saveData(T data, String fileName) {
         saveData(data, fileName, false);
+    }
+
+    public DeleteStatus deleteData(Class<?> clazz, String fileName) {
+        Pair<String, ISavePort<?>> pair = registry.get(clazz);
+        if (pair == null) {
+            throw new RuntimeException("Unregistered save data " + clazz.getName());
+        }
+        ISavePort<?> savePort = pair.getSecond();
+        File targetDir = new File(savePort.isGlobal() ? globalData : levelData, pair.getFirst());
+        if (!targetDir.exists() || !targetDir.isDirectory()) {
+            return DeleteStatus.NOT_FOUND;
+        }
+        File targetFile = new File(targetDir, fixName(fileName) + "." + savePort.getFileType());
+        if (!targetFile.exists()) {
+            return DeleteStatus.NOT_FOUND;
+        }
+        return targetFile.delete() ? DeleteStatus.DELETED : DeleteStatus.FAILED;
     }
 
     public void saveData() {
