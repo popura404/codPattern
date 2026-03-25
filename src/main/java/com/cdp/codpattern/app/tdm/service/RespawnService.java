@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.ObjIntConsumer;
 import java.util.function.Predicate;
 
 public final class RespawnService {
@@ -28,7 +29,8 @@ public final class RespawnService {
             Map<UUID, Integer> respawnTimers,
             ServerLevel serverLevel,
             Predicate<ServerPlayer> respawnAction,
-            int respawnRetryTicks
+            int respawnRetryTicks,
+            ObjIntConsumer<ServerPlayer> respawnRetryAction
     ) {
         Iterator<Map.Entry<UUID, Integer>> iterator = respawnTimers.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -42,7 +44,11 @@ public final class RespawnService {
                     if (respawnAction.test(serverPlayer)) {
                         iterator.remove();
                     } else {
-                        entry.setValue(Math.max(1, respawnRetryTicks));
+                        int retryTicks = Math.max(1, respawnRetryTicks);
+                        entry.setValue(retryTicks);
+                        if (respawnRetryAction != null) {
+                            respawnRetryAction.accept(serverPlayer, retryTicks);
+                        }
                     }
                     continue;
                 }

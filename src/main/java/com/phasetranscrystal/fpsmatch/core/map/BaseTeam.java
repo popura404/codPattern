@@ -176,7 +176,12 @@ public class BaseTeam {
     }
 
     public Optional<SpawnPointData> assignNextSpawnPoint(UUID playerId, SpawnPointKind kind) {
-        Optional<SpawnPointData> nextPoint = selectSpawnPoint(playerId, kind);
+        return assignNextSpawnPoint(playerId, kind, Set.of());
+    }
+
+    public Optional<SpawnPointData> assignNextSpawnPoint(UUID playerId, SpawnPointKind kind,
+            Set<SpawnPointData> excludedPoints) {
+        Optional<SpawnPointData> nextPoint = selectSpawnPoint(playerId, kind, excludedPoints);
         nextPoint.ifPresent(point -> {
             PlayerData playerData = players.get(playerId);
             if (playerData != null) {
@@ -187,12 +192,20 @@ public class BaseTeam {
     }
 
     public Optional<SpawnPointData> selectSpawnPoint(UUID playerId, SpawnPointKind kind) {
+        return selectSpawnPoint(playerId, kind, Set.of());
+    }
+
+    public Optional<SpawnPointData> selectSpawnPoint(UUID playerId, SpawnPointKind kind,
+            Set<SpawnPointData> excludedPoints) {
         PlayerData playerData = players.get(playerId);
         if (playerData == null) {
             return Optional.empty();
         }
 
-        List<SpawnPointData> uniquePoints = getUniqueSpawnPoints(kind);
+        Set<SpawnPointData> normalizedExcludedPoints = excludedPoints == null ? Set.of() : excludedPoints;
+        List<SpawnPointData> uniquePoints = getUniqueSpawnPoints(kind).stream()
+                .filter(point -> !normalizedExcludedPoints.contains(point))
+                .toList();
         if (uniquePoints.isEmpty()) {
             return Optional.empty();
         }

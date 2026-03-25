@@ -1,9 +1,11 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.tdm.service.CombatRegenService;
 import com.cdp.codpattern.app.tdm.service.DeathCamService;
 import com.cdp.codpattern.app.tdm.service.RespawnService;
 import com.cdp.codpattern.config.tdm.CodTdmConfig;
+import com.cdp.codpattern.network.tdm.DeathCamPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -52,7 +54,8 @@ final class CodTdmRespawnRuntime {
                 playerState.respawnTimers(),
                 serverLevelSupplier.get(),
                 this::respawnPlayer,
-                respawnRetryTicksSupplier.get()
+                respawnRetryTicksSupplier.get(),
+                this::notifyRespawnRetry
         );
     }
 
@@ -78,5 +81,12 @@ final class CodTdmRespawnRuntime {
                 playerState.invinciblePlayers(),
                 playerState.invincibilityTimers()
         );
+    }
+
+    private void notifyRespawnRetry(ServerPlayer player, int retryTicks) {
+        if (player == null || retryTicks <= 0) {
+            return;
+        }
+        ModNetworkChannel.sendToPlayer(new DeathCamPacket(null, "", 0, retryTicks), player);
     }
 }

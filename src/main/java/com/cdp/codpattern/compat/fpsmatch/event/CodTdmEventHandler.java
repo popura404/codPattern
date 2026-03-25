@@ -98,14 +98,6 @@ public class CodTdmEventHandler {
         var gateway = FpsMatchGatewayProvider.gateway();
         Optional<CodTdmReadPort> readPortOptional = gateway.findPlayerTdmReadPort(player);
         Optional<CodTdmActionPort> actionPortOptional = gateway.findPlayerTdmActionPort(player);
-        if ((readPortOptional.isEmpty() || actionPortOptional.isEmpty()) && killer != null) {
-            if (readPortOptional.isEmpty()) {
-                readPortOptional = gateway.findPlayerTdmReadPort(killer);
-            }
-            if (actionPortOptional.isEmpty()) {
-                actionPortOptional = gateway.findPlayerTdmActionPort(killer);
-            }
-        }
         if (readPortOptional.isEmpty() || actionPortOptional.isEmpty()) {
             return;
         }

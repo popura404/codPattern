@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 final class DynamicRespawnSelector {
@@ -36,13 +37,18 @@ final class DynamicRespawnSelector {
     private DynamicRespawnSelector() {
     }
 
-    static Optional<SpawnPointData> selectBestSpawnPoint(ServerPlayer player, BaseTeam team, MapTeams mapTeams) {
+    static Optional<SpawnPointData> selectBestSpawnPoint(ServerPlayer player, BaseTeam team, MapTeams mapTeams,
+            Set<SpawnPointData> excludedPoints) {
         if (player == null || team == null || mapTeams == null) {
             return Optional.empty();
         }
 
+        Set<SpawnPointData> normalizedExcludedPoints = excludedPoints == null ? Set.of() : excludedPoints;
         List<CandidateScore> scores = new ArrayList<>();
         for (SpawnPointData candidate : new LinkedHashSet<>(team.getSpawnPointsData(SpawnPointKind.DYNAMIC_CANDIDATE))) {
+            if (normalizedExcludedPoints.contains(candidate)) {
+                continue;
+            }
             evaluateCandidate(player, team, mapTeams, candidate).ifPresent(scores::add);
         }
         if (scores.isEmpty()) {

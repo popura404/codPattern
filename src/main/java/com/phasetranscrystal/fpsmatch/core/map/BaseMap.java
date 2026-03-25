@@ -17,8 +17,11 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -119,34 +122,55 @@ public abstract class BaseMap {
         }
         return mapTeams.getTeamByPlayer(player).flatMap(team ->
                 team.getPlayerData(player.getUUID()).map(playerData -> {
-                    SpawnPointData currentPoint = pointKind == SpawnPointKind.INITIAL
-                            ? playerData.getSpawnPointsData()
-                            : null;
-                    if (currentPoint == null) {
-                        currentPoint = resolveSpawnPointForTeleport(player, team, pointKind).orElse(null);
-                    }
-                    if (currentPoint == null) {
-                        return false;
-                    }
+                    int maxAttempts = Math.max(1, new LinkedHashSet<>(team.getSpawnPointsData(pointKind)).size() + 1);
+                    Set<SpawnPointData> attemptedPoints = new LinkedHashSet<>();
+                    while (attemptedPoints.size() < maxAttempts) {
+                        SpawnPointData currentPoint = pointKind == SpawnPointKind.INITIAL
+                                ? playerData.getSpawnPointsData()
+                                : null;
+                        if (currentPoint != null && attemptedPoints.contains(currentPoint)) {
+                            currentPoint = null;
+                        }
+                        if (currentPoint == null) {
+                            currentPoint = resolveSpawnPointForTeleport(player, team, pointKind, attemptedPoints)
+                                    .orElse(null);
+                        }
+                        if (currentPoint == null) {
+                            if (pointKind == SpawnPointKind.INITIAL) {
+                                playerData.setSpawnPointsData(null);
+                            }
+                            return false;
+                        }
 
-                    player.setRespawnPosition(currentPoint.getDimension(), currentPoint.getPosition(),
-                            currentPoint.getYaw(), true, false);
-                    if (!teleportToPoint(player, currentPoint)) {
-                        return false;
+                        attemptedPoints.add(currentPoint);
+                        if (!teleportToPoint(player, currentPoint)) {
+                            if (pointKind == SpawnPointKind.INITIAL
+                                    && Objects.equals(playerData.getSpawnPointsData(), currentPoint)) {
+                                playerData.setSpawnPointsData(null);
+                            }
+                            continue;
+                        }
+                        player.setRespawnPosition(currentPoint.getDimension(), currentPoint.getPosition(),
+                                currentPoint.getYaw(), true, false);
+                        team.markSpawnUsed(player.getUUID(), currentPoint);
+                        if (pointKind == SpawnPointKind.INITIAL) {
+                            team.assignNextSpawnPoint(player.getUUID(), SpawnPointKind.INITIAL, attemptedPoints);
+                        }
+                        return true;
                     }
-                    team.markSpawnUsed(player.getUUID(), currentPoint);
                     if (pointKind == SpawnPointKind.INITIAL) {
-                        team.assignNextSpawnPoint(player.getUUID(), SpawnPointKind.INITIAL);
+                        playerData.setSpawnPointsData(null);
                     }
-                    return true;
+                    return false;
                 })).orElse(false);
     }
 
-    private Optional<SpawnPointData> resolveSpawnPointForTeleport(ServerPlayer player, BaseTeam team, SpawnPointKind pointKind) {
+    private Optional<SpawnPointData> resolveSpawnPointForTeleport(ServerPlayer player, BaseTeam team,
+            SpawnPointKind pointKind, Set<SpawnPointData> attemptedPoints) {
         if (pointKind == SpawnPointKind.DYNAMIC_CANDIDATE) {
-            return DynamicRespawnSelector.selectBestSpawnPoint(player, team, mapTeams);
+            return DynamicRespawnSelector.selectBestSpawnPoint(player, team, mapTeams, attemptedPoints);
         }
-        return team.assignNextSpawnPoint(player.getUUID(), pointKind);
+        return team.assignNextSpawnPoint(player.getUUID(), pointKind, attemptedPoints);
     }
 
     public boolean teleportToPoint(ServerPlayer player, SpawnPointData data) {

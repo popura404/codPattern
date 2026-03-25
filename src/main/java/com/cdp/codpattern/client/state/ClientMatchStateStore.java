@@ -292,9 +292,11 @@ public final class ClientMatchStateStore {
 
     public void setDeathCam(String killer, int duration) {
         dead = true;
-        killerName = (killer == null || killer.isBlank())
-                ? Component.translatable("common.codpattern.unknown_player").getString()
-                : killer;
+        if (killer != null && !killer.isBlank()) {
+            killerName = killer;
+        } else if (killerName == null || killerName.isBlank()) {
+            killerName = Component.translatable("common.codpattern.unknown_player").getString();
+        }
         deathCamTicks = Math.max(0, duration);
     }
 
@@ -389,9 +391,6 @@ public final class ClientMatchStateStore {
         }
         if (deathCamTicks > 0) {
             deathCamTicks--;
-            if (deathCamTicks == 0) {
-                clearDeathCam();
-            }
         }
         tickKillFeed();
 
