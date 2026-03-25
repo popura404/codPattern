@@ -2,6 +2,7 @@ package com.cdp.codpattern.app.tdm.service;
 
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.GameType;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,7 +42,8 @@ public final class TeamPlayerSnapshotService {
                             playerKills.getOrDefault(playerId, 0),
                             playerDeaths.getOrDefault(playerId, 0),
                             maxKillStreaks.getOrDefault(playerId, 0),
-                            !respawningPlayers.contains(playerId),
+                            serverPlayer.gameMode.getGameModeForPlayer() == GameType.ADVENTURE
+                                    && !respawningPlayers.contains(playerId),
                             invinciblePlayers.contains(playerId),
                             Math.max(0, serverPlayer.latency)
                     );

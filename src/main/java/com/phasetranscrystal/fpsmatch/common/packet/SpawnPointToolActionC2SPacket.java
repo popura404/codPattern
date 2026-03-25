@@ -1,5 +1,6 @@
 package com.phasetranscrystal.fpsmatch.common.packet;
 
+import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.SpawnPointTool;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
@@ -183,7 +184,8 @@ public class SpawnPointToolActionC2SPacket {
             String requestedTeam, String requestedKind, int requestedIndex) {
         FPSMCore core = FPSMCore.getInstance();
         List<String> availableTypes = core.getGameTypes();
-        String selectedType = availableTypes.contains(requestedType) ? requestedType : firstOrBlank(availableTypes);
+        String canonicalRequestedType = TdmGameTypes.canonicalize(requestedType);
+        String selectedType = availableTypes.contains(canonicalRequestedType) ? canonicalRequestedType : firstOrBlank(availableTypes);
         List<String> availableMaps = selectedType.isBlank() ? List.of() : core.getMapNamesWithType(selectedType);
         String selectedMap = availableMaps.contains(requestedMap) ? requestedMap : firstOrBlank(availableMaps);
         Optional<BaseMap> map = selectedType.isBlank() || selectedMap.isBlank()

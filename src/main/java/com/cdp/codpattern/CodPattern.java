@@ -28,11 +28,8 @@ public class CodPattern {
         com.cdp.codpattern.config.tdm.CodTdmConfig.load(event.getServer());
     }
 
-    @SuppressWarnings("deprecation")
     @net.minecraftforge.eventbus.api.SubscribeEvent
     public void onRegisterCommands(net.minecraftforge.event.RegisterCommandsEvent event) {
         com.cdp.codpattern.command.CommandRegistration.register(event.getDispatcher());
-        // 新命令: /fpsm tdm create <mapName> (通过 TdmFpsmCommandHandler 注册)
-        com.cdp.codpattern.command.CodTdmCommands.register(event.getDispatcher());
     }
 }

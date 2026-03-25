@@ -1,5 +1,6 @@
 package com.phasetranscrystal.fpsmatch.common.item;
 
+import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.tool.CreatorToolItem;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionAction;
@@ -210,11 +211,11 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
     }
 
     public static void setSelectedType(ItemStack stack, String selectedType) {
-        setStringTag(stack, TYPE_TAG, selectedType);
+        setStringTag(stack, TYPE_TAG, TdmGameTypes.canonicalize(selectedType));
     }
 
     public static String getSelectedType(ItemStack stack) {
-        return getStringTag(stack, TYPE_TAG);
+        return TdmGameTypes.canonicalize(getStringTag(stack, TYPE_TAG));
     }
 
     public static void setSelectedMap(ItemStack stack, String selectedMap) {

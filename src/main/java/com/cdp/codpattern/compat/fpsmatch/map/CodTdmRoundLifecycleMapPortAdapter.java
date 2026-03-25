@@ -12,7 +12,8 @@ final record CodTdmRoundLifecycleMapPortAdapter(
         Supplier<List<String>> missingSpawnTeamsSupplier,
         Predicate<ServerPlayer> teleportToRoundStartAction,
         java.util.function.Consumer<ServerPlayer> givePlayerKitsAction,
-        java.util.function.Consumer<ServerPlayer> clearPlayerInventoryAction
+        java.util.function.Consumer<ServerPlayer> clearPlayerInventoryAction,
+        java.util.function.Consumer<ServerPlayer> scheduleRespawnAction
 ) implements CodTdmRoundLifecyclePort {
 
     @Override
@@ -31,8 +32,8 @@ final record CodTdmRoundLifecycleMapPortAdapter(
     }
 
     @Override
-    public void teleportPlayerToRoundStartPoint(ServerPlayer player) {
-        teleportToRoundStartAction.test(player);
+    public boolean teleportPlayerToRoundStartPoint(ServerPlayer player) {
+        return teleportToRoundStartAction.test(player);
     }
 
     @Override
@@ -43,5 +44,10 @@ final record CodTdmRoundLifecycleMapPortAdapter(
     @Override
     public void clearPlayerInventory(ServerPlayer player) {
         clearPlayerInventoryAction.accept(player);
+    }
+
+    @Override
+    public void scheduleRespawn(ServerPlayer player) {
+        scheduleRespawnAction.accept(player);
     }
 }

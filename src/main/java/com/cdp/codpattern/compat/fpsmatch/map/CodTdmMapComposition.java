@@ -61,6 +61,7 @@ final class CodTdmMapComposition {
                 matchState,
                 supportHooks.voteService(),
                 mapNameSupplier,
+                scheduleRespawnAction,
                 clearPlayerInventoryAction,
                 leaveFromBaseMapAction,
                 teleportToMatchEndPointAction

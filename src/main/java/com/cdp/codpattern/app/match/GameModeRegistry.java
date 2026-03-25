@@ -16,9 +16,9 @@ public final class GameModeRegistry {
     static {
         register(new ModeDescriptor(
                 TdmGameTypes.CDP_TDM,
-                "mode.codpattern.cdptdm",
+                "mode.codpattern.frontline",
                 "screen.codpattern.tdm_room.header",
-                "/fpsm map create cdptdm <名称> <起点> <终点>",
+                "/cdp map create frontline <名称> <起点> <终点>",
                 List.of(
                         new TeamDescriptor(TdmTeamNames.KORTAC,
                                 "screen.codpattern.tdm_room.team.kortac",
@@ -32,9 +32,9 @@ public final class GameModeRegistry {
         ));
         register(new ModeDescriptor(
                 TdmGameTypes.CDP_TACTICAL_TDM,
-                "mode.codpattern.cdptacticaltdm",
+                "mode.codpattern.teamdeathmatch",
                 "screen.codpattern.tactical_room.header",
-                "/fpsm map create cdptacticaltdm <名称> <起点> <终点>",
+                "/cdp map create teamdeathmatch <名称> <起点> <终点>",
                 List.of(
                         new TeamDescriptor(TdmTeamNames.KORTAC,
                                 "screen.codpattern.tdm_room.team.kortac",
@@ -59,7 +59,14 @@ public final class GameModeRegistry {
     }
 
     public static Optional<ModeDescriptor> find(String gameType) {
-        return Optional.ofNullable(DESCRIPTORS.get(gameType));
+        if (gameType == null || gameType.isBlank()) {
+            return Optional.empty();
+        }
+        ModeDescriptor descriptor = DESCRIPTORS.get(gameType);
+        if (descriptor != null) {
+            return Optional.of(descriptor);
+        }
+        return Optional.ofNullable(DESCRIPTORS.get(TdmGameTypes.canonicalize(gameType)));
     }
 
     public static ModeDescriptor getOrDefault(String gameType) {

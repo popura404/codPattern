@@ -1,5 +1,6 @@
 package com.phasetranscrystal.fpsmatch.common.packet;
 
+import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.mojang.datafixers.util.Function3;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.MapCreatorTool;
@@ -77,14 +78,14 @@ public class MapCreatorToolActionC2SPacket {
     }
 
     private void saveDraft(ItemStack stack) {
-        MapCreatorTool.setSelectedType(stack, selectedType.trim());
+        MapCreatorTool.setSelectedType(stack, TdmGameTypes.canonicalize(selectedType));
         MapCreatorTool.setDraftMapName(stack, draftMapName);
         MapCreatorTool.setBlockPos(stack, MapCreatorTool.BLOCK_POS_TAG_1, pos1);
         MapCreatorTool.setBlockPos(stack, MapCreatorTool.BLOCK_POS_TAG_2, pos2);
     }
 
     private void createMap(ServerPlayer player, ItemStack stack) {
-        String type = selectedType.trim();
+        String type = TdmGameTypes.canonicalize(selectedType);
         FPSMCore core = FPSMCore.getInstance();
         if (!core.checkGameType(type)) {
             player.displayClientMessage(Component.translatable("message.fpsm.map_creator_tool.invalid_type"), false);

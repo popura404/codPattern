@@ -67,6 +67,7 @@ final class CodTdmCoordinatorComposition {
             CodTdmMatchRuntimeState matchState,
             VoteService voteService,
             Supplier<String> mapNameSupplier,
+            Consumer<ServerPlayer> scheduleRespawnAction,
             Consumer<ServerPlayer> clearPlayerInventoryAction,
             Consumer<ServerPlayer> leaveFromBaseMapAction,
             Function<ServerPlayer, Boolean> teleportToMatchEndPointAction
@@ -117,7 +118,8 @@ final class CodTdmCoordinatorComposition {
                         mapPort::randomizeAllTeamSpawnsAndCollectMissingTeams,
                         mapPort::teleportPlayerToRoundStartPoint,
                         mapPort::givePlayerKits,
-                        clearPlayerInventoryAction
+                        clearPlayerInventoryAction,
+                        scheduleRespawnAction
                 )
         );
 

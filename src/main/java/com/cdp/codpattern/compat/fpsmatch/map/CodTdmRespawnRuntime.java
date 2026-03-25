@@ -6,6 +6,7 @@ import com.cdp.codpattern.app.tdm.service.DeathCamService;
 import com.cdp.codpattern.app.tdm.service.RespawnService;
 import com.cdp.codpattern.config.tdm.CodTdmConfig;
 import com.cdp.codpattern.network.tdm.DeathCamPacket;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -14,6 +15,8 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 final class CodTdmRespawnRuntime {
+    private static final int MAX_RESPAWN_RETRY_ATTEMPTS = 5;
+
     private final CodTdmPlayerRuntimeState playerState;
     private final Supplier<ServerLevel> serverLevelSupplier;
     private final Predicate<ServerPlayer> teleportPlayerToRespawnAction;
@@ -42,6 +45,10 @@ final class CodTdmRespawnRuntime {
     }
 
     void scheduleRespawn(ServerPlayer player) {
+        if (player == null) {
+            return;
+        }
+        playerState.clearRespawnRetryCount(player.getUUID());
         RespawnService.scheduleRespawn(
                 playerState.respawnTimers(),
                 player,
@@ -73,7 +80,7 @@ final class CodTdmRespawnRuntime {
 
     private boolean respawnPlayer(ServerPlayer player) {
         CombatRegenService.clearPlayerCooldown(playerState.combatRegenCooldowns(), player.getUUID());
-        return RespawnService.respawnPlayer(
+        boolean respawned = RespawnService.respawnPlayer(
                 player,
                 teleportPlayerToRespawnAction,
                 givePlayerKitsAction,
@@ -81,6 +88,24 @@ final class CodTdmRespawnRuntime {
                 playerState.invinciblePlayers(),
                 playerState.invincibilityTimers()
         );
+        if (respawned) {
+            playerState.clearRespawnRetryCount(player.getUUID());
+            return true;
+        }
+
+        int retryCount = playerState.incrementRespawnRetryCount(player.getUUID());
+        if (retryCount == 1) {
+            player.sendSystemMessage(Component.translatable("message.codpattern.game.respawn_retrying"));
+        }
+        if (retryCount < MAX_RESPAWN_RETRY_ATTEMPTS) {
+            return false;
+        }
+
+        playerState.clearRespawnRetryCount(player.getUUID());
+        playerState.deathCamPlayers().remove(player.getUUID());
+        ModNetworkChannel.sendToPlayer(DeathCamPacket.clear(), player);
+        player.sendSystemMessage(Component.translatable("message.codpattern.game.respawn_give_up"));
+        return true;
     }
 
     private void notifyRespawnRetry(ServerPlayer player, int retryTicks) {

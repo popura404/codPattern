@@ -32,7 +32,7 @@ import java.util.Optional;
 
 /**
  * TDM 地图数据序列化和保存
- * 数据将保存到 fpsmatch/<world>/cdptdm/ 文件夹
+ * 数据将保存到 fpsmatch/<world>/frontline/ 文件夹
  */
 @Mod.EventBusSubscriber(modid = "codpattern", bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class CodTdmMapData {

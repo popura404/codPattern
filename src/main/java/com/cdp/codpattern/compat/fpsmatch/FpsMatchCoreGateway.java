@@ -28,10 +28,10 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
         if (roomId == null) {
             return Optional.empty();
         }
-        if (TdmGameTypes.CDP_TDM.equals(roomId.gameType())) {
+        if (TdmGameTypes.isFrontline(roomId.gameType())) {
             return CodTdmMapAccess.findActionPortByMapName(roomId.mapName()).map(port -> (ModeRoomActionPort) port);
         }
-        if (TdmGameTypes.CDP_TACTICAL_TDM.equals(roomId.gameType())) {
+        if (TdmGameTypes.isTeamDeathMatch(roomId.gameType())) {
             return CodTacticalTdmMapAccess.findActionPortByMapName(roomId.mapName()).map(port -> (ModeRoomActionPort) port);
         }
         return Optional.empty();
@@ -52,10 +52,10 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
         if (roomId == null) {
             return Optional.empty();
         }
-        if (TdmGameTypes.CDP_TDM.equals(roomId.gameType())) {
+        if (TdmGameTypes.isFrontline(roomId.gameType())) {
             return CodTdmMapAccess.findReadPortByMapName(roomId.mapName()).map(port -> (ModeRoomReadPort) port);
         }
-        if (TdmGameTypes.CDP_TACTICAL_TDM.equals(roomId.gameType())) {
+        if (TdmGameTypes.isTeamDeathMatch(roomId.gameType())) {
             return CodTacticalTdmMapAccess.findReadPortByMapName(roomId.mapName()).map(port -> (ModeRoomReadPort) port);
         }
         return Optional.empty();
