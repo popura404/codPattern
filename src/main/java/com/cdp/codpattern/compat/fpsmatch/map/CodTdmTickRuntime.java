@@ -7,6 +7,7 @@ final class CodTdmTickRuntime {
     private final Runnable tickRespawn;
     private final Runnable tickInvincibility;
     private final Runnable tickCombatRegen;
+    private final Runnable tickDisconnectedPlayers;
 
     CodTdmTickRuntime(
             Runnable tickPhaseStateMachine,
@@ -14,7 +15,8 @@ final class CodTdmTickRuntime {
             Runnable tickDeathCam,
             Runnable tickRespawn,
             Runnable tickInvincibility,
-            Runnable tickCombatRegen
+            Runnable tickCombatRegen,
+            Runnable tickDisconnectedPlayers
     ) {
         this.tickPhaseStateMachine = tickPhaseStateMachine;
         this.tickVoteSession = tickVoteSession;
@@ -22,6 +24,7 @@ final class CodTdmTickRuntime {
         this.tickRespawn = tickRespawn;
         this.tickInvincibility = tickInvincibility;
         this.tickCombatRegen = tickCombatRegen;
+        this.tickDisconnectedPlayers = tickDisconnectedPlayers;
     }
 
     void tick() {
@@ -31,5 +34,6 @@ final class CodTdmTickRuntime {
         tickInvincibility.run();
         tickRespawn.run();
         tickCombatRegen.run();
+        tickDisconnectedPlayers.run();
     }
 }

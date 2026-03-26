@@ -38,7 +38,6 @@ public final class TdmRoomInfoPanelRenderer {
             Map<String, TdmRoomData> rooms,
             Map<String, List<PlayerInfo>> teamPlayers,
             boolean leavePending,
-            boolean joinGamePending,
             boolean hasRoomNotice,
             String roomNoticeText,
             int roomNoticeColor,
@@ -134,7 +133,7 @@ public final class TdmRoomInfoPanelRenderer {
             infoY += referenceLineHeight * 2 + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP);
         }
 
-        int hintLines = (leavePending ? 1 : 0) + (joinGamePending ? 1 : 0) + (hasRoomNotice ? 1 : 0);
+        int hintLines = (leavePending ? 1 : 0) + (hasRoomNotice ? 1 : 0);
         int rosterTop = Math.max(
                 infoActionBottomY + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP + 8),
                 infoY + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP + 2));
@@ -168,17 +167,6 @@ public final class TdmRoomInfoPanelRenderer {
                     graphics,
                     mc.font,
                     Component.translatable("screen.codpattern.tdm_room.leave_room_cancel_hint"),
-                    contentX,
-                    hintY,
-                    scaleAlpha(0xFFFFD75E, contentFactor),
-                    false);
-            hintY -= referenceLineHeight + GuiTextHelper.referenceScaled(3);
-        }
-        if (joinGamePending) {
-            GuiTextHelper.drawReferenceString(
-                    graphics,
-                    mc.font,
-                    Component.translatable("screen.codpattern.tdm.join_game_cancel_hint"),
                     contentX,
                     hintY,
                     scaleAlpha(0xFFFFD75E, contentFactor),

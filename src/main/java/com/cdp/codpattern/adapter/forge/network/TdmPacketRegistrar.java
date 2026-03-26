@@ -4,8 +4,6 @@ import com.cdp.codpattern.network.tdm.CountdownPacket;
 import com.cdp.codpattern.network.tdm.CombatMarkerConfigPacket;
 import com.cdp.codpattern.network.tdm.DeathCamPacket;
 import com.cdp.codpattern.network.tdm.GamePhasePacket;
-import com.cdp.codpattern.network.tdm.JoinGameFromSpectatorPacket;
-import com.cdp.codpattern.network.tdm.JoinGameResultPacket;
 import com.cdp.codpattern.network.tdm.JoinRoomPacket;
 import com.cdp.codpattern.network.tdm.JoinRoomResultPacket;
 import com.cdp.codpattern.network.tdm.KillFeedPacket;
@@ -52,12 +50,6 @@ final class TdmPacketRegistrar {
                 .decoder(SelectTeamPacket::decode)
                 .encoder(SelectTeamPacket::encode)
                 .consumerMainThread(SelectTeamPacket::handle)
-                .add();
-
-        ModNetworkChannel.CHANNEL.messageBuilder(JoinGameFromSpectatorPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_SERVER)
-                .decoder(JoinGameFromSpectatorPacket::decode)
-                .encoder(JoinGameFromSpectatorPacket::encode)
-                .consumerMainThread(JoinGameFromSpectatorPacket::handle)
                 .add();
 
         ModNetworkChannel.CHANNEL.messageBuilder(VoteStartPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_SERVER)
@@ -160,12 +152,6 @@ final class TdmPacketRegistrar {
                 .decoder(LeaveRoomResultPacket::decode)
                 .encoder(LeaveRoomResultPacket::encode)
                 .consumerMainThread(LeaveRoomResultPacket::handle)
-                .add();
-
-        ModNetworkChannel.CHANNEL.messageBuilder(JoinGameResultPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(JoinGameResultPacket::decode)
-                .encoder(JoinGameResultPacket::encode)
-                .consumerMainThread(JoinGameResultPacket::handle)
                 .add();
     }
 }

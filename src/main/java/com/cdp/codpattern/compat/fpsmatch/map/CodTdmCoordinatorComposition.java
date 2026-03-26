@@ -44,6 +44,8 @@ final class CodTdmCoordinatorComposition {
 
         void joinTeam(String teamName, ServerPlayer player);
 
+        void removePlayerById(UUID playerId);
+
         String gameType();
 
         ServerLevel serverLevel();
@@ -70,7 +72,8 @@ final class CodTdmCoordinatorComposition {
             Consumer<ServerPlayer> scheduleRespawnAction,
             Consumer<ServerPlayer> clearPlayerInventoryAction,
             Consumer<ServerPlayer> leaveFromBaseMapAction,
-            Function<ServerPlayer, Boolean> teleportToMatchEndPointAction
+            Function<ServerPlayer, Boolean> teleportToMatchEndPointAction,
+            Runnable resetGameAction
     ) {
         CodTdmVoteCoordinator voteCoordinator = new CodTdmVoteCoordinator(
                 playerState.readyStates(),
@@ -99,6 +102,11 @@ final class CodTdmCoordinatorComposition {
                         playerState::getSpectatorPreferredJoinTeam,
                         playerState::clearSpectatorPreferredJoinTeam,
                         () -> matchState.phase() == TdmGamePhase.WAITING,
+                        () -> mapPort.teamBalanceSnapshots().stream().anyMatch(snapshot -> snapshot.playerCount() > 0),
+                        playerState::markDisconnected,
+                        playerState::clearDisconnected,
+                        playerState::disconnectedGraceTimers,
+                        mapPort::removePlayerById,
                         mapPort::hasTeam,
                         mapPort::isTeamFull,
                         mapPort::findTeamNameByPlayer,
@@ -108,7 +116,8 @@ final class CodTdmCoordinatorComposition {
                         mapPort::serverLevel,
                         mapNameSupplier
                 ),
-                leaveFromBaseMapAction
+                leaveFromBaseMapAction,
+                resetGameAction
         );
 
         CodTdmRoundLifecycleCoordinator roundLifecycleCoordinator = new CodTdmRoundLifecycleCoordinator(

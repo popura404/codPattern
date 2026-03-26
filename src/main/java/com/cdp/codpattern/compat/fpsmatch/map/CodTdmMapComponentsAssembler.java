@@ -37,6 +37,7 @@ final class CodTdmMapComponentsAssembler {
                 player -> CodTdmMapTeamViews.findTeamNameByPlayer(map, player),
                 player -> map.getMapTeams().leaveTeam(player),
                 map::join,
+                playerId -> map.getMapTeams().removePlayer(playerId),
                 map::getGameType,
                 map::getServerLevel,
                 () -> CodTdmMapTeamViews.joinedPlayers(map),

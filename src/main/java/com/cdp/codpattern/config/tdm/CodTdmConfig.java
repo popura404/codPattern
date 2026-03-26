@@ -37,8 +37,6 @@ public class CodTdmConfig {
     private int votePercentageToEnd = 75; // 75%投票结束
     private int combatRegenDelayTicks = 120; // 受伤后多久开始回血
     private float combatRegenHalfHeartsPerSecond = 5.0f; // 每秒回复多少半颗心
-    private boolean allowJoinDuringPlaying = true; // 对局进行中是否允许加入
-    private boolean joinAsSpectatorWhenPlaying = true; // 对局中加入是否旁观
     private int maxTeamDiff = 1; // 自动分队允许的最大人数差
     private String enemyMarkerStyle = ENEMY_MARKER_STYLE_HEALTH_BAR; // 敌方标识样式：HEALTH_BAR / MARKER_DOT
     private float markerFocusHalfAngleDegrees = 30.0f; // 敌方标识判定半角（度）
@@ -101,14 +99,6 @@ public class CodTdmConfig {
 
     public float getCombatRegenHalfHeartsPerSecond() {
         return combatRegenHalfHeartsPerSecond;
-    }
-
-    public boolean isAllowJoinDuringPlaying() {
-        return allowJoinDuringPlaying;
-    }
-
-    public boolean isJoinAsSpectatorWhenPlaying() {
-        return joinAsSpectatorWhenPlaying;
     }
 
     public int getMaxTeamDiff() {
@@ -190,14 +180,6 @@ public class CodTdmConfig {
 
     public void setCombatRegenHalfHeartsPerSecond(float value) {
         this.combatRegenHalfHeartsPerSecond = value;
-    }
-
-    public void setAllowJoinDuringPlaying(boolean value) {
-        this.allowJoinDuringPlaying = value;
-    }
-
-    public void setJoinAsSpectatorWhenPlaying(boolean value) {
-        this.joinAsSpectatorWhenPlaying = value;
     }
 
     public void setMaxTeamDiff(int value) {

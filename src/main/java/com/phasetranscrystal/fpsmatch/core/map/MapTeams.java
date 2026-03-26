@@ -113,4 +113,54 @@ public class MapTeams {
         }
         teams.values().forEach(team -> team.leave(player));
     }
+
+    public boolean removePlayer(UUID playerId) {
+        if (playerId == null) {
+            return false;
+        }
+        if (removePlayerFromTeam(spectatorTeam, playerId)) {
+            return true;
+        }
+        for (BaseTeam team : teams.values()) {
+            if (removePlayerFromTeam(team, playerId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public List<UUID> removeOfflinePlayers() {
+        List<UUID> removedPlayers = new ArrayList<>();
+        removeOfflinePlayersFromTeam(spectatorTeam, removedPlayers);
+        teams.values().forEach(team -> removeOfflinePlayersFromTeam(team, removedPlayers));
+        return removedPlayers;
+    }
+
+    private void removeOfflinePlayersFromTeam(BaseTeam team, List<UUID> removedPlayers) {
+        for (PlayerData playerData : new ArrayList<>(team.getPlayersData())) {
+            if (playerData == null || playerData.isOnline()) {
+                continue;
+            }
+            if (removePlayerFromTeam(team, playerData.getOwner())) {
+                removedPlayers.add(playerData.getOwner());
+            }
+        }
+    }
+
+    private boolean removePlayerFromTeam(BaseTeam team, UUID playerId) {
+        if (team == null || playerId == null) {
+            return false;
+        }
+        Optional<PlayerData> playerDataOptional = team.getPlayerData(playerId);
+        if (playerDataOptional.isEmpty()) {
+            return false;
+        }
+        PlayerData playerData = playerDataOptional.get();
+        team.delPlayer(playerId);
+        String scoreboardName = playerData.scoreboardName();
+        if (!scoreboardName.isBlank()) {
+            level.getScoreboard().removePlayerFromTeam(scoreboardName, team.getPlayerTeam());
+        }
+        return true;
+    }
 }

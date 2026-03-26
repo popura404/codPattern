@@ -16,22 +16,16 @@ public final class TdmRoomButtonStateBinder {
             boolean hasJoinedRoom,
             boolean hasPendingAction,
             String currentRoomState,
-            boolean localPlayerReady,
-            boolean localSpectatorInPlaying
+            boolean localPlayerReady
     ) {
-        boolean canSwitchTeam = TdmRoomStateEvaluator.isTeamSwitchAllowed(currentRoomState) || localSpectatorInPlaying;
+        boolean canSwitchTeam = TdmRoomStateEvaluator.isTeamSwitchAllowed(currentRoomState);
         boolean canStartVote = TdmRoomStateEvaluator.canStartVote(currentRoomState);
         boolean canEndVote = TdmRoomStateEvaluator.canEndVote(currentRoomState);
 
         if (readyButton != null) {
-            if (localSpectatorInPlaying) {
-                readyButton.active = false;
-                readyButton.setMessage(Component.translatable("screen.codpattern.tdm.join_game_disabled"));
-            } else {
-                readyButton.active = hasJoinedRoom && "WAITING".equals(currentRoomState) && !hasPendingAction;
-                readyButton.setMessage(Component.translatable(
-                        localPlayerReady ? "screen.codpattern.tdm.ready_cancel" : "screen.codpattern.tdm.ready"));
-            }
+            readyButton.active = hasJoinedRoom && "WAITING".equals(currentRoomState) && !hasPendingAction;
+            readyButton.setMessage(Component.translatable(
+                    localPlayerReady ? "screen.codpattern.tdm.ready_cancel" : "screen.codpattern.tdm.ready"));
         }
 
         if (voteStartButton != null) {

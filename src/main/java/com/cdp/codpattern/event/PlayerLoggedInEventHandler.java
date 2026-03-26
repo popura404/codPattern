@@ -3,9 +3,11 @@ package com.cdp.codpattern.event;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
+import com.cdp.codpattern.compat.fpsmatch.map.CodTdmDeferredLeaveRegistry;
 import com.cdp.codpattern.network.SyncBackpackConfigPacket;
 import com.cdp.codpattern.network.SyncWeaponFilterPacket;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
+import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -37,5 +39,10 @@ public class PlayerLoggedInEventHandler {
         // 同步到客户端
         ModNetworkChannel.sendToPlayer(new SyncWeaponFilterPacket(fliterconfig), (ServerPlayer) player);
         ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), (ServerPlayer) player);
+
+        if (CodTdmDeferredLeaveRegistry.applyIfPresent((ServerPlayer) player)) {
+            return;
+        }
+        FPSMCore.handlePlayerLogin((ServerPlayer) player);
     }
 }

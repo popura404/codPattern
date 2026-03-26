@@ -39,12 +39,12 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
 
     @Override
     public Optional<ModeRoomActionPort> findPlayerRoomActionPort(ServerPlayer player) {
-        Optional<ModeRoomActionPort> tdmPort = CodTdmMapAccess.findActionPortByPlayer(player)
+        Optional<ModeRoomActionPort> tacticalPort = CodTacticalTdmMapAccess.findActionPortByPlayer(player)
                 .map(port -> (ModeRoomActionPort) port);
-        if (tdmPort.isPresent()) {
-            return tdmPort;
+        if (tacticalPort.isPresent()) {
+            return tacticalPort;
         }
-        return CodTacticalTdmMapAccess.findActionPortByPlayer(player).map(port -> (ModeRoomActionPort) port);
+        return CodTdmMapAccess.findActionPortByPlayer(player).map(port -> (ModeRoomActionPort) port);
     }
 
     @Override
@@ -63,12 +63,12 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
 
     @Override
     public Optional<ModeRoomReadPort> findPlayerRoomReadPort(ServerPlayer player) {
-        Optional<ModeRoomReadPort> tdmPort = CodTdmMapAccess.findReadPortByPlayer(player)
+        Optional<ModeRoomReadPort> tacticalPort = CodTacticalTdmMapAccess.findReadPortByPlayer(player)
                 .map(port -> (ModeRoomReadPort) port);
-        if (tdmPort.isPresent()) {
-            return tdmPort;
+        if (tacticalPort.isPresent()) {
+            return tacticalPort;
         }
-        return CodTacticalTdmMapAccess.findReadPortByPlayer(player).map(port -> (ModeRoomReadPort) port);
+        return CodTdmMapAccess.findReadPortByPlayer(player).map(port -> (ModeRoomReadPort) port);
     }
 
     @Override
@@ -86,11 +86,12 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
 
     @Override
     public Optional<CodTdmActionPort> findPlayerTdmActionPort(ServerPlayer player) {
-        Optional<CodTdmActionPort> tdmPort = CodTdmMapAccess.findActionPortByPlayer(player).map(port -> (CodTdmActionPort) port);
-        if (tdmPort.isPresent()) {
-            return tdmPort;
+        Optional<CodTdmActionPort> tacticalPort = CodTacticalTdmMapAccess.findActionPortByPlayer(player)
+                .map(port -> (CodTdmActionPort) port);
+        if (tacticalPort.isPresent()) {
+            return tacticalPort;
         }
-        return CodTacticalTdmMapAccess.findActionPortByPlayer(player).map(port -> (CodTdmActionPort) port);
+        return CodTdmMapAccess.findActionPortByPlayer(player).map(port -> (CodTdmActionPort) port);
     }
 
     @Override
@@ -100,11 +101,12 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
 
     @Override
     public Optional<CodTdmReadPort> findPlayerTdmReadPort(ServerPlayer player) {
-        Optional<CodTdmReadPort> tdmPort = CodTdmMapAccess.findReadPortByPlayer(player).map(port -> (CodTdmReadPort) port);
-        if (tdmPort.isPresent()) {
-            return tdmPort;
+        Optional<CodTdmReadPort> tacticalPort = CodTacticalTdmMapAccess.findReadPortByPlayer(player)
+                .map(port -> (CodTdmReadPort) port);
+        if (tacticalPort.isPresent()) {
+            return tacticalPort;
         }
-        return CodTacticalTdmMapAccess.findReadPortByPlayer(player).map(port -> (CodTdmReadPort) port);
+        return CodTdmMapAccess.findReadPortByPlayer(player).map(port -> (CodTdmReadPort) port);
     }
 
     @Override

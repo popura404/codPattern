@@ -201,6 +201,20 @@ public class FPSMCore {
         getInstance().getMapByPlayerWithSpec(player).ifPresent(map -> map.leave(player));
     }
 
+    public static void handlePlayerLogout(ServerPlayer player) {
+        if (!initialized()) {
+            return;
+        }
+        getInstance().getMapByPlayerWithSpec(player).ifPresent(map -> map.onPlayerLoggedOut(player));
+    }
+
+    public static void handlePlayerLogin(ServerPlayer player) {
+        if (!initialized()) {
+            return;
+        }
+        getInstance().getMapByPlayerWithSpec(player).ifPresent(map -> map.onPlayerLoggedIn(player));
+    }
+
     public MinecraftServer getServer() {
         return ServerLifecycleHooks.getCurrentServer();
     }

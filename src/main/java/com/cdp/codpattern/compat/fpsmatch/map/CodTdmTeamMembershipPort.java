@@ -3,6 +3,7 @@ package com.cdp.codpattern.compat.fpsmatch.map;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +27,16 @@ interface CodTdmTeamMembershipPort {
     void clearSpectatorPreferredTeam(UUID playerId);
 
     boolean isWaitingPhase();
+
+    boolean hasJoinedPlayers();
+
+    void markDisconnected(UUID playerId, int graceTicks);
+
+    void clearDisconnected(UUID playerId);
+
+    Map<UUID, Integer> disconnectedGraceTimers();
+
+    void removePlayerById(UUID playerId);
 
     boolean hasTeam(String teamName);
 

@@ -7,7 +7,7 @@ import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 public final class ModNetworkChannel {
-    private static final String PROTOCOL_VERSION = "8";
+    private static final String PROTOCOL_VERSION = "9";
     static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation("codpattern", "main"),
             () -> PROTOCOL_VERSION,

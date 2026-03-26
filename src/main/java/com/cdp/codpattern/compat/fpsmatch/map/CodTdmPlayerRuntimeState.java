@@ -22,6 +22,7 @@ final class CodTdmPlayerRuntimeState {
     private final Map<UUID, Integer> respawnRetryCounts = new HashMap<>();
     private final Map<UUID, Boolean> readyStates = new HashMap<>();
     private final Map<UUID, String> spectatorPreferredJoinTeams = new HashMap<>();
+    private final Map<UUID, Integer> disconnectedGraceTimers = new HashMap<>();
 
     Map<UUID, Integer> respawnTimers() {
         return respawnTimers;
@@ -77,6 +78,24 @@ final class CodTdmPlayerRuntimeState {
         return readyStates;
     }
 
+    Map<UUID, Integer> disconnectedGraceTimers() {
+        return disconnectedGraceTimers;
+    }
+
+    void markDisconnected(UUID playerId, int graceTicks) {
+        if (playerId == null) {
+            return;
+        }
+        disconnectedGraceTimers.put(playerId, Math.max(1, graceTicks));
+    }
+
+    void clearDisconnected(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        disconnectedGraceTimers.remove(playerId);
+    }
+
     void setSpectatorPreferredJoinTeam(UUID playerId, String teamName) {
         if (playerId == null || teamName == null || teamName.isBlank()) {
             return;
@@ -115,6 +134,7 @@ final class CodTdmPlayerRuntimeState {
         maxKillStreaks.clear();
         readyStates.clear();
         spectatorPreferredJoinTeams.clear();
+        disconnectedGraceTimers.clear();
     }
 
     void clearTransientPlayerState(UUID playerId) {
@@ -125,6 +145,7 @@ final class CodTdmPlayerRuntimeState {
         combatRegenCooldowns.remove(playerId);
         respawnRetryCounts.remove(playerId);
         spectatorPreferredJoinTeams.remove(playerId);
+        disconnectedGraceTimers.remove(playerId);
     }
 
     void removePlayerCombatStats(UUID playerId) {

@@ -100,6 +100,13 @@ public abstract class BaseMap {
         player.setGameMode(GameType.ADVENTURE);
     }
 
+    public void onPlayerLoggedOut(ServerPlayer player) {
+        leave(player);
+    }
+
+    public void onPlayerLoggedIn(ServerPlayer player) {
+    }
+
     public boolean teleportPlayerToRoundStartPoint(ServerPlayer player) {
         return teleportPlayerToSpawnPoint(player, SpawnSelectionReason.ROUND_START);
     }
@@ -251,7 +258,7 @@ public abstract class BaseMap {
     @SubscribeEvent
     public static void onPlayerLoggedOutEvent(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer player && FPSMCore.initialized()) {
-            FPSMCore.checkAndLeaveTeam(player);
+            FPSMCore.handlePlayerLogout(player);
         }
     }
 }

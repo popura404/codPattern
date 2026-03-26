@@ -36,7 +36,8 @@ final class CodTdmMapRuntimeBundleBuilder {
                 matchState,
                 playerState,
                 voteRuntime,
-                () -> map.getMapTeams().getTeams()
+                () -> map.getMapTeams().getTeams(),
+                map.getMapTeams()::removeOfflinePlayers
         );
         CodTdmCombatRuntime combatRuntime = new CodTdmCombatRuntime(
                 matchState,
@@ -61,7 +62,8 @@ final class CodTdmMapRuntimeBundleBuilder {
                 respawnRuntime::tickDeathCam,
                 respawnRuntime::tickRespawn,
                 respawnRuntime::tickInvincibility,
-                combatRuntime::tickCombatRegen
+                combatRuntime::tickCombatRegen,
+                teamMembershipCoordinator::tickDisconnectedPlayers
         );
         CodTdmMapMutationRuntime mapMutationRuntime = new CodTdmMapMutationRuntime(
                 (teamName, player) -> {

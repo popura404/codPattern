@@ -3,6 +3,7 @@ package com.cdp.codpattern.compat.fpsmatch.map;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BiConsumer;
@@ -23,6 +24,11 @@ final record CodTdmTeamMembershipMapPortAdapter(
         Function<UUID, Optional<String>> getSpectatorPreferredTeamAction,
         Consumer<UUID> clearSpectatorPreferredTeamAction,
         BooleanSupplier waitingPhaseChecker,
+        BooleanSupplier hasJoinedPlayersChecker,
+        BiConsumer<UUID, Integer> markDisconnectedAction,
+        Consumer<UUID> clearDisconnectedAction,
+        Supplier<Map<UUID, Integer>> disconnectedGraceTimersSupplier,
+        Consumer<UUID> removePlayerByIdAction,
         Predicate<String> teamExistsChecker,
         Predicate<String> teamFullChecker,
         Function<ServerPlayer, Optional<String>> teamNameByPlayerResolver,
@@ -81,6 +87,31 @@ final record CodTdmTeamMembershipMapPortAdapter(
     @Override
     public boolean isWaitingPhase() {
         return waitingPhaseChecker.getAsBoolean();
+    }
+
+    @Override
+    public boolean hasJoinedPlayers() {
+        return hasJoinedPlayersChecker.getAsBoolean();
+    }
+
+    @Override
+    public void markDisconnected(UUID playerId, int graceTicks) {
+        markDisconnectedAction.accept(playerId, graceTicks);
+    }
+
+    @Override
+    public void clearDisconnected(UUID playerId) {
+        clearDisconnectedAction.accept(playerId);
+    }
+
+    @Override
+    public Map<UUID, Integer> disconnectedGraceTimers() {
+        return disconnectedGraceTimersSupplier.get();
+    }
+
+    @Override
+    public void removePlayerById(UUID playerId) {
+        removePlayerByIdAction.accept(playerId);
     }
 
     @Override

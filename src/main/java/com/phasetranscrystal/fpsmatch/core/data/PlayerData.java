@@ -13,18 +13,24 @@ import java.util.UUID;
 public class PlayerData {
     private final UUID owner;
     private final Component name;
+    private final String scoreboardName;
     private final Map<UUID, Float> damageData = new HashMap<>();
     private boolean living = true;
     private SpawnPointData spawnPointsData;
     private SpawnPointData lastSpawnPoint;
 
     public PlayerData(Player owner) {
-        this(owner.getUUID(), owner.getDisplayName());
+        this(owner.getUUID(), owner.getDisplayName(), owner.getScoreboardName());
     }
 
     public PlayerData(UUID owner, Component name) {
+        this(owner, name, name == null ? "" : name.getString());
+    }
+
+    public PlayerData(UUID owner, Component name, String scoreboardName) {
         this.owner = owner;
         this.name = name;
+        this.scoreboardName = scoreboardName == null ? "" : scoreboardName;
     }
 
     public Component name() {
@@ -43,6 +49,10 @@ public class PlayerData {
 
     public UUID getOwner() {
         return owner;
+    }
+
+    public String scoreboardName() {
+        return scoreboardName;
     }
 
     public void setSpawnPointsData(SpawnPointData spawnPointsData) {

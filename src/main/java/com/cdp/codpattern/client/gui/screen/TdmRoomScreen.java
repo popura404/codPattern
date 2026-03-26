@@ -210,7 +210,6 @@ public class TdmRoomScreen extends Screen {
         boolean localPlayerReady = TdmRoomStateEvaluator.isLocalPlayerReady(
                 Minecraft.getInstance().player == null ? null : Minecraft.getInstance().player.getUUID(),
                 roomState.teamPlayers());
-        boolean localSpectatorInPlaying = actionController.isLocalSpectatorInPlaying();
         TdmRoomButtonStateBinder.refresh(
                 readyButton,
                 voteStartButton,
@@ -220,8 +219,7 @@ public class TdmRoomScreen extends Screen {
                 roomState.joinedRoom() != null,
                 actionController.hasPendingAction(),
                 currentRoomState,
-                localPlayerReady,
-                localSpectatorInPlaying);
+                localPlayerReady);
     }
 
     @Override
@@ -307,7 +305,6 @@ public class TdmRoomScreen extends Screen {
                 roomState.rooms(),
                 roomState.teamPlayers(),
                 actionController.isLeavePending(),
-                actionController.isJoinGamePending(),
                 actionController.hasRoomNotice(),
                 actionController.roomNoticeText(),
                 actionController.roomNoticeColor(),
@@ -423,12 +420,6 @@ public class TdmRoomScreen extends Screen {
     public void handleLeaveResult(boolean success, String roomKey, String reasonCode, String reasonMessage) {
         actionController.handleLeaveResult(success, roomKey, reasonCode, reasonMessage);
     }
-
-    public void handleJoinGameResult(boolean success, long requestId, String roomKey, String reasonCode,
-            String reasonMessage) {
-        actionController.handleJoinGameResult(success, requestId, roomKey, reasonCode, reasonMessage);
-    }
-
     @Override
     public void onClose() {
         pendingRoomListUpdate = null;

@@ -219,20 +219,6 @@ public class ClientPacketHandler {
         });
     }
 
-    public static void handleJoinGameResult(
-            boolean success,
-            long requestId,
-            String roomKey,
-            String reasonCode,
-            String reasonMessage) {
-        Minecraft.getInstance().execute(() -> {
-            Screen screen = Minecraft.getInstance().screen;
-            if (screen instanceof TdmRoomScreen tdmRoomScreen) {
-                tdmRoomScreen.handleJoinGameResult(success, requestId, roomKey, reasonCode, reasonMessage);
-            }
-        });
-    }
-
     public static void handlePhysicsMobRetain(int entityId, double x, double y, double z, float yRot, float xRot,
             float yHeadRot, float yBodyRot, double motionX, double motionY, double motionZ) {
         if (!PhysicsModClientBridge.isPhysicsModLoaded()) {
@@ -324,12 +310,10 @@ public class ClientPacketHandler {
         return switch (reasonCode == null ? "" : reasonCode) {
             case "MAP_NOT_FOUND" -> Component.translatable("screen.codpattern.tdm_room.error.map_not_found");
             case "PHASE_LOCKED" -> Component.translatable("screen.codpattern.tdm_room.error.phase_locked");
-            case "MID_JOIN_DISABLED" -> Component.translatable("message.codpattern.room.mid_join_disabled");
             case "TEAM_NOT_FOUND" -> Component.translatable("screen.codpattern.tdm_room.error.team_not_found");
             case "TEAM_FULL" -> Component.translatable("screen.codpattern.tdm_room.error.team_full");
             case "TEAM_BALANCE_EXCEEDED" -> Component.translatable("screen.codpattern.tdm_room.error.team_balance_exceeded");
             case "NOT_IN_ROOM" -> Component.translatable("screen.codpattern.tdm_room.error.not_in_room");
-            case "NOT_SPECTATOR" -> Component.translatable("screen.codpattern.tdm_room.error.not_spectator");
             case "UNKNOWN" -> Component.translatable("screen.codpattern.tdm_room.error.unknown");
             default -> Component.translatable("screen.codpattern.tdm_room.error.unknown");
         };

@@ -64,7 +64,8 @@ final class CodTdmMapComposition {
                 scheduleRespawnAction,
                 clearPlayerInventoryAction,
                 leaveFromBaseMapAction,
-                teleportToMatchEndPointAction
+                teleportToMatchEndPointAction,
+                resetGameAction
         );
         CodTdmMatchResultExporter matchResultExporter = new CodTdmMatchResultExporter(
                 coordinatorMapPort,

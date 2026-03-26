@@ -60,6 +60,10 @@ public final class CodTdmMapAccess {
     }
 
     public static void leaveMap(BaseMap map, ServerPlayer player) {
+        if (map instanceof CodTacticalTdmMap tacticalMap) {
+            CodTacticalTdmMapAccess.actionPort(tacticalMap).leaveRoom(player);
+            return;
+        }
         if (map instanceof CodTdmMap tdmMap) {
             actionPort(tdmMap).leaveRoom(player);
             return;
@@ -95,7 +99,7 @@ public final class CodTdmMapAccess {
     }
 
     private static Optional<CodTdmMap> findByName(String mapName) {
-        return asTdmMap(core().getMapByName(mapName));
+        return asTdmMap(core().getMapByTypeWithName(TdmGameTypes.CDP_TDM, mapName));
     }
 
     private static Optional<CodTdmMap> findByPlayer(ServerPlayer player) {
@@ -130,7 +134,7 @@ public final class CodTdmMapAccess {
 
     private static Optional<CodTdmMap> asTdmMap(Optional<BaseMap> mapOptional) {
         return mapOptional
-                .filter(map -> map instanceof CodTdmMap)
+                .filter(map -> map instanceof CodTdmMap && !(map instanceof CodTacticalTdmMap))
                 .map(map -> (CodTdmMap) map);
     }
 

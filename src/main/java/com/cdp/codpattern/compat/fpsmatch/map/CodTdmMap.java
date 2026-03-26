@@ -92,6 +92,16 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         lifecycleRuntime.leaveRoom(player);
     }
 
+    @Override
+    public void onPlayerLoggedOut(ServerPlayer player) {
+        lifecycleRuntime.handleUnexpectedDisconnect(player);
+    }
+
+    @Override
+    public void onPlayerLoggedIn(ServerPlayer player) {
+        lifecycleRuntime.handleReconnect(player);
+    }
+
     /**
      * 发放玩家装备 (基于背包系统)
      */

@@ -27,8 +27,10 @@ final class CodTdmMapAssemblyOutputBuilder {
                 runtimeBundle.tickRuntime(),
                 runtimeBundle.resetRuntime(),
                 runtimeBundle.teamMembershipCoordinator(),
+                respawnRuntime,
                 endTeleportRuntime,
                 runtimeBundle.matchProgressRuntime(),
+                matchState::phase,
                 markStartedAction,
                 markStoppedAction
         );

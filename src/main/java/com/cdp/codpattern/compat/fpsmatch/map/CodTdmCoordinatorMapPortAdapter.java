@@ -23,6 +23,7 @@ final record CodTdmCoordinatorMapPortAdapter(
         Function<ServerPlayer, Optional<String>> findTeamNameByPlayerFunction,
         Consumer<ServerPlayer> leaveTeamAction,
         BiConsumer<String, ServerPlayer> joinTeamAction,
+        Consumer<UUID> removePlayerByIdAction,
         Supplier<String> gameTypeSupplier,
         Supplier<ServerLevel> serverLevelSupplier,
         Supplier<List<ServerPlayer>> joinedPlayersSupplier,
@@ -71,6 +72,11 @@ final record CodTdmCoordinatorMapPortAdapter(
     @Override
     public void joinTeam(String teamName, ServerPlayer player) {
         joinTeamAction.accept(teamName, player);
+    }
+
+    @Override
+    public void removePlayerById(UUID playerId) {
+        removePlayerByIdAction.accept(playerId);
     }
 
     @Override
