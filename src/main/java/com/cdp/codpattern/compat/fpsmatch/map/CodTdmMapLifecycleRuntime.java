@@ -20,10 +20,15 @@ final record CodTdmMapLifecycleRuntime(
 
     void tick() {
         tickRuntime.tick();
+        clientSyncCoordinator.tick();
     }
 
     void syncToClient() {
         clientSyncCoordinator.syncToClient();
+    }
+
+    void requestRosterResync(ServerPlayer player) {
+        clientSyncCoordinator.requestRosterResync(player);
     }
 
     void transitionToCountdown() {

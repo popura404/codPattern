@@ -6,6 +6,7 @@ import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.UUID;
 
@@ -20,6 +21,7 @@ final class CodTdmMapActions {
             CodTdmEndTeleportRuntime endTeleportRuntime,
             CodTdmVoteRuntime voteRuntime,
             CodTdmRespawnRuntime respawnRuntime,
+            Consumer<ServerPlayer> requestRosterResyncAction,
             Supplier<String> mapNameSupplier
     ) {
         return new MapActionPort(
@@ -29,6 +31,7 @@ final class CodTdmMapActions {
                 endTeleportRuntime,
                 voteRuntime,
                 respawnRuntime,
+                requestRosterResyncAction,
                 mapNameSupplier
         );
     }
@@ -40,6 +43,7 @@ final class CodTdmMapActions {
             CodTdmEndTeleportRuntime endTeleportRuntime,
             CodTdmVoteRuntime voteRuntime,
             CodTdmRespawnRuntime respawnRuntime,
+            Consumer<ServerPlayer> requestRosterResyncAction,
             Supplier<String> mapNameSupplier
     ) implements CodTdmActionPort {
 
@@ -136,6 +140,11 @@ final class CodTdmMapActions {
         @Override
         public Optional<String> consumeSpectatorPreferredTeam(ServerPlayer player) {
             return teamMembershipCoordinator.consumeSpectatorPreferredTeam(player);
+        }
+
+        @Override
+        public void requestRosterResync(ServerPlayer player) {
+            requestRosterResyncAction.accept(player);
         }
     }
 }

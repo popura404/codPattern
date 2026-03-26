@@ -48,4 +48,7 @@ public interface ModeRoomActionPort {
     void setSpectatorPreferredTeam(ServerPlayer player, String teamName);
 
     Optional<String> consumeSpectatorPreferredTeam(ServerPlayer player);
+
+    default void requestRosterResync(ServerPlayer player) {
+    }
 }

@@ -3,6 +3,7 @@ package com.cdp.codpattern.client;
 import com.cdp.codpattern.client.state.ClientMatchStateStore;
 import com.cdp.codpattern.client.state.KillFeedEntry;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
+import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
@@ -13,6 +14,13 @@ import java.util.Map;
  * 实际状态存储在实例化的 {@link ClientMatchStateStore}。
  */
 public final class ClientTdmState {
+    public enum RosterDeltaApplyResult {
+        APPLIED,
+        VERSION_GAP,
+        PLAYER_MISSING,
+        ROOM_MISMATCH
+    }
+
     public enum BlackoutPhase {
         NONE,
         FADE_IN,
@@ -37,12 +45,24 @@ public final class ClientTdmState {
         STORE.updateScore(scores, legacyTeam1, legacyTeam2, time);
     }
 
-    public static void updateTeamPlayers(String mapName, Map<String, List<PlayerInfo>> teamPlayers) {
-        STORE.updateTeamPlayers(mapName, teamPlayers);
+    public static void updateTeamPlayers(String mapName, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
+        STORE.updateTeamPlayers(mapName, rosterVersion, teamPlayers);
+    }
+
+    public static RosterDeltaApplyResult applyTeamPlayerDelta(
+            String roomKey,
+            int rosterVersion,
+            List<RoomPlayerDeltaPacket.PlayerDelta> updates
+    ) {
+        return STORE.applyTeamPlayerDelta(roomKey, rosterVersion, updates);
     }
 
     public static Map<String, List<PlayerInfo>> teamPlayersSnapshot() {
         return STORE.teamPlayersSnapshot();
+    }
+
+    public static Map<String, Integer> teamScoresSnapshot() {
+        return STORE.teamScoresSnapshot();
     }
 
     public static boolean hasRoomContext() {
@@ -128,6 +148,26 @@ public final class ClientTdmState {
 
     public static String currentPhase() {
         return STORE.currentPhase();
+    }
+
+    public static String roomContextName() {
+        return STORE.roomContextName();
+    }
+
+    public static int rosterVersion() {
+        return STORE.rosterVersion();
+    }
+
+    public static long lastPhaseSyncAtMs() {
+        return STORE.lastPhaseSyncAtMs();
+    }
+
+    public static long lastScoreSyncAtMs() {
+        return STORE.lastScoreSyncAtMs();
+    }
+
+    public static long lastRosterSyncAtMs() {
+        return STORE.lastRosterSyncAtMs();
     }
 
     public static int remainingTimeTicks() {

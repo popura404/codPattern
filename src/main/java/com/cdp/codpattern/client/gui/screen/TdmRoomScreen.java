@@ -65,6 +65,7 @@ public class TdmRoomScreen extends Screen {
     private final Map<String, Float> roomHighlightProgress = new HashMap<>();
     private final Map<String, Long> roomEnteredAtMs = new HashMap<>();
     private Map<String, TdmRoomData> pendingRoomListUpdate = null;
+    private long pendingRoomListSnapshotVersion = 0L;
     private long pendingRoomListReceivedAtMs = 0L;
     private String infoContextKey = "";
     private long infoContentTransitionAtMs = 0L;
@@ -250,8 +251,10 @@ public class TdmRoomScreen extends Screen {
     public void tick() {
         super.tick();
         actionController.tick();
+        roomState.refreshJoinedRoomLiveState();
         flushPendingRoomListUpdate(false);
         refreshInfoContextTransition(false);
+        updateButtonStates();
     }
 
     /**
@@ -274,7 +277,7 @@ public class TdmRoomScreen extends Screen {
                 roomListWidth,
                 roomListHeight,
                 roomItemHeight(),
-                roomState.rooms(),
+                roomState.lobbySummaryState(),
                 roomState.selectedRoom(),
                 roomState.joinedRoom(),
                 roomListScrollOffset,
@@ -300,10 +303,11 @@ public class TdmRoomScreen extends Screen {
                 rightPanelWidth,
                 rightPanelHeight,
                 infoActionBottomY,
+                roomState.lobbySummaryState(),
+                roomState.joinedRoomLiveState(),
+                roomState.selectedRoomPreviewState(),
                 roomState.joinedRoom(),
                 roomState.selectedRoom(),
-                roomState.rooms(),
-                roomState.teamPlayers(),
                 actionController.isLeavePending(),
                 actionController.hasRoomNotice(),
                 actionController.roomNoticeText(),
@@ -374,8 +378,9 @@ public class TdmRoomScreen extends Screen {
     /**
      * 更新房间列表
      */
-    public void updateRoomList(Map<String, TdmRoomData> rooms) {
+    public void updateRoomList(long snapshotVersion, Map<String, TdmRoomData> rooms) {
         pendingRoomListUpdate = rooms == null ? new HashMap<>() : new HashMap<>(rooms);
+        pendingRoomListSnapshotVersion = Math.max(0L, snapshotVersion);
         pendingRoomListReceivedAtMs = System.currentTimeMillis();
         if (roomState.rooms().isEmpty()) {
             flushPendingRoomListUpdate(true);
@@ -384,7 +389,7 @@ public class TdmRoomScreen extends Screen {
 
     private void applyRoomListUpdate(Map<String, TdmRoomData> rooms) {
         Set<String> previous = new HashSet<>(roomState.rooms().keySet());
-        actionController.updateRoomList(rooms);
+        actionController.updateRoomList(pendingRoomListSnapshotVersion, rooms);
 
         long now = System.currentTimeMillis();
         for (String roomName : roomState.rooms().keySet()) {
@@ -402,8 +407,12 @@ public class TdmRoomScreen extends Screen {
     /**
      * 更新当前房间的玩家列表
      */
-    public void updatePlayerList(String mapName, Map<String, List<PlayerInfo>> teamPlayers) {
-        actionController.updatePlayerList(mapName, teamPlayers);
+    public void updatePlayerList(String roomKey, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
+        actionController.updatePlayerList(roomKey, rosterVersion, teamPlayers);
+    }
+
+    public void updatePlayerDelta(String roomKey, int rosterVersion) {
+        actionController.updatePlayerDelta(roomKey, rosterVersion);
     }
 
     /**
@@ -423,7 +432,9 @@ public class TdmRoomScreen extends Screen {
     @Override
     public void onClose() {
         pendingRoomListUpdate = null;
+        pendingRoomListSnapshotVersion = 0L;
         roomListRenderResult = TdmRoomListRenderer.RenderResult.empty();
+        actionController.unsubscribeRoomList();
         actionController.reset();
         super.onClose();
     }
@@ -457,10 +468,15 @@ public class TdmRoomScreen extends Screen {
 
     private String currentInfoContextKey() {
         String joined = roomState.joinedRoom();
+        String selected = roomState.selectedRoom();
+        if (joined != null && !joined.isBlank()
+                && selected != null && !selected.isBlank()
+                && !selected.equals(joined)) {
+            return "J:" + joined + "|S:" + selected;
+        }
         if (joined != null && !joined.isBlank()) {
             return "J:" + joined;
         }
-        String selected = roomState.selectedRoom();
         if (selected != null && !selected.isBlank()) {
             return "S:" + selected;
         }

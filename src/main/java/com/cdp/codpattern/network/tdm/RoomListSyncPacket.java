@@ -15,13 +15,16 @@ import java.util.function.Supplier;
  * S→C: 同步房间列表数据包
  */
 public class RoomListSyncPacket {
+    private final long snapshotVersion;
     private final Map<RoomId, RoomInfo> rooms;
 
-    public RoomListSyncPacket(Map<RoomId, RoomInfo> rooms) {
+    public RoomListSyncPacket(long snapshotVersion, Map<RoomId, RoomInfo> rooms) {
+        this.snapshotVersion = snapshotVersion;
         this.rooms = rooms;
     }
 
     public RoomListSyncPacket(FriendlyByteBuf buf) {
+        this.snapshotVersion = buf.readLong();
         int size = buf.readInt();
         this.rooms = new HashMap<>();
         for (int i = 0; i < size; i++) {
@@ -32,6 +35,7 @@ public class RoomListSyncPacket {
     }
 
     public void encode(FriendlyByteBuf buf) {
+        buf.writeLong(snapshotVersion);
         buf.writeInt(rooms.size());
         for (Map.Entry<RoomId, RoomInfo> entry : rooms.entrySet()) {
             entry.getKey().write(buf);
@@ -45,7 +49,8 @@ public class RoomListSyncPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientPacketHandler.handleRoomListSync(rooms));
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                    () -> () -> ClientPacketHandler.handleRoomListSync(snapshotVersion, rooms));
         });
         ctx.get().setPacketHandled(true);
     }

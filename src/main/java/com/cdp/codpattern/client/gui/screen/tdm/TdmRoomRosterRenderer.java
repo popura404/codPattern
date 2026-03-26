@@ -166,12 +166,13 @@ public final class TdmRoomRosterRenderer {
 
         String aliveMark = player.isAlive() ? "●" : "■";
         String readyMark = player.isReady() ? "§a[R]" : "§7[ ]";
+        String invincibleMark = player.isInvincible() ? " §e[INV]" : "";
         String nameText = isLocalPlayer(mc.player, player) ? "§e" + player.name() : player.name();
-        String headline = readyMark + " " + aliveMark + " " + nameText;
-        String meta = String.format("§c%d§7/§f%d  §8|  §b%dms",
+        String headline = readyMark + " " + aliveMark + " " + nameText + invincibleMark;
+        String meta = String.format("§c%d§7/§f%d  §8|  §b%s",
                 player.kills(),
                 player.deaths(),
-                Math.max(0, player.pingMs()));
+                TdmRoomTextFormatter.pingBucketText(player.pingMs()));
 
         int textX = x + GuiTextHelper.referenceScaled(6);
         int rightPadding = GuiTextHelper.referenceScaled(5);

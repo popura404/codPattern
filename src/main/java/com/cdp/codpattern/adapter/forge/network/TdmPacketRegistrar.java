@@ -11,12 +11,16 @@ import com.cdp.codpattern.network.tdm.LeaveRoomPacket;
 import com.cdp.codpattern.network.tdm.LeaveRoomResultPacket;
 import com.cdp.codpattern.network.tdm.PhysicsMobRetainPacket;
 import com.cdp.codpattern.network.tdm.PopupNoticePacket;
+import com.cdp.codpattern.network.tdm.RequestRoomRosterResyncPacket;
 import com.cdp.codpattern.network.tdm.RequestRoomListPacket;
 import com.cdp.codpattern.network.tdm.RoomListSyncPacket;
+import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
 import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
 import com.cdp.codpattern.network.tdm.SelectTeamPacket;
 import com.cdp.codpattern.network.tdm.SetReadyStatePacket;
+import com.cdp.codpattern.network.tdm.SubscribeRoomListPacket;
 import com.cdp.codpattern.network.tdm.TeamPlayerListPacket;
+import com.cdp.codpattern.network.tdm.UnsubscribeRoomListPacket;
 import com.cdp.codpattern.network.tdm.VoteDialogPacket;
 import com.cdp.codpattern.network.tdm.VoteEndPacket;
 import com.cdp.codpattern.network.tdm.VoteResponsePacket;
@@ -32,6 +36,24 @@ final class TdmPacketRegistrar {
                 .decoder(RequestRoomListPacket::decode)
                 .encoder(RequestRoomListPacket::encode)
                 .consumerMainThread(RequestRoomListPacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(SubscribeRoomListPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(SubscribeRoomListPacket::decode)
+                .encoder(SubscribeRoomListPacket::encode)
+                .consumerMainThread(SubscribeRoomListPacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(UnsubscribeRoomListPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(UnsubscribeRoomListPacket::decode)
+                .encoder(UnsubscribeRoomListPacket::encode)
+                .consumerMainThread(UnsubscribeRoomListPacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(RequestRoomRosterResyncPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(RequestRoomRosterResyncPacket::decode)
+                .encoder(RequestRoomRosterResyncPacket::encode)
+                .consumerMainThread(RequestRoomRosterResyncPacket::handle)
                 .add();
 
         ModNetworkChannel.CHANNEL.messageBuilder(JoinRoomPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_SERVER)
@@ -80,6 +102,12 @@ final class TdmPacketRegistrar {
                 .decoder(TeamPlayerListPacket::decode)
                 .encoder(TeamPlayerListPacket::encode)
                 .consumerMainThread(TeamPlayerListPacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(RoomPlayerDeltaPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(RoomPlayerDeltaPacket::decode)
+                .encoder(RoomPlayerDeltaPacket::encode)
+                .consumerMainThread(RoomPlayerDeltaPacket::handle)
                 .add();
 
         ModNetworkChannel.CHANNEL.messageBuilder(VoteDialogPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)

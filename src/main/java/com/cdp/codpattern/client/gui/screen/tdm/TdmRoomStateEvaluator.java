@@ -10,9 +10,17 @@ public final class TdmRoomStateEvaluator {
     private TdmRoomStateEvaluator() {
     }
 
-    public static String currentRoomState(String joinedRoom, Map<String, TdmRoomData> rooms, String fallbackPhase) {
+    public static String currentRoomState(
+            String joinedRoom,
+            Map<String, TdmRoomData> rooms,
+            String livePhase,
+            String fallbackPhase
+    ) {
         if (joinedRoom == null) {
             return null;
+        }
+        if (livePhase != null && !livePhase.isBlank()) {
+            return livePhase;
         }
         TdmRoomData joined = rooms.get(joinedRoom);
         if (joined != null) {

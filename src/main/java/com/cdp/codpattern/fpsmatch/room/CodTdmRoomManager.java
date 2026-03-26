@@ -13,7 +13,10 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.server.ServerLifecycleHooks;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * 房间管理器（单例）
@@ -21,10 +24,13 @@ import java.util.Map;
  */
 @Mod.EventBusSubscriber(modid = CodPattern.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class CodTdmRoomManager {
-    private static final long ROOM_PUSH_THROTTLE_MS = 1000L;
+    private static final long ROOM_PUSH_DIRTY_THROTTLE_MS = 350L;
+    private static final long ROOM_PUSH_STEADY_REFRESH_MS = 1000L;
     private static CodTdmRoomManager INSTANCE = null;
     private boolean roomListDirty = true;
     private long lastRoomPushAtMs = 0L;
+    private long snapshotVersion = 0L;
+    private final Set<UUID> lobbySubscribers = new HashSet<>();
 
     private CodTdmRoomManager() {
     }
@@ -43,11 +49,26 @@ public class CodTdmRoomManager {
         roomListDirty = true;
     }
 
+    public void subscribeLobbySummary(ServerPlayer player) {
+        if (player == null) {
+            return;
+        }
+        lobbySubscribers.add(player.getUUID());
+        syncRoomListToClient(player);
+    }
+
+    public void unsubscribeLobbySummary(ServerPlayer player) {
+        if (player == null) {
+            return;
+        }
+        lobbySubscribers.remove(player.getUUID());
+    }
+
     /**
      * 向客户端同步房间列表
      */
     public void syncRoomListToClient(ServerPlayer player) {
-        ModNetworkChannel.sendToPlayer(new RoomListSyncPacket(buildRoomInfos()), player);
+        ModNetworkChannel.sendToPlayer(new RoomListSyncPacket(snapshotVersion, buildRoomInfos()), player);
     }
 
     private Map<RoomId, RoomListSyncPacket.RoomInfo> buildRoomInfos() {
@@ -84,19 +105,40 @@ public class CodTdmRoomManager {
         if (ServerLifecycleHooks.getCurrentServer() == null) {
             return;
         }
-        RoomListSyncPacket packet = new RoomListSyncPacket(buildRoomInfos());
+        Map<UUID, ServerPlayer> onlinePlayers = new HashMap<>();
         for (ServerPlayer player : ServerLifecycleHooks.getCurrentServer().getPlayerList().getPlayers()) {
-            ModNetworkChannel.sendToPlayer(packet, player);
+            onlinePlayers.put(player.getUUID(), player);
+        }
+        lobbySubscribers.retainAll(onlinePlayers.keySet());
+        if (lobbySubscribers.isEmpty()) {
+            return;
+        }
+
+        RoomListSyncPacket packet = new RoomListSyncPacket(snapshotVersion, buildRoomInfos());
+        for (UUID subscriberId : lobbySubscribers) {
+            ServerPlayer player = onlinePlayers.get(subscriberId);
+            if (player != null) {
+                ModNetworkChannel.sendToPlayer(packet, player);
+            }
         }
     }
 
     private void flushPendingRoomPush() {
-        if (!roomListDirty) {
+        if (lobbySubscribers.isEmpty()) {
+            roomListDirty = false;
             return;
         }
+
         long now = System.currentTimeMillis();
-        if (now - lastRoomPushAtMs < ROOM_PUSH_THROTTLE_MS) {
+        boolean dueForSteadyRefresh = now - lastRoomPushAtMs >= ROOM_PUSH_STEADY_REFRESH_MS;
+        if (!roomListDirty && !dueForSteadyRefresh) {
             return;
+        }
+        if (roomListDirty && now - lastRoomPushAtMs < ROOM_PUSH_DIRTY_THROTTLE_MS) {
+            return;
+        }
+        if (roomListDirty) {
+            snapshotVersion++;
         }
         pushRoomListToAllPlayers();
         roomListDirty = false;

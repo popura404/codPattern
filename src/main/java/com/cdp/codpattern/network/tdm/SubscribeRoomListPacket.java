@@ -1,7 +1,6 @@
 package com.cdp.codpattern.network.tdm;
 
 import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
-import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
@@ -9,30 +8,27 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 /**
- * C→S: 请求房间列表数据包
+ * C→S: 订阅房间列表摘要流。
  */
-public class RequestRoomListPacket {
-
-    public RequestRoomListPacket() {
+public class SubscribeRoomListPacket {
+    public SubscribeRoomListPacket() {
     }
 
-    public RequestRoomListPacket(FriendlyByteBuf buf) {
-        // 无数据需要读取
+    public SubscribeRoomListPacket(FriendlyByteBuf buf) {
     }
 
     public void encode(FriendlyByteBuf buf) {
-        // 无数据需要写入
     }
 
-    public static RequestRoomListPacket decode(FriendlyByteBuf buf) {
-        return new RequestRoomListPacket(buf);
+    public static SubscribeRoomListPacket decode(FriendlyByteBuf buf) {
+        return new SubscribeRoomListPacket(buf);
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
-                CodTdmRoomManager.getInstance().syncRoomListToClient(player);
+                CodTdmRoomManager.getInstance().subscribeLobbySummary(player);
             }
         });
         ctx.get().setPacketHandled(true);

@@ -120,6 +120,11 @@ final class CodTacticalTdmPorts {
         public Optional<String> consumeSpectatorPreferredTeam(ServerPlayer player) {
             return delegate.consumeSpectatorPreferredTeam(player);
         }
+
+        @Override
+        public void requestRosterResync(ServerPlayer player) {
+            delegate.requestRosterResync(player);
+        }
     }
 
     private record TacticalReadPort(CodTdmReadPort delegate) implements CodTacticalTdmReadPort {

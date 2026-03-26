@@ -6,9 +6,10 @@ import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.network.tdm.JoinRoomPacket;
 import com.cdp.codpattern.network.tdm.LeaveRoomPacket;
-import com.cdp.codpattern.network.tdm.RequestRoomListPacket;
 import com.cdp.codpattern.network.tdm.SelectTeamPacket;
 import com.cdp.codpattern.network.tdm.SetReadyStatePacket;
+import com.cdp.codpattern.network.tdm.SubscribeRoomListPacket;
+import com.cdp.codpattern.network.tdm.UnsubscribeRoomListPacket;
 import com.cdp.codpattern.network.tdm.VoteEndPacket;
 import com.cdp.codpattern.network.tdm.VoteStartPacket;
 import net.minecraft.client.Minecraft;
@@ -63,7 +64,12 @@ public final class TdmRoomActionController {
     }
 
     public void requestRoomList() {
-        ModNetworkChannel.sendToServer(new RequestRoomListPacket());
+        roomState.lobbySummaryState().beginLoading();
+        ModNetworkChannel.sendToServer(new SubscribeRoomListPacket());
+    }
+
+    public void unsubscribeRoomList() {
+        ModNetworkChannel.sendToServer(new UnsubscribeRoomListPacket());
     }
 
     public void joinSelectedRoom() {
@@ -146,8 +152,17 @@ public final class TdmRoomActionController {
         ModNetworkChannel.sendToServer(new VoteEndPacket());
     }
 
-    public void updateRoomList(Map<String, TdmRoomData> rooms) {
-        roomState.setRooms(rooms);
+    public void updateRoomList(long snapshotVersion, Map<String, TdmRoomData> rooms) {
+        long now = System.currentTimeMillis();
+        roomState.lobbySummaryState().applySnapshot(rooms, snapshotVersion, now);
+        roomState.selectedRoomPreviewState().syncFromLobby(roomState.lobbySummaryState(), now);
+        String selectedRoom = roomState.selectedRoom();
+        if (selectedRoom != null
+                && !selectedRoom.isBlank()
+                && !roomState.rooms().containsKey(selectedRoom)
+                && !selectedRoom.equals(roomState.joinedRoom())) {
+            roomState.setSelectedRoom(null);
+        }
         if (roomState.joinedRoom() != null
                 && !roomState.rooms().containsKey(roomState.joinedRoom())
                 && uiState.pendingAction() != TdmRoomUiState.PendingAction.JOINING) {
@@ -157,9 +172,9 @@ public final class TdmRoomActionController {
         buttonStateUpdater.run();
     }
 
-    public void updatePlayerList(String roomKey, Map<String, List<PlayerInfo>> teamPlayers) {
+    public void updatePlayerList(String roomKey, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
         roomState.setJoinedRoom(roomKey);
-        roomState.setTeamPlayers(teamPlayers);
+        roomState.refreshJoinedRoomLiveState();
         if (uiState.pendingAction() == TdmRoomUiState.PendingAction.JOINING
                 && roomKey != null
                 && roomKey.equals(uiState.pendingRoomName())) {
@@ -168,9 +183,18 @@ public final class TdmRoomActionController {
         buttonStateUpdater.run();
     }
 
+    public void updatePlayerDelta(String roomKey, int rosterVersion) {
+        if (roomKey == null || !roomKey.equals(roomState.joinedRoom())) {
+            return;
+        }
+        roomState.refreshJoinedRoomLiveState();
+        buttonStateUpdater.run();
+    }
+
     public void setJoinedRoom(String roomKey) {
         roomState.setJoinedRoom(roomKey);
         roomState.setSelectedRoom(roomKey);
+        roomState.refreshJoinedRoomLiveState();
         clearSwitchFlow();
         clearPendingAction();
         buttonStateUpdater.run();
@@ -186,6 +210,7 @@ public final class TdmRoomActionController {
             roomState.clearTeamPlayers();
             roomState.setJoinedRoom(roomKey);
             roomState.setSelectedRoom(roomKey);
+            roomState.refreshJoinedRoomLiveState();
             clearRoomNotice();
             if (switchJoinAttempt && roomKey != null && !roomKey.isBlank()) {
                 showRoomNotice(

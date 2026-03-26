@@ -58,4 +58,6 @@ public interface CodTdmActionPort extends ModeRoomActionPort {
     void setSpectatorPreferredTeam(ServerPlayer player, String teamName);
 
     Optional<String> consumeSpectatorPreferredTeam(ServerPlayer player);
+
+    void requestRosterResync(ServerPlayer player);
 }

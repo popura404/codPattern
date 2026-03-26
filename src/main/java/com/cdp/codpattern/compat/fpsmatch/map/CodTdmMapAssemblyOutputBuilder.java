@@ -41,6 +41,7 @@ final class CodTdmMapAssemblyOutputBuilder {
                 endTeleportRuntime,
                 runtimeBundle.voteRuntime(),
                 respawnRuntime,
+                lifecycleRuntime::requestRosterResync,
                 mapNameSupplier
         );
         CodTdmMapReadRuntime readRuntime = new CodTdmMapReadRuntime(

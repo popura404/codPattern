@@ -44,6 +44,35 @@ public final class TdmRoomTextFormatter {
         return String.format("§cK:%d §7| §9S:%d", kortacScore, specgruScore);
     }
 
+    public static String teamSplitText(Map<String, Integer> teamPlayerCounts) {
+        int kortacCount = teamPlayerCounts.getOrDefault(TdmTeamNames.KORTAC, 0);
+        int specgruCount = teamPlayerCounts.getOrDefault(TdmTeamNames.SPECGRU, 0);
+        return kortacCount + "v" + specgruCount;
+    }
+
+    public static String pingBucketText(int pingMs) {
+        return switch (pingBucket(pingMs)) {
+            case 0 -> Component.translatable("screen.codpattern.tdm_room.ping.excellent").getString();
+            case 1 -> Component.translatable("screen.codpattern.tdm_room.ping.good").getString();
+            case 2 -> Component.translatable("screen.codpattern.tdm_room.ping.fair").getString();
+            default -> Component.translatable("screen.codpattern.tdm_room.ping.poor").getString();
+        };
+    }
+
+    public static int pingBucket(int pingMs) {
+        int normalized = Math.max(0, pingMs);
+        if (normalized <= 80) {
+            return 0;
+        }
+        if (normalized <= 150) {
+            return 1;
+        }
+        if (normalized <= 250) {
+            return 2;
+        }
+        return 3;
+    }
+
     public static String formatKd(int kills, int deaths) {
         if (kills <= 0 && deaths <= 0) {
             return "0.00";

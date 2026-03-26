@@ -18,15 +18,18 @@ import java.util.function.Supplier;
  */
 public class TeamPlayerListPacket {
     private final String roomKey;
+    private final int rosterVersion;
     private final Map<String, List<PlayerInfo>> teamPlayers;
 
-    public TeamPlayerListPacket(String roomKey, Map<String, List<PlayerInfo>> teamPlayers) {
+    public TeamPlayerListPacket(String roomKey, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
         this.roomKey = roomKey;
+        this.rosterVersion = rosterVersion;
         this.teamPlayers = teamPlayers;
     }
 
     public TeamPlayerListPacket(FriendlyByteBuf buf) {
         this.roomKey = buf.readUtf();
+        this.rosterVersion = buf.readInt();
         int teamCount = buf.readInt();
         this.teamPlayers = new HashMap<>();
         for (int i = 0; i < teamCount; i++) {
@@ -42,6 +45,7 @@ public class TeamPlayerListPacket {
 
     public void encode(FriendlyByteBuf buf) {
         buf.writeUtf(roomKey);
+        buf.writeInt(rosterVersion);
         buf.writeInt(teamPlayers.size());
         for (Map.Entry<String, List<PlayerInfo>> entry : teamPlayers.entrySet()) {
             buf.writeUtf(entry.getKey());
@@ -59,7 +63,7 @@ public class TeamPlayerListPacket {
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
             DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                    () -> () -> ClientPacketHandler.handleTeamPlayerList(roomKey, teamPlayers));
+                    () -> () -> ClientPacketHandler.handleTeamPlayerList(roomKey, rosterVersion, teamPlayers));
         });
         ctx.get().setPacketHandled(true);
     }

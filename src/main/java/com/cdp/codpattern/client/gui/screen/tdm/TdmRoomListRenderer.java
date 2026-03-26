@@ -83,7 +83,7 @@ public final class TdmRoomListRenderer {
             int roomListWidth,
             int roomListHeight,
             int roomItemHeight,
-            Map<String, TdmRoomData> rooms,
+            LobbySummaryState lobbySummaryState,
             String selectedRoom,
             String joinedRoom,
             int scrollOffset,
@@ -95,6 +95,7 @@ public final class TdmRoomListRenderer {
             boolean hasPendingAction,
             boolean leavePending,
             float panelAlphaFactor) {
+        Map<String, TdmRoomData> rooms = lobbySummaryState.rooms();
         int referenceLineHeight = GuiTextHelper.referenceLineHeight(mc.font);
         int frameInset = frameInset();
         int panelPadding = panelPadding();
@@ -134,6 +135,27 @@ public final class TdmRoomListRenderer {
         List<ActionHitbox> actionHitboxes = new ArrayList<>();
         highlightProgress.keySet().retainAll(roomNames);
         roomEnteredAtMs.keySet().retainAll(roomNames);
+
+        if (lobbySummaryState.isLoading() && !lobbySummaryState.hasLoaded()) {
+            int emptyY = listTop + GuiTextHelper.referenceScaled(8);
+            GuiTextHelper.drawReferenceString(
+                    graphics,
+                    mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.loading"),
+                    roomListX + panelPadding,
+                    emptyY,
+                    scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor),
+                    false);
+            GuiTextHelper.drawReferenceString(
+                    graphics,
+                    mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.loading_hint"),
+                    roomListX + panelPadding,
+                    emptyY + referenceLineHeight + GuiTextHelper.referenceScaled(3),
+                    scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
+                    false);
+            return new RenderResult(roomNames, roomHitboxes, actionHitboxes);
+        }
 
         if (roomNames.isEmpty()) {
             int emptyY = listTop + GuiTextHelper.referenceScaled(8);
@@ -273,6 +295,7 @@ public final class TdmRoomListRenderer {
 
             String playerText = room.playerCount + "/" + room.maxPlayers;
             String scoreText = TdmRoomTextFormatter.teamScoreText(room.teamScores);
+            String splitText = TdmRoomTextFormatter.teamSplitText(room.teamPlayerCounts);
             int playerTextY = primaryTextY + referenceLineHeight + GuiTextHelper.referenceScaled(BASE_ROW_SECONDARY_GAP);
             GuiTextHelper.drawReferenceEllipsizedString(
                     graphics,
@@ -286,7 +309,7 @@ public final class TdmRoomListRenderer {
             GuiTextHelper.drawReferenceEllipsizedString(
                     graphics,
                     mc.font,
-                    scoreText,
+                    splitText + "  " + scoreText,
                     contentLeft,
                     playerTextY + referenceLineHeight,
                     Math.max(GuiTextHelper.referenceScaled(34), textRight - contentLeft),
@@ -328,13 +351,19 @@ public final class TdmRoomListRenderer {
                     scaleAlpha(CodTheme.SELECTED_BORDER, panelAlphaFactor));
         }
 
+        Component footerText = lobbySummaryState.isStale(nowMs)
+                ? Component.translatable(
+                        "screen.codpattern.tdm_room.stale_hint",
+                        Math.max(1, lobbySummaryState.secondsSinceLastUpdate(nowMs)))
+                : Component.translatable("screen.codpattern.tdm_room.scroll_hint");
+        int footerColor = lobbySummaryState.isStale(nowMs) ? CodTheme.TEXT_DANGER : CodTheme.TEXT_DIM;
         GuiTextHelper.drawReferenceString(
                 graphics,
                 mc.font,
-                Component.translatable("screen.codpattern.tdm_room.scroll_hint"),
+                footerText,
                 roomListX + panelPadding,
                 footerY,
-                scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
+                scaleAlpha(footerColor, panelAlphaFactor),
                 false);
 
         return new RenderResult(roomNames, roomHitboxes, actionHitboxes);

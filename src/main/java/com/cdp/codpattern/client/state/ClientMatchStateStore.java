@@ -3,6 +3,7 @@ package com.cdp.codpattern.client.state;
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
+import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
@@ -11,6 +12,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +54,10 @@ public final class ClientMatchStateStore {
     private int deathCamTicks = 0;
     private String roomContextName = "";
     private String syncedMapName = "";
+    private int rosterVersion = 0;
+    private long lastPhaseSyncAtMs = 0L;
+    private long lastScoreSyncAtMs = 0L;
+    private long lastRosterSyncAtMs = 0L;
     private final Map<String, List<PlayerInfo>> teamPlayers = new HashMap<>();
     private final List<ActiveKillFeedEntry> killFeedEntries = new ArrayList<>();
 
@@ -129,6 +135,26 @@ public final class ClientMatchStateStore {
         return syncedMapName;
     }
 
+    public String roomContextName() {
+        return roomContextName;
+    }
+
+    public int rosterVersion() {
+        return rosterVersion;
+    }
+
+    public long lastPhaseSyncAtMs() {
+        return lastPhaseSyncAtMs;
+    }
+
+    public long lastScoreSyncAtMs() {
+        return lastScoreSyncAtMs;
+    }
+
+    public long lastRosterSyncAtMs() {
+        return lastRosterSyncAtMs;
+    }
+
     public boolean hasRoomContext() {
         return !roomContextName.isBlank() || !syncedMapName.isBlank() || !teamPlayers.isEmpty();
     }
@@ -141,6 +167,10 @@ public final class ClientMatchStateStore {
         return snapshot;
     }
 
+    public Map<String, Integer> teamScoresSnapshot() {
+        return new HashMap<>(teamScores);
+    }
+
     public List<KillFeedEntry> killFeedSnapshot() {
         List<KillFeedEntry> snapshot = new ArrayList<>(killFeedEntries.size());
         for (ActiveKillFeedEntry entry : killFeedEntries) {
@@ -149,11 +179,14 @@ public final class ClientMatchStateStore {
         return snapshot;
     }
 
-    public void updateTeamPlayers(String mapName, Map<String, List<PlayerInfo>> latestTeamPlayers) {
+    public void updateTeamPlayers(String mapName, int latestRosterVersion, Map<String, List<PlayerInfo>> latestTeamPlayers) {
+        long now = System.currentTimeMillis();
         syncedMapName = mapName == null ? "" : mapName;
         if (!syncedMapName.isBlank()) {
             roomContextName = syncedMapName;
         }
+        rosterVersion = Math.max(0, latestRosterVersion);
+        lastRosterSyncAtMs = now;
         teamPlayers.clear();
         if (latestTeamPlayers == null || latestTeamPlayers.isEmpty()) {
             return;
@@ -167,7 +200,43 @@ public final class ClientMatchStateStore {
         }
     }
 
+    public ClientTdmState.RosterDeltaApplyResult applyTeamPlayerDelta(
+            String roomKey,
+            int nextRosterVersion,
+            List<RoomPlayerDeltaPacket.PlayerDelta> updates
+    ) {
+        if (roomKey == null || roomKey.isBlank()) {
+            return ClientTdmState.RosterDeltaApplyResult.ROOM_MISMATCH;
+        }
+        if (!syncedMapName.isBlank() && !syncedMapName.equals(roomKey)
+                && !roomContextName.isBlank() && !roomContextName.equals(roomKey)) {
+            return ClientTdmState.RosterDeltaApplyResult.ROOM_MISMATCH;
+        }
+        if (rosterVersion <= 0 || nextRosterVersion != rosterVersion + 1) {
+            return ClientTdmState.RosterDeltaApplyResult.VERSION_GAP;
+        }
+
+        Map<String, List<PlayerInfo>> snapshot = teamPlayersSnapshot();
+        for (RoomPlayerDeltaPacket.PlayerDelta update : updates) {
+            if (!applyPlayerDelta(snapshot, update)) {
+                return ClientTdmState.RosterDeltaApplyResult.PLAYER_MISSING;
+            }
+        }
+        for (List<PlayerInfo> players : snapshot.values()) {
+            players.sort(playerComparator());
+        }
+
+        syncedMapName = roomKey;
+        roomContextName = roomKey;
+        rosterVersion = nextRosterVersion;
+        lastRosterSyncAtMs = System.currentTimeMillis();
+        teamPlayers.clear();
+        teamPlayers.putAll(snapshot);
+        return ClientTdmState.RosterDeltaApplyResult.APPLIED;
+    }
+
     public void updatePhase(String phase, int time) {
+        lastPhaseSyncAtMs = System.currentTimeMillis();
         String oldPhase = currentPhase;
         if (!phase.equals(oldPhase)) {
             if (phase.equals("WARMUP") || phase.equals("PLAYING")) {
@@ -200,6 +269,7 @@ public final class ClientMatchStateStore {
     }
 
     public void updateScore(Map<String, Integer> scores, int legacyTeam1, int legacyTeam2, int time) {
+        lastScoreSyncAtMs = System.currentTimeMillis();
         int oldTeam1 = team1Score;
         int oldTeam2 = team2Score;
 
@@ -240,6 +310,8 @@ public final class ClientMatchStateStore {
     public void clearRoomContext() {
         roomContextName = "";
         syncedMapName = "";
+        rosterVersion = 0;
+        lastRosterSyncAtMs = 0L;
         teamPlayers.clear();
         clearKillFeed();
     }
@@ -270,9 +342,55 @@ public final class ClientMatchStateStore {
         endSummaryTicks = 0;
         roomContextName = "";
         syncedMapName = "";
+        rosterVersion = 0;
+        lastPhaseSyncAtMs = 0L;
+        lastScoreSyncAtMs = 0L;
+        lastRosterSyncAtMs = 0L;
         teamPlayers.clear();
         clearKillFeed();
         clearDeathCam();
+    }
+
+    private boolean applyPlayerDelta(
+            Map<String, List<PlayerInfo>> snapshot,
+            RoomPlayerDeltaPacket.PlayerDelta update
+    ) {
+        if (update == null || update.snapshot() == null) {
+            return false;
+        }
+        String hintedTeam = update.teamName() == null ? "" : update.teamName();
+        if (!hintedTeam.isBlank()) {
+            List<PlayerInfo> hintedPlayers = snapshot.get(hintedTeam);
+            if (replacePlayer(hintedPlayers, update)) {
+                return true;
+            }
+        }
+        for (List<PlayerInfo> players : snapshot.values()) {
+            if (replacePlayer(players, update)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean replacePlayer(List<PlayerInfo> players, RoomPlayerDeltaPacket.PlayerDelta update) {
+        if (players == null) {
+            return false;
+        }
+        for (int index = 0; index < players.size(); index++) {
+            if (players.get(index).uuid().equals(update.playerId())) {
+                players.set(index, update.snapshot());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Comparator<PlayerInfo> playerComparator() {
+        return Comparator
+                .comparingInt(PlayerInfo::kills).reversed()
+                .thenComparingInt(PlayerInfo::deaths)
+                .thenComparing(PlayerInfo::name, String.CASE_INSENSITIVE_ORDER);
     }
 
     public void updateCountdown(int count, boolean black) {

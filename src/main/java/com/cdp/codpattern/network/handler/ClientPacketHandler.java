@@ -16,6 +16,8 @@ import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.network.tdm.VoteResponsePacket;
 import com.cdp.codpattern.network.tdm.RoomListSyncPacket.RoomInfo;
+import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
+import com.cdp.codpattern.network.tdm.RequestRoomRosterResyncPacket;
 import com.google.gson.Gson;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.client.Minecraft;
@@ -113,7 +115,7 @@ public class ClientPacketHandler {
         Minecraft.getInstance().player.sendSystemMessage(resolveWeaponUpdateFailure(code, message));
     }
 
-    public static void handleRoomListSync(Map<RoomId, RoomInfo> rooms) {
+    public static void handleRoomListSync(long snapshotVersion, Map<RoomId, RoomInfo> rooms) {
         Minecraft.getInstance().execute(() -> {
             Screen screen = Minecraft.getInstance().screen;
             if (screen instanceof TdmRoomScreen tdmScreen) {
@@ -132,17 +134,37 @@ public class ClientPacketHandler {
                             info.remainingTimeTicks,
                             info.hasMatchEndTeleportPoint));
                 }
-                tdmScreen.updateRoomList(roomDataMap);
+                tdmScreen.updateRoomList(snapshotVersion, roomDataMap);
             }
         });
     }
 
-    public static void handleTeamPlayerList(String roomKey, Map<String, List<PlayerInfo>> teamPlayers) {
+    public static void handleTeamPlayerList(String roomKey, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
         Minecraft.getInstance().execute(() -> {
-            ClientTdmState.updateTeamPlayers(roomKey, teamPlayers);
+            ClientTdmState.updateTeamPlayers(roomKey, rosterVersion, teamPlayers);
             Screen screen = Minecraft.getInstance().screen;
             if (screen instanceof TdmRoomScreen tdmScreen) {
-                tdmScreen.updatePlayerList(roomKey, teamPlayers);
+                tdmScreen.updatePlayerList(roomKey, rosterVersion, teamPlayers);
+            }
+        });
+    }
+
+    public static void handleRoomPlayerDelta(
+            String roomKey,
+            int rosterVersion,
+            List<RoomPlayerDeltaPacket.PlayerDelta> updates
+    ) {
+        Minecraft.getInstance().execute(() -> {
+            ClientTdmState.RosterDeltaApplyResult result = ClientTdmState.applyTeamPlayerDelta(
+                    roomKey,
+                    rosterVersion,
+                    updates);
+            if (result != ClientTdmState.RosterDeltaApplyResult.APPLIED) {
+                ModNetworkChannel.sendToServer(new RequestRoomRosterResyncPacket());
+            }
+            Screen screen = Minecraft.getInstance().screen;
+            if (screen instanceof TdmRoomScreen tdmScreen) {
+                tdmScreen.updatePlayerDelta(roomKey, rosterVersion);
             }
         });
     }
