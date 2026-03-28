@@ -58,6 +58,12 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int KILL_FEED_TEXT_GAP = 5;
     private static final int KILL_FEED_BACKGROUND_SEGMENTS = 18;
     private static final float KILL_FEED_TEXT_SCALE_MULTIPLIER = 1.0f;
+    private static final int DEATH_CAM_PANEL_WIDTH = 240;
+    private static final int DEATH_CAM_PANEL_HEIGHT = 56;
+    private static final int DEATH_CAM_PANEL_SIDE_MARGIN = 16;
+    private static final int DEATH_CAM_PANEL_BOTTOM_MARGIN = 40;
+    private static final int DEATH_CAM_PANEL_MIN_CENTER_OFFSET = 18;
+    private static final int DEATH_CAM_PANEL_TEXT_PADDING = 12;
     private static final double TEAM_MARKER_HEAD_OFFSET = 0.45D;
     private static final double ENEMY_BAR_HEAD_OFFSET = 0.62D;
     private static final double INVINCIBILITY_MARKER_HEAD_OFFSET = 0.92D;
@@ -93,7 +99,7 @@ public class TdmHudOverlay implements IGuiOverlay {
         renderCountdownFocus(graphics, font, centerX, screenHeight);
         renderCombatMarkers(graphics, partialTick, screenWidth, screenHeight);
         renderEndgameSplash(graphics, font, centerX, screenWidth, screenHeight);
-        renderDeathCamPanel(graphics, font, centerX, screenHeight);
+        renderDeathCamPanel(graphics, font, centerX, screenWidth, screenHeight);
     }
 
     private boolean shouldRenderHud() {
@@ -1060,28 +1066,50 @@ public class TdmHudOverlay implements IGuiOverlay {
         return new Vec3(x, y, z);
     }
 
-    private void renderDeathCamPanel(GuiGraphics graphics, Font font, int centerX, int screenHeight) {
+    private void renderDeathCamPanel(GuiGraphics graphics, Font font, int centerX, int screenWidth, int screenHeight) {
         if (!ClientTdmState.isDead()) {
             return;
         }
-        int panelWidth = 240;
-        int panelHeight = 56;
+        int panelWidth = Math.max(96, Math.min(DEATH_CAM_PANEL_WIDTH, screenWidth - (DEATH_CAM_PANEL_SIDE_MARGIN * 2)));
+        int panelHeight = DEATH_CAM_PANEL_HEIGHT;
         int x = centerX - panelWidth / 2;
-        int y = screenHeight / 2 - 30;
+        int minY = (screenHeight / 2) + DEATH_CAM_PANEL_MIN_CENTER_OFFSET;
+        int preferredY = (screenHeight * 2 / 3) - (panelHeight / 2);
+        int maxY = Math.max(8, screenHeight - panelHeight - DEATH_CAM_PANEL_BOTTOM_MARGIN);
+        int y = maxY < minY ? maxY : Math.min(maxY, Math.max(minY, preferredY));
+        int textMaxWidth = Math.max(24, panelWidth - (DEATH_CAM_PANEL_TEXT_PADDING * 2));
 
         graphics.fillGradient(x, y, x + panelWidth, y + panelHeight, 0xCC2B0E0E, 0xCC120A0A);
         graphics.fill(x, y + panelHeight - 2, x + panelWidth, y + panelHeight, 0xFFFF5A5A);
 
-        drawCenteredString(graphics, font, Component.translatable("hud.codpattern.tdm.death.title").getString(), centerX,
-                y + 7, 0xFFFFC4C4);
-        drawCenteredString(graphics, font,
-                Component.translatable("hud.codpattern.tdm.death.killer", ClientTdmState.killerName()).getString(), centerX,
-                y + 20, 0xFFF1F1F1);
-        drawCenteredString(graphics, font,
-                Component.translatable("hud.codpattern.tdm.death.respawn", String.format(Locale.ROOT, "%.1f",
-                        ClientTdmState.deathCamTicks() / 20.0f))
-                        .getString(),
-                centerX, y + 34, 0xFFD8D8D8);
+        GuiTextHelper.drawCenteredEllipsizedString(
+                graphics,
+                font,
+                Component.translatable("hud.codpattern.tdm.death.title").getString(),
+                centerX,
+                y + 7,
+                textMaxWidth,
+                0xFFFFC4C4,
+                true);
+        GuiTextHelper.drawCenteredEllipsizedString(
+                graphics,
+                font,
+                Component.translatable("hud.codpattern.tdm.death.killer", ClientTdmState.killerName()).getString(),
+                centerX,
+                y + 20,
+                textMaxWidth,
+                0xFFF1F1F1,
+                true);
+        GuiTextHelper.drawCenteredEllipsizedString(
+                graphics,
+                font,
+                Component.translatable("hud.codpattern.tdm.death.respawn",
+                        String.format(Locale.ROOT, "%.1f", ClientTdmState.deathCamTicks() / 20.0f)).getString(),
+                centerX,
+                y + 34,
+                textMaxWidth,
+                0xFFD8D8D8,
+                true);
     }
 
     private String buildTimerText() {
