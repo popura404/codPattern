@@ -261,6 +261,7 @@
     "screen.codpattern.tdm_room.notice.timeout.leave_room": "ルーム退出リクエストがタイムアウトしました",
     "screen.codpattern.tdm_room.notice.timeout.join_game": "試合参加リクエストがタイムアウトしました",
     "screen.codpattern.tdm_room.notice.left_room": "ルームから退出しました",
+    "command.codpattern.map.ambiguous_map": "同名のマップ %s が複数あります。マップ名を一意にするか、ゲームタイプで区別してください。該当タイプ: %s",
     "message.codpattern.weapon_update.error.bag_not_found": "§cロードアウト更新を拒否しました: バックパックが見つかりません",
     "message.codpattern.weapon_update.error.slot_invalid": "§cロードアウト更新を拒否しました: 無効なスロットです",
     "message.codpattern.weapon_update.error.item_id_invalid": "§cロードアウト更新を拒否しました: 無効なアイテム ID です",

@@ -3,9 +3,12 @@ package com.cdp.codpattern.command;
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.cdp.codpattern.compat.fpsmatch.data.CodTacticalTdmMapData;
 import com.cdp.codpattern.compat.fpsmatch.data.CodTdmMapData;
+import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.mojang.brigadier.suggestion.Suggestions;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
@@ -16,18 +19,48 @@ import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import com.phasetranscrystal.fpsmatch.common.item.MapCreatorTool;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec2;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 public final class MapManagementCommand {
+    private static final SuggestionProvider<CommandSourceStack> REGISTERED_TYPE_SUGGESTIONS =
+            (context, builder) -> SharedSuggestionProvider.suggest(registeredGameTypes(), builder);
+    private static final SuggestionProvider<CommandSourceStack> MAP_BY_TYPE_SUGGESTIONS =
+            (context, builder) -> SharedSuggestionProvider.suggest(mapNamesForContextType(context), builder);
+    private static final SuggestionProvider<CommandSourceStack> ALL_MAP_SUGGESTIONS =
+            (context, builder) -> SharedSuggestionProvider.suggest(allMapNames(), builder);
+    private static final SuggestionProvider<CommandSourceStack> TEAM_SUGGESTIONS =
+            (context, builder) -> {
+                BaseMap map = resolveMapFromContext(context);
+                if (map == null) {
+                    return Suggestions.empty();
+                }
+                List<String> teamNames = map.getMapTeams().getTeams().stream()
+                        .map(team -> team.name)
+                        .sorted(String.CASE_INSENSITIVE_ORDER)
+                        .toList();
+                return SharedSuggestionProvider.suggest(teamNames, builder);
+            };
+    private static final SuggestionProvider<CommandSourceStack> SPAWN_KIND_SUGGESTIONS =
+            (context, builder) -> SharedSuggestionProvider.suggest(
+                    List.of(
+                            SpawnPointKind.INITIAL.serializedName(),
+                            SpawnPointKind.DYNAMIC_CANDIDATE.serializedName()),
+                    builder);
+
     private MapManagementCommand() {
     }
 
@@ -37,11 +70,13 @@ public final class MapManagementCommand {
                 .then(Commands.literal("list")
                         .executes(context -> listTypes(context.getSource()))
                         .then(Commands.argument("type", StringArgumentType.word())
+                                .suggests(REGISTERED_TYPE_SUGGESTIONS)
                                 .executes(context -> listMaps(
                                         context.getSource(),
                                         StringArgumentType.getString(context, "type")))))
                 .then(Commands.literal("create")
                         .then(Commands.argument("type", StringArgumentType.word())
+                                .suggests(REGISTERED_TYPE_SUGGESTIONS)
                                 .then(Commands.argument("map", StringArgumentType.string())
                                         .then(Commands.argument("from", BlockPosArgument.blockPos())
                                                 .then(Commands.argument("to", BlockPosArgument.blockPos())
@@ -53,7 +88,9 @@ public final class MapManagementCommand {
                                                                 BlockPosArgument.getLoadedBlockPos(context, "to"))))))))
                 .then(Commands.literal("delete")
                         .then(Commands.argument("type", StringArgumentType.word())
+                                .suggests(REGISTERED_TYPE_SUGGESTIONS)
                                 .then(Commands.argument("map", StringArgumentType.string())
+                                        .suggests(MAP_BY_TYPE_SUGGESTIONS)
                                         .executes(context -> deleteMap(
                                                 context.getSource(),
                                                 StringArgumentType.getString(context, "type"),
@@ -61,9 +98,13 @@ public final class MapManagementCommand {
                 .then(Commands.literal("spawn")
                         .then(Commands.literal("list")
                                 .then(Commands.argument("type", StringArgumentType.word())
+                                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
                                         .then(Commands.argument("map", StringArgumentType.string())
+                                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
                                                 .then(Commands.argument("team", StringArgumentType.word())
+                                                        .suggests(TEAM_SUGGESTIONS)
                                                         .then(Commands.argument("kind", StringArgumentType.word())
+                                                                .suggests(SPAWN_KIND_SUGGESTIONS)
                                                                 .executes(context -> listSpawnPoints(
                                                                         context.getSource(),
                                                                         StringArgumentType.getString(context, "type"),
@@ -72,9 +113,13 @@ public final class MapManagementCommand {
                                                                         StringArgumentType.getString(context, "kind"))))))))
                         .then(Commands.literal("add")
                                 .then(Commands.argument("type", StringArgumentType.word())
+                                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
                                         .then(Commands.argument("map", StringArgumentType.string())
+                                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
                                                 .then(Commands.argument("team", StringArgumentType.word())
+                                                        .suggests(TEAM_SUGGESTIONS)
                                                         .then(Commands.argument("kind", StringArgumentType.word())
+                                                                .suggests(SPAWN_KIND_SUGGESTIONS)
                                                                 .then(Commands.argument("pos", BlockPosArgument.blockPos())
                                                                         .executes(context -> addSpawnPoint(
                                                                                 context.getSource(),
@@ -85,9 +130,13 @@ public final class MapManagementCommand {
                                                                                 BlockPosArgument.getLoadedBlockPos(context, "pos")))))))))
                         .then(Commands.literal("remove")
                                 .then(Commands.argument("type", StringArgumentType.word())
+                                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
                                         .then(Commands.argument("map", StringArgumentType.string())
+                                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
                                                 .then(Commands.argument("team", StringArgumentType.word())
+                                                        .suggests(TEAM_SUGGESTIONS)
                                                         .then(Commands.argument("kind", StringArgumentType.word())
+                                                                .suggests(SPAWN_KIND_SUGGESTIONS)
                                                                 .then(Commands.argument("index", IntegerArgumentType.integer(1))
                                                                         .executes(context -> removeSpawnPoint(
                                                                                 context.getSource(),
@@ -98,9 +147,13 @@ public final class MapManagementCommand {
                                                                                 IntegerArgumentType.getInteger(context, "index")))))))))
                         .then(Commands.literal("clear")
                                 .then(Commands.argument("type", StringArgumentType.word())
+                                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
                                         .then(Commands.argument("map", StringArgumentType.string())
+                                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
                                                 .then(Commands.argument("team", StringArgumentType.word())
+                                                        .suggests(TEAM_SUGGESTIONS)
                                                         .then(Commands.argument("kind", StringArgumentType.word())
+                                                                .suggests(SPAWN_KIND_SUGGESTIONS)
                                                                 .executes(context -> clearSpawnPoints(
                                                                         context.getSource(),
                                                                         StringArgumentType.getString(context, "type"),
@@ -109,28 +162,25 @@ public final class MapManagementCommand {
                                                                         StringArgumentType.getString(context, "kind")))))))))
                 .then(Commands.literal("endtp")
                         .then(Commands.literal("show")
-                                .then(Commands.argument("type", StringArgumentType.word())
-                                        .then(Commands.argument("map", StringArgumentType.string())
-                                                .executes(context -> showMatchEndTeleport(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "type"),
-                                                        StringArgumentType.getString(context, "map"))))))
+                                .then(Commands.argument("map", StringArgumentType.string())
+                                        .suggests(ALL_MAP_SUGGESTIONS)
+                                        .executes(context -> showMatchEndTeleport(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "map")))))
                         .then(Commands.literal("set")
-                                .then(Commands.argument("type", StringArgumentType.word())
-                                        .then(Commands.argument("map", StringArgumentType.string())
-                                                .then(Commands.argument("pos", BlockPosArgument.blockPos())
-                                                        .executes(context -> setMatchEndTeleport(
-                                                                context.getSource(),
-                                                                StringArgumentType.getString(context, "type"),
-                                                                StringArgumentType.getString(context, "map"),
-                                                                BlockPosArgument.getLoadedBlockPos(context, "pos")))))))
-                        .then(Commands.literal("clear")
-                                .then(Commands.argument("type", StringArgumentType.word())
-                                        .then(Commands.argument("map", StringArgumentType.string())
-                                                .executes(context -> clearMatchEndTeleport(
+                                .then(Commands.argument("map", StringArgumentType.string())
+                                        .suggests(ALL_MAP_SUGGESTIONS)
+                                        .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                                                .executes(context -> setMatchEndTeleport(
                                                         context.getSource(),
-                                                        StringArgumentType.getString(context, "type"),
-                                                        StringArgumentType.getString(context, "map")))))));
+                                                        StringArgumentType.getString(context, "map"),
+                                                        BlockPosArgument.getLoadedBlockPos(context, "pos"))))))
+                        .then(Commands.literal("clear")
+                                .then(Commands.argument("map", StringArgumentType.string())
+                                        .suggests(ALL_MAP_SUGGESTIONS)
+                                        .executes(context -> clearMatchEndTeleport(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "map"))))));
     }
 
     private static int listTypes(CommandSourceStack source) {
@@ -356,8 +406,8 @@ public final class MapManagementCommand {
         return removedCount;
     }
 
-    private static int showMatchEndTeleport(CommandSourceStack source, String rawType, String mapName) {
-        BaseMap map = requireMap(source, rawType, mapName);
+    private static int showMatchEndTeleport(CommandSourceStack source, String mapName) {
+        BaseMap map = requireUniqueMap(source, mapName);
         if (map == null) {
             return 0;
         }
@@ -377,8 +427,8 @@ public final class MapManagementCommand {
         return 1;
     }
 
-    private static int setMatchEndTeleport(CommandSourceStack source, String rawType, String mapName, BlockPos pos) {
-        BaseMap map = requireMap(source, rawType, mapName);
+    private static int setMatchEndTeleport(CommandSourceStack source, String mapName, BlockPos pos) {
+        BaseMap map = requireUniqueMap(source, mapName);
         if (map == null) {
             return 0;
         }
@@ -399,8 +449,8 @@ public final class MapManagementCommand {
         return 1;
     }
 
-    private static int clearMatchEndTeleport(CommandSourceStack source, String rawType, String mapName) {
-        BaseMap map = requireMap(source, rawType, mapName);
+    private static int clearMatchEndTeleport(CommandSourceStack source, String mapName) {
+        BaseMap map = requireUniqueMap(source, mapName);
         if (map == null) {
             return 0;
         }
@@ -432,6 +482,25 @@ public final class MapManagementCommand {
             return null;
         }
         return map.get();
+    }
+
+    private static BaseMap requireUniqueMap(CommandSourceStack source, String mapName) {
+        List<BaseMap> maps = findMapsByName(mapName);
+        if (maps.isEmpty()) {
+            source.sendFailure(Component.translatable("message.fpsm.spawn_point_tool.map_not_found", mapName));
+            return null;
+        }
+        if (maps.size() > 1) {
+            String matchedTypes = maps.stream()
+                    .map(BaseMap::getGameType)
+                    .distinct()
+                    .sorted(String.CASE_INSENSITIVE_ORDER)
+                    .reduce((left, right) -> left + ", " + right)
+                    .orElse("");
+            source.sendFailure(Component.translatable("command.codpattern.map.ambiguous_map", mapName, matchedTypes));
+            return null;
+        }
+        return maps.get(0);
     }
 
     private static BaseTeam requireTeam(CommandSourceStack source, BaseMap map, String teamName) {
@@ -527,5 +596,59 @@ public final class MapManagementCommand {
 
     private static String formatAngle(float value) {
         return String.format(Locale.ROOT, "%.1f", value);
+    }
+
+    private static List<String> registeredGameTypes() {
+        return FPSMCore.getInstance().getGameTypes().stream()
+                .map(TdmGameTypes::canonicalize)
+                .distinct()
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
+    }
+
+    private static List<String> mapNamesForContextType(CommandContext<CommandSourceStack> context) {
+        try {
+            String rawType = StringArgumentType.getString(context, "type");
+            String type = TdmGameTypes.canonicalize(rawType);
+            if (!FPSMCore.getInstance().checkGameType(type)) {
+                return List.of();
+            }
+            return FPSMCore.getInstance().getMapNamesWithType(type).stream()
+                    .sorted(String.CASE_INSENSITIVE_ORDER)
+                    .toList();
+        } catch (IllegalArgumentException ignored) {
+            return List.of();
+        }
+    }
+
+    private static List<String> allMapNames() {
+        Set<String> names = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        names.addAll(FPSMCore.getInstance().getMapNames());
+        return List.copyOf(names);
+    }
+
+    private static BaseMap resolveMapFromContext(CommandContext<CommandSourceStack> context) {
+        try {
+            String rawType = StringArgumentType.getString(context, "type");
+            String mapName = StringArgumentType.getString(context, "map");
+            String type = TdmGameTypes.canonicalize(rawType);
+            if (!FPSMCore.getInstance().checkGameType(type)) {
+                return null;
+            }
+            return FPSMCore.getInstance().getMapByTypeWithName(type, mapName).orElse(null);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private static List<BaseMap> findMapsByName(String mapName) {
+        if (mapName == null || mapName.isBlank()) {
+            return List.of();
+        }
+        List<BaseMap> matches = new ArrayList<>();
+        FPSMCore.getInstance().getAllMaps().values().forEach(maps -> maps.stream()
+                .filter(map -> mapName.equals(map.getMapName()))
+                .forEach(matches::add));
+        return matches;
     }
 }

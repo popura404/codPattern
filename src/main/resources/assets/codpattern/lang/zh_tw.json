@@ -261,6 +261,7 @@
     "screen.codpattern.tdm_room.notice.timeout.leave_room": "離開房間請求超時",
     "screen.codpattern.tdm_room.notice.timeout.join_game": "加入遊戲請求超時",
     "screen.codpattern.tdm_room.notice.left_room": "已離開房間",
+    "command.codpattern.map.ambiguous_map": "存在多個同名地圖 %s，請改用唯一地圖名或按遊戲類型區分（匹配類型：%s）",
     "message.codpattern.weapon_update.error.bag_not_found": "§c配裝寫入被拒絕：目標背包不存在",
     "message.codpattern.weapon_update.error.slot_invalid": "§c配裝寫入被拒絕：槽位無效",
     "message.codpattern.weapon_update.error.item_id_invalid": "§c配裝寫入被拒絕：物品 ID 無效",

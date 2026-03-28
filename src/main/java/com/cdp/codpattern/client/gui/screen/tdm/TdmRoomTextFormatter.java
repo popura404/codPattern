@@ -50,27 +50,23 @@ public final class TdmRoomTextFormatter {
         return kortacCount + "v" + specgruCount;
     }
 
-    public static String pingBucketText(int pingMs) {
-        return switch (pingBucket(pingMs)) {
-            case 0 -> Component.translatable("screen.codpattern.tdm_room.ping.excellent").getString();
-            case 1 -> Component.translatable("screen.codpattern.tdm_room.ping.good").getString();
-            case 2 -> Component.translatable("screen.codpattern.tdm_room.ping.fair").getString();
-            default -> Component.translatable("screen.codpattern.tdm_room.ping.poor").getString();
-        };
-    }
-
     public static int pingBucket(int pingMs) {
-        int normalized = Math.max(0, pingMs);
-        if (normalized <= 80) {
+        if (pingMs < 0) {
+            return 5;
+        }
+        if (pingMs < 150) {
             return 0;
         }
-        if (normalized <= 150) {
+        if (pingMs < 300) {
             return 1;
         }
-        if (normalized <= 250) {
+        if (pingMs < 600) {
             return 2;
         }
-        return 3;
+        if (pingMs < 1000) {
+            return 3;
+        }
+        return 4;
     }
 
     public static String formatKd(int kills, int deaths) {

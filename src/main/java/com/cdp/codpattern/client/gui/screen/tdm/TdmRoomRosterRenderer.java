@@ -4,18 +4,24 @@ import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 public final class TdmRoomRosterRenderer {
+    private static final ResourceLocation GUI_ICONS_LOCATION =
+            Objects.requireNonNull(ResourceLocation.tryBuild("minecraft", "textures/gui/icons.png"));
+
     private TdmRoomRosterRenderer() {
     }
 
@@ -169,16 +175,23 @@ public final class TdmRoomRosterRenderer {
         String invincibleMark = player.isInvincible() ? " §e[INV]" : "";
         String nameText = isLocalPlayer(mc.player, player) ? "§e" + player.name() : player.name();
         String headline = readyMark + " " + aliveMark + " " + nameText + invincibleMark;
-        String meta = String.format("§c%d§7/§f%d  §8|  §b%s",
+        String meta = String.format("§c%d§7/§f%d",
                 player.kills(),
-                player.deaths(),
-                TdmRoomTextFormatter.pingBucketText(player.pingMs()));
+                player.deaths());
 
         int textX = x + GuiTextHelper.referenceScaled(6);
         int rightPadding = GuiTextHelper.referenceScaled(5);
         int topY = y + Math.max(1, (height - GuiTextHelper.referenceLineHeight(mc.font)) / 2);
+        int pingIconWidth = GuiTextHelper.referenceScaled(10);
+        int pingIconHeight = GuiTextHelper.referenceScaled(8);
+        int pingGap = GuiTextHelper.referenceScaled(4);
+        int pingX = cardRight - rightPadding - pingIconWidth;
+        int pingY = y + Math.max(0, (height - pingIconHeight) / 2);
+        int metaRight = pingX - pingGap;
         int metaWidth = GuiTextHelper.referenceWidth(mc.font, meta);
-        int nameMaxWidth = Math.max(GuiTextHelper.referenceScaled(28), width - metaWidth - GuiTextHelper.referenceScaled(18));
+        int nameMaxWidth = Math.max(
+                GuiTextHelper.referenceScaled(28),
+                width - metaWidth - pingIconWidth - GuiTextHelper.referenceScaled(22));
         GuiTextHelper.drawReferenceEllipsizedString(
                 graphics,
                 mc.font,
@@ -192,11 +205,12 @@ public final class TdmRoomRosterRenderer {
                 graphics,
                 mc.font,
                 meta,
-                cardRight - rightPadding,
+                metaRight,
                 topY,
                 Math.max(GuiTextHelper.referenceScaled(28), width / 2),
                 scaleAlpha(0xFFB5B5B5, alphaFactor),
                 false);
+        renderPingIcon(graphics, pingX, pingY, player.pingMs(), alphaFactor);
     }
 
     private static Comparator<PlayerInfo> playerComparator() {
@@ -232,6 +246,24 @@ public final class TdmRoomRosterRenderer {
 
     private static boolean isLocalPlayer(LocalPlayer localPlayer, PlayerInfo player) {
         return localPlayer != null && player != null && player.uuid().equals(localPlayer.getUUID());
+    }
+
+    private static void renderPingIcon(GuiGraphics graphics, int x, int y, int pingMs, float alphaFactor) {
+        int iconIndex = TdmRoomTextFormatter.pingBucket(pingMs);
+        RenderSystem.enableBlend();
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, Math.max(0.0F, Math.min(1.0F, alphaFactor)));
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, 100.0F);
+        graphics.blit(
+                GUI_ICONS_LOCATION,
+                x,
+                y,
+                0,
+                176 + iconIndex * 8,
+                GuiTextHelper.referenceScaled(10),
+                GuiTextHelper.referenceScaled(8));
+        graphics.pose().popPose();
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
     }
 
     private record RenderResult(int nextY, int nextRowIndex) {

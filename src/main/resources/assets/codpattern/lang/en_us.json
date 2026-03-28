@@ -261,6 +261,7 @@
     "screen.codpattern.tdm_room.notice.timeout.leave_room": "Leave room request timed out",
     "screen.codpattern.tdm_room.notice.timeout.join_game": "Join match request timed out",
     "screen.codpattern.tdm_room.notice.left_room": "Left room",
+    "command.codpattern.map.ambiguous_map": "Multiple maps are named %s. Use a unique map name or disambiguate by game type. Matching types: %s",
     "message.codpattern.weapon_update.error.bag_not_found": "§cLoadout update rejected: backpack not found",
     "message.codpattern.weapon_update.error.slot_invalid": "§cLoadout update rejected: invalid slot",
     "message.codpattern.weapon_update.error.item_id_invalid": "§cLoadout update rejected: invalid item ID",

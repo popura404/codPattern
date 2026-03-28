@@ -296,17 +296,22 @@ final class CodTdmClientSyncCoordinator {
     }
 
     private int pingBucket(int pingMs) {
-        int normalized = Math.max(0, pingMs);
-        if (normalized <= 80) {
+        if (pingMs < 0) {
+            return 5;
+        }
+        if (pingMs < 150) {
             return 0;
         }
-        if (normalized <= 150) {
+        if (pingMs < 300) {
             return 1;
         }
-        if (normalized <= 250) {
+        if (pingMs < 600) {
             return 2;
         }
-        return 3;
+        if (pingMs < 1000) {
+            return 3;
+        }
+        return 4;
     }
 
     private Map<String, List<PlayerInfo>> deepCopyTeamPlayers(Map<String, List<PlayerInfo>> source) {
