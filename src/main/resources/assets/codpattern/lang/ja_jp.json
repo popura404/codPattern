@@ -290,6 +290,8 @@
     "command.codpattern.map.delete.success": "マップ %s/%s を削除し、オンラインのプレイヤー/観戦者を %s 人退出させました",
     "command.codpattern.map.delete.save_failed": "マップ %s/%s の保存データ削除に失敗しました",
     "command.codpattern.map.delete.unregister_failed": "マップ %s/%s の実行時登録解除に失敗しました",
+    "message.codpattern.map.save_failed": "§cマップ %s/%s の保存に失敗しました。サーバーログを確認してください",
+    "message.codpattern.map.create_save_failed_rollback": "§cマップ %s/%s の保存に失敗したため、作成をロールバックしました",
     "command.codpattern.map.invalid_kind": "無効なスポーン地点タイプ: %s",
     "command.codpattern.map.spawn.list.header": "マップ %s/%s チーム %s の %s スポーン地点は %s 個です",
     "command.codpattern.map.spawn.list.entry": "#%s %s (%s, %s, %s) yaw=%s pitch=%s",

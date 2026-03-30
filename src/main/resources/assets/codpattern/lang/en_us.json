@@ -290,6 +290,8 @@
     "command.codpattern.map.delete.success": "Deleted map %s/%s and removed %s online players or spectators",
     "command.codpattern.map.delete.save_failed": "Failed to delete saved data for map %s/%s",
     "command.codpattern.map.delete.unregister_failed": "Failed to unregister runtime map %s/%s",
+    "message.codpattern.map.save_failed": "§cFailed to save map %s/%s. Check the server log",
+    "message.codpattern.map.create_save_failed_rollback": "§cFailed to save map %s/%s. Creation was rolled back",
     "command.codpattern.map.invalid_kind": "Invalid spawn point kind: %s",
     "command.codpattern.map.spawn.list.header": "Map %s/%s team %s has %s spawn points: %s",
     "command.codpattern.map.spawn.list.entry": "#%s %s (%s, %s, %s) yaw=%s pitch=%s",

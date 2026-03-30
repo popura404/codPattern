@@ -1,6 +1,7 @@
 package com.phasetranscrystal.fpsmatch.common.packet;
 
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.mojang.datafixers.util.Function3;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.MapCreatorTool;
@@ -117,6 +118,15 @@ public class MapCreatorToolActionC2SPacket {
 
         BaseMap newMap = factory.apply(player.serverLevel(), mapName, area.get());
         core.registerMap(type, newMap);
+        try {
+            CodMapPersistence.saveMapOrRollback(newMap, () -> core.unregisterMap(newMap));
+        } catch (RuntimeException e) {
+            player.displayClientMessage(Component.translatable(
+                    "message.codpattern.map.create_save_failed_rollback",
+                    type,
+                    mapName), false);
+            return;
+        }
 
         MapCreatorTool.setSelectedType(stack, type);
         MapCreatorTool.setBlockPos(stack, MapCreatorTool.BLOCK_POS_TAG_1, pos1);

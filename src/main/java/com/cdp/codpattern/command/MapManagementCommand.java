@@ -1,6 +1,7 @@
 package com.cdp.codpattern.command;
 
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.cdp.codpattern.compat.fpsmatch.data.CodTacticalTdmMapData;
 import com.cdp.codpattern.compat.fpsmatch.data.CodTdmMapData;
 import com.mojang.brigadier.context.CommandContext;
@@ -13,6 +14,7 @@ import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
+import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
 import com.phasetranscrystal.fpsmatch.core.data.save.FPSMDataManager;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
@@ -229,6 +231,12 @@ public final class MapManagementCommand {
         }
         BaseMap newMap = factory.apply(source.getLevel(), mapName, new AreaData(from, to));
         core.registerMap(type, newMap);
+        try {
+            CodMapPersistence.saveMapOrRollback(newMap, () -> core.unregisterMap(newMap));
+        } catch (RuntimeException e) {
+            source.sendFailure(Component.translatable("message.codpattern.map.create_save_failed_rollback", type, mapName));
+            return 0;
+        }
         source.sendSuccess(() -> Component.translatable("commands.fpsm.create.success", mapName), true);
         return 1;
     }
@@ -323,6 +331,7 @@ public final class MapManagementCommand {
         if (kind == null) {
             return 0;
         }
+        TeamSpawnProfile previousSpawnProfile = team.getSpawnProfile();
 
         SpawnPointData spawnPoint = new SpawnPointData(
                 source.getLevel().dimension(),
@@ -336,6 +345,12 @@ public final class MapManagementCommand {
         }
         if (map.isStart && kind == SpawnPointKind.INITIAL) {
             team.assignNextSpawnPoints(SpawnPointKind.INITIAL);
+        }
+        try {
+            CodMapPersistence.saveMapOrRollback(map, () -> CodMapPersistence.restoreSpawnProfile(map, team, previousSpawnProfile));
+        } catch (RuntimeException e) {
+            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
+            return 0;
         }
         map.syncToClient();
         source.sendSuccess(() -> Component.translatable(
@@ -358,6 +373,7 @@ public final class MapManagementCommand {
         if (kind == null) {
             return 0;
         }
+        TeamSpawnProfile previousSpawnProfile = team.getSpawnProfile();
 
         int zeroBasedIndex = oneBasedIndex - 1;
         Optional<SpawnPointData> removed = team.removeSpawnPointData(kind, zeroBasedIndex);
@@ -368,6 +384,12 @@ public final class MapManagementCommand {
         team.clearPlayerSpawnPointAssignments();
         if (kind == SpawnPointKind.INITIAL && !team.getSpawnPointsData(kind).isEmpty()) {
             team.assignNextSpawnPoints(SpawnPointKind.INITIAL);
+        }
+        try {
+            CodMapPersistence.saveMapOrRollback(map, () -> CodMapPersistence.restoreSpawnProfile(map, team, previousSpawnProfile));
+        } catch (RuntimeException e) {
+            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
+            return 0;
         }
         map.syncToClient();
         SpawnPointData point = removed.get();
@@ -393,10 +415,17 @@ public final class MapManagementCommand {
         if (kind == null) {
             return 0;
         }
+        TeamSpawnProfile previousSpawnProfile = team.getSpawnProfile();
 
         int removedCount = team.getSpawnPointsData(kind).size();
         team.resetSpawnPointData(kind);
         team.clearPlayerSpawnPointAssignments();
+        try {
+            CodMapPersistence.saveMapOrRollback(map, () -> CodMapPersistence.restoreSpawnProfile(map, team, previousSpawnProfile));
+        } catch (RuntimeException e) {
+            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
+            return 0;
+        }
         map.syncToClient();
         source.sendSuccess(() -> Component.translatable(
                 "command.codpattern.map.spawn.cleared",
@@ -440,7 +469,14 @@ public final class MapManagementCommand {
                 pos,
                 currentYaw(source),
                 currentPitch(source));
+        Optional<SpawnPointData> previousPoint = readMatchEndTeleportPoint(map);
         writeMatchEndTeleportPoint(map, point);
+        try {
+            CodMapPersistence.saveMapOrRollback(map, () -> writeMatchEndTeleportPoint(map, previousPoint.orElse(null)));
+        } catch (RuntimeException e) {
+            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
+            return 0;
+        }
         map.syncToClient();
         source.sendSuccess(() -> Component.translatable(
                 "command.codpattern.map.endtp.set",
@@ -454,7 +490,14 @@ public final class MapManagementCommand {
         if (map == null) {
             return 0;
         }
+        Optional<SpawnPointData> previousPoint = readMatchEndTeleportPoint(map);
         writeMatchEndTeleportPoint(map, null);
+        try {
+            CodMapPersistence.saveMapOrRollback(map, () -> writeMatchEndTeleportPoint(map, previousPoint.orElse(null)));
+        } catch (RuntimeException e) {
+            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
+            return 0;
+        }
         map.syncToClient();
         source.sendSuccess(() -> Component.translatable(
                 "command.codpattern.map.endtp.cleared",

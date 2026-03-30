@@ -290,6 +290,8 @@
     "command.codpattern.map.delete.success": "已删除地图 %s/%s，并移出 %s 名在线玩家/观战者",
     "command.codpattern.map.delete.save_failed": "删除地图 %s/%s 的存档失败",
     "command.codpattern.map.delete.unregister_failed": "删除地图 %s/%s 的运行时注册失败",
+    "message.codpattern.map.save_failed": "§c地图 %s/%s 保存失败，请检查服务端日志",
+    "message.codpattern.map.create_save_failed_rollback": "§c地图 %s/%s 保存失败，已回滚创建",
     "command.codpattern.map.invalid_kind": "无效的复活点类型: %s",
     "command.codpattern.map.spawn.list.header": "地图 %s/%s 队伍 %s 的 %s 复活点，共 %s 个",
     "command.codpattern.map.spawn.list.entry": "#%s %s (%s, %s, %s) yaw=%s pitch=%s",

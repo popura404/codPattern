@@ -1,6 +1,7 @@
 package com.phasetranscrystal.fpsmatch.common.item;
 
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.tool.CreatorToolItem;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionAction;
@@ -12,6 +13,7 @@ import com.phasetranscrystal.fpsmatch.common.packet.SpawnPointToolActionC2SPacke
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
+import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import com.phasetranscrystal.fpsmatch.util.PreviewColorUtil;
@@ -191,6 +193,7 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
         }
 
         BaseTeam team = teamOptional.get();
+        TeamSpawnProfile previousSpawnProfile = team.getSpawnProfile();
         SpawnPointData spawnPointData = new SpawnPointData(
                 player.serverLevel().dimension(),
                 clickedPos.above(),
@@ -205,6 +208,16 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
         if (map.isStart && selectedKind == SpawnPointKind.INITIAL) {
             team.assignNextSpawnPoints(SpawnPointKind.INITIAL);
         }
+        try {
+            CodMapPersistence.saveMapOrRollback(map, () -> CodMapPersistence.restoreSpawnProfile(map, team, previousSpawnProfile));
+        } catch (RuntimeException e) {
+            player.displayClientMessage(Component.translatable(
+                    "message.codpattern.map.save_failed",
+                    map.getGameType(),
+                    map.getMapName()), false);
+            return;
+        }
+        map.syncToClient();
 
         player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.added",
                 MapCreatorTool.formatPos(clickedPos.above())).withStyle(ChatFormatting.GREEN), true);

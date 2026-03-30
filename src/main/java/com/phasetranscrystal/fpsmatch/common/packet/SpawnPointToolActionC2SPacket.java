@@ -1,11 +1,13 @@
 package com.phasetranscrystal.fpsmatch.common.packet;
 
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.SpawnPointTool;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
+import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import net.minecraft.network.FriendlyByteBuf;
@@ -136,11 +138,33 @@ public class SpawnPointToolActionC2SPacket {
         }
 
         BaseTeam team = snapshot.team().get();
+        TeamSpawnProfile previousSpawnProfile = team.getSpawnProfile();
         team.removeSpawnPointData(snapshot.spawnPointKind(), snapshot.selectedIndex());
         team.clearPlayerSpawnPointAssignments();
         if (snapshot.spawnPointKind() == SpawnPointKind.INITIAL && !team.getSpawnPointsData().isEmpty()) {
             team.assignNextSpawnPoints(SpawnPointKind.INITIAL);
         }
+        try {
+            CodMapPersistence.saveMapOrRollback(
+                    snapshot.map().orElseThrow(),
+                    () -> CodMapPersistence.restoreSpawnProfile(snapshot.map().orElse(null), team, previousSpawnProfile));
+        } catch (RuntimeException e) {
+            player.displayClientMessage(Component.translatable(
+                    "message.codpattern.map.save_failed",
+                    snapshot.selectedType(),
+                    snapshot.selectedMap()), false);
+            sendScreen(
+                    player,
+                    stack,
+                    snapshot.selectedType(),
+                    snapshot.selectedMap(),
+                    snapshot.selectedTeam(),
+                    snapshot.selectedKind(),
+                    snapshot.selectedIndex()
+            );
+            return;
+        }
+        snapshot.map().ifPresent(BaseMap::syncToClient);
         sendScreen(
                 player,
                 stack,
@@ -167,8 +191,30 @@ public class SpawnPointToolActionC2SPacket {
         }
 
         BaseTeam team = snapshot.team().get();
+        TeamSpawnProfile previousSpawnProfile = team.getSpawnProfile();
         team.resetSpawnPointData(snapshot.spawnPointKind());
         team.clearPlayerSpawnPointAssignments();
+        try {
+            CodMapPersistence.saveMapOrRollback(
+                    snapshot.map().orElseThrow(),
+                    () -> CodMapPersistence.restoreSpawnProfile(snapshot.map().orElse(null), team, previousSpawnProfile));
+        } catch (RuntimeException e) {
+            player.displayClientMessage(Component.translatable(
+                    "message.codpattern.map.save_failed",
+                    snapshot.selectedType(),
+                    snapshot.selectedMap()), false);
+            sendScreen(
+                    player,
+                    stack,
+                    snapshot.selectedType(),
+                    snapshot.selectedMap(),
+                    snapshot.selectedTeam(),
+                    snapshot.selectedKind(),
+                    snapshot.selectedIndex()
+            );
+            return;
+        }
+        snapshot.map().ifPresent(BaseMap::syncToClient);
         sendScreen(
                 player,
                 stack,

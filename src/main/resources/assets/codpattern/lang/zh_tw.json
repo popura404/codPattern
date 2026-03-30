@@ -290,6 +290,8 @@
     "command.codpattern.map.delete.success": "已刪除地圖 %s/%s，並移出 %s 名線上玩家/觀戰者",
     "command.codpattern.map.delete.save_failed": "刪除地圖 %s/%s 的存檔失敗",
     "command.codpattern.map.delete.unregister_failed": "刪除地圖 %s/%s 的執行時註冊失敗",
+    "message.codpattern.map.save_failed": "§c地圖 %s/%s 儲存失敗，請檢查伺服器日誌",
+    "message.codpattern.map.create_save_failed_rollback": "§c地圖 %s/%s 儲存失敗，已回滾建立",
     "command.codpattern.map.invalid_kind": "無效的重生點類型: %s",
     "command.codpattern.map.spawn.list.header": "地圖 %s/%s 隊伍 %s 的 %s 重生點，共 %s 個",
     "command.codpattern.map.spawn.list.entry": "#%s %s (%s, %s, %s) yaw=%s pitch=%s",
