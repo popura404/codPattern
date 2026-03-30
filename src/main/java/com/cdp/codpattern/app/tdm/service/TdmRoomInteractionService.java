@@ -81,6 +81,7 @@ public final class TdmRoomInteractionService {
         }
 
         actionPort.initializeReadyState(player);
+        RoomFoodLockService.enforce(player);
         warnIfMissingEndTeleport(player, readPort);
         actionPort.syncToClient();
         return okJoin(roomId.encode(), "OK", "");
@@ -147,6 +148,7 @@ public final class TdmRoomInteractionService {
         if (readPort.isWaitingPhase()) {
             actionPort.joinTeam(teamName, player);
             actionPort.initializeReadyState(player);
+            RoomFoodLockService.enforce(player);
             actionPort.syncToClient();
             return;
         }

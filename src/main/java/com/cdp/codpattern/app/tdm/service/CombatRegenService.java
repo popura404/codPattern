@@ -78,7 +78,7 @@ public final class CombatRegenService {
                 }
             }
 
-            player.heal(healPerTick);
+            RoomFoodLockService.allowCustomHeal(player, () -> player.heal(healPerTick));
             if (player.getHealth() >= player.getMaxHealth()) {
                 combatRegenCooldowns.remove(playerId);
             } else {
