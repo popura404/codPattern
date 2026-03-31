@@ -12,6 +12,8 @@ public class WeaponFilterConfig {
     private List<String> secondaryWeaponTabs = defaultSecondaryWeaponTabs();
     private List<String> blockedItemNamespaces = defaultBlockedItemNamespaces();
     private List<String> blockedWeaponIds = defaultBlockedWeaponIds();
+    private List<String> blockedAttachmentNamespaces = defaultBlockedAttachmentNamespaces();
+    private List<String> blockedAttachmentIds = defaultBlockedAttachmentIds();
 
     /** null 或旧配置无此键时视为 true */
     private Boolean throwablesEnabled = true;
@@ -65,6 +67,36 @@ public class WeaponFilterConfig {
         this.blockedWeaponIds = normalizeStringList(blockedWeaponIds);
     }
 
+    public List<String> getBlockedAttachmentNamespaces() {
+        if (blockedAttachmentNamespaces == null) {
+            return defaultBlockedAttachmentNamespaces();
+        }
+        return blockedAttachmentNamespaces;
+    }
+
+    public void setBlockedAttachmentNamespaces(List<String> blockedAttachmentNamespaces) {
+        if (blockedAttachmentNamespaces == null) {
+            this.blockedAttachmentNamespaces = defaultBlockedAttachmentNamespaces();
+            return;
+        }
+        this.blockedAttachmentNamespaces = normalizeStringList(blockedAttachmentNamespaces);
+    }
+
+    public List<String> getBlockedAttachmentIds() {
+        if (blockedAttachmentIds == null) {
+            return defaultBlockedAttachmentIds();
+        }
+        return blockedAttachmentIds;
+    }
+
+    public void setBlockedAttachmentIds(List<String> blockedAttachmentIds) {
+        if (blockedAttachmentIds == null) {
+            this.blockedAttachmentIds = defaultBlockedAttachmentIds();
+            return;
+        }
+        this.blockedAttachmentIds = normalizeStringList(blockedAttachmentIds);
+    }
+
     public Integer getAmmunitionPerMagazineMultiple() {
         return ammunitionPerMagazineMultiple;
     }
@@ -86,6 +118,8 @@ public class WeaponFilterConfig {
         setSecondaryWeaponTabs(secondaryWeaponTabs);
         setBlockedItemNamespaces(blockedItemNamespaces);
         setBlockedWeaponIds(blockedWeaponIds);
+        setBlockedAttachmentNamespaces(blockedAttachmentNamespaces);
+        setBlockedAttachmentIds(blockedAttachmentIds);
         if (throwablesEnabled == null) {
             throwablesEnabled = true;
         }
@@ -122,6 +156,18 @@ public class WeaponFilterConfig {
         List<String> weaponIds = new ArrayList<>();
         weaponIds.add("namespace:gunid");
         return weaponIds;
+    }
+
+    private static List<String> defaultBlockedAttachmentNamespaces() {
+        List<String> namespaces = new ArrayList<>();
+        namespaces.add("example_attachment_pack");
+        return namespaces;
+    }
+
+    private static List<String> defaultBlockedAttachmentIds() {
+        List<String> attachmentIds = new ArrayList<>();
+        attachmentIds.add("namespace:attachmentid");
+        return attachmentIds;
     }
 
     private static List<String> normalizeStringList(List<String> values) {

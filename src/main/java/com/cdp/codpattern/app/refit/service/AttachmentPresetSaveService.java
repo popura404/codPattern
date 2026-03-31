@@ -1,8 +1,11 @@
 package com.cdp.codpattern.app.refit.service;
 
+import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.compat.taczaddon.TaczAddonRefitCompat;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
@@ -65,10 +68,15 @@ public final class AttachmentPresetSaveService {
 
             String uuid = player.getUUID().toString();
             Path backpackPath = ConfigPath.SERVERBACKPACK.getPath(player.server);
+            Path filterPath = ConfigPath.SERVER_FILTER.getPath(player.server);
             playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, backpackPath);
+            WeaponFilterConfig filterConfig = WeaponFilterConfigRepository.loadOrCreate(filterPath);
             BackpackConfig.Backpack backpack = playerData.getBackpacks_MAP().get(bagId);
             if (backpack == null) {
                 throw new SaveFailureException("message.codpattern.refit.save_failed_backpack_missing");
+            }
+            if (BackpackAttachmentFilter.findFirstBlockedInstalledAttachmentId(filterConfig, gunStack).isPresent()) {
+                throw new SaveFailureException("message.codpattern.refit.save_failed_attachment_blocked");
             }
 
             mutatedBackpack = backpack;

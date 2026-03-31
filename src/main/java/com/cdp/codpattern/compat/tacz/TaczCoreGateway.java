@@ -1,6 +1,8 @@
 package com.cdp.codpattern.compat.tacz;
 
+import com.tacz.guns.api.DefaultAssets;
 import com.tacz.guns.api.TimelessAPI;
+import com.tacz.guns.api.item.IAttachment;
 import com.tacz.guns.api.item.IGun;
 import com.tacz.guns.api.item.attachment.AttachmentType;
 import com.tacz.guns.api.item.nbt.GunItemDataAccessor;
@@ -14,6 +16,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public final class TaczCoreGateway implements TaczGateway {
@@ -38,6 +42,39 @@ public final class TaczCoreGateway implements TaczGateway {
                 .map(iGun -> iGun.getGunId(stack))
                 .filter(id -> id != null)
                 .map(ResourceLocation::toString);
+    }
+
+    @Override
+    public Optional<String> resolveAttachmentId(ItemStack stack) {
+        return Optional.ofNullable(IAttachment.getIAttachmentOrNull(stack))
+                .map(iAttachment -> iAttachment.getAttachmentId(stack))
+                .filter(id -> id != null && !DefaultAssets.isEmptyAttachmentId(id))
+                .map(ResourceLocation::toString);
+    }
+
+    @Override
+    public List<String> resolveInstalledAttachmentIds(ItemStack gunStack) {
+        Optional<IGun> iGunOpt = resolveGun(gunStack);
+        if (iGunOpt.isEmpty()) {
+            return List.of();
+        }
+
+        IGun iGun = iGunOpt.get();
+        List<String> attachmentIds = new ArrayList<>();
+        for (AttachmentType type : AttachmentType.values()) {
+            if (type == AttachmentType.NONE || !iGun.allowAttachmentType(gunStack, type)) {
+                continue;
+            }
+            ResourceLocation attachmentId = iGun.getAttachmentId(gunStack, type);
+            if (attachmentId == null || DefaultAssets.isEmptyAttachmentId(attachmentId)) {
+                continue;
+            }
+            String id = attachmentId.toString();
+            if (!attachmentIds.contains(id)) {
+                attachmentIds.add(id);
+            }
+        }
+        return attachmentIds;
     }
 
     @Override

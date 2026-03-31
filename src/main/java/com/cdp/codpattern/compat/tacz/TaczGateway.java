@@ -4,6 +4,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface TaczGateway {
@@ -14,6 +15,10 @@ public interface TaczGateway {
     Optional<String> resolveGunType(ItemStack stack);
 
     Optional<String> resolveGunId(ItemStack stack);
+
+    Optional<String> resolveAttachmentId(ItemStack stack);
+
+    List<String> resolveInstalledAttachmentIds(ItemStack gunStack);
 
     boolean canAttach(ItemStack gunStack, ItemStack attachmentStack);
 

@@ -4,6 +4,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.List;
 import java.util.Optional;
 
 public final class NoopTaczGateway implements TaczGateway {
@@ -25,6 +26,16 @@ public final class NoopTaczGateway implements TaczGateway {
     @Override
     public Optional<String> resolveGunId(ItemStack stack) {
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<String> resolveAttachmentId(ItemStack stack) {
+        return Optional.empty();
+    }
+
+    @Override
+    public List<String> resolveInstalledAttachmentIds(ItemStack gunStack) {
+        return List.of();
     }
 
     @Override

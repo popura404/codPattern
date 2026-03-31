@@ -48,9 +48,11 @@ The project follows a server-authoritative design with client synchronization to
 
 * Primary/secondary category filtering via `primaryWeaponTabs` and `secondaryWeaponTabs`.
 * Gunpack namespace blocking and exact weapon blacklist support via `blockedItemNamespaces` / `blockedWeaponIds`.
+* Attachment namespace blocking and exact attachment blacklist support via `blockedAttachmentNamespaces` / `blockedAttachmentIds`.
 * Throwable and ammo multiplier controls via `throwablesEnabled` and `ammunitionPerMagazineMultiple`.
 * Optional integrations for LR Tactical and Physics Mod with graceful fallback when absent.
 * Includes compatibility handling for `tacz-addon 1.1.6` in backpack refit flow to prevent unload-button lockups.
+* TaCZ native refit UI is globally disabled and redirected to the COD Pattern backpack refit flow.
 * Bundles `zh_cn / zh_tw / en_us / ja_jp` language resources for core UI, notices, and error messages.
 
 ## Commands and Entrypoints
@@ -82,6 +84,8 @@ Server configuration is stored under world save path: `serverconfig/codpattern/`
     * `primaryWeaponTabs` / `secondaryWeaponTabs`
     * `blockedItemNamespaces`
     * `blockedWeaponIds` (format: `namespace:gunid`)
+    * `blockedAttachmentNamespaces`
+    * `blockedAttachmentIds` (format: `namespace:attachmentid`)
     * `throwablesEnabled`
     * `ammunitionPerMagazineMultiple`
 * `tdm_rules/config.json`
