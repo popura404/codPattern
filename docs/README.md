@@ -1,6 +1,7 @@
 # COD Pattern
 
 [English README](README.en.md)
+[详细操作指南](GUIDE.md)
 
 * > ****发布状态：Beta。建议先在测试环境验证后再部署到正式服务器，并提前备份存档与配置。***
 

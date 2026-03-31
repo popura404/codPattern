@@ -1,6 +1,7 @@
 # COD Pattern
 
 [中文文档](README.md)
+[Detailed Guide (Chinese)](GUIDE.md)
 
 * > ****Release Status: Beta. Validate in a staging environment before production deployment, and back up world data/configuration first.***
 
