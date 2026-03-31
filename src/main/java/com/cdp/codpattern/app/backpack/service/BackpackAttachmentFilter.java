@@ -2,6 +2,8 @@ package com.cdp.codpattern.app.backpack.service;
 
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
+import com.tacz.guns.api.item.IGun;
+import com.tacz.guns.api.item.attachment.AttachmentType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
@@ -24,6 +26,30 @@ public final class BackpackAttachmentFilter {
         return resolveBlockedAttachmentId(
                 filterConfig,
                 TaczGatewayProvider.gateway().resolveInstalledAttachmentIds(gunStack).stream());
+    }
+
+    public static boolean removeBlockedInstalledAttachments(WeaponFilterConfig filterConfig, ItemStack gunStack) {
+        if (filterConfig == null || gunStack == null || gunStack.isEmpty()) {
+            return false;
+        }
+        IGun iGun = IGun.getIGunOrNull(gunStack);
+        if (iGun == null) {
+            return false;
+        }
+
+        boolean changed = false;
+        for (AttachmentType type : AttachmentType.values()) {
+            if (type == AttachmentType.NONE || !iGun.allowAttachmentType(gunStack, type)) {
+                continue;
+            }
+            ItemStack attachmentStack = iGun.getAttachment(gunStack, type);
+            if (attachmentStack.isEmpty() || !isAttachmentBlocked(filterConfig, attachmentStack)) {
+                continue;
+            }
+            iGun.unloadAttachment(gunStack, type);
+            changed = true;
+        }
+        return changed;
     }
 
     private static Optional<ResourceLocation> resolveBlockedAttachmentId(WeaponFilterConfig filterConfig,

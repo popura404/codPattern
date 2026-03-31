@@ -68,14 +68,23 @@ public final class AttachmentPresetRequestService {
         TaczAddonRefitCompat.sanitizeGunForBackpackRefitSession(gunStack);
 
         String storedPreset = itemData.getAttachmentPreset();
-        Optional<String> presetPayload = storedPreset == null || storedPreset.isBlank()
+        Optional<String> storedPresetPayload = storedPreset == null || storedPreset.isBlank()
                 ? Optional.empty()
                 : Optional.of(storedPreset);
-        CompoundTag presetTag = presetPayload.map(AttachmentPresetUtil::parsePresetString).orElseGet(CompoundTag::new);
+        CompoundTag presetTag = storedPresetPayload.map(AttachmentPresetUtil::parsePresetString).orElseGet(CompoundTag::new);
         if (!presetTag.isEmpty()) {
             AttachmentPresetUtil.applyPresetToGun(gunStack, presetTag);
+        }
+        boolean sanitizedBlockedAttachments = BackpackAttachmentFilter.removeBlockedInstalledAttachments(filterConfig,
+                gunStack);
+        if (!presetTag.isEmpty() || sanitizedBlockedAttachments) {
             TaczGatewayProvider.gateway().postAttachmentChanged(player, gunStack);
         }
+
+        String syncedPresetPayloadRaw = AttachmentPresetUtil.buildPresetFromGun(gunStack).toString();
+        Optional<String> syncedPresetPayload = syncedPresetPayloadRaw == null || syncedPresetPayloadRaw.isBlank()
+                ? Optional.empty()
+                : Optional.of(syncedPresetPayloadRaw);
 
         Optional<String> expectedGunIdOpt = TaczGatewayProvider.gateway().resolveGunId(gunStack);
         if (expectedGunIdOpt.isEmpty()) {
@@ -87,11 +96,11 @@ public final class AttachmentPresetRequestService {
         SyncAttachmentPresetPacket packet = new SyncAttachmentPresetPacket(
                 bagId,
                 slot,
-                presetPayload.orElse(""),
+                syncedPresetPayload.orElse(""),
                 expectedGunIdOpt.get());
         return Optional.of(new Result(
                 packet,
-                presetPayload.isPresent(),
+                syncedPresetPayload.isPresent(),
                 session.getSandboxAttachmentCount(),
                 session.getTruncatedAttachmentCount()));
     }

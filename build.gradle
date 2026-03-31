@@ -70,11 +70,8 @@ minecraft {
 }
 
 mixin {
-    //add sourceSets.main, "tacz.refmap.json"
-    //config "tacz.mixins.json"
-
-    //add sourceSets.main, "lrtactical.refmap.json"
-    //config "lrtactical.mixins.json"
+    add sourceSets.main, "codpattern.refmap.json"
+    config "codpattern.mixins.json"
 }
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
@@ -100,10 +97,10 @@ dependencies {
     implementation fg.deobf("maven.modrinth:lr-tactical:0.3.0")
     //implementation fg.deobf("maven.modrinth:cloth-config:11.1.136+forge")
     runtimeOnly fg.deobf("maven.modrinth:physicsmod:JkM3OTEl")
-    implementation fg.deobf("maven.modrinth:taczaddon:1.1.6")
+    runtimeOnly fg.deobf("maven.modrinth:taczaddon:1.1.6")
     //runtimeOnly fg.deobf("curse.maven:embeddium-908741:5175031")
     //runtimeOnly fg.deobf("curse.maven:oculus-581495:5299671")
-    //annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
 tasks.named('processResources', ProcessResources).configure {

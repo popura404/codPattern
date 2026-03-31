@@ -11,7 +11,6 @@ import org.jetbrains.annotations.NotNull;
 
 @OnlyIn(Dist.CLIENT)
 public class CodGunRefitScreen extends GunRefitScreen {
-
     private final Screen parentScreen;
 
     public CodGunRefitScreen() {
