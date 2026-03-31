@@ -1,180 +1,145 @@
 # COD Pattern
 
-[中文文档](README.md)
-[Detailed Guide (Chinese)](GUIDE.md)
+[Repository README](../README.md) | [中文文档](README.md) | [Detailed Guide](GUIDE.md) | [Q&A (Chinese)](QANDA.md) | [Changelog](CHANGES.md)
 
-* > ****Release Status: Beta. Validate in a staging environment before production deployment, and back up world data/configuration first.***
+> Release status: Beta. Validate in a staging environment before production rollout, and back up the world save, `serverconfig/codpattern/`, and `fpsmatch/` first.
 
 ## Overview
 
 COD Pattern is built around **TaCZ + an embedded FPSM-compatible core**, providing a COD-like workflow for:
 
-* Loadout presets and respawn equipment distribution
-* In-match weapon refit with attachment presets
-* `Frontline / TeamDeathMatch` rooms, maps, and match flow
-* Localized UI and system messages (`zh_cn / zh_tw / en_us / ja_jp`)
+- Loadout presets and respawn equipment distribution
+- In-match weapon refit with attachment preset persistence
+- `frontline / teamdeathmatch` maps, rooms, and match flow
+- Localized UI and system messages (`zh_cn / zh_tw / en_us / ja_jp`)
 
-The project follows a server-authoritative design with client synchronization to keep multiplayer state consistent.
+The project uses a server-authoritative design. Loadouts, filters, room state, and match phases are decided on the server and synchronized to clients.
 
 ## Main Features
 
-### 1) Loadout Management and Equipment Distribution
+### Loadout Management and Equipment Distribution
 
-* Supports create/clone/rename/delete/select operations for loadouts, up to `10` per player.
-* Each loadout contains four slots: `primary / secondary / tactical / lethal`.
-* Loadout-related UIs use a fixed text-scaling baseline across different `GUI Scale` settings to keep readability more consistent.
-* Default loadout names, clone suffixes, and equipped notifications are now localized by client language.
-* On respawn, the selected loadout is distributed automatically (normal flow applies to joined room/match players).
-* Player loadout/filter data is persisted on server side and synced on login.
-* Admin commands can force immediate distribution for all online players or selected targets.
+- Supports create / clone / rename / delete / select operations, up to `10` loadouts per player.
+- Each loadout has four fixed slots: `primary / secondary / tactical / lethal`.
+- New players automatically receive `3` default loadouts on first login.
+- The selected loadout is distributed automatically on respawn.
+- Normal auto-distribution only applies to players already joined to a room or match.
+- Admins can force distribution with `/cdp distribute [target]`.
 
-### 2) In-Match Weapon Refit and Attachment Presets
+### Weapon Selection, Filtering, and Refit
 
-* Supports slot-level editing for primary, secondary, and throwable slots from the loadout UI.
-* Uses TaCZ weapon capabilities, with server-side validation and persistence.
-* Attachment presets are now stored directly inside the loadout config by loadout id and slot.
-* Supports result feedback and rollback handling to reduce client/server state drift.
+- Slot updates are validated server-side for slot name, item id, NBT, category, and blacklist rules.
+- Attachment refit is limited to `primary` / `secondary` and saved back into `attachmentPreset`.
+- Attachment blacklist rules apply to candidate listing, installed attachment cleanup, and save-time blocking.
+- TaCZ native refit UI is globally disabled and redirected to the COD Pattern backpack flow.
 
-### 3) Rooms, Maps, and Match Flow (Embedded FPSM Compatibility Layer)
+### Rooms, Maps, and Match Flow
 
-* Adds a unified room entry in pause menu for room list, join/leave, and team selection.
-* Supports both `frontline` and `teamdeathmatch` under the same room system, map data model, and persistence flow.
-* Maps now support area creation, spawn-point setup, match-end teleport setup, and persistence.
-* TDM room screens use the same fixed text-scaling baseline across different `GUI Scale` settings for more consistent list/panel/button readability.
-* Supports auto team assignment with balance constraints (`maxTeamDiff`).
-* Supports ready state, start vote, and end vote with threshold and timeout logic.
-* Full phase pipeline: `WAITING -> COUNTDOWN -> WARMUP -> PLAYING -> ENDED`.
-* `teamdeathmatch` includes dynamic respawn candidates and spawn safety validation.
-* Includes kill feed, score tracking, respawn delay, invincibility frames, combat regen, death cam, HUD phase feedback, ally/enemy highlights, and enemy health bars.
-* Exports JSON match records automatically when a match ends.
+- Adds a unified room entry to the pause menu.
+- Supports both `frontline` and `teamdeathmatch`.
+- Supports map area creation, spawn-point setup, match-end teleport setup, and persistence.
+- Room joining is only allowed during the `WAITING` phase.
+- Supports ready state, start vote, end vote, phase transitions, and room-list synchronization.
+- `teamdeathmatch` includes dynamic respawn candidates and spawn safety validation.
+- Includes kill feed, score display, death cam, respawn invincibility, combat regen, ally/enemy highlights, enemy health bars, and result pages.
 
-### 4) Filtering, Compatibility, and Localization
+### Persistence, Compatibility, and Localization
 
-* Primary/secondary category filtering via `primaryWeaponTabs` and `secondaryWeaponTabs`.
-* Gunpack namespace blocking and exact weapon blacklist support via `blockedItemNamespaces` / `blockedWeaponIds`.
-* Attachment namespace blocking and exact attachment blacklist support via `blockedAttachmentNamespaces` / `blockedAttachmentIds`.
-* Throwable and ammo multiplier controls via `throwablesEnabled` and `ammunitionPerMagazineMultiple`.
-* Optional integrations for LR Tactical and Physics Mod with graceful fallback when absent.
-* Includes compatibility handling for `tacz-addon 1.1.6` in backpack refit flow to prevent unload-button lockups.
-* TaCZ native refit UI is globally disabled and redirected to the COD Pattern backpack refit flow.
-* Bundles `zh_cn / zh_tw / en_us / ja_jp` language resources for core UI, notices, and error messages.
+- Loadouts are stored in `serverconfig/codpattern/backpack_rules/backpack_config.json`
+- Weapon filters are stored in `serverconfig/codpattern/backpack_rules/weapon_filter.json`
+- TDM config is stored in `serverconfig/codpattern/tdm_rules/config.json`
+- Map data is stored under `<game dir>/fpsmatch/<world name>/...`
+- Supports LR Tactical, Physics Mod, and `tacz-addon 1.1.6`
+- Bundles `zh_cn / zh_tw / en_us / ja_jp` language resources
 
 ## Commands and Entrypoints
 
-### `/cdp` Commands
+### `/cdp`
 
-* `/cdp screen`
-  * Opens the backpack/loadout UI (debug entrypoint).
-* `/cdp update`
-  * Syncs weapon filter and loadout config to all online players (OP required).
-* `/cdp distribute [target]`
-  * Forces equipment distribution for all online players or selected players (OP required).
+- `/cdp screen`
+  - Opens the backpack UI, mainly as a debug entrypoint.
+- `/cdp update`
+  - Reloads `weapon_filter.json` and syncs weapon-filter plus loadout data to all online players.
+- `/cdp distribute [target]`
+  - Forces equipment distribution.
 
-### `/cdp map` Command Chain
+### `/cdp map`
 
-* `/cdp map list [type]`
-  * Lists registered game types or maps under a given type.
-* `/cdp map create <frontline|teamdeathmatch> <name> <from> <to>`
-  * Creates a map area and persists it immediately.
-* `/cdp map delete <type> <name>`
-  * Removes a map and its persisted data.
-* `/cdp map spawn <list|add|remove|clear> ...`
-  * Manages team spawn points and dynamic respawn candidates.
-* `/cdp map endtp <show|set|clear> <map> [pos]`
-  * Manages match-end teleport points.
+- `/cdp map list [type]`
+  - Lists registered types or maps under a type.
+- `/cdp map create <frontline|teamdeathmatch> <name> <from> <to>`
+  - Creates a map area and persists it immediately.
+- `/cdp map delete <type> <name>`
+  - Deletes the map and its persisted data.
+- `/cdp map spawn <list|add|remove|clear> ...`
+  - Manages `INITIAL` / `DYNAMIC_CANDIDATE` spawn points.
+- `/cdp map endtp <show|set|clear> <map> [pos]`
+  - Manages the match-end teleport point.
 
-## Configuration
+## Configuration and Directories
 
-Server configuration is stored under world save path: `serverconfig/codpattern/`
+### `backpack_rules/backpack_config.json`
 
-* `backpack_rules/backpack_config.json`
-  * Player loadout data (JSON).
-  * Attachment presets are now embedded on each loadout slot via the `attachmentPreset` field.
-* `backpack_rules/weapon_filter.json`
-  * Weapon filter config (JSON).
-  * Key fields:
-    * `primaryWeaponTabs` / `secondaryWeaponTabs`
-    * `blockedItemNamespaces`
-    * `blockedWeaponIds` (format: `namespace:gunid`)
-    * `blockedAttachmentNamespaces`
-    * `blockedAttachmentIds` (format: `namespace:attachmentid`)
-    * `throwablesEnabled`
-    * `ammunitionPerMagazineMultiple`
-* `tdm_rules/config.json`
-  * TDM runtime parameters (time, score, respawn, voting, join policy, balance policy).
-  * In-match enemy/ally display is now fixed to highlights plus enemy health bars; the old marker-dot style toggle has been removed.
-* `tdm_match_records/`
-  * Exported match records (`.json`) after each match.
-* Legacy paths `backpackconfig` / `filterconfig` / `attachment_preset/` / `tdmconfig/`
-  * Deprecated and no longer read by this version; existing worlds require manual migration.
+- Stores per-player loadouts, selected loadout id, and slot item data.
+- Attachment presets are embedded directly on each slot via `attachmentPreset`.
 
-### Default Parameters in `tdm_rules/config.json`
+### `backpack_rules/weapon_filter.json`
+
+- Controls weapon categories, blacklists, throwable enablement, and ammo multiplier.
+- Main fields:
+  - `primaryWeaponTabs`
+  - `secondaryWeaponTabs`
+  - `blockedItemNamespaces`
+  - `blockedWeaponIds`
+  - `blockedAttachmentNamespaces`
+  - `blockedAttachmentIds`
+  - `throwablesEnabled`
+  - `ammunitionPerMagazineMultiple`
+
+### `tdm_rules/config.json`
+
+These are the actual default fields in the current code:
 
 | Field | Default | Description |
 |---|---:|---|
-| `timeLimitSeconds` | `420` | Match duration in seconds |
-| `scoreLimit` | `75` | Kill score to win |
-| `invincibilityTicks` | `30` | Post-respawn invincibility ticks |
+| `timeLimitSeconds` | `420` | Playing-phase duration in seconds |
+| `scoreLimit` | `75` | Kill score cap |
+| `invincibilityTicks` | `30` | Respawn invincibility ticks |
 | `respawnDelayTicks` | `40` | Respawn delay ticks |
 | `warmupTimeTicks` | `400` | Warmup duration ticks |
 | `preGameCountdownTicks` | `200` | Pre-game countdown ticks |
-| `blackoutStartTicks` | `60` | Countdown blackout ticks |
-| `deathCamTicks` | `30` | Death cam duration ticks |
-| `minPlayersToStart` | `1` | Minimum players required to start |
-| `votePercentageToStart` | `60` | Start vote pass threshold (%) |
-| `votePercentageToEnd` | `75` | End vote pass threshold (%) |
-| `combatRegenDelayTicks` | `120` | Delay before regen starts after taking damage (ticks) |
-| `combatRegenHalfHeartsPerSecond` | `5.0` | Half-hearts restored per second while regenerating |
-| `allowJoinDuringPlaying` | `true` | Allow joining during active match |
-| `joinAsSpectatorWhenPlaying` | `true` | Join as spectator during active match |
-| `maxTeamDiff` | `1` | Max allowed team size difference |
-| `markerFocusHalfAngleDegrees` | `30.0` | Enemy health-bar focus cone half-angle (degrees) |
-| `markerFocusRequiredTicks` | `20` | Ticks required in the focus cone before the enemy health bar appears |
-| `markerBarMaxDistance` | `96.0` | Max distance for enemy health-bar detection (blocks) |
-| `markerVisibleGraceTicks` | `3` | Anti-flicker grace ticks while the enemy health bar remains visible |
+| `blackoutStartTicks` | `60` | End-of-countdown blackout ticks |
+| `deathCamTicks` | `30` | Death-cam duration ticks |
+| `minPlayersToStart` | `1` | Minimum players before start vote |
+| `votePercentageToStart` | `60` | Start-vote threshold |
+| `votePercentageToEnd` | `75` | End-vote threshold |
+| `combatRegenDelayTicks` | `120` | Delay before regen starts after damage |
+| `combatRegenHalfHeartsPerSecond` | `5.0` | Half-hearts restored per second |
+| `maxTeamDiff` | `1` | Maximum allowed team-size difference for auto join |
+| `markerFocusHalfAngleDegrees` | `30.0` | Enemy health-bar focus cone half-angle |
+| `markerFocusRequiredTicks` | `20` | Continuous ticks required to trigger the enemy health bar |
+| `markerBarMaxDistance` | `96.0` | Maximum enemy health-bar detection distance |
+| `markerVisibleGraceTicks` | `3` | Anti-flicker grace ticks for enemy health bars |
+
+### Match Result Export Directories
+
+- `frontline` -> `serverconfig/codpattern/tdm_match_records/`
+- `teamdeathmatch` -> `serverconfig/codpattern/tactical_tdm_match_records/`
+
+## Documentation
+
+- Full implementation-oriented guide: [GUIDE.md](GUIDE.md)
+- Common questions: [QANDA.md](QANDA.md)
+- Version history: [CHANGES.md](CHANGES.md)
 
 ## Compatibility and Dependencies
 
-* **Minecraft:** `1.20.1`
-* **Forge:** `47.4.0+`
-* **Java:** `17`
-* **Required Dependencies:**
-  * TaCZ `1.1.6+`
-* **Embedded Component:**
-  * FPSM-compatible core (no external `fpsmatch.jar` required)
-* **Optional Integrations:**
-  * LR Tactical (throwable/melee content path)
-  * Physics Mod (ragdoll/retained death entity presentation)
-  * tacz-addon `1.1.6` (backpack refit unload flow compatibility included)
-
-## Deployment Notes
-
-* Non-forced distribution applies only to players joined in room/match flow.
-* If no match-end teleport point is configured, end phase warns but does not auto-teleport back.
-* If `tacz-addon` is enabled and attachment unload behaves abnormally in refit UI, ensure `/gamerule liberateAttachment false`.
-* Before production rollout, verify:
-  * `tdm_rules/config.json` values match your server pacing
-  * `backpack_rules/weapon_filter.json` matches your gunpack filtering policy
-  * maps include team spawn points and a match-end teleport point
-
-## Issue Reporting
-
-When reporting issues, include:
-
-* Reproduction steps
-* Relevant log excerpts
-* Full mod list and versions
-
-## Changelog
-
-Current version: `v0.6.5b`  
-See `CHANGES.md` for detailed history.
+- Minecraft: `1.20.1`
+- Forge: `47.4.0+`
+- Java: `17`
+- Required dependency: TaCZ `1.1.6+`
+- Embedded component: FPSM-compatible core, no external `fpsmatch.jar` required
 
 ## License
 
-Licensed under **GPL-3.0-only**. See `LICENSE.txt` for details.
-
-## Author
-
-* **Author:** popura404
-* **Contact:** `gzyoung2330351551@163.com`
+Licensed under **GPL-3.0-only**. See root `LICENSE.txt` for details.
