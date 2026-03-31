@@ -10,6 +10,7 @@ import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.mojang.authlib.GameProfile;
 import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -25,6 +26,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -61,9 +64,9 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int DEATH_CAM_PANEL_BOTTOM_MARGIN = 40;
     private static final int DEATH_CAM_PANEL_MIN_CENTER_OFFSET = 18;
     private static final int DEATH_CAM_PANEL_TEXT_PADDING = 12;
-    private static final double ENEMY_BAR_HEAD_OFFSET = 0.62D;
+    private static final int ENEMY_BAR_SCREEN_Y_OFFSET = 10;
+    private static final double ENEMY_BAR_HEAD_OFFSET = 0.18D;
     private static final double INVINCIBILITY_MARKER_HEAD_OFFSET = 0.92D;
-    private static final Vec3 WORLD_UP = new Vec3(0.0D, 1.0D, 0.0D);
 
     public static final TdmHudOverlay INSTANCE = new TdmHudOverlay();
 
@@ -952,7 +955,7 @@ public class TdmHudOverlay implements IGuiOverlay {
         int barHeight = Math.max(1, Math.round((3.0f * 0.5f) * distanceScale));
 
         int left = projection.x() - barWidth / 2;
-        int top = projection.y() - 4;
+        int top = projection.y() - ENEMY_BAR_SCREEN_Y_OFFSET;
         int right = left + barWidth;
         int bottom = top + barHeight;
         if (right < 0 || left > screenWidth || bottom < 0 || top > screenHeight) {
@@ -973,33 +976,20 @@ public class TdmHudOverlay implements IGuiOverlay {
             Vec3 worldPos,
             int screenWidth,
             int screenHeight) {
-        if (minecraft.gameRenderer == null || minecraft.gameRenderer.getMainCamera() == null
-                || !minecraft.gameRenderer.getMainCamera().isInitialized()) {
+        if (minecraft.gameRenderer == null) {
+            return null;
+        }
+        Camera camera = minecraft.gameRenderer.getMainCamera();
+        if (camera == null || !camera.isInitialized()) {
             return null;
         }
 
-        Entity cameraEntity = minecraft.getCameraEntity();
-        if (cameraEntity == null) {
-            cameraEntity = minecraft.player;
-        }
-        if (cameraEntity == null) {
-            return null;
-        }
-
-        Vec3 cameraPos = minecraft.gameRenderer.getMainCamera().getPosition();
+        Vec3 cameraPos = camera.getPosition();
         Vec3 relative = worldPos.subtract(cameraPos);
 
-        float pitch = cameraEntity.getViewXRot(partialTick);
-        float yaw = cameraEntity.getViewYRot(partialTick);
-        Vec3 forward = Vec3.directionFromRotation(pitch, yaw).normalize();
-
-        Vec3 right = forward.cross(WORLD_UP);
-        if (right.lengthSqr() <= 1.0E-6) {
-            right = new Vec3(1.0D, 0.0D, 0.0D);
-        } else {
-            right = right.normalize();
-        }
-        Vec3 up = right.cross(forward).normalize();
+        Vec3 forward = toVec3(camera.getLookVector()).normalize();
+        Vec3 up = toVec3(camera.getUpVector()).normalize();
+        Vec3 right = toVec3(camera.getLeftVector()).scale(-1.0D).normalize();
 
         double depth = relative.dot(forward);
         if (depth <= 0.05D) {
@@ -1009,11 +999,12 @@ public class TdmHudOverlay implements IGuiOverlay {
         double horizontal = relative.dot(right);
         double vertical = relative.dot(up);
 
-        double fovDegrees = minecraft.options.fov().get();
-        double focalLength = screenHeight / (2.0D * Math.tan(Math.toRadians(fovDegrees) / 2.0D));
+        Matrix4f projection = RenderSystem.getProjectionMatrix();
+        double focalLengthX = screenWidth * projection.m00() * 0.5D;
+        double focalLengthY = screenHeight * projection.m11() * 0.5D;
 
-        int screenX = (int) Math.round((screenWidth * 0.5D) + (horizontal * focalLength / depth));
-        int screenY = (int) Math.round((screenHeight * 0.5D) - (vertical * focalLength / depth));
+        int screenX = (int) Math.round((screenWidth * 0.5D) + (horizontal * focalLengthX / depth));
+        int screenY = (int) Math.round((screenHeight * 0.5D) - (vertical * focalLengthY / depth));
 
         if (screenX < -COMBAT_MARKER_SCREEN_MARGIN || screenX > screenWidth + COMBAT_MARKER_SCREEN_MARGIN
                 || screenY < -COMBAT_MARKER_SCREEN_MARGIN || screenY > screenHeight + COMBAT_MARKER_SCREEN_MARGIN) {
@@ -1024,10 +1015,11 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private Vec3 interpolatePlayerHeadPos(Player player, float partialTick, double headOffset) {
-        double x = Mth.lerp(partialTick, player.xo, player.getX());
-        double y = Mth.lerp(partialTick, player.yo, player.getY()) + player.getBbHeight() + headOffset;
-        double z = Mth.lerp(partialTick, player.zo, player.getZ());
-        return new Vec3(x, y, z);
+        return player.getEyePosition(partialTick).add(0.0D, headOffset, 0.0D);
+    }
+
+    private Vec3 toVec3(Vector3f vector) {
+        return new Vec3(vector.x(), vector.y(), vector.z());
     }
 
     private void renderDeathCamPanel(GuiGraphics graphics, Font font, int centerX, int screenWidth, int screenHeight) {
