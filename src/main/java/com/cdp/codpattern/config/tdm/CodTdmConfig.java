@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Locale;
 
 /**
  * COD Team Deathmatch 配置文件
@@ -20,8 +19,6 @@ public class CodTdmConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(CodTdmConfig.class);
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static CodTdmConfig INSTANCE = new CodTdmConfig();
-    public static final String ENEMY_MARKER_STYLE_HEALTH_BAR = "HEALTH_BAR";
-    public static final String ENEMY_MARKER_STYLE_DOT = "MARKER_DOT";
 
     // 游戏配置参数
     private int timeLimitSeconds = 420; // 7分钟
@@ -38,11 +35,10 @@ public class CodTdmConfig {
     private int combatRegenDelayTicks = 120; // 受伤后多久开始回血
     private float combatRegenHalfHeartsPerSecond = 5.0f; // 每秒回复多少半颗心
     private int maxTeamDiff = 1; // 自动分队允许的最大人数差
-    private String enemyMarkerStyle = ENEMY_MARKER_STYLE_HEALTH_BAR; // 敌方标识样式：HEALTH_BAR / MARKER_DOT
-    private float markerFocusHalfAngleDegrees = 30.0f; // 敌方标识判定半角（度）
-    private int markerFocusRequiredTicks = 20; // 视锥内累计显示标识所需 tick
-    private double markerBarMaxDistance = 96.0D; // 敌方标识判定最远距离（格）
-    private int markerVisibleGraceTicks = 3; // 可见状态下敌方标识防闪烁缓冲 tick
+    private float markerFocusHalfAngleDegrees = 30.0f; // 敌方血条判定半角（度）
+    private int markerFocusRequiredTicks = 20; // 视锥内累计显示敌方血条所需 tick
+    private double markerBarMaxDistance = 96.0D; // 敌方血条判定最远距离（格）
+    private int markerVisibleGraceTicks = 3; // 敌方血条防闪烁缓冲 tick
 
     // Getters
     public static CodTdmConfig getConfig() {
@@ -103,14 +99,6 @@ public class CodTdmConfig {
 
     public int getMaxTeamDiff() {
         return maxTeamDiff;
-    }
-
-    public String getEnemyMarkerStyle() {
-        return normalizeEnemyMarkerStyle(enemyMarkerStyle);
-    }
-
-    public boolean isEnemyMarkerHealthBar() {
-        return ENEMY_MARKER_STYLE_HEALTH_BAR.equals(getEnemyMarkerStyle());
     }
 
     public float getMarkerFocusHalfAngleDegrees() {
@@ -186,10 +174,6 @@ public class CodTdmConfig {
         this.maxTeamDiff = value;
     }
 
-    public void setEnemyMarkerStyle(String value) {
-        this.enemyMarkerStyle = normalizeEnemyMarkerStyle(value);
-    }
-
     public void setMarkerFocusHalfAngleDegrees(float value) {
         this.markerFocusHalfAngleDegrees = value;
     }
@@ -224,7 +208,6 @@ public class CodTdmConfig {
                 String json = Files.readString(configFile);
                 CodTdmConfig loaded = GSON.fromJson(json, CodTdmConfig.class);
                 INSTANCE = loaded == null ? new CodTdmConfig() : loaded;
-                INSTANCE.normalizeAfterLoad();
                 LOGGER.info("TDM配置已加载: {}", configFile);
             } else {
                 // 首次创建默认配置
@@ -243,7 +226,6 @@ public class CodTdmConfig {
         try {
             Path configDir = ConfigPath.SERVER_TDM_CONFIG.getPath(server);
             Path configFile = configDir.resolve("config.json");
-            INSTANCE.normalizeAfterLoad();
 
             // 创建目录
             if (!Files.exists(configDir)) {
@@ -257,20 +239,5 @@ public class CodTdmConfig {
         } catch (IOException e) {
             LOGGER.error("保存TDM配置失败", e);
         }
-    }
-
-    private void normalizeAfterLoad() {
-        enemyMarkerStyle = normalizeEnemyMarkerStyle(enemyMarkerStyle);
-    }
-
-    private static String normalizeEnemyMarkerStyle(String value) {
-        if (value == null || value.isBlank()) {
-            return ENEMY_MARKER_STYLE_HEALTH_BAR;
-        }
-        String normalized = value.trim().toUpperCase(Locale.ROOT);
-        if (ENEMY_MARKER_STYLE_DOT.equals(normalized)) {
-            return ENEMY_MARKER_STYLE_DOT;
-        }
-        return ENEMY_MARKER_STYLE_HEALTH_BAR;
     }
 }

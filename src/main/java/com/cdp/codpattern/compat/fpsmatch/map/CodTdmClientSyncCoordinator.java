@@ -71,7 +71,6 @@ final class CodTdmClientSyncCoordinator {
         GamePhasePacket phasePacket = new GamePhasePacket(phase.name(), remainingTime);
         ScoreUpdatePacket scorePacket = new ScoreUpdatePacket(teamScores, gameTimeTicks);
         CombatMarkerConfigPacket markerConfigPacket = new CombatMarkerConfigPacket(
-                config.isEnemyMarkerHealthBar(),
                 config.getMarkerFocusHalfAngleDegrees(),
                 config.getMarkerFocusRequiredTicks(),
                 config.getMarkerBarMaxDistance(),

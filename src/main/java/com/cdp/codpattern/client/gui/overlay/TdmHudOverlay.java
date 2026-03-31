@@ -39,9 +39,6 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int ROSTER_ROW_STAGGER_TICKS = 6;
     private static final int ROSTER_ROW_FADE_TICKS = 10;
     private static final int COMBAT_MARKER_SCREEN_MARGIN = 24;
-    private static final int TEAM_MARKER_DOT_SIZE = 6;
-    private static final int TEAM_MARKER_ALPHA = 128;
-    private static final int TEAM_MARKER_GREEN_BASE_COLOR = 0xFF54F28C;
     private static final int INVINCIBILITY_MARKER_SIZE = 8;
     private static final int INVINCIBILITY_MARKER_COLOR = 0xFFF6F6F6;
     private static final int INVINCIBILITY_MARKER_OUTLINE = 0xFFBFC7D0;
@@ -64,7 +61,6 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int DEATH_CAM_PANEL_BOTTOM_MARGIN = 40;
     private static final int DEATH_CAM_PANEL_MIN_CENTER_OFFSET = 18;
     private static final int DEATH_CAM_PANEL_TEXT_PADDING = 12;
-    private static final double TEAM_MARKER_HEAD_OFFSET = 0.45D;
     private static final double ENEMY_BAR_HEAD_OFFSET = 0.62D;
     private static final double INVINCIBILITY_MARKER_HEAD_OFFSET = 0.92D;
     private static final Vec3 WORLD_UP = new Vec3(0.0D, 1.0D, 0.0D);
@@ -913,23 +909,9 @@ public class TdmHudOverlay implements IGuiOverlay {
                 }
             }
 
-            boolean teammate = snapshot.isTeammate(playerId);
-            if (warmup || teammate) {
-                ScreenProjection markerProjection = projectWorldToScreen(
-                        minecraft,
-                        partialTick,
-                        interpolatePlayerHeadPos(tracked, partialTick, TEAM_MARKER_HEAD_OFFSET),
-                        screenWidth,
-                        screenHeight);
-                if (markerProjection != null) {
-                    drawTeamMarkerDot(graphics, markerProjection.x(), markerProjection.y(), teamAccent(entry.getValue()),
-                            playing);
-                }
-            }
-
             if (playing
                     && snapshot.isEnemy(playerId)
-                    && markerTracker.shouldRenderEnemyMarker(playerId)) {
+                    && markerTracker.shouldRenderEnemyHealthBar(playerId)) {
                 ScreenProjection barProjection = projectWorldToScreen(
                         minecraft,
                         partialTick,
@@ -937,27 +919,9 @@ public class TdmHudOverlay implements IGuiOverlay {
                         screenWidth,
                         screenHeight);
                 if (barProjection != null) {
-                    if (markerTracker.isEnemyMarkerHealthBar()) {
-                        drawEnemyHealthBar(graphics, localPlayer, tracked, barProjection, screenWidth, screenHeight);
-                    } else {
-                        drawTeamMarkerDot(graphics, barProjection.x(), barProjection.y(), teamAccent(entry.getValue()), false);
-                    }
+                    drawEnemyHealthBar(graphics, localPlayer, tracked, barProjection, screenWidth, screenHeight);
                 }
             }
-        }
-    }
-
-    private void drawTeamMarkerDot(GuiGraphics graphics, int centerX, int centerY, int teamColor, boolean showGreenBase) {
-        int half = TEAM_MARKER_DOT_SIZE / 2;
-        int left = centerX - half;
-        int top = centerY - half;
-        int right = left + TEAM_MARKER_DOT_SIZE;
-        int bottom = top + TEAM_MARKER_DOT_SIZE;
-
-        graphics.fill(left - 1, top - 1, right + 1, bottom + 1, withAlpha(0xFF000000, 90));
-        graphics.fill(left, top, right, bottom, withAlpha(teamColor, TEAM_MARKER_ALPHA));
-        if (showGreenBase) {
-            graphics.fill(left, bottom - 1, right, bottom, withAlpha(TEAM_MARKER_GREEN_BASE_COLOR, 220));
         }
     }
 

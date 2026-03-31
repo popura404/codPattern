@@ -1,10 +1,12 @@
 package com.cdp.codpattern.client;
 
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.scores.PlayerTeam;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -19,16 +21,18 @@ import java.util.UUID;
 /**
  * 客户端战斗标识追踪器：
  * - 每 tick 维护房间敌我关系快照
- * - 每 tick 维护敌方“瞄准触发血条”状态（30°视锥 + 20tick）
+ * - 热身/正式阶段维护敌我高光状态
+ * - 正式阶段维护敌方“瞄准触发血条”状态（30°视锥 + 20tick）
  */
 public final class TdmCombatMarkerTracker {
     public static final TdmCombatMarkerTracker INSTANCE = new TdmCombatMarkerTracker();
 
-    private static final boolean DEFAULT_ENEMY_MARKER_HEALTH_BAR = true;
     private static final float DEFAULT_ENEMY_FOCUS_HALF_ANGLE_DEGREES = 30.0f;
     private static final int DEFAULT_ENEMY_FOCUS_REQUIRED_TICKS = 20;
     private static final double DEFAULT_ENEMY_BAR_MAX_DISTANCE = 96.0D;
     private static final int DEFAULT_ENEMY_BAR_VISIBLE_GRACE_TICKS = 3;
+    private static final ChatFormatting TEAM_HIGHLIGHT_COLOR = ChatFormatting.WHITE;
+    private static final ChatFormatting ENEMY_WARMUP_HIGHLIGHT_COLOR = ChatFormatting.YELLOW;
 
     private static final float MIN_ENEMY_FOCUS_HALF_ANGLE_DEGREES = 5.0f;
     private static final float MAX_ENEMY_FOCUS_HALF_ANGLE_DEGREES = 80.0f;
@@ -42,8 +46,9 @@ public final class TdmCombatMarkerTracker {
     private final Map<UUID, Integer> enemyFocusTicks = new HashMap<>();
     private final Map<UUID, Integer> enemyBarGraceTicks = new HashMap<>();
     private final Set<UUID> visibleEnemyBars = new HashSet<>();
+    private final Set<UUID> highlightedPlayers = new HashSet<>();
+    private final Map<String, ChatFormatting> originalTeamColors = new HashMap<>();
 
-    private boolean enemyMarkerHealthBar = DEFAULT_ENEMY_MARKER_HEALTH_BAR;
     private float enemyFocusHalfAngleDegrees = DEFAULT_ENEMY_FOCUS_HALF_ANGLE_DEGREES;
     private int enemyFocusRequiredTicks = DEFAULT_ENEMY_FOCUS_REQUIRED_TICKS;
     private double enemyBarMaxDistance = DEFAULT_ENEMY_BAR_MAX_DISTANCE;
@@ -59,14 +64,31 @@ public final class TdmCombatMarkerTracker {
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer localPlayer = minecraft.player;
         ClientLevel level = minecraft.level;
-        if (localPlayer == null || level == null) {
+        if (level == null) {
             clear();
+            return;
+        }
+        if (localPlayer == null) {
+            latestSnapshot = TeamVisionSnapshot.empty();
+            clearEnemyTrackingOnly();
+            clearHighlighting(level);
             return;
         }
 
         latestSnapshot = buildSnapshot(localPlayer.getUUID(), ClientTdmState.teamPlayersSnapshot());
+        String phase = ClientTdmState.currentPhase();
+        boolean warmup = "WARMUP".equals(phase);
+        boolean playing = "PLAYING".equals(phase);
 
-        if (!"PLAYING".equals(ClientTdmState.currentPhase()) || !latestSnapshot.hasLocalTeam()) {
+        if ((!warmup && !playing) || !latestSnapshot.hasLocalTeam()) {
+            clearEnemyTrackingOnly();
+            clearHighlighting(level);
+            return;
+        }
+
+        updateHighlights(level, localPlayer, warmup);
+
+        if (!playing) {
             clearEnemyTrackingOnly();
             return;
         }
@@ -131,12 +153,10 @@ public final class TdmCombatMarkerTracker {
         }
     }
 
-    public void updateConfig(boolean enemyMarkerHealthBar,
-            float focusHalfAngleDegrees,
+    public void updateConfig(float focusHalfAngleDegrees,
             int focusRequiredTicks,
             double barMaxDistance,
             int barVisibleGraceTicks) {
-        this.enemyMarkerHealthBar = enemyMarkerHealthBar;
         this.enemyFocusHalfAngleDegrees = clampFloat(
                 focusHalfAngleDegrees,
                 MIN_ENEMY_FOCUS_HALF_ANGLE_DEGREES,
@@ -160,27 +180,121 @@ public final class TdmCombatMarkerTracker {
         return latestSnapshot;
     }
 
-    public boolean shouldRenderEnemyMarker(UUID playerId) {
-        return playerId != null && visibleEnemyBars.contains(playerId);
-    }
-
     public boolean shouldRenderEnemyHealthBar(UUID playerId) {
-        return shouldRenderEnemyMarker(playerId);
-    }
-
-    public boolean isEnemyMarkerHealthBar() {
-        return enemyMarkerHealthBar;
+        return playerId != null && visibleEnemyBars.contains(playerId);
     }
 
     public void clear() {
         latestSnapshot = TeamVisionSnapshot.empty();
         clearEnemyTrackingOnly();
+        clearHighlighting(Minecraft.getInstance().level);
     }
 
     private void clearEnemyTrackingOnly() {
         enemyFocusTicks.clear();
         enemyBarGraceTicks.clear();
         visibleEnemyBars.clear();
+    }
+
+    private void updateHighlights(ClientLevel level, LocalPlayer localPlayer, boolean warmup) {
+        Set<UUID> desiredHighlights = new HashSet<>();
+        Set<String> activeColorTeams = new HashSet<>();
+        applyHighlightColor(resolvePlayerTeam(localPlayer), TEAM_HIGHLIGHT_COLOR, activeColorTeams);
+
+        for (Map.Entry<UUID, String> entry : latestSnapshot.teamByPlayer().entrySet()) {
+            UUID playerId = entry.getKey();
+            if (playerId == null || playerId.equals(localPlayer.getUUID()) || !latestSnapshot.isLiving(playerId)) {
+                continue;
+            }
+
+            Player tracked = level.getPlayerByUUID(playerId);
+            if (tracked == null || !tracked.isAlive() || tracked.isRemoved()) {
+                continue;
+            }
+
+            if (latestSnapshot.isTeammate(playerId)) {
+                desiredHighlights.add(playerId);
+                applyHighlightColor(resolvePlayerTeam(tracked), TEAM_HIGHLIGHT_COLOR, activeColorTeams);
+                continue;
+            }
+
+            if (warmup && latestSnapshot.isEnemy(playerId)) {
+                desiredHighlights.add(playerId);
+                applyHighlightColor(resolvePlayerTeam(tracked), ENEMY_WARMUP_HIGHLIGHT_COLOR, activeColorTeams);
+            }
+        }
+
+        syncHighlightedPlayers(level, desiredHighlights);
+        restoreUnusedTeamColors(level, activeColorTeams);
+    }
+
+    private void syncHighlightedPlayers(ClientLevel level, Set<UUID> desiredHighlights) {
+        Set<UUID> staleHighlights = new HashSet<>(highlightedPlayers);
+        staleHighlights.removeAll(desiredHighlights);
+        for (UUID playerId : staleHighlights) {
+            setPlayerHighlight(level, playerId, false);
+        }
+        for (UUID playerId : desiredHighlights) {
+            setPlayerHighlight(level, playerId, true);
+        }
+        highlightedPlayers.clear();
+        highlightedPlayers.addAll(desiredHighlights);
+    }
+
+    private void clearHighlighting(ClientLevel level) {
+        for (UUID playerId : highlightedPlayers) {
+            setPlayerHighlight(level, playerId, false);
+        }
+        highlightedPlayers.clear();
+        restoreUnusedTeamColors(level, Set.of());
+    }
+
+    private void setPlayerHighlight(ClientLevel level, UUID playerId, boolean glowing) {
+        if (level == null || playerId == null) {
+            return;
+        }
+        Player player = level.getPlayerByUUID(playerId);
+        if (player == null || player.isRemoved()) {
+            return;
+        }
+        player.setGlowingTag(glowing);
+    }
+
+    private void applyHighlightColor(PlayerTeam team, ChatFormatting color, Set<String> activeColorTeams) {
+        if (team == null || color == null) {
+            return;
+        }
+        String teamName = team.getName();
+        if (teamName == null || teamName.isBlank()) {
+            return;
+        }
+        activeColorTeams.add(teamName);
+        originalTeamColors.putIfAbsent(teamName, team.getColor());
+        if (team.getColor() != color) {
+            team.setColor(color);
+        }
+    }
+
+    private void restoreUnusedTeamColors(ClientLevel level, Set<String> activeColorTeams) {
+        if (level == null) {
+            originalTeamColors.clear();
+            return;
+        }
+        for (var iterator = originalTeamColors.entrySet().iterator(); iterator.hasNext();) {
+            Map.Entry<String, ChatFormatting> entry = iterator.next();
+            if (activeColorTeams.contains(entry.getKey())) {
+                continue;
+            }
+            PlayerTeam team = level.getScoreboard().getPlayerTeam(entry.getKey());
+            if (team != null && team.getColor() != entry.getValue()) {
+                team.setColor(entry.getValue());
+            }
+            iterator.remove();
+        }
+    }
+
+    private PlayerTeam resolvePlayerTeam(Player player) {
+        return player != null && player.getTeam() instanceof PlayerTeam playerTeam ? playerTeam : null;
     }
 
     private TeamVisionSnapshot buildSnapshot(UUID localPlayerId, Map<String, List<PlayerInfo>> teamPlayers) {
