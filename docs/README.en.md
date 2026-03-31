@@ -10,7 +10,7 @@ COD Pattern is built around **TaCZ + an embedded FPSM-compatible core**, providi
 
 * Loadout presets and respawn equipment distribution
 * In-match weapon refit with attachment presets
-* TDM room lifecycle and match flow
+* `Frontline / TeamDeathMatch` rooms, maps, and match flow
 * Localized UI and system messages (`zh_cn / zh_tw / en_us / ja_jp`)
 
 The project follows a server-authoritative design with client synchronization to keep multiplayer state consistent.
@@ -34,14 +34,17 @@ The project follows a server-authoritative design with client synchronization to
 * Attachment presets are now stored directly inside the loadout config by loadout id and slot.
 * Supports result feedback and rollback handling to reduce client/server state drift.
 
-### 3) TDM Room and Match Flow (Embedded FPSM Compatibility Layer)
+### 3) Rooms, Maps, and Match Flow (Embedded FPSM Compatibility Layer)
 
-* Adds a Team Deathmatch entry in pause menu for room list, join/leave, and team selection.
+* Adds a unified room entry in pause menu for room list, join/leave, and team selection.
+* Supports both `frontline` and `teamdeathmatch` under the same room system, map data model, and persistence flow.
+* Maps now support area creation, spawn-point setup, match-end teleport setup, and persistence.
 * TDM room screens use the same fixed text-scaling baseline across different `GUI Scale` settings for more consistent list/panel/button readability.
 * Supports auto team assignment with balance constraints (`maxTeamDiff`).
 * Supports ready state, start vote, and end vote with threshold and timeout logic.
 * Full phase pipeline: `WAITING -> COUNTDOWN -> WARMUP -> PLAYING -> ENDED`.
-* Includes kill feed, score tracking, respawn delay, invincibility frames, combat regen, death cam, HUD phase feedback, and match summary.
+* `teamdeathmatch` includes dynamic respawn candidates and spawn safety validation.
+* Includes kill feed, score tracking, respawn delay, invincibility frames, combat regen, death cam, HUD phase feedback, ally/enemy highlights, and enemy health bars.
 * Exports JSON match records automatically when a match ends.
 
 ### 4) Filtering, Compatibility, and Localization
@@ -66,10 +69,18 @@ The project follows a server-authoritative design with client synchronization to
 * `/cdp distribute [target]`
   * Forces equipment distribution for all online players or selected players (OP required).
 
-### FPSMatch Command Chain
+### `/cdp map` Command Chain
 
-* Use `/fpsm tdm ...` for TDM map and flow management (for example `/fpsm tdm create <mapName>`).
-* Legacy `/codtdm` is deprecated.
+* `/cdp map list [type]`
+  * Lists registered game types or maps under a given type.
+* `/cdp map create <frontline|teamdeathmatch> <name> <from> <to>`
+  * Creates a map area and persists it immediately.
+* `/cdp map delete <type> <name>`
+  * Removes a map and its persisted data.
+* `/cdp map spawn <list|add|remove|clear> ...`
+  * Manages team spawn points and dynamic respawn candidates.
+* `/cdp map endtp <show|set|clear> <map> [pos]`
+  * Manages match-end teleport points.
 
 ## Configuration
 
@@ -90,6 +101,7 @@ Server configuration is stored under world save path: `serverconfig/codpattern/`
     * `ammunitionPerMagazineMultiple`
 * `tdm_rules/config.json`
   * TDM runtime parameters (time, score, respawn, voting, join policy, balance policy).
+  * In-match enemy/ally display is now fixed to highlights plus enemy health bars; the old marker-dot style toggle has been removed.
 * `tdm_match_records/`
   * Exported match records (`.json`) after each match.
 * Legacy paths `backpackconfig` / `filterconfig` / `attachment_preset/` / `tdmconfig/`
@@ -154,7 +166,7 @@ When reporting issues, include:
 
 ## Changelog
 
-Current version: `v0.5.9b`  
+Current version: `v0.6.5b`  
 See `CHANGES.md` for detailed history.
 
 ## License
