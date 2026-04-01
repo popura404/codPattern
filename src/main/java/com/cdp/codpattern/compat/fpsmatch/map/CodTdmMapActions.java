@@ -22,6 +22,7 @@ final class CodTdmMapActions {
             CodTdmVoteRuntime voteRuntime,
             CodTdmRespawnRuntime respawnRuntime,
             Consumer<ServerPlayer> requestRosterResyncAction,
+            Consumer<ServerPlayer> requestRosterPreviewAction,
             Supplier<String> mapNameSupplier
     ) {
         return new MapActionPort(
@@ -32,6 +33,7 @@ final class CodTdmMapActions {
                 voteRuntime,
                 respawnRuntime,
                 requestRosterResyncAction,
+                requestRosterPreviewAction,
                 mapNameSupplier
         );
     }
@@ -44,6 +46,7 @@ final class CodTdmMapActions {
             CodTdmVoteRuntime voteRuntime,
             CodTdmRespawnRuntime respawnRuntime,
             Consumer<ServerPlayer> requestRosterResyncAction,
+            Consumer<ServerPlayer> requestRosterPreviewAction,
             Supplier<String> mapNameSupplier
     ) implements CodTdmActionPort {
 
@@ -145,6 +148,11 @@ final class CodTdmMapActions {
         @Override
         public void requestRosterResync(ServerPlayer player) {
             requestRosterResyncAction.accept(player);
+        }
+
+        @Override
+        public void requestRosterPreview(ServerPlayer player) {
+            requestRosterPreviewAction.accept(player);
         }
     }
 }

@@ -125,6 +125,11 @@ final class CodTacticalTdmPorts {
         public void requestRosterResync(ServerPlayer player) {
             delegate.requestRosterResync(player);
         }
+
+        @Override
+        public void requestRosterPreview(ServerPlayer player) {
+            delegate.requestRosterPreview(player);
+        }
     }
 
     private record TacticalReadPort(CodTdmReadPort delegate) implements CodTacticalTdmReadPort {

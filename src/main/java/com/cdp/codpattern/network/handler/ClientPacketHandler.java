@@ -149,6 +149,15 @@ public class ClientPacketHandler {
         });
     }
 
+    public static void handleRoomPreviewRoster(String roomKey, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
+        Minecraft.getInstance().execute(() -> {
+            Screen screen = Minecraft.getInstance().screen;
+            if (screen instanceof TdmRoomScreen tdmScreen) {
+                tdmScreen.updatePreviewPlayerList(roomKey, rosterVersion, teamPlayers);
+            }
+        });
+    }
+
     public static void handleRoomPlayerDelta(
             String roomKey,
             int rosterVersion,

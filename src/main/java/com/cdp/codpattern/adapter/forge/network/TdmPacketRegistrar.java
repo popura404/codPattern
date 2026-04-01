@@ -11,9 +11,11 @@ import com.cdp.codpattern.network.tdm.LeaveRoomPacket;
 import com.cdp.codpattern.network.tdm.LeaveRoomResultPacket;
 import com.cdp.codpattern.network.tdm.PhysicsMobRetainPacket;
 import com.cdp.codpattern.network.tdm.PopupNoticePacket;
+import com.cdp.codpattern.network.tdm.RequestRoomPreviewRosterPacket;
 import com.cdp.codpattern.network.tdm.RequestRoomRosterResyncPacket;
 import com.cdp.codpattern.network.tdm.RequestRoomListPacket;
 import com.cdp.codpattern.network.tdm.RoomListSyncPacket;
+import com.cdp.codpattern.network.tdm.RoomPreviewRosterPacket;
 import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
 import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
 import com.cdp.codpattern.network.tdm.SelectTeamPacket;
@@ -54,6 +56,12 @@ final class TdmPacketRegistrar {
                 .decoder(RequestRoomRosterResyncPacket::decode)
                 .encoder(RequestRoomRosterResyncPacket::encode)
                 .consumerMainThread(RequestRoomRosterResyncPacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(RequestRoomPreviewRosterPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(RequestRoomPreviewRosterPacket::decode)
+                .encoder(RequestRoomPreviewRosterPacket::encode)
+                .consumerMainThread(RequestRoomPreviewRosterPacket::handle)
                 .add();
 
         ModNetworkChannel.CHANNEL.messageBuilder(JoinRoomPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_SERVER)
@@ -102,6 +110,12 @@ final class TdmPacketRegistrar {
                 .decoder(TeamPlayerListPacket::decode)
                 .encoder(TeamPlayerListPacket::encode)
                 .consumerMainThread(TeamPlayerListPacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(RoomPreviewRosterPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(RoomPreviewRosterPacket::decode)
+                .encoder(RoomPreviewRosterPacket::encode)
+                .consumerMainThread(RoomPreviewRosterPacket::handle)
                 .add();
 
         ModNetworkChannel.CHANNEL.messageBuilder(RoomPlayerDeltaPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)

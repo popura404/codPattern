@@ -43,6 +43,14 @@ public final class TdmRoomSessionState {
         selectedRoomPreviewState.updateSelection(selectedRoom, lobbySummaryState, System.currentTimeMillis());
     }
 
+    public void beginSelectedRoomPreviewRosterLoad() {
+        selectedRoomPreviewState.beginRosterLoading(System.currentTimeMillis());
+    }
+
+    public void updateSelectedRoomPreviewRoster(String roomKey, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
+        selectedRoomPreviewState.applyRoster(roomKey, rosterVersion, teamPlayers, System.currentTimeMillis());
+    }
+
     public String joinedRoom() {
         return joinedRoom;
     }

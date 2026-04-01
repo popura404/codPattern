@@ -6,6 +6,7 @@ import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.network.tdm.JoinRoomPacket;
 import com.cdp.codpattern.network.tdm.LeaveRoomPacket;
+import com.cdp.codpattern.network.tdm.RequestRoomPreviewRosterPacket;
 import com.cdp.codpattern.network.tdm.SelectTeamPacket;
 import com.cdp.codpattern.network.tdm.SetReadyStatePacket;
 import com.cdp.codpattern.network.tdm.SubscribeRoomListPacket;
@@ -23,6 +24,11 @@ public final class TdmRoomActionController {
     private static final long LEAVE_CONFIRM_WINDOW_MS = 3000L;
     private static final long ACTION_ACK_TIMEOUT_MS = 5000L;
     private static final long ROOM_NOTICE_DURATION_MS = 4500L;
+    private static final long PREVIEW_ROSTER_REFRESH_MS = 2500L;
+    private static final long PREVIEW_ROSTER_RETRY_MS = 900L;
+
+    public record PrimaryRoomActionPresentation(Component message, String glyph, int accentColor, boolean active) {
+    }
 
     private final TdmRoomSessionState roomState;
     private final TdmRoomUiState uiState;
@@ -41,13 +47,16 @@ public final class TdmRoomActionController {
         long now = System.currentTimeMillis();
         uiState.expireNotice(now);
 
-        if (uiState.shouldAutoExecuteLeave(now)) {
+        TdmRoomUiState.ConfirmAction expiredConfirm = uiState.consumeExpiredConfirm(now);
+        if (expiredConfirm != TdmRoomUiState.ConfirmAction.NONE) {
             executeLeaveRoom();
             return;
         }
-        if (uiState.isLeavePending(now)) {
+        if (uiState.hasConfirmPending(now)) {
             buttonStateUpdater.run();
         }
+
+        requestSelectedPreviewRosterIfNeeded(false);
 
         TdmRoomUiState.PendingAction expiredAction = uiState.consumeExpiredPendingAction(now);
         if (expiredAction != TdmRoomUiState.PendingAction.NONE) {
@@ -77,7 +86,7 @@ public final class TdmRoomActionController {
         if (selectedRoom == null || selectedRoom.isEmpty() || uiState.hasPendingAction()) {
             return;
         }
-        clearPendingLeave();
+        clearPendingConfirm();
         clearSwitchFlow();
         clearRoomNotice();
         ModNetworkChannel.sendToServer(new JoinRoomPacket(selectedRoom, null));
@@ -99,10 +108,19 @@ public final class TdmRoomActionController {
             return;
         }
 
-        clearPendingLeave();
+        long now = System.currentTimeMillis();
+        if (uiState.isSwitchPending(now) && targetRoom.equals(uiState.confirmTargetRoom())) {
+            clearPendingConfirm();
+            clearSwitchFlow();
+            buttonStateUpdater.run();
+            return;
+        }
+
+        clearPendingConfirm();
         clearRoomNotice();
         startSwitchFlow(joinedRoom, targetRoom);
-        executeLeaveRoom();
+        uiState.startSwitchConfirm(targetRoom, now, LEAVE_CONFIRM_WINDOW_MS);
+        buttonStateUpdater.run();
     }
 
     public void selectTeam(String teamName) {
@@ -124,13 +142,16 @@ public final class TdmRoomActionController {
         if (roomState.joinedRoom() == null || uiState.hasPendingAction()) {
             return;
         }
-        clearSwitchFlow();
-        if (isLeavePending()) {
-            clearPendingLeave();
+        long now = System.currentTimeMillis();
+        if (uiState.isLeavePending(now)) {
+            clearPendingConfirm();
+            clearSwitchFlow();
             buttonStateUpdater.run();
             return;
         }
-        uiState.startLeaveConfirm(System.currentTimeMillis(), LEAVE_CONFIRM_WINDOW_MS);
+        clearPendingConfirm();
+        clearSwitchFlow();
+        uiState.startLeaveConfirm(now, LEAVE_CONFIRM_WINDOW_MS);
         buttonStateUpdater.run();
     }
 
@@ -156,6 +177,16 @@ public final class TdmRoomActionController {
         long now = System.currentTimeMillis();
         roomState.lobbySummaryState().applySnapshot(rooms, snapshotVersion, now);
         roomState.selectedRoomPreviewState().syncFromLobby(roomState.lobbySummaryState(), now);
+        if (uiState.isSwitchPending(now)) {
+            String pendingTarget = uiState.confirmTargetRoom();
+            if (pendingTarget == null || !roomState.rooms().containsKey(pendingTarget)) {
+                clearPendingConfirm();
+                clearSwitchFlow();
+                showRoomNotice(
+                        Component.translatable("screen.codpattern.tdm_room.error.map_not_found").getString(),
+                        CodTheme.TEXT_DANGER);
+            }
+        }
         String selectedRoom = roomState.selectedRoom();
         if (selectedRoom != null
                 && !selectedRoom.isBlank()
@@ -163,12 +194,7 @@ public final class TdmRoomActionController {
                 && !selectedRoom.equals(roomState.joinedRoom())) {
             roomState.setSelectedRoom(null);
         }
-        if (roomState.joinedRoom() != null
-                && !roomState.rooms().containsKey(roomState.joinedRoom())
-                && uiState.pendingAction() != TdmRoomUiState.PendingAction.JOINING) {
-            roomState.setJoinedRoom(null);
-            roomState.clearTeamPlayers();
-        }
+        requestSelectedPreviewRosterIfNeeded(false);
         buttonStateUpdater.run();
     }
 
@@ -191,9 +217,15 @@ public final class TdmRoomActionController {
         buttonStateUpdater.run();
     }
 
+    public void updatePreviewPlayerList(String roomKey, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
+        roomState.updateSelectedRoomPreviewRoster(roomKey, rosterVersion, teamPlayers);
+        buttonStateUpdater.run();
+    }
+
     public void setJoinedRoom(String roomKey) {
         roomState.setJoinedRoom(roomKey);
         roomState.setSelectedRoom(roomKey);
+        roomState.selectedRoomPreviewState().clearRoster();
         roomState.refreshJoinedRoomLiveState();
         clearSwitchFlow();
         clearPendingAction();
@@ -284,8 +316,141 @@ public final class TdmRoomActionController {
         return uiState.isLeavePending(System.currentTimeMillis());
     }
 
-    public int leaveSecondsRemaining() {
-        return uiState.leaveSecondsRemaining(System.currentTimeMillis());
+    public boolean hasConfirmPending() {
+        return uiState.hasConfirmPending(System.currentTimeMillis());
+    }
+
+    public boolean isSwitchPending() {
+        return uiState.isSwitchPending(System.currentTimeMillis());
+    }
+
+    public boolean isPreviewingOtherRoom() {
+        String joinedRoom = roomState.joinedRoom();
+        String selectedRoom = roomState.selectedRoom();
+        return joinedRoom != null
+                && !joinedRoom.isBlank()
+                && selectedRoom != null
+                && !selectedRoom.isBlank()
+                && !selectedRoom.equals(joinedRoom)
+                && roomState.selectedRoomPreviewState().hasPreview();
+    }
+
+    public String pendingSwitchTargetRoom() {
+        return uiState.confirmTargetRoom();
+    }
+
+    public String confirmHintText() {
+        long now = System.currentTimeMillis();
+        if (!uiState.hasConfirmPending(now)) {
+            return "";
+        }
+        int secondsRemaining = uiState.confirmSecondsRemaining(now);
+        return switch (uiState.confirmAction()) {
+            case LEAVE_ROOM -> Component.translatable(
+                    "screen.codpattern.tdm_room.leave_room_pending",
+                    secondsRemaining).getString();
+            case SWITCH_ROOM -> Component.translatable(
+                    "screen.codpattern.tdm_room.switch_room_pending",
+                    roomLabel(uiState.confirmTargetRoom()),
+                    secondsRemaining).getString();
+            default -> "";
+        };
+    }
+
+    public int confirmHintColor() {
+        return uiState.confirmAction() == TdmRoomUiState.ConfirmAction.SWITCH_ROOM
+                ? CodTheme.SELECTED_BORDER
+                : 0xFFFFD75E;
+    }
+
+    public PrimaryRoomActionPresentation primaryRoomActionPresentation() {
+        if (uiState.pendingAction() == TdmRoomUiState.PendingAction.LEAVING) {
+            int accent = hasActiveSwitchFlow() ? CodTheme.SELECTED_BORDER : CodTheme.TEXT_DANGER;
+            Component message = hasActiveSwitchFlow()
+                    ? Component.translatable("screen.codpattern.tdm_room.switching")
+                    : Component.translatable("screen.codpattern.tdm_room.leaving");
+            return new PrimaryRoomActionPresentation(message, glyphForAction(hasActiveSwitchFlow() ? "SWITCH" : "LEAVE"), accent, false);
+        }
+        if (uiState.pendingAction() == TdmRoomUiState.PendingAction.JOINING) {
+            int accent = hasActiveSwitchFlow() ? CodTheme.SELECTED_BORDER : CodTheme.HOVER_BORDER;
+            Component message = hasActiveSwitchFlow()
+                    ? Component.translatable("screen.codpattern.tdm_room.switching")
+                    : Component.translatable("screen.codpattern.tdm_room.joining");
+            return new PrimaryRoomActionPresentation(message, glyphForAction(hasActiveSwitchFlow() ? "SWITCH" : "JOIN"), accent, false);
+        }
+
+        long now = System.currentTimeMillis();
+        if (uiState.isLeavePending(now)) {
+            return new PrimaryRoomActionPresentation(
+                    Component.translatable("screen.codpattern.tdm_room.leave_room"),
+                    glyphForAction("LEAVE"),
+                    CodTheme.TEXT_DANGER,
+                    true);
+        }
+        if (uiState.isSwitchPending(now)) {
+            return new PrimaryRoomActionPresentation(
+                    Component.translatable("screen.codpattern.tdm_room.switch_room"),
+                    glyphForAction("SWITCH"),
+                    CodTheme.SELECTED_BORDER,
+                    true);
+        }
+
+        String joinedRoom = roomState.joinedRoom();
+        String selectedRoom = roomState.selectedRoom();
+        if (joinedRoom == null || joinedRoom.isBlank()) {
+            boolean canJoin = selectedRoom != null && !selectedRoom.isBlank();
+            Component message = canJoin
+                    ? Component.translatable("screen.codpattern.tdm_room.join_room")
+                    : Component.translatable("screen.codpattern.tdm_room.select_room_first");
+            return new PrimaryRoomActionPresentation(
+                    message,
+                    canJoin ? glyphForAction("JOIN") : "?",
+                    CodTheme.HOVER_BORDER,
+                    canJoin);
+        }
+        if (selectedRoom != null && !selectedRoom.isBlank() && !selectedRoom.equals(joinedRoom)) {
+            return new PrimaryRoomActionPresentation(
+                    Component.translatable("screen.codpattern.tdm_room.switch_room"),
+                    glyphForAction("SWITCH"),
+                    CodTheme.SELECTED_BORDER,
+                    true);
+        }
+        return new PrimaryRoomActionPresentation(
+                Component.translatable("screen.codpattern.tdm_room.leave_room"),
+                glyphForAction("LEAVE"),
+                CodTheme.TEXT_DANGER,
+                true);
+    }
+
+    public void pressPrimaryRoomAction() {
+        if (uiState.hasPendingAction()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (uiState.isLeavePending(now)) {
+            leaveRoom();
+            return;
+        }
+        if (uiState.isSwitchPending(now)) {
+            String targetRoom = uiState.confirmTargetRoom();
+            if (targetRoom != null && !targetRoom.isBlank()) {
+                switchToRoom(targetRoom);
+            }
+            return;
+        }
+        String joinedRoom = roomState.joinedRoom();
+        String selectedRoom = roomState.selectedRoom();
+        if (joinedRoom == null || joinedRoom.isBlank()) {
+            if (selectedRoom != null && !selectedRoom.isBlank()) {
+                joinSelectedRoom();
+            }
+            return;
+        }
+        if (selectedRoom != null && !selectedRoom.isBlank() && !selectedRoom.equals(joinedRoom)) {
+            switchToRoom(selectedRoom);
+            return;
+        }
+        leaveRoom();
     }
 
     public boolean hasRoomNotice() {
@@ -305,8 +470,22 @@ public final class TdmRoomActionController {
         uiState.reset();
     }
 
+    public void selectRoom(String roomName) {
+        long now = System.currentTimeMillis();
+        if (uiState.isSwitchPending(now)) {
+            String pendingTarget = uiState.confirmTargetRoom();
+            if (roomName == null || !roomName.equals(pendingTarget)) {
+                clearPendingConfirm();
+                clearSwitchFlow();
+            }
+        }
+        roomState.setSelectedRoom(roomName);
+        requestSelectedPreviewRosterIfNeeded(true);
+        buttonStateUpdater.run();
+    }
+
     private void executeLeaveRoom() {
-        clearPendingLeave();
+        clearPendingConfirm();
         ModNetworkChannel.sendToServer(new LeaveRoomPacket());
         startPendingAction(TdmRoomUiState.PendingAction.LEAVING, roomState.joinedRoom());
         buttonStateUpdater.run();
@@ -320,8 +499,8 @@ public final class TdmRoomActionController {
         uiState.clearPendingAction();
     }
 
-    private void clearPendingLeave() {
-        uiState.clearLeaveConfirm();
+    private void clearPendingConfirm() {
+        uiState.clearConfirm();
     }
 
     private void showRoomNotice(String message, int color) {
@@ -337,6 +516,27 @@ public final class TdmRoomActionController {
 
     private void clearRoomNotice() {
         uiState.clearNotice();
+    }
+
+    private void requestSelectedPreviewRosterIfNeeded(boolean force) {
+        String selectedRoom = roomState.selectedRoom();
+        String joinedRoom = roomState.joinedRoom();
+        SelectedRoomPreviewState previewState = roomState.selectedRoomPreviewState();
+        if (selectedRoom == null || selectedRoom.isBlank() || selectedRoom.equals(joinedRoom)) {
+            previewState.clearRoster();
+            return;
+        }
+        TdmRoomData summary = previewState.summarySnapshot();
+        long now = System.currentTimeMillis();
+        if (!force && !previewState.shouldRequestRoster(
+                now,
+                summary == null ? -1 : summary.playerCount,
+                PREVIEW_ROSTER_REFRESH_MS,
+                PREVIEW_ROSTER_RETRY_MS)) {
+            return;
+        }
+        roomState.beginSelectedRoomPreviewRosterLoad();
+        ModNetworkChannel.sendToServer(new RequestRoomPreviewRosterPacket(selectedRoom));
     }
 
     private void startSwitchFlow(String originRoom, String targetRoom) {
@@ -399,5 +599,14 @@ public final class TdmRoomActionController {
             return roomKey == null ? "" : roomKey;
         }
         return room.mapName;
+    }
+
+    private String glyphForAction(String action) {
+        return switch (action) {
+            case "JOIN" -> ">|";
+            case "LEAVE" -> "|<";
+            case "SWITCH" -> "><";
+            default -> "?";
+        };
     }
 }

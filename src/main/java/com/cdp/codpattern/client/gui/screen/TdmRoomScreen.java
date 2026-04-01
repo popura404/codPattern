@@ -70,13 +70,15 @@ public class TdmRoomScreen extends Screen {
     private String infoContextKey = "";
     private long infoContentTransitionAtMs = 0L;
 
-    // 队伍选择按钮
+    // 房内操作按钮
     private Button kortacButton;
     private Button specgruButton;
     private Button readyButton;
     private Button voteStartButton;
     private Button voteEndButton;
     private int infoActionBottomY;
+    private int collapsedActionBottomY;
+    private int fullActionBottomY;
 
     public TdmRoomScreen() {
         super(Component.translatable("screen.codpattern.room.title"));
@@ -143,11 +145,8 @@ public class TdmRoomScreen extends Screen {
         int actionWidth = Math.max(scaled(120), rightPanelWidth - actionPadding * 2);
         int halfWidth = Math.max(1, (actionWidth - spacing) / 2);
         int headerY = rightPanelY + scaled(4);
-        int overviewY = headerY + scaled(26);
-        int overviewBottom = overviewY + scaled(42);
-        int actionsLabelY = overviewBottom + scaled(10);
-        int dividerY = actionsLabelY + GuiTextHelper.referenceLineHeight(Minecraft.getInstance().font) + scaled(4);
-        int teamButtonY = dividerY + scaled(6);
+        int headerBottom = headerY + scaled(26);
+        int teamButtonY = headerBottom + scaled(8);
 
         // KORTAC 队伍按钮
         kortacButton = addRenderableWidget(new TdmRoomActionButton(
@@ -198,7 +197,9 @@ public class TdmRoomScreen extends Screen {
                 Component.translatable("screen.codpattern.tdm_room.vote_end"),
                 btn -> actionController.voteEnd(),
                 CodTheme.TEXT_DANGER));
-        infoActionBottomY = voteY + buttonHeight;
+        collapsedActionBottomY = headerBottom;
+        fullActionBottomY = voteY + buttonHeight;
+        infoActionBottomY = collapsedActionBottomY;
 
         updateButtonStates();
     }
@@ -208,6 +209,8 @@ public class TdmRoomScreen extends Screen {
      */
     private void updateButtonStates() {
         String currentRoomState = actionController.currentRoomState();
+        boolean hasJoinedRoom = roomState.joinedRoom() != null;
+        boolean previewingOtherRoom = actionController.isPreviewingOtherRoom();
         boolean localPlayerReady = TdmRoomStateEvaluator.isLocalPlayerReady(
                 Minecraft.getInstance().player == null ? null : Minecraft.getInstance().player.getUUID(),
                 roomState.teamPlayers());
@@ -217,10 +220,27 @@ public class TdmRoomScreen extends Screen {
                 voteEndButton,
                 kortacButton,
                 specgruButton,
-                roomState.joinedRoom() != null,
+                hasJoinedRoom,
                 actionController.hasPendingAction(),
                 currentRoomState,
                 localPlayerReady);
+        boolean showCurrentRoomControls = hasJoinedRoom && !previewingOtherRoom;
+        if (kortacButton != null) {
+            kortacButton.visible = showCurrentRoomControls;
+        }
+        if (specgruButton != null) {
+            specgruButton.visible = showCurrentRoomControls;
+        }
+        if (readyButton != null) {
+            readyButton.visible = showCurrentRoomControls;
+        }
+        if (voteStartButton != null) {
+            voteStartButton.visible = showCurrentRoomControls;
+        }
+        if (voteEndButton != null) {
+            voteEndButton.visible = showCurrentRoomControls;
+        }
+        infoActionBottomY = showCurrentRoomControls ? fullActionBottomY : collapsedActionBottomY;
     }
 
     @Override
@@ -288,6 +308,7 @@ public class TdmRoomScreen extends Screen {
                 mouseY,
                 actionController.hasPendingAction(),
                 actionController.isLeavePending(),
+                actionController.pendingSwitchTargetRoom(),
                 enterProgress);
     }
 
@@ -308,7 +329,9 @@ public class TdmRoomScreen extends Screen {
                 roomState.selectedRoomPreviewState(),
                 roomState.joinedRoom(),
                 roomState.selectedRoom(),
-                actionController.isLeavePending(),
+                actionController.hasConfirmPending(),
+                actionController.confirmHintText(),
+                actionController.confirmHintColor(),
                 actionController.hasRoomNotice(),
                 actionController.roomNoticeText(),
                 actionController.roomNoticeColor(),
@@ -326,9 +349,8 @@ public class TdmRoomScreen extends Screen {
             }
             String roomName = roomListRenderResult.roomAt(mouseX, mouseY);
             if (roomName != null) {
-                roomState.setSelectedRoom(roomName);
+                actionController.selectRoom(roomName);
                 refreshInfoContextTransition(true);
-                updateButtonStates();
                 return true;
             }
         }
@@ -340,7 +362,7 @@ public class TdmRoomScreen extends Screen {
             return;
         }
         if (actionHitbox.type() != TdmRoomListRenderer.ActionType.LEAVE) {
-            roomState.setSelectedRoom(actionHitbox.roomName());
+            actionController.selectRoom(actionHitbox.roomName());
             refreshInfoContextTransition(true);
         }
         switch (actionHitbox.type()) {
@@ -413,6 +435,10 @@ public class TdmRoomScreen extends Screen {
 
     public void updatePlayerDelta(String roomKey, int rosterVersion) {
         actionController.updatePlayerDelta(roomKey, rosterVersion);
+    }
+
+    public void updatePreviewPlayerList(String roomKey, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
+        actionController.updatePreviewPlayerList(roomKey, rosterVersion, teamPlayers);
     }
 
     /**

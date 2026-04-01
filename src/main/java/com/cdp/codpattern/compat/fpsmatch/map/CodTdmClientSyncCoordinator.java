@@ -8,6 +8,7 @@ import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.tdm.CombatMarkerConfigPacket;
 import com.cdp.codpattern.network.tdm.GamePhasePacket;
+import com.cdp.codpattern.network.tdm.RoomPreviewRosterPacket;
 import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
 import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
 import com.cdp.codpattern.network.tdm.TeamPlayerListPacket;
@@ -105,6 +106,15 @@ final class CodTdmClientSyncCoordinator {
         fullSnapshotPendingForAll = true;
         pendingDeltaUpdates.clear();
         flushRosterSync(recipients, true);
+    }
+
+    void requestRosterPreview(ServerPlayer player) {
+        if (player == null) {
+            return;
+        }
+        Map<String, List<PlayerInfo>> snapshot = deepCopyTeamPlayers(port.getTeamPlayers());
+        int effectiveVersion = Math.max(1, rosterVersion);
+        ModNetworkChannel.sendToPlayer(new RoomPreviewRosterPacket(port.roomKey(), effectiveVersion, snapshot), player);
     }
 
     private void captureRosterChanges(Map<UUID, ServerPlayer> recipients) {

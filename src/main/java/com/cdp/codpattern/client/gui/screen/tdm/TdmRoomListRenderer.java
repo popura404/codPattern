@@ -19,7 +19,7 @@ public final class TdmRoomListRenderer {
 
     private static final int BASE_FRAME_INSET = 5;
     private static final int BASE_PANEL_PADDING = 8;
-    private static final int BASE_HEADER_SECTION_HEIGHT = 24;
+    private static final int BASE_HEADER_SECTION_HEIGHT = 8;
     private static final int BASE_FOOTER_SECTION_HEIGHT = 20;
     private static final int BASE_ROW_TOP_PADDING = 2;
     private static final int BASE_ROW_SECONDARY_GAP = 0;
@@ -94,6 +94,7 @@ public final class TdmRoomListRenderer {
             int mouseY,
             boolean hasPendingAction,
             boolean leavePending,
+            String pendingSwitchTargetRoom,
             float panelAlphaFactor) {
         Map<String, TdmRoomData> rooms = lobbySummaryState.rooms();
         int referenceLineHeight = GuiTextHelper.referenceLineHeight(mc.font);
@@ -105,7 +106,6 @@ public final class TdmRoomListRenderer {
         int frameBottom = roomListY + roomListHeight + frameInset;
         int headerHeight = headerSectionHeight();
         int footerHeight = footerSectionHeight();
-        int titleY = roomListY + GuiTextHelper.referenceScaled(4);
         int listTop = roomListY + headerHeight;
         int listBottom = roomListY + roomListHeight - footerHeight;
         int listHeight = Math.max(GuiTextHelper.referenceScaled(40), listBottom - listTop);
@@ -118,18 +118,6 @@ public final class TdmRoomListRenderer {
         graphics.fill(frameLeft, frameBottom - 1, frameRight, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
         graphics.fill(frameLeft, frameTop, frameLeft + 1, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
         graphics.fill(frameRight - 1, frameTop, frameRight, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
-        graphics.fill(roomListX, listTop - GuiTextHelper.referenceScaled(4), roomListX + roomListWidth,
-                listTop - GuiTextHelper.referenceScaled(3), scaleAlpha(CodTheme.DIVIDER, panelAlphaFactor));
-
-        GuiTextHelper.drawReferenceString(
-                graphics,
-                mc.font,
-                Component.translatable("screen.codpattern.tdm_room.available_rooms"),
-                roomListX + panelPadding,
-                titleY,
-                scaleAlpha(CodTheme.TEXT_PRIMARY, panelAlphaFactor),
-                false);
-
         List<String> roomNames = orderedRoomNames(rooms, joinedRoom);
         List<RoomHitbox> roomHitboxes = new ArrayList<>();
         List<ActionHitbox> actionHitboxes = new ArrayList<>();
@@ -253,20 +241,71 @@ public final class TdmRoomListRenderer {
                 }
             }
 
-            ActionType actionType = resolveActionType(joinedRoom, roomKey, hovered);
+            ActionType actionType = resolveActionType(joinedRoom, roomKey, hovered, selected);
             boolean showAction = actionType != null;
             int contentLeft = roomListX + panelPadding;
             int contentRight = roomListX + roomListWidth - panelPadding;
             int actionGap = GuiTextHelper.referenceScaled(4);
-            int actionSize = Math.max(GuiTextHelper.referenceScaled(12), roomItemHeight - GuiTextHelper.referenceScaled(14));
-            int actionX = contentRight - actionSize;
-            int actionY = y + Math.max(0, (roomItemHeight - actionSize) / 2);
+            String actionLabel = showAction ? actionLabel(actionType) : "";
+            int actionHeight = Math.max(GuiTextHelper.referenceScaled(12), roomItemHeight - GuiTextHelper.referenceScaled(16));
+            int actionWidth = showAction
+                    ? Math.max(
+                            GuiTextHelper.referenceScaled(28),
+                            GuiTextHelper.referenceWidth(mc.font, actionLabel) + GuiTextHelper.referenceScaled(10))
+                    : 0;
+            int actionX = contentRight - actionWidth;
+            int actionY = y + Math.max(0, (roomItemHeight - actionHeight) / 2);
             boolean actionHovered = showAction
                     && mouseX >= actionX
-                    && mouseX <= actionX + actionSize
+                    && mouseX <= actionX + actionWidth
                     && mouseY >= actionY
-                    && mouseY <= actionY + actionSize;
+                    && mouseY <= actionY + actionHeight;
             int textRight = showAction ? actionX - actionGap : contentRight;
+
+            String badgeText = null;
+            int badgeAccent = 0;
+            int badgeTextColor = 0xFF081008;
+            if (joined) {
+                badgeText = Component.translatable("screen.codpattern.tdm_room.badge.current").getString();
+                badgeAccent = CodTheme.HOVER_BORDER;
+            } else if (selected) {
+                badgeText = Component.translatable("screen.codpattern.tdm_room.badge.selected").getString();
+                badgeAccent = CodTheme.SELECTED_BORDER;
+                badgeTextColor = 0xFF08121F;
+            }
+            if (badgeText != null) {
+                int badgePaddingX = GuiTextHelper.referenceScaled(4);
+                int badgePaddingY = GuiTextHelper.referenceScaled(1);
+                int badgeHeight = referenceLineHeight + badgePaddingY * 2;
+                int badgeWidth = GuiTextHelper.referenceWidth(mc.font, badgeText) + badgePaddingX * 2;
+                int badgeRight = showAction ? actionX - actionGap : contentRight;
+                int badgeX = Math.max(contentLeft + GuiTextHelper.referenceScaled(44), badgeRight - badgeWidth);
+                int badgeY = y + GuiTextHelper.referenceScaled(3);
+
+                graphics.fillGradient(
+                        badgeX,
+                        badgeY,
+                        badgeRight,
+                        badgeY + badgeHeight,
+                        scaleAlpha(withAlpha(badgeAccent, hovered ? 116 : 92), panelAlphaFactor),
+                        scaleAlpha(withAlpha(CodTheme.HOVER_BG_BOTTOM, hovered ? 168 : 148), panelAlphaFactor));
+                graphics.fill(
+                        badgeX,
+                        badgeY + badgeHeight - 1,
+                        badgeRight,
+                        badgeY + badgeHeight,
+                        scaleAlpha(withAlpha(badgeAccent, 210), panelAlphaFactor));
+                GuiTextHelper.drawReferenceCenteredEllipsizedString(
+                        graphics,
+                        mc.font,
+                        badgeText,
+                        badgeX + (badgeRight - badgeX) / 2,
+                        badgeY + badgePaddingY,
+                        Math.max(GuiTextHelper.referenceScaled(22), badgeRight - badgeX - badgePaddingX * 2),
+                        scaleAlpha(badgeTextColor, panelAlphaFactor),
+                        false);
+                textRight = Math.min(textRight, badgeX - actionGap);
+            }
 
             String statusIcon = TdmRoomTextFormatter.statusIcon(room.state);
             String roomText = statusIcon + " " + room.mapName;
@@ -294,26 +333,16 @@ public final class TdmRoomListRenderer {
                     false);
 
             String playerText = room.playerCount + "/" + room.maxPlayers;
-            String scoreText = TdmRoomTextFormatter.teamScoreText(room.teamScores);
-            String splitText = TdmRoomTextFormatter.teamSplitText(room.teamPlayerCounts);
+            String phaseText = TdmRoomTextFormatter.phaseStatusText(room.state, room.remainingTimeTicks);
             int playerTextY = primaryTextY + referenceLineHeight + GuiTextHelper.referenceScaled(BASE_ROW_SECONDARY_GAP);
             GuiTextHelper.drawReferenceEllipsizedString(
                     graphics,
                     mc.font,
-                    modeText + "  " + playerText,
+                    modeText + "  " + playerText + "  " + phaseText,
                     contentLeft,
                     playerTextY,
-                    Math.max(GuiTextHelper.referenceScaled(24), textRight - contentLeft),
-                    scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor),
-                    false);
-            GuiTextHelper.drawReferenceEllipsizedString(
-                    graphics,
-                    mc.font,
-                    splitText + "  " + scoreText,
-                    contentLeft,
-                    playerTextY + referenceLineHeight,
                     Math.max(GuiTextHelper.referenceScaled(34), textRight - contentLeft),
-                    scaleAlpha(0xFFAFAFAF, panelAlphaFactor),
+                    scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor),
                     false);
 
             int barThickness = Math.max(1, GuiTextHelper.referenceScaled(2));
@@ -332,9 +361,13 @@ public final class TdmRoomListRenderer {
 
             if (showAction) {
                 boolean enabled = !hasPendingAction;
-                actionHitboxes.add(new ActionHitbox(roomKey, actionType, actionX, actionY, actionSize, actionSize, enabled));
-                renderActionButton(graphics, mc, actionX, actionY, actionSize, actionType, actionHovered, enabled,
-                        leavePending && actionType == ActionType.LEAVE, panelAlphaFactor);
+                actionHitboxes.add(new ActionHitbox(roomKey, actionType, actionX, actionY, actionWidth, actionHeight, enabled));
+                boolean confirmPending = (leavePending && actionType == ActionType.LEAVE)
+                        || (actionType == ActionType.SWITCH
+                        && pendingSwitchTargetRoom != null
+                        && pendingSwitchTargetRoom.equals(roomKey));
+                renderActionButton(graphics, mc, actionX, actionY, actionWidth, actionHeight, actionType, actionLabel,
+                        actionHovered, enabled, confirmPending, panelAlphaFactor);
             }
         }
 
@@ -369,11 +402,11 @@ public final class TdmRoomListRenderer {
         return new RenderResult(roomNames, roomHitboxes, actionHitboxes);
     }
 
-    private static ActionType resolveActionType(String joinedRoom, String mapName, boolean hovered) {
+    private static ActionType resolveActionType(String joinedRoom, String mapName, boolean hovered, boolean selected) {
         if (mapName.equals(joinedRoom)) {
             return ActionType.LEAVE;
         }
-        if (!hovered) {
+        if (!hovered && !selected) {
             return null;
         }
         if (joinedRoom == null || joinedRoom.isBlank()) {
@@ -387,11 +420,13 @@ public final class TdmRoomListRenderer {
             Minecraft mc,
             int x,
             int y,
-            int size,
+            int width,
+            int height,
             ActionType type,
+            String label,
             boolean hovered,
             boolean enabled,
-            boolean leavePending,
+            boolean confirmPending,
             float panelAlphaFactor) {
         int accentColor = switch (type) {
             case JOIN -> CodTheme.HOVER_BORDER;
@@ -401,32 +436,42 @@ public final class TdmRoomListRenderer {
 
         int bgTop = enabled ? withAlpha(CodTheme.CARD_BG_TOP, hovered ? 224 : 208) : withAlpha(CodTheme.DISABLED_BG, 214);
         int bgBottom = enabled ? withAlpha(CodTheme.CARD_BG_BOTTOM, hovered ? 238 : 222) : withAlpha(0xFF1A1A1A, 222);
-        graphics.fillGradient(x, y, x + size, y + size,
+        graphics.fillGradient(x, y, x + width, y + height,
                 scaleAlpha(bgTop, panelAlphaFactor),
                 scaleAlpha(bgBottom, panelAlphaFactor));
 
         if (enabled) {
             int overlayTop = withAlpha(CodTheme.HOVER_BG_TOP, hovered ? 96 : 52);
             int overlayBottom = withAlpha(CodTheme.HOVER_BG_BOTTOM, hovered ? 118 : 68);
-            graphics.fillGradient(x, y, x + size, y + size,
+            graphics.fillGradient(x, y, x + width, y + height,
                     scaleAlpha(overlayTop, panelAlphaFactor),
                     scaleAlpha(overlayBottom, panelAlphaFactor));
         }
 
         int borderColor = enabled
-                ? withAlpha(accentColor, leavePending ? 255 : (hovered ? 228 : 176))
+                ? withAlpha(accentColor, confirmPending ? 255 : (hovered ? 228 : 176))
                 : withAlpha(CodTheme.BORDER_SUBTLE, 180);
-        graphics.fill(x, y, x + size, y + 1, scaleAlpha(borderColor, panelAlphaFactor));
-        graphics.fill(x, y + size - 1, x + size, y + size, scaleAlpha(borderColor, panelAlphaFactor));
-        graphics.fill(x, y, x + 1, y + size, scaleAlpha(borderColor, panelAlphaFactor));
-        graphics.fill(x + size - 1, y, x + size, y + size, scaleAlpha(borderColor, panelAlphaFactor));
+        graphics.fill(x, y, x + width, y + 1, scaleAlpha(borderColor, panelAlphaFactor));
+        graphics.fill(x, y + height - 1, x + width, y + height, scaleAlpha(borderColor, panelAlphaFactor));
+        graphics.fill(x, y, x + 1, y + height, scaleAlpha(borderColor, panelAlphaFactor));
+        graphics.fill(x + width - 1, y, x + width, y + height, scaleAlpha(borderColor, panelAlphaFactor));
+        graphics.fill(x, y, x + 2, y + height, scaleAlpha(withAlpha(accentColor, enabled ? 220 : 110), panelAlphaFactor));
 
-        if (leavePending) {
-            int pulseColor = scaleAlpha(withAlpha(CodTheme.SELECTED_BORDER, hovered ? 168 : 132), panelAlphaFactor);
-            graphics.fill(x + 1, y + 1, x + size - 1, y + 2, pulseColor);
+        if (confirmPending) {
+            int pulseColor = scaleAlpha(withAlpha(accentColor, hovered ? 168 : 132), panelAlphaFactor);
+            graphics.fill(x + 1, y + 1, x + width - 1, y + 2, pulseColor);
         }
 
-        drawActionGlyph(graphics, mc, x, y, size, type, enabled ? accentColor : CodTheme.DISABLED_TEXT, panelAlphaFactor);
+        drawActionGlyph(
+                graphics,
+                mc,
+                x,
+                y,
+                width,
+                height,
+                label,
+                enabled ? accentColor : CodTheme.DISABLED_TEXT,
+                panelAlphaFactor);
     }
 
     private static void drawActionGlyph(
@@ -434,29 +479,29 @@ public final class TdmRoomListRenderer {
             Minecraft mc,
             int x,
             int y,
-            int size,
-            ActionType type,
+            int width,
+            int height,
+            String label,
             int color,
             float panelAlphaFactor) {
         int scaledColor = scaleAlpha(color, panelAlphaFactor);
-        if (type == ActionType.JOIN || type == ActionType.LEAVE) {
-            int blockSize = Math.max(GuiTextHelper.referenceScaled(4), size / 3);
-            int blockX = x + (size - blockSize) / 2;
-            int blockY = y + (size - blockSize) / 2;
-            graphics.fill(blockX, blockY, blockX + blockSize, blockY + blockSize, scaledColor);
-            return;
-        }
-
-        String glyph = ">";
-        int glyphY = y + (size - GuiTextHelper.referenceLineHeight(mc.font)) / 2;
+        int glyphY = y + (height - GuiTextHelper.referenceLineHeight(mc.font)) / 2;
         GuiTextHelper.drawReferenceCenteredString(
                 graphics,
                 mc.font,
-                glyph,
-                x + size / 2.0f,
+                label,
+                x + width / 2.0f,
                 glyphY,
                 scaledColor,
                 false);
+    }
+
+    private static String actionLabel(ActionType type) {
+        return Component.translatable(switch (type) {
+            case JOIN -> "screen.codpattern.tdm_room.action.join";
+            case LEAVE -> "screen.codpattern.tdm_room.action.leave";
+            case SWITCH -> "screen.codpattern.tdm_room.action.switch";
+        }).getString();
     }
 
     private static List<String> orderedRoomNames(Map<String, TdmRoomData> rooms, String joinedRoom) {

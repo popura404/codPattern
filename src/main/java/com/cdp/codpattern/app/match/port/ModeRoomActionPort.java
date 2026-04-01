@@ -51,4 +51,7 @@ public interface ModeRoomActionPort {
 
     default void requestRosterResync(ServerPlayer player) {
     }
+
+    default void requestRosterPreview(ServerPlayer player) {
+    }
 }

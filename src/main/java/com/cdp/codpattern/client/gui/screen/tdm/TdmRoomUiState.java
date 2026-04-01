@@ -3,13 +3,21 @@ package com.cdp.codpattern.client.gui.screen.tdm;
 import com.cdp.codpattern.client.gui.CodTheme;
 
 public final class TdmRoomUiState {
+    public enum ConfirmAction {
+        NONE,
+        LEAVE_ROOM,
+        SWITCH_ROOM
+    }
+
     public enum PendingAction {
         NONE,
         JOINING,
         LEAVING
     }
 
-    private long pendingLeaveDeadlineMs = 0L;
+    private long pendingConfirmDeadlineMs = 0L;
+    private ConfirmAction pendingConfirmAction = ConfirmAction.NONE;
+    private String pendingConfirmTargetRoom = null;
     private long pendingActionDeadlineMs = 0L;
     private PendingAction pendingAction = PendingAction.NONE;
     private String pendingRoomName = null;
@@ -19,6 +27,14 @@ public final class TdmRoomUiState {
 
     public PendingAction pendingAction() {
         return pendingAction;
+    }
+
+    public ConfirmAction confirmAction() {
+        return pendingConfirmAction;
+    }
+
+    public String confirmTargetRoom() {
+        return pendingConfirmTargetRoom;
     }
 
     public boolean hasPendingAction() {
@@ -51,23 +67,46 @@ public final class TdmRoomUiState {
     }
 
     public void startLeaveConfirm(long nowMs, long windowMs) {
-        pendingLeaveDeadlineMs = nowMs + windowMs;
+        startConfirm(ConfirmAction.LEAVE_ROOM, null, nowMs, windowMs);
     }
 
-    public void clearLeaveConfirm() {
-        pendingLeaveDeadlineMs = 0L;
+    public void startSwitchConfirm(String targetRoom, long nowMs, long windowMs) {
+        startConfirm(ConfirmAction.SWITCH_ROOM, targetRoom, nowMs, windowMs);
+    }
+
+    public void clearConfirm() {
+        pendingConfirmDeadlineMs = 0L;
+        pendingConfirmAction = ConfirmAction.NONE;
+        pendingConfirmTargetRoom = null;
+    }
+
+    public boolean hasConfirmPending(long nowMs) {
+        return pendingConfirmAction != ConfirmAction.NONE
+                && pendingConfirmDeadlineMs > 0L
+                && nowMs < pendingConfirmDeadlineMs;
     }
 
     public boolean isLeavePending(long nowMs) {
-        return pendingLeaveDeadlineMs > 0L && nowMs < pendingLeaveDeadlineMs;
+        return pendingConfirmAction == ConfirmAction.LEAVE_ROOM && hasConfirmPending(nowMs);
     }
 
-    public boolean shouldAutoExecuteLeave(long nowMs) {
-        return pendingLeaveDeadlineMs > 0L && nowMs >= pendingLeaveDeadlineMs;
+    public boolean isSwitchPending(long nowMs) {
+        return pendingConfirmAction == ConfirmAction.SWITCH_ROOM && hasConfirmPending(nowMs);
     }
 
-    public int leaveSecondsRemaining(long nowMs) {
-        long remainMs = pendingLeaveDeadlineMs - nowMs;
+    public ConfirmAction consumeExpiredConfirm(long nowMs) {
+        if (pendingConfirmAction == ConfirmAction.NONE
+                || pendingConfirmDeadlineMs <= 0L
+                || nowMs < pendingConfirmDeadlineMs) {
+            return ConfirmAction.NONE;
+        }
+        ConfirmAction expired = pendingConfirmAction;
+        clearConfirm();
+        return expired;
+    }
+
+    public int confirmSecondsRemaining(long nowMs) {
+        long remainMs = pendingConfirmDeadlineMs - nowMs;
         if (remainMs <= 0L) {
             return 0;
         }
@@ -107,8 +146,14 @@ public final class TdmRoomUiState {
     }
 
     public void reset() {
-        clearLeaveConfirm();
+        clearConfirm();
         clearPendingAction();
         clearNotice();
+    }
+
+    private void startConfirm(ConfirmAction action, String targetRoom, long nowMs, long windowMs) {
+        pendingConfirmAction = action == null ? ConfirmAction.NONE : action;
+        pendingConfirmTargetRoom = targetRoom;
+        pendingConfirmDeadlineMs = nowMs + Math.max(0L, windowMs);
     }
 }

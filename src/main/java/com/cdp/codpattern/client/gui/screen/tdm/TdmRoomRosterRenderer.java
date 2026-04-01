@@ -44,6 +44,52 @@ public final class TdmRoomRosterRenderer {
             }
         }
 
+        if (panelWidth < GuiTextHelper.referenceScaled(120)) {
+            renderSingleColumn(graphics, mc, panelX, panelWidth, startY, maxY, teamOrder, teamPlayers, alphaFactor, nowMs);
+            return;
+        }
+
+        int columnGap = GuiTextHelper.referenceScaled(8);
+        int columnWidth = Math.max(GuiTextHelper.referenceScaled(52), (panelWidth - columnGap) / 2);
+        int[] columnYs = new int[] {startY, startY};
+        int rowIndex = 0;
+        for (int index = 0; index < teamOrder.size(); index++) {
+            String teamName = teamOrder.get(index);
+            List<PlayerInfo> players = new ArrayList<>(teamPlayers.getOrDefault(teamName, List.of()));
+            players.sort(playerComparator());
+            int columnIndex = index % 2;
+            int columnX = panelX + columnIndex * (columnWidth + columnGap);
+            int effectiveWidth = columnIndex == 0
+                    ? columnWidth
+                    : Math.max(GuiTextHelper.referenceScaled(52), panelX + panelWidth - columnX);
+            RenderResult result = renderSingleTeamRoster(
+                    graphics,
+                    mc,
+                    columnX,
+                    effectiveWidth,
+                    columnYs[columnIndex],
+                    maxY,
+                    teamName,
+                    players,
+                    rowIndex,
+                    alphaFactor,
+                    nowMs);
+            columnYs[columnIndex] = result.nextY;
+            rowIndex = result.nextRowIndex;
+        }
+    }
+
+    private static void renderSingleColumn(
+            GuiGraphics graphics,
+            Minecraft mc,
+            int panelX,
+            int panelWidth,
+            int startY,
+            int maxY,
+            List<String> teamOrder,
+            Map<String, List<PlayerInfo>> teamPlayers,
+            float alphaFactor,
+            long nowMs) {
         int y = startY;
         int rowIndex = 0;
         for (String teamName : teamOrder) {
@@ -82,7 +128,7 @@ public final class TdmRoomRosterRenderer {
             float alphaFactor,
             long nowMs) {
         int accent = getTeamAccentColor(teamName);
-        int headerHeight = GuiTextHelper.referenceScaled(14);
+        int headerHeight = GuiTextHelper.referenceScaled(15);
         int lineHeight = GuiTextHelper.referenceLineHeight(mc.font);
         if (startY + headerHeight > maxY) {
             return new RenderResult(maxY + 1, rowIndex);
@@ -108,7 +154,7 @@ public final class TdmRoomRosterRenderer {
                 scaleAlpha(accent, alphaFactor),
                 false);
 
-        int y = startY + headerHeight + GuiTextHelper.referenceScaled(3);
+        int y = startY + headerHeight + GuiTextHelper.referenceScaled(4);
         if (players.isEmpty()) {
             GuiTextHelper.drawReferenceString(
                     graphics,
@@ -121,7 +167,7 @@ public final class TdmRoomRosterRenderer {
             return new RenderResult(y + lineHeight + GuiTextHelper.referenceScaled(5), rowIndex);
         }
 
-        int rowHeight = GuiTextHelper.referenceScaled(14);
+        int rowHeight = GuiTextHelper.referenceScaled(13);
         int currentIndex = rowIndex;
         for (PlayerInfo player : players) {
             if (y + rowHeight > maxY) {
@@ -171,10 +217,10 @@ public final class TdmRoomRosterRenderer {
         graphics.fill(x, y, x + 2, y + height, scaleAlpha(lifeColor, alphaFactor));
 
         String aliveMark = player.isAlive() ? "●" : "■";
-        String readyMark = player.isReady() ? "§a[R]" : "§7[ ]";
-        String invincibleMark = player.isInvincible() ? " §e[INV]" : "";
+        String readyMark = player.isReady() ? " §aR" : "";
+        String invincibleMark = player.isInvincible() ? " §eINV" : "";
         String nameText = isLocalPlayer(mc.player, player) ? "§e" + player.name() : player.name();
-        String headline = readyMark + " " + aliveMark + " " + nameText + invincibleMark;
+        String headline = aliveMark + " " + nameText + readyMark + invincibleMark;
         String meta = String.format("§c%d§7/§f%d",
                 player.kills(),
                 player.deaths());
@@ -190,8 +236,8 @@ public final class TdmRoomRosterRenderer {
         int metaRight = pingX - pingGap;
         int metaWidth = GuiTextHelper.referenceWidth(mc.font, meta);
         int nameMaxWidth = Math.max(
-                GuiTextHelper.referenceScaled(28),
-                width - metaWidth - pingIconWidth - GuiTextHelper.referenceScaled(22));
+                GuiTextHelper.referenceScaled(20),
+                width - metaWidth - pingIconWidth - GuiTextHelper.referenceScaled(20));
         GuiTextHelper.drawReferenceEllipsizedString(
                 graphics,
                 mc.font,

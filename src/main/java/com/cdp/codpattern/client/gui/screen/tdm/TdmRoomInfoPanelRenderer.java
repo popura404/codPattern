@@ -1,23 +1,24 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
+import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
+import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+
+import java.util.List;
+import java.util.Map;
 
 public final class TdmRoomInfoPanelRenderer {
     private static final int BASE_FRAME_INSET = 5;
     private static final int BASE_CONTENT_PADDING = 10;
     private static final int BASE_HEADER_TOP_PADDING = 4;
     private static final int BASE_HEADER_BLOCK_HEIGHT = 26;
-    private static final int BASE_ACTIONS_LABEL_GAP = 10;
-    private static final int BASE_DIVIDER_GAP = 4;
     private static final int BASE_INFO_BLOCK_GAP = 8;
     private static final int BASE_BOTTOM_HINT_PADDING = 18;
-    private static final int BASE_PREVIEW_CARD_HEIGHT = 46;
-
     private TdmRoomInfoPanelRenderer() {
     }
 
@@ -34,7 +35,9 @@ public final class TdmRoomInfoPanelRenderer {
             SelectedRoomPreviewState selectedRoomPreviewState,
             String joinedRoom,
             String selectedRoom,
-            boolean leavePending,
+            boolean hasConfirmHint,
+            String confirmHintText,
+            int confirmHintColor,
             boolean hasRoomNotice,
             String roomNoticeText,
             int roomNoticeColor,
@@ -61,10 +64,8 @@ public final class TdmRoomInfoPanelRenderer {
         int contentX = panelX + contentPadding;
         int contentWidth = Math.max(GuiTextHelper.referenceScaled(40), panelWidth - contentPadding * 2);
         int headerY = panelY + GuiTextHelper.referenceScaled(BASE_HEADER_TOP_PADDING);
-        int overviewY = headerY + GuiTextHelper.referenceScaled(BASE_HEADER_BLOCK_HEIGHT);
-        int overviewHeight = GuiTextHelper.referenceScaled(42);
-        int actionsLabelY = overviewY + overviewHeight + GuiTextHelper.referenceScaled(BASE_ACTIONS_LABEL_GAP);
-        int dividerY = actionsLabelY + referenceLineHeight + GuiTextHelper.referenceScaled(BASE_DIVIDER_GAP);
+        int headerBottom = headerY + GuiTextHelper.referenceScaled(BASE_HEADER_BLOCK_HEIGHT);
+        int headerDividerY = headerBottom + GuiTextHelper.referenceScaled(2);
 
         TdmRoomData currentRoomSummary = joinedRoom == null ? null : lobbySummaryState.rooms().get(joinedRoom);
         TdmRoomData selectedPreview = selectedRoomPreviewState.summarySnapshot();
@@ -72,67 +73,44 @@ public final class TdmRoomInfoPanelRenderer {
                 && selectedRoom != null
                 && !selectedRoom.isBlank()
                 && (joinedRoom == null || !selectedRoom.equals(joinedRoom));
+        TdmRoomData activeRoomSummary = showSelectedPreview ? selectedPreview : currentRoomSummary;
 
         renderHeader(
                 graphics,
                 mc,
                 contentX,
+                contentWidth,
                 headerY,
                 lobbySummaryState,
-                currentRoomSummary,
+                activeRoomSummary,
                 joinedRoomLiveState,
-                selectedPreview,
                 joinedRoom,
                 selectedRoom,
-                nowMs,
+                showSelectedPreview,
                 contentFactor);
-        renderPrimaryCard(
-                graphics,
-                mc,
-                contentX,
-                overviewY,
-                contentWidth,
-                currentRoomSummary,
-                joinedRoomLiveState,
-                selectedPreview,
-                joinedRoom,
-                contentFactor);
-
-        GuiTextHelper.drawReferenceString(
-                graphics,
-                mc.font,
-                Component.translatable("screen.codpattern.tdm_room.room_actions"),
-                contentX,
-                actionsLabelY,
-                scaleAlpha(CodTheme.TEXT_SECONDARY, contentFactor),
-                false);
-        int dividerEndX = contentX + Math.max(GuiTextHelper.referenceScaled(24),
-                Math.min(GuiTextHelper.referenceScaled(220), contentWidth - GuiTextHelper.referenceScaled(8)));
-        graphics.fill(contentX, dividerY, dividerEndX, dividerY + 1, scaleAlpha(CodTheme.DIVIDER, contentFactor));
+        graphics.fill(contentX, headerDividerY, contentX + contentWidth, headerDividerY + 1,
+                scaleAlpha(CodTheme.DIVIDER, contentFactor));
 
         int infoY = Math.max(
-                dividerY + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP + 6),
+                headerDividerY + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP),
                 infoActionBottomY + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP));
 
-        if (showSelectedPreview) {
-            renderPreviewCard(
-                    graphics,
-                    mc,
-                    contentX,
-                    infoY,
-                    contentWidth,
-                    selectedPreview,
-                    contentFactor);
-            infoY += GuiTextHelper.referenceScaled(BASE_PREVIEW_CARD_HEIGHT + BASE_INFO_BLOCK_GAP);
-        }
-
-        if (joinedRoom != null && joinedRoomLiveState.hasLiveRoom()) {
+        if (activeRoomSummary != null) {
+            Map<String, Integer> teamScores = showSelectedPreview
+                    ? activeRoomSummary.teamScores
+                    : joinedRoomLiveState.teamScores().isEmpty()
+                    ? activeRoomSummary.teamScores
+                    : joinedRoomLiveState.teamScores();
+            String phase = showSelectedPreview ? activeRoomSummary.state : joinedRoomLiveState.phase();
+            int remainingTimeTicks = showSelectedPreview
+                    ? activeRoomSummary.remainingTimeTicks
+                    : joinedRoomLiveState.remainingTimeTicks();
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,
                     Component.translatable(
                             "screen.codpattern.tdm_room.current_score",
-                            TdmRoomTextFormatter.teamScoreText(joinedRoomLiveState.teamScores())),
+                            TdmRoomTextFormatter.teamScoreText(teamScores)),
                     contentX,
                     infoY,
                     scaleAlpha(0xFFE5E5E5, contentFactor),
@@ -143,14 +121,14 @@ public final class TdmRoomInfoPanelRenderer {
                     Component.translatable(
                             "screen.codpattern.tdm_room.current_phase",
                             TdmRoomTextFormatter.phaseStatusText(
-                                    joinedRoomLiveState.phase(),
-                                    joinedRoomLiveState.remainingTimeTicks())),
+                                    phase,
+                                    remainingTimeTicks)),
                     contentX,
                     infoY + referenceLineHeight + GuiTextHelper.referenceScaled(3),
                     scaleAlpha(0xFFB0B0B0, contentFactor),
                     false);
             infoY += referenceLineHeight * 2 + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP);
-            if (joinedRoomLiveState.isStale(nowMs)) {
+            if (!showSelectedPreview && joinedRoomLiveState.isStale(nowMs)) {
                 GuiTextHelper.drawReferenceString(
                         graphics,
                         mc.font,
@@ -175,7 +153,7 @@ public final class TdmRoomInfoPanelRenderer {
             infoY += referenceLineHeight + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP - 2);
         }
 
-        TdmRoomData warningRoom = showSelectedPreview ? selectedPreview : currentRoomSummary;
+        TdmRoomData warningRoom = activeRoomSummary;
         if (warningRoom != null && !warningRoom.hasMatchEndTeleportPoint) {
             GuiTextHelper.drawReferenceString(
                     graphics,
@@ -196,14 +174,14 @@ public final class TdmRoomInfoPanelRenderer {
             infoY += referenceLineHeight * 2 + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP);
         }
 
-        int hintLines = (leavePending ? 1 : 0) + (hasRoomNotice ? 1 : 0);
+        int hintLines = (hasConfirmHint ? 1 : 0) + (hasRoomNotice ? 1 : 0);
         int rosterTop = Math.max(
                 infoActionBottomY + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP + 8),
                 infoY + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP + 2));
         int hintPadding = GuiTextHelper.referenceScaled(BASE_BOTTOM_HINT_PADDING);
         int rosterBottom = panelY + panelHeight - hintPadding
                 - (hintLines * (referenceLineHeight + GuiTextHelper.referenceScaled(3)));
-        if (joinedRoom != null && rosterTop < rosterBottom) {
+        if (activeRoomSummary != null && rosterTop < rosterBottom) {
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,
@@ -212,27 +190,43 @@ public final class TdmRoomInfoPanelRenderer {
                     rosterTop - referenceLineHeight - GuiTextHelper.referenceScaled(3),
                     scaleAlpha(CodTheme.TEXT_SECONDARY, contentFactor),
                     false);
-            TdmRoomRosterRenderer.render(
-                    graphics,
-                    mc,
-                    contentX,
-                    contentWidth,
-                    rosterTop,
-                    rosterBottom,
-                    joinedRoomLiveState.teamPlayers(),
-                    contentFactor,
-                    nowMs);
+            if (showSelectedPreview && !selectedRoomPreviewState.hasRosterSnapshot()) {
+                GuiTextHelper.drawReferenceString(
+                        graphics,
+                        mc.font,
+                        activeRoomSummary.playerCount > 0
+                                ? Component.translatable("screen.codpattern.tdm_room.roster_loading")
+                                : Component.translatable("screen.codpattern.tdm_room.no_players"),
+                        contentX,
+                        rosterTop,
+                        scaleAlpha(CodTheme.TEXT_DIM, contentFactor),
+                        false);
+            } else {
+                Map<String, List<PlayerInfo>> teamPlayers = showSelectedPreview
+                        ? selectedRoomPreviewState.teamPlayers()
+                        : joinedRoomLiveState.teamPlayers();
+                TdmRoomRosterRenderer.render(
+                        graphics,
+                        mc,
+                        contentX,
+                        contentWidth,
+                        rosterTop,
+                        rosterBottom,
+                        teamPlayers,
+                        contentFactor,
+                        nowMs);
+            }
         }
 
         int hintY = panelY + panelHeight - hintPadding;
-        if (leavePending) {
+        if (hasConfirmHint && confirmHintText != null && !confirmHintText.isBlank()) {
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,
-                    Component.translatable("screen.codpattern.tdm_room.leave_room_cancel_hint"),
+                    confirmHintText,
                     contentX,
                     hintY,
-                    scaleAlpha(0xFFFFD75E, contentFactor),
+                    scaleAlpha(confirmHintColor, contentFactor),
                     false);
             hintY -= referenceLineHeight + GuiTextHelper.referenceScaled(3);
         }
@@ -252,57 +246,63 @@ public final class TdmRoomInfoPanelRenderer {
             GuiGraphics graphics,
             Minecraft mc,
             int x,
+            int contentWidth,
             int headerY,
             LobbySummaryState lobbySummaryState,
-            TdmRoomData currentRoomSummary,
+            TdmRoomData activeRoomSummary,
             JoinedRoomLiveState joinedRoomLiveState,
-            TdmRoomData selectedPreview,
             String joinedRoom,
             String selectedRoom,
-            long nowMs,
+            boolean showSelectedPreview,
             float alphaFactor) {
         int secondaryY = headerY + GuiTextHelper.referenceLineHeight(mc.font) + GuiTextHelper.referenceScaled(4);
-        if (joinedRoom != null && currentRoomSummary != null) {
-            GuiTextHelper.drawReferenceString(
+        if (showSelectedPreview && activeRoomSummary != null) {
+            GuiTextHelper.drawReferenceEllipsizedString(
                     graphics,
                     mc.font,
-                    Component.translatable("screen.codpattern.tdm_room.current_room", currentRoomSummary.mapName),
+                    Component.translatable("screen.codpattern.tdm_room.selected_room", activeRoomSummary.mapName),
                     x,
                     headerY,
+                    contentWidth,
                     scaleAlpha(CodTheme.TEXT_PRIMARY, alphaFactor),
                     false);
-            Component secondary = joinedRoomLiveState.isStale(nowMs)
-                    ? Component.translatable(
-                            "screen.codpattern.tdm_room.live_stale_hint",
-                            Math.max(1, joinedRoomLiveState.secondsSinceLatestSync(nowMs)))
-                    : Component.translatable("screen.codpattern.tdm_room.current_room_live_hint");
-            int secondaryColor = joinedRoomLiveState.isStale(nowMs) ? CodTheme.TEXT_DANGER : CodTheme.TEXT_SECONDARY;
-            GuiTextHelper.drawReferenceString(
+            GuiTextHelper.drawReferenceEllipsizedString(
+                    graphics,
+                    mc.font,
+                    roomMetaText(activeRoomSummary),
+                    x,
+                    secondaryY,
+                    contentWidth,
+                    scaleAlpha(CodTheme.TEXT_SECONDARY, alphaFactor),
+                    false);
+            return;
+        }
+
+        if (joinedRoom != null && (!joinedRoom.isBlank())
+                && (activeRoomSummary != null || joinedRoomLiveState.hasLiveRoom())) {
+            GuiTextHelper.drawReferenceEllipsizedString(
+                    graphics,
+                    mc.font,
+                    Component.translatable("screen.codpattern.tdm_room.current_room", roomLabel(joinedRoom, activeRoomSummary)),
+                    x,
+                    headerY,
+                    contentWidth,
+                    scaleAlpha(CodTheme.TEXT_PRIMARY, alphaFactor),
+                    false);
+            Component secondary = activeRoomSummary != null
+                    ? roomMetaText(activeRoomSummary)
+                    : Component.translatable(
+                            "screen.codpattern.tdm_room.current_phase",
+                            TdmRoomTextFormatter.phaseStatusText(
+                                    joinedRoomLiveState.phase(),
+                                    joinedRoomLiveState.remainingTimeTicks()));
+            GuiTextHelper.drawReferenceEllipsizedString(
                     graphics,
                     mc.font,
                     secondary,
                     x,
                     secondaryY,
-                    scaleAlpha(secondaryColor, alphaFactor),
-                    false);
-            return;
-        }
-
-        if (selectedPreview != null && selectedRoom != null && !selectedRoom.isBlank()) {
-            GuiTextHelper.drawReferenceString(
-                    graphics,
-                    mc.font,
-                    Component.translatable("screen.codpattern.tdm_room.selected_room", selectedPreview.mapName),
-                    x,
-                    headerY,
-                    scaleAlpha(CodTheme.TEXT_PRIMARY, alphaFactor),
-                    false);
-            GuiTextHelper.drawReferenceString(
-                    graphics,
-                    mc.font,
-                    Component.translatable("screen.codpattern.tdm_room.selected_room_preview_hint"),
-                    x,
-                    secondaryY,
+                    contentWidth,
                     scaleAlpha(CodTheme.TEXT_SECONDARY, alphaFactor),
                     false);
             return;
@@ -311,177 +311,25 @@ public final class TdmRoomInfoPanelRenderer {
         Component fallback = lobbySummaryState.isLoading() && !lobbySummaryState.hasLoaded()
                 ? Component.translatable("screen.codpattern.tdm_room.loading")
                 : Component.translatable("screen.codpattern.tdm_room.select_hint");
-        GuiTextHelper.drawReferenceString(
+        GuiTextHelper.drawReferenceEllipsizedString(
                 graphics,
                 mc.font,
                 fallback,
                 x,
                 headerY,
+                contentWidth,
                 scaleAlpha(CodTheme.TEXT_SECONDARY, alphaFactor),
                 false);
     }
 
-    private static void renderPrimaryCard(
-            GuiGraphics graphics,
-            Minecraft mc,
-            int x,
-            int y,
-            int width,
-            TdmRoomData currentRoomSummary,
-            JoinedRoomLiveState joinedRoomLiveState,
-            TdmRoomData selectedPreview,
-            String joinedRoom,
-            float alphaFactor) {
-        if (joinedRoom != null && currentRoomSummary != null) {
-            renderCard(
-                    graphics,
-                    mc,
-                    x,
-                    y,
-                    width,
-                    Component.translatable("screen.codpattern.tdm_room.current_room_live_title").getString(),
-                    currentRoomSummary.mapName,
-                    TdmRoomTextFormatter.teamScoreText(joinedRoomLiveState.teamScores())
-                            + "  "
-                            + TdmRoomTextFormatter.phaseStatusText(
-                                    joinedRoomLiveState.phase(),
-                                    joinedRoomLiveState.remainingTimeTicks()),
-                    "",
-                    CodTheme.HOVER_BORDER,
-                    alphaFactor);
-            return;
-        }
-
-        if (selectedPreview != null) {
-            renderCard(
-                    graphics,
-                    mc,
-                    x,
-                    y,
-                    width,
-                    Component.translatable("screen.codpattern.tdm_room.selected_room_preview_title").getString(),
-                    selectedPreview.mapName,
-                    Component.translatable(
-                            "screen.codpattern.tdm_room.players",
-                            selectedPreview.playerCount,
-                            selectedPreview.maxPlayers).getString()
-                            + "  "
-                            + TdmRoomTextFormatter.phaseStatusText(
-                                    selectedPreview.state,
-                                    selectedPreview.remainingTimeTicks),
-                    "",
-                    CodTheme.SELECTED_BORDER,
-                    alphaFactor);
-            return;
-        }
-
-        renderCard(
-                graphics,
-                mc,
-                x,
-                y,
-                width,
-                Component.translatable("screen.codpattern.tdm_room.overview").getString(),
-                Component.translatable("screen.codpattern.tdm_room.select_hint").getString(),
-                "",
-                "",
-                CodTheme.SELECTED_BORDER,
-                alphaFactor);
-    }
-
-    private static void renderPreviewCard(
-            GuiGraphics graphics,
-            Minecraft mc,
-            int x,
-            int y,
-            int width,
-            TdmRoomData preview,
-            float alphaFactor) {
-        renderCard(
-                graphics,
-                mc,
-                x,
-                y,
-                width,
-                Component.translatable("screen.codpattern.tdm_room.selected_room_preview_title").getString(),
-                preview.mapName,
-                Component.translatable(GameModeRegistry.getOrDefault(preview.gameType).displayNameKey()).getString()
+    private static Component roomMetaText(TdmRoomData roomSummary) {
+        return Component.literal(
+                Component.translatable(GameModeRegistry.getOrDefault(roomSummary.gameType).displayNameKey()).getString()
                         + "  "
-                        + preview.playerCount
-                        + "/"
-                        + preview.maxPlayers
-                        + "  "
-                        + TdmRoomTextFormatter.teamSplitText(preview.teamPlayerCounts)
-                        + "  "
-                        + TdmRoomTextFormatter.phaseStatusText(preview.state, preview.remainingTimeTicks),
-                "",
-                CodTheme.SELECTED_BORDER,
-                alphaFactor);
-    }
-
-    private static void renderCard(
-            GuiGraphics graphics,
-            Minecraft mc,
-            int x,
-            int y,
-            int width,
-            String title,
-            String line1,
-            String line2,
-            String line3,
-            int accentColor,
-            float alphaFactor) {
-        int cardHeight = GuiTextHelper.referenceScaled(42);
-        int lineHeight = GuiTextHelper.referenceLineHeight(mc.font);
-        graphics.fillGradient(
-                x,
-                y,
-                x + width,
-                y + cardHeight,
-                scaleAlpha(withAlpha(CodTheme.CARD_BG_TOP, 180), alphaFactor),
-                scaleAlpha(withAlpha(CodTheme.CARD_BG_BOTTOM, 200), alphaFactor));
-        graphics.fill(x, y + cardHeight - GuiTextHelper.referenceScaled(2), x + width, y + cardHeight,
-                scaleAlpha(withAlpha(accentColor, 170), alphaFactor));
-
-        int textX = x + GuiTextHelper.referenceScaled(6);
-        GuiTextHelper.drawReferenceString(
-                graphics,
-                mc.font,
-                title,
-                textX,
-                y + GuiTextHelper.referenceScaled(4),
-                scaleAlpha(CodTheme.TEXT_SECONDARY, alphaFactor),
-                false);
-        GuiTextHelper.drawReferenceEllipsizedString(
-                graphics,
-                mc.font,
-                line1,
-                textX,
-                y + GuiTextHelper.referenceScaled(4) + lineHeight + GuiTextHelper.referenceScaled(3),
-                width - GuiTextHelper.referenceScaled(12),
-                scaleAlpha(CodTheme.TEXT_PRIMARY, alphaFactor),
-                false);
-        if (line2 != null && !line2.isBlank()) {
-            GuiTextHelper.drawReferenceEllipsizedString(
-                    graphics,
-                    mc.font,
-                    line2,
-                    textX,
-                    y + GuiTextHelper.referenceScaled(4) + (lineHeight + GuiTextHelper.referenceScaled(3)) * 2,
-                    width - GuiTextHelper.referenceScaled(12),
-                    scaleAlpha(0xFFB8C7D8, alphaFactor),
-                    false);
-        } else if (line3 != null && !line3.isBlank()) {
-            GuiTextHelper.drawReferenceEllipsizedString(
-                    graphics,
-                    mc.font,
-                    line3,
-                    textX,
-                    y + GuiTextHelper.referenceScaled(4) + (lineHeight + GuiTextHelper.referenceScaled(3)) * 2,
-                    width - GuiTextHelper.referenceScaled(12),
-                    scaleAlpha(0xFFB8C7D8, alphaFactor),
-                    false);
-        }
+                        + Component.translatable(
+                                "screen.codpattern.tdm_room.players",
+                                roomSummary.playerCount,
+                                roomSummary.maxPlayers).getString());
     }
 
     private static int scaleAlpha(int color, float factor) {
@@ -496,5 +344,19 @@ public final class TdmRoomInfoPanelRenderer {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static String roomLabel(String roomKey, TdmRoomData summary) {
+        if (summary != null && summary.mapName != null && !summary.mapName.isBlank()) {
+            return summary.mapName;
+        }
+        if (roomKey == null || roomKey.isBlank()) {
+            return "";
+        }
+        try {
+            return RoomId.decode(roomKey).mapName();
+        } catch (IllegalArgumentException ignored) {
+            return roomKey;
+        }
     }
 }

@@ -37,11 +37,11 @@ public final class TdmRoomButtonStateBinder {
         }
 
         if (kortacButton != null) {
-            kortacButton.active = canSwitchTeam && !hasPendingAction;
+            kortacButton.active = hasJoinedRoom && canSwitchTeam && !hasPendingAction;
         }
 
         if (specgruButton != null) {
-            specgruButton.active = canSwitchTeam && !hasPendingAction;
+            specgruButton.active = hasJoinedRoom && canSwitchTeam && !hasPendingAction;
         }
     }
 }

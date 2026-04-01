@@ -31,6 +31,10 @@ final record CodTdmMapLifecycleRuntime(
         clientSyncCoordinator.requestRosterResync(player);
     }
 
+    void requestRosterPreview(ServerPlayer player) {
+        clientSyncCoordinator.requestRosterPreview(player);
+    }
+
     void transitionToCountdown() {
         phaseRuntime.transitionToPhase(TdmGamePhase.COUNTDOWN);
     }
