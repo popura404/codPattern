@@ -27,9 +27,6 @@ public final class TdmRoomActionController {
     private static final long PREVIEW_ROSTER_REFRESH_MS = 2500L;
     private static final long PREVIEW_ROSTER_RETRY_MS = 900L;
 
-    public record PrimaryRoomActionPresentation(Component message, String glyph, int accentColor, boolean active) {
-    }
-
     private final TdmRoomSessionState roomState;
     private final TdmRoomUiState uiState;
     private final Runnable buttonStateUpdater;
@@ -308,20 +305,12 @@ public final class TdmRoomActionController {
         return uiState.hasPendingAction();
     }
 
-    public TdmRoomUiState.PendingAction pendingAction() {
-        return uiState.pendingAction();
-    }
-
     public boolean isLeavePending() {
         return uiState.isLeavePending(System.currentTimeMillis());
     }
 
     public boolean hasConfirmPending() {
         return uiState.hasConfirmPending(System.currentTimeMillis());
-    }
-
-    public boolean isSwitchPending() {
-        return uiState.isSwitchPending(System.currentTimeMillis());
     }
 
     public boolean isPreviewingOtherRoom() {
@@ -361,96 +350,6 @@ public final class TdmRoomActionController {
         return uiState.confirmAction() == TdmRoomUiState.ConfirmAction.SWITCH_ROOM
                 ? CodTheme.SELECTED_BORDER
                 : 0xFFFFD75E;
-    }
-
-    public PrimaryRoomActionPresentation primaryRoomActionPresentation() {
-        if (uiState.pendingAction() == TdmRoomUiState.PendingAction.LEAVING) {
-            int accent = hasActiveSwitchFlow() ? CodTheme.SELECTED_BORDER : CodTheme.TEXT_DANGER;
-            Component message = hasActiveSwitchFlow()
-                    ? Component.translatable("screen.codpattern.tdm_room.switching")
-                    : Component.translatable("screen.codpattern.tdm_room.leaving");
-            return new PrimaryRoomActionPresentation(message, glyphForAction(hasActiveSwitchFlow() ? "SWITCH" : "LEAVE"), accent, false);
-        }
-        if (uiState.pendingAction() == TdmRoomUiState.PendingAction.JOINING) {
-            int accent = hasActiveSwitchFlow() ? CodTheme.SELECTED_BORDER : CodTheme.HOVER_BORDER;
-            Component message = hasActiveSwitchFlow()
-                    ? Component.translatable("screen.codpattern.tdm_room.switching")
-                    : Component.translatable("screen.codpattern.tdm_room.joining");
-            return new PrimaryRoomActionPresentation(message, glyphForAction(hasActiveSwitchFlow() ? "SWITCH" : "JOIN"), accent, false);
-        }
-
-        long now = System.currentTimeMillis();
-        if (uiState.isLeavePending(now)) {
-            return new PrimaryRoomActionPresentation(
-                    Component.translatable("screen.codpattern.tdm_room.leave_room"),
-                    glyphForAction("LEAVE"),
-                    CodTheme.TEXT_DANGER,
-                    true);
-        }
-        if (uiState.isSwitchPending(now)) {
-            return new PrimaryRoomActionPresentation(
-                    Component.translatable("screen.codpattern.tdm_room.switch_room"),
-                    glyphForAction("SWITCH"),
-                    CodTheme.SELECTED_BORDER,
-                    true);
-        }
-
-        String joinedRoom = roomState.joinedRoom();
-        String selectedRoom = roomState.selectedRoom();
-        if (joinedRoom == null || joinedRoom.isBlank()) {
-            boolean canJoin = selectedRoom != null && !selectedRoom.isBlank();
-            Component message = canJoin
-                    ? Component.translatable("screen.codpattern.tdm_room.join_room")
-                    : Component.translatable("screen.codpattern.tdm_room.select_room_first");
-            return new PrimaryRoomActionPresentation(
-                    message,
-                    canJoin ? glyphForAction("JOIN") : "?",
-                    CodTheme.HOVER_BORDER,
-                    canJoin);
-        }
-        if (selectedRoom != null && !selectedRoom.isBlank() && !selectedRoom.equals(joinedRoom)) {
-            return new PrimaryRoomActionPresentation(
-                    Component.translatable("screen.codpattern.tdm_room.switch_room"),
-                    glyphForAction("SWITCH"),
-                    CodTheme.SELECTED_BORDER,
-                    true);
-        }
-        return new PrimaryRoomActionPresentation(
-                Component.translatable("screen.codpattern.tdm_room.leave_room"),
-                glyphForAction("LEAVE"),
-                CodTheme.TEXT_DANGER,
-                true);
-    }
-
-    public void pressPrimaryRoomAction() {
-        if (uiState.hasPendingAction()) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        if (uiState.isLeavePending(now)) {
-            leaveRoom();
-            return;
-        }
-        if (uiState.isSwitchPending(now)) {
-            String targetRoom = uiState.confirmTargetRoom();
-            if (targetRoom != null && !targetRoom.isBlank()) {
-                switchToRoom(targetRoom);
-            }
-            return;
-        }
-        String joinedRoom = roomState.joinedRoom();
-        String selectedRoom = roomState.selectedRoom();
-        if (joinedRoom == null || joinedRoom.isBlank()) {
-            if (selectedRoom != null && !selectedRoom.isBlank()) {
-                joinSelectedRoom();
-            }
-            return;
-        }
-        if (selectedRoom != null && !selectedRoom.isBlank() && !selectedRoom.equals(joinedRoom)) {
-            switchToRoom(selectedRoom);
-            return;
-        }
-        leaveRoom();
     }
 
     public boolean hasRoomNotice() {
@@ -601,12 +500,4 @@ public final class TdmRoomActionController {
         return room.mapName;
     }
 
-    private String glyphForAction(String action) {
-        return switch (action) {
-            case "JOIN" -> ">|";
-            case "LEAVE" -> "|<";
-            case "SWITCH" -> "><";
-            default -> "?";
-        };
-    }
 }
