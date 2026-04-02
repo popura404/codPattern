@@ -7,6 +7,7 @@ import com.cdp.codpattern.client.gui.GuiTextHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -16,13 +17,18 @@ import java.util.Map;
 public final class TdmRoomListRenderer {
     private static final float HIGHLIGHT_APPROACH_STEP = 0.44f;
     private static final long NEW_ROOM_PULSE_MS = 550L;
+    private static final float MAP_TITLE_SCALE = 1.28f;
+    private static final float MODE_INFO_SCALE = 1.04f;
+    private static final int FRONTLINE_MODE_COLOR = 0xFF62F08A;
+    private static final int TACTICAL_MODE_COLOR = 0xFF5FC7C3;
+    private static final int UNKNOWN_MODE_COLOR = 0xFFB8C2CC;
 
     private static final int BASE_FRAME_INSET = 5;
     private static final int BASE_PANEL_PADDING = 8;
     private static final int BASE_HEADER_SECTION_HEIGHT = 8;
     private static final int BASE_FOOTER_SECTION_HEIGHT = 20;
-    private static final int BASE_ROW_TOP_PADDING = 2;
-    private static final int BASE_ROW_SECONDARY_GAP = 0;
+    private static final int BASE_ROW_TOP_PADDING = 4;
+    private static final int BASE_ROW_SECONDARY_GAP = 1;
     private static final int BASE_ROW_BAR_BOTTOM_PADDING = 2;
 
     public enum ActionType {JOIN, LEAVE, SWITCH}
@@ -307,11 +313,6 @@ public final class TdmRoomListRenderer {
                 textRight = Math.min(textRight, badgeX - actionGap);
             }
 
-            String statusIcon = TdmRoomTextFormatter.statusIcon(room.state);
-            String roomText = statusIcon + " " + room.mapName;
-            if (!room.hasMatchEndTeleportPoint) {
-                roomText += " §c!";
-            }
             int roomTextColor = joined
                     ? CodTheme.TEXT_HOVER
                     : (selected ? CodTheme.SELECTED_TEXT : CodTheme.TEXT_PRIMARY);
@@ -321,27 +322,29 @@ public final class TdmRoomListRenderer {
                     GuiTextHelper.referenceScaled(34),
                     textRight - contentLeft);
             ModeDescriptor descriptor = GameModeRegistry.getOrDefault(room.gameType);
-            String modeText = Component.translatable(descriptor.displayNameKey()).getString();
-            GuiTextHelper.drawReferenceEllipsizedString(
+            MutableComponent roomTitle = buildRoomTitle(room);
+            MutableComponent modeInfo = buildModeInfo(descriptor, room, joined, selected);
+            GuiTextHelper.drawReferenceScaledEllipsizedString(
                     graphics,
                     mc.font,
-                    roomText,
+                    roomTitle,
                     contentLeft,
                     primaryTextY,
                     roomTextMaxWidth,
+                    MAP_TITLE_SCALE,
                     scaleAlpha(roomTextColor, panelAlphaFactor),
                     false);
 
-            String playerText = room.playerCount + "/" + room.maxPlayers;
-            String phaseText = TdmRoomTextFormatter.phaseStatusText(room.state, room.remainingTimeTicks);
-            int playerTextY = primaryTextY + referenceLineHeight + GuiTextHelper.referenceScaled(BASE_ROW_SECONDARY_GAP);
-            GuiTextHelper.drawReferenceEllipsizedString(
+            int titleLineHeight = GuiTextHelper.referenceLineHeight(mc.font, MAP_TITLE_SCALE);
+            int playerTextY = primaryTextY + titleLineHeight + GuiTextHelper.referenceScaled(BASE_ROW_SECONDARY_GAP);
+            GuiTextHelper.drawReferenceScaledEllipsizedString(
                     graphics,
                     mc.font,
-                    modeText + "  " + playerText + "  " + phaseText,
+                    modeInfo,
                     contentLeft,
                     playerTextY,
                     Math.max(GuiTextHelper.referenceScaled(34), textRight - contentLeft),
+                    MODE_INFO_SCALE,
                     scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor),
                     false);
 
@@ -515,6 +518,36 @@ public final class TdmRoomListRenderer {
         return names;
     }
 
+    private static MutableComponent buildRoomTitle(TdmRoomData room) {
+        MutableComponent title = Component.empty()
+                .append(Component.literal("\u25cf ").withStyle(style -> style.withColor(statusColor(room.state))))
+                .append(Component.literal(room.mapName == null ? "" : room.mapName));
+        if (!room.hasMatchEndTeleportPoint) {
+            title.append(Component.literal(" !").withStyle(style -> style.withColor(CodTheme.TEXT_DANGER & 0x00FFFFFF)));
+        }
+        return title;
+    }
+
+    private static MutableComponent buildModeInfo(
+            ModeDescriptor descriptor,
+            TdmRoomData room,
+            boolean joined,
+            boolean selected
+    ) {
+        String playerText = room.playerCount + "/" + room.maxPlayers;
+        String phaseText = TdmRoomTextFormatter.phaseStatusText(room.state, room.remainingTimeTicks);
+        int statsColor = joined ? 0xFFE3EDF6 : (selected ? 0xFFD5E5FB : 0xFFB7C2CD);
+        int separatorColor = joined ? 0xFF8FA7B4 : 0xFF70808D;
+
+        return Component.empty()
+                .append(Component.literal(Component.translatable(descriptor.displayNameKey()).getString())
+                        .withStyle(style -> style.withItalic(true).withColor(modeAccentColor(room.gameType))))
+                .append(Component.literal("  ").withStyle(style -> style.withColor(separatorColor)))
+                .append(Component.literal(playerText).withStyle(style -> style.withColor(statsColor)))
+                .append(Component.literal("  ").withStyle(style -> style.withColor(separatorColor)))
+                .append(Component.literal(phaseText).withStyle(style -> style.withColor(statusColor(room.state))));
+    }
+
     private static Comparator<Map.Entry<String, TdmRoomData>> roomComparator(String joinedRoom) {
         return (left, right) -> {
             String leftRoomKey = left.getKey();
@@ -558,6 +591,30 @@ public final class TdmRoomListRenderer {
             case "ENDED" -> 4;
             default -> 5;
         };
+    }
+
+    private static int statusColor(String state) {
+        return switch (state) {
+            case "WAITING" -> 0xFF69D88D;
+            case "COUNTDOWN", "WARMUP" -> 0xFFF1C15B;
+            case "PLAYING" -> 0xFFF16666;
+            case "ENDED" -> 0xFFADB8C6;
+            default -> 0xFFF2F5F8;
+        };
+    }
+
+    private static int modeAccentColor(String gameType) {
+        if (gameType == null || gameType.isBlank()) {
+            return UNKNOWN_MODE_COLOR;
+        }
+        String normalized = gameType.toLowerCase();
+        if (normalized.contains("frontline")) {
+            return FRONTLINE_MODE_COLOR;
+        }
+        if (normalized.contains("teamdeathmatch") || normalized.contains("tactical")) {
+            return TACTICAL_MODE_COLOR;
+        }
+        return UNKNOWN_MODE_COLOR;
     }
 
     private static float approach(float current, float target, float step) {

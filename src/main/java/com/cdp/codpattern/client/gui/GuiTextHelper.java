@@ -39,11 +39,22 @@ public final class GuiTextHelper {
         return Math.max(1, Math.round(font.lineHeight * referenceScale()));
     }
 
+    public static int referenceLineHeight(Font font, float scaleMultiplier) {
+        return Math.max(1, Math.round(font.lineHeight * effectiveReferenceScale(scaleMultiplier)));
+    }
+
     public static int referenceWidth(Font font, String text) {
         if (text == null || text.isEmpty()) {
             return 0;
         }
         return Math.round(font.width(text) * referenceScale());
+    }
+
+    public static int referenceWidth(Font font, String text, float scaleMultiplier) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        return Math.round(font.width(text) * effectiveReferenceScale(scaleMultiplier));
     }
 
     public static int referenceWidth(Font font, Component text) {
@@ -53,11 +64,25 @@ public final class GuiTextHelper {
         return Math.round(font.width(text) * referenceScale());
     }
 
+    public static int referenceWidth(Font font, Component text, float scaleMultiplier) {
+        if (text == null) {
+            return 0;
+        }
+        return Math.round(font.width(text) * effectiveReferenceScale(scaleMultiplier));
+    }
+
     public static int referenceWidth(Font font, FormattedCharSequence text) {
         if (text == null) {
             return 0;
         }
         return Math.round(font.width(text) * referenceScale());
+    }
+
+    public static int referenceWidth(Font font, FormattedCharSequence text, float scaleMultiplier) {
+        if (text == null) {
+            return 0;
+        }
+        return Math.round(font.width(text) * effectiveReferenceScale(scaleMultiplier));
     }
 
     public static String ellipsize(Font font, Component text, int maxWidth) {
@@ -262,6 +287,86 @@ public final class GuiTextHelper {
         drawReferenceString(graphics, font, ellipsizeReferenceFormatted(font, text, maxWidth), x, y, color, shadow);
     }
 
+    public static void drawReferenceScaledString(
+            GuiGraphics graphics,
+            Font font,
+            String text,
+            float x,
+            float y,
+            float scaleMultiplier,
+            int color,
+            boolean shadow) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        drawReferenceScaledString(
+                graphics,
+                font,
+                Language.getInstance().getVisualOrder(FormattedText.of(text)),
+                x,
+                y,
+                scaleMultiplier,
+                color,
+                shadow);
+    }
+
+    public static void drawReferenceScaledString(
+            GuiGraphics graphics,
+            Font font,
+            Component text,
+            float x,
+            float y,
+            float scaleMultiplier,
+            int color,
+            boolean shadow) {
+        if (text == null) {
+            return;
+        }
+        drawReferenceScaledString(graphics, font, text.getVisualOrderText(), x, y, scaleMultiplier, color, shadow);
+    }
+
+    public static void drawReferenceScaledEllipsizedString(
+            GuiGraphics graphics,
+            Font font,
+            String text,
+            int x,
+            int y,
+            int maxWidth,
+            float scaleMultiplier,
+            int color,
+            boolean shadow) {
+        drawReferenceScaledString(
+                graphics,
+                font,
+                ellipsize(font, text, toReferenceFontWidth(maxWidth, scaleMultiplier)),
+                x,
+                y,
+                scaleMultiplier,
+                color,
+                shadow);
+    }
+
+    public static void drawReferenceScaledEllipsizedString(
+            GuiGraphics graphics,
+            Font font,
+            Component text,
+            int x,
+            int y,
+            int maxWidth,
+            float scaleMultiplier,
+            int color,
+            boolean shadow) {
+        drawReferenceScaledString(
+                graphics,
+                font,
+                ellipsizeFormatted(font, text, toReferenceFontWidth(maxWidth, scaleMultiplier)),
+                x,
+                y,
+                scaleMultiplier,
+                color,
+                shadow);
+    }
+
     public static void drawReferenceCenteredEllipsizedString(
             GuiGraphics graphics,
             Font font,
@@ -320,11 +425,46 @@ public final class GuiTextHelper {
         graphics.pose().popPose();
     }
 
+    private static void drawReferenceScaledString(
+            GuiGraphics graphics,
+            Font font,
+            FormattedCharSequence text,
+            float x,
+            float y,
+            float scaleMultiplier,
+            int color,
+            boolean shadow) {
+        if (text == null) {
+            return;
+        }
+        float scale = effectiveReferenceScale(scaleMultiplier);
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 0.0f);
+        graphics.pose().scale(scale, scale, 1.0f);
+        graphics.drawString(font, text, 0, 0, color, shadow);
+        graphics.pose().popPose();
+    }
+
+    private static float effectiveReferenceScale(float scaleMultiplier) {
+        return referenceScale() * Math.max(0.01f, scaleMultiplier);
+    }
+
     private static int toReferenceFontWidth(int maxWidth) {
         if (maxWidth <= 0) {
             return 0;
         }
         float scale = referenceScale();
+        if (scale <= 0.0f) {
+            return maxWidth;
+        }
+        return Math.max(1, (int) Math.floor(maxWidth / scale));
+    }
+
+    private static int toReferenceFontWidth(int maxWidth, float scaleMultiplier) {
+        if (maxWidth <= 0) {
+            return 0;
+        }
+        float scale = effectiveReferenceScale(scaleMultiplier);
         if (scale <= 0.0f) {
             return maxWidth;
         }

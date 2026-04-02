@@ -213,6 +213,7 @@ public class SpawnPointToolScreen extends Screen {
         this.mapButton.setMessage(Component.literal(selectedMap.isBlank() ? "-" : selectedMap));
         this.teamButton.setMessage(Component.literal(selectedTeam.isBlank() ? "-" : selectedTeam));
         this.kindButton.setMessage(Component.literal(selectedKind.isBlank() ? "-" : selectedKind));
+        this.kindButton.active = availableKinds.size() > 1;
         boolean hasPoints = !spawnPoints.isEmpty();
         this.prevButton.active = hasPoints;
         this.nextButton.active = hasPoints;

@@ -253,7 +253,24 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
 
     public static String getSelectedKind(ItemStack stack) {
         String stored = getStringTag(stack, KIND_TAG);
-        return stored.isBlank() ? SpawnPointKind.INITIAL.serializedName() : stored;
+        return normalizeSelectedKind(getSelectedType(stack), stored);
+    }
+
+    public static List<String> availableKindsForType(String gameType) {
+        if (TdmGameTypes.supportsDynamicRespawnPoints(gameType)) {
+            return List.of(
+                    SpawnPointKind.INITIAL.serializedName(),
+                    SpawnPointKind.DYNAMIC_CANDIDATE.serializedName());
+        }
+        return List.of(SpawnPointKind.INITIAL.serializedName());
+    }
+
+    public static String normalizeSelectedKind(String gameType, String selectedKind) {
+        List<String> availableKinds = availableKindsForType(gameType);
+        if (selectedKind != null && availableKinds.contains(selectedKind)) {
+            return selectedKind;
+        }
+        return SpawnPointKind.INITIAL.serializedName();
     }
 
     @Override

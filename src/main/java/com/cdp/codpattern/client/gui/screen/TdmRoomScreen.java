@@ -37,7 +37,7 @@ public class TdmRoomScreen extends Screen {
     private static final int BASE_PANEL_GAP = 14;
     private static final int BASE_HEADER_HEIGHT = 48;
     private static final int BASE_FOOTER_HEIGHT = 20;
-    private static final int BASE_ROOM_ITEM_HEIGHT = 34;
+    private static final int BASE_ROOM_ITEM_HEIGHT = 38;
     private static final float LEFT_PANEL_WIDTH_RATIO = 0.25f;
     private static final long ENTER_ANIMATION_MS = 180L;
     private static final long ROOM_LIST_APPLY_DEBOUNCE_MS = 60L;

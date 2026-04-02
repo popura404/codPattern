@@ -242,13 +242,8 @@ public class SpawnPointToolActionC2SPacket {
                 .toList()).orElse(List.of());
         String selectedTeam = availableTeams.contains(requestedTeam) ? requestedTeam : firstOrBlank(availableTeams);
         Optional<BaseTeam> team = map.flatMap(baseMap -> baseMap.getMapTeams().getTeamByName(selectedTeam));
-        List<String> availableKinds = List.of(
-                SpawnPointKind.INITIAL.serializedName(),
-                SpawnPointKind.DYNAMIC_CANDIDATE.serializedName()
-        );
-        String selectedKind = availableKinds.contains(requestedKind)
-                ? requestedKind
-                : SpawnPointKind.INITIAL.serializedName();
+        List<String> availableKinds = SpawnPointTool.availableKindsForType(selectedType);
+        String selectedKind = SpawnPointTool.normalizeSelectedKind(selectedType, requestedKind);
         SpawnPointKind spawnPointKind = SpawnPointKind.fromSerializedName(selectedKind);
         List<SpawnPointData> spawnPoints = team.map(baseTeam -> baseTeam.getSpawnPointsData(spawnPointKind))
                 .map(List::copyOf)

@@ -33,6 +33,10 @@ public final class TdmGameTypes {
         return TEAM_DEATHMATCH.equals(canonicalize(gameType));
     }
 
+    public static boolean supportsDynamicRespawnPoints(String gameType) {
+        return isTeamDeathMatch(gameType);
+    }
+
     private static String normalize(String gameType) {
         return gameType == null ? "" : gameType.trim().toLowerCase(Locale.ROOT);
     }
