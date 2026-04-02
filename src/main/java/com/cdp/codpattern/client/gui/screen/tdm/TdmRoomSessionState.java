@@ -1,8 +1,8 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
+import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -80,7 +80,20 @@ public final class TdmRoomSessionState {
         }
     }
 
+    public boolean restoreJoinedRoomFromClientState() {
+        if (joinedRoom != null && !joinedRoom.isBlank()) {
+            return false;
+        }
+        String clientRoomContext = ClientTdmState.roomContextName();
+        if (clientRoomContext == null || clientRoomContext.isBlank()) {
+            return false;
+        }
+        setJoinedRoom(clientRoomContext);
+        return true;
+    }
+
     public void refreshJoinedRoomLiveState() {
+        restoreJoinedRoomFromClientState();
         if (joinedRoom == null || joinedRoom.isBlank()) {
             joinedRoomLiveState.clear();
             return;

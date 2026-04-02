@@ -1,5 +1,6 @@
 package com.cdp.codpattern.client.gui.screen;
 
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
@@ -13,6 +14,7 @@ import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomSessionState;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomStateEvaluator;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomUiState;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
+import com.cdp.codpattern.network.tdm.RequestRoomRosterResyncPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -125,6 +127,7 @@ public class TdmRoomScreen extends Screen {
         openedAtMs = System.currentTimeMillis();
         infoContextKey = currentInfoContextKey();
         infoContentTransitionAtMs = openedAtMs;
+        restoreJoinedRoomFromClientStateIfNeeded();
 
         // 请求房间列表
         actionController.requestRoomList();
@@ -271,6 +274,7 @@ public class TdmRoomScreen extends Screen {
     public void tick() {
         super.tick();
         actionController.tick();
+        restoreJoinedRoomFromClientStateIfNeeded();
         roomState.refreshJoinedRoomLiveState();
         flushPendingRoomListUpdate(false);
         refreshInfoContextTransition(false);
@@ -490,6 +494,21 @@ public class TdmRoomScreen extends Screen {
             infoContextKey = currentKey;
             infoContentTransitionAtMs = System.currentTimeMillis();
         }
+    }
+
+    private void restoreJoinedRoomFromClientStateIfNeeded() {
+        if (!roomState.restoreJoinedRoomFromClientState()) {
+            return;
+        }
+        String restoredJoinedRoom = roomState.joinedRoom();
+        if ((roomState.selectedRoom() == null || roomState.selectedRoom().isBlank())
+                && restoredJoinedRoom != null
+                && !restoredJoinedRoom.isBlank()) {
+            roomState.setSelectedRoom(restoredJoinedRoom);
+        }
+        roomState.refreshJoinedRoomLiveState();
+        ModNetworkChannel.sendToServer(new RequestRoomRosterResyncPacket());
+        refreshInfoContextTransition(true);
     }
 
     private String currentInfoContextKey() {
