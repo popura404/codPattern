@@ -1,13 +1,14 @@
 package com.phasetranscrystal.fpsmatch.common.packet;
 
-import com.phasetranscrystal.fpsmatch.common.client.screen.SpawnPointToolScreen;
+import com.phasetranscrystal.fpsmatch.common.client.FpsmClientPacketHandler;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
@@ -144,12 +145,8 @@ public class OpenSpawnPointToolScreenS2CPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            Minecraft minecraft = Minecraft.getInstance();
-            if (minecraft.screen instanceof SpawnPointToolScreen screen) {
-                screen.applyData(this);
-            } else {
-                minecraft.setScreen(new SpawnPointToolScreen(this));
-            }
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                    () -> () -> FpsmClientPacketHandler.handleOpenSpawnPointToolScreen(this));
         });
         ctx.get().setPacketHandled(true);
     }

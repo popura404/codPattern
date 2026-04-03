@@ -4,7 +4,9 @@
   "package": "com.cdp.codpattern.mixin",
   "compatibilityLevel": "JAVA_17",
   "refmap": "codpattern.refmap.json",
-  "mixins": [],
+  "mixins": [
+    "taczaddon.LiberateAttachmentMixin"
+  ],
   "client": [
     "tacz.GunRefitScreenMixin"
   ],

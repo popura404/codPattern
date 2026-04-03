@@ -1,11 +1,12 @@
 package com.phasetranscrystal.fpsmatch.common.packet;
 
-import com.phasetranscrystal.fpsmatch.common.client.screen.MapCreatorToolScreen;
+import com.phasetranscrystal.fpsmatch.common.client.FpsmClientPacketHandler;
 import com.phasetranscrystal.fpsmatch.common.item.MapCreatorTool;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
@@ -78,12 +79,8 @@ public class OpenMapCreatorToolScreenS2CPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            Minecraft minecraft = Minecraft.getInstance();
-            if (minecraft.screen instanceof MapCreatorToolScreen screen) {
-                screen.applyData(this);
-            } else {
-                minecraft.setScreen(new MapCreatorToolScreen(this));
-            }
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                    () -> () -> FpsmClientPacketHandler.handleOpenMapCreatorToolScreen(this));
         });
         ctx.get().setPacketHandled(true);
     }
