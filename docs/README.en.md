@@ -71,10 +71,10 @@ The project uses a server-authoritative design. Loadouts, filters, room state, a
   - Creates a map area and persists it immediately.
 - `/cdp map delete <type> <name>`
   - Deletes the map and its persisted data.
-- `/cdp map spawn <list|add|remove|clear> ...`
-  - Manages `INITIAL` / `DYNAMIC_CANDIDATE` spawn points.
-- `/cdp map endtp <show|set|clear> <map> [pos]`
-  - Manages the match-end teleport point.
+- `/cdp map spawn <list|add|remove|clear|merge> ...`
+  - Manages `INITIAL` / `DYNAMIC_CANDIDATE` spawn points and supports merging dynamic respawn candidates for a specific mode/map.
+- `/cdp map endtp <show|set> <map> [pos]`
+  - Manages the match-end teleport point; `set` overwrites the existing one and may point outside the map area.
 
 ## Configuration and Directories
 

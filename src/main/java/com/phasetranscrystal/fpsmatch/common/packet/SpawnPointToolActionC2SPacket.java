@@ -1,6 +1,7 @@
 package com.phasetranscrystal.fpsmatch.common.packet;
 
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.tdm.service.DynamicSpawnMergeService;
 import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.SpawnPointTool;
@@ -16,7 +17,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.network.NetworkEvent;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -25,7 +28,8 @@ public class SpawnPointToolActionC2SPacket {
         REFRESH,
         SAVE_SELECTIONS,
         DELETE_SELECTED,
-        CLEAR_TEAM
+        CLEAR_TEAM,
+        MERGE_DYNAMIC
     }
 
     private final Action action;
@@ -106,6 +110,7 @@ public class SpawnPointToolActionC2SPacket {
                 case SAVE_SELECTIONS -> resolveSelection(stack, selectedType, selectedMap, selectedTeam, selectedKind, selectedIndex);
                 case DELETE_SELECTED -> deleteSelected(player, stack);
                 case CLEAR_TEAM -> clearTeam(player, stack);
+                case MERGE_DYNAMIC -> mergeDynamicCandidates(player, stack);
             }
         });
         ctx.get().setPacketHandled(true);
@@ -226,6 +231,100 @@ public class SpawnPointToolActionC2SPacket {
         );
     }
 
+    private void mergeDynamicCandidates(ServerPlayer player, ItemStack stack) {
+        SelectionSnapshot snapshot = resolveSelection(
+                stack,
+                selectedType,
+                selectedMap,
+                selectedTeam,
+                selectedKind,
+                selectedIndex
+        );
+        if (snapshot.map().isEmpty()) {
+            player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.map_not_found", snapshot.selectedMap()), false);
+            return;
+        }
+
+        BaseMap map = snapshot.map().get();
+        if (!TdmGameTypes.supportsDynamicRespawnPoints(map.getGameType())) {
+            player.displayClientMessage(Component.translatable(
+                    "command.codpattern.map.spawn.merge.unsupported_mode",
+                    map.getGameType()), false);
+            return;
+        }
+
+        List<BaseTeam> teams = map.getMapTeams().getTeams();
+        if (teams.size() != 2) {
+            player.displayClientMessage(Component.translatable(
+                    "command.codpattern.map.spawn.merge.invalid_team_count",
+                    map.getGameType(),
+                    map.getMapName(),
+                    teams.size()), false);
+            return;
+        }
+
+        DynamicSpawnMergeService.MergeResult mergeResult =
+                DynamicSpawnMergeService.mergeDynamicSpawnCandidates(teams);
+        if (mergeResult.uniqueDynamicPointCount() <= 0) {
+            player.displayClientMessage(Component.translatable(
+                    "command.codpattern.map.spawn.merge.none",
+                    map.getGameType(),
+                    map.getMapName()), false);
+            return;
+        }
+
+        Map<BaseTeam, TeamSpawnProfile> previousProfiles = captureTeamSpawnProfiles(teams);
+        for (BaseTeam team : teams) {
+            TeamSpawnProfile currentProfile = team.getSpawnProfile();
+            team.setSpawnProfile(new TeamSpawnProfile(
+                    currentProfile.initialSpawnPoints(),
+                    mergeResult.dynamicPointsByTeam().getOrDefault(team.name, List.of())
+            ));
+            team.clearPlayerSpawnPointAssignments();
+        }
+
+        try {
+            CodMapPersistence.saveMapOrRollback(map, () -> restoreTeamSpawnProfiles(previousProfiles));
+        } catch (RuntimeException e) {
+            player.displayClientMessage(Component.translatable(
+                    "message.codpattern.map.save_failed",
+                    map.getGameType(),
+                    map.getMapName()), false);
+            sendScreen(
+                    player,
+                    stack,
+                    snapshot.selectedType(),
+                    snapshot.selectedMap(),
+                    snapshot.selectedTeam(),
+                    snapshot.selectedKind(),
+                    snapshot.selectedIndex()
+            );
+            return;
+        }
+
+        map.syncToClient();
+        BaseTeam firstTeam = teams.get(0);
+        BaseTeam secondTeam = teams.get(1);
+        player.displayClientMessage(Component.translatable(
+                "command.codpattern.map.spawn.merge.success",
+                map.getGameType(),
+                map.getMapName(),
+                mergeResult.uniqueDynamicPointCount(),
+                firstTeam.name,
+                mergeResult.countForTeam(firstTeam.name),
+                secondTeam.name,
+                mergeResult.countForTeam(secondTeam.name)), false);
+        sendScreen(
+                player,
+                stack,
+                snapshot.selectedType(),
+                snapshot.selectedMap(),
+                snapshot.selectedTeam(),
+                snapshot.selectedKind(),
+                snapshot.selectedIndex()
+        );
+    }
+
     private static SelectionSnapshot resolveSelection(ItemStack stack, String requestedType, String requestedMap,
             String requestedTeam, String requestedKind, int requestedIndex) {
         FPSMCore core = FPSMCore.getInstance();
@@ -277,6 +376,29 @@ public class SpawnPointToolActionC2SPacket {
 
     private static String firstOrBlank(List<String> values) {
         return values.isEmpty() ? "" : values.get(0);
+    }
+
+    private static Map<BaseTeam, TeamSpawnProfile> captureTeamSpawnProfiles(List<BaseTeam> teams) {
+        Map<BaseTeam, TeamSpawnProfile> previousProfiles = new LinkedHashMap<>();
+        for (BaseTeam team : teams) {
+            if (team != null) {
+                previousProfiles.put(team, team.getSpawnProfile());
+            }
+        }
+        return previousProfiles;
+    }
+
+    private static void restoreTeamSpawnProfiles(Map<BaseTeam, TeamSpawnProfile> previousProfiles) {
+        if (previousProfiles == null) {
+            return;
+        }
+        previousProfiles.forEach((team, profile) -> {
+            if (team == null) {
+                return;
+            }
+            team.setSpawnProfile(profile);
+            team.clearPlayerSpawnPointAssignments();
+        });
     }
 
     private record SelectionSnapshot(

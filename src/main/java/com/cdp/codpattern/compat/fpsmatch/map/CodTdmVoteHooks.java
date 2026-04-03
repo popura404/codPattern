@@ -58,6 +58,11 @@ final class CodTdmVoteHooks implements VoteService.Hooks {
     }
 
     @Override
+    public boolean hasMatchEndTeleportPoint() {
+        return port.hasMatchEndTeleportPoint();
+    }
+
+    @Override
     public int getMinPlayersToStart() {
         return CodTdmConfig.getConfig().getMinPlayersToStart();
     }

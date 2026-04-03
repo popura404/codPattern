@@ -15,6 +15,8 @@ interface CodTdmVoteHooksPort {
 
     TdmGamePhase getPhase();
 
+    boolean hasMatchEndTeleportPoint();
+
     String mapName();
 
     void startGame();

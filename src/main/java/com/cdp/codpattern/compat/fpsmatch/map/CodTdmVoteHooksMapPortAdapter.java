@@ -7,6 +7,7 @@ import net.minecraft.world.entity.player.Player;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -14,6 +15,7 @@ final record CodTdmVoteHooksMapPortAdapter(
         Function<UUID, Player> playerResolver,
         Supplier<List<ServerPlayer>> joinedPlayersSupplier,
         Supplier<TdmGamePhase> phaseSupplier,
+        BooleanSupplier hasMatchEndTeleportPointSupplier,
         Supplier<String> mapNameSupplier,
         Runnable startGameAction,
         Runnable endVoteTransitionAction
@@ -32,6 +34,11 @@ final record CodTdmVoteHooksMapPortAdapter(
     @Override
     public TdmGamePhase getPhase() {
         return phaseSupplier.get();
+    }
+
+    @Override
+    public boolean hasMatchEndTeleportPoint() {
+        return hasMatchEndTeleportPointSupplier.getAsBoolean();
     }
 
     @Override

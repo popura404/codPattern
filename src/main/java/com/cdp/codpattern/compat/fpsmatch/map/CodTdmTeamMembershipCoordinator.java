@@ -37,7 +37,11 @@ final class CodTdmTeamMembershipCoordinator {
         port.clearSpectatorPreferredTeam(playerId);
         port.clearDisconnected(playerId);
 
-        leaveRoomEffects.handleTeleportResult(player, port.teleportPlayerToMatchEndPoint(player));
+        // Match-end teleport is only meaningful while a round is active or in the end-summary phase.
+        // Once the room has reset back to WAITING, leaving the room should not re-run endtp logic.
+        if (!port.isWaitingPhase()) {
+            leaveRoomEffects.handleTeleportResult(player, port.teleportPlayerToMatchEndPoint(player));
+        }
         leaveRoomEffects.sendLeaveStatePackets(player);
         port.clearPlayerInventory(player);
         leaveFromMapAction.accept(player);

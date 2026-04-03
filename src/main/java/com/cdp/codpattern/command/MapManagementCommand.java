@@ -1,6 +1,7 @@
 package com.cdp.codpattern.command;
 
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.tdm.service.DynamicSpawnMergeService;
 import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.cdp.codpattern.compat.fpsmatch.data.CodTacticalTdmMapData;
 import com.cdp.codpattern.compat.fpsmatch.data.CodTdmMapData;
@@ -29,8 +30,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec2;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -67,122 +70,134 @@ public final class MapManagementCommand {
     }
 
     public static LiteralArgumentBuilder<CommandSourceStack> buildCommand() {
-        return Commands.literal("map")
-                .requires(source -> source.hasPermission(2))
-                .then(Commands.literal("list")
-                        .executes(context -> listTypes(context.getSource()))
-                        .then(Commands.argument("type", StringArgumentType.word())
-                                .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                                .executes(context -> listMaps(
+        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("map")
+                .requires(source -> source.hasPermission(2));
+
+        root.then(Commands.literal("list")
+                .executes(context -> listTypes(context.getSource()))
+                .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
+                        .executes(context -> listMaps(
+                                context.getSource(),
+                                StringArgumentType.getString(context, "type")))));
+
+        root.then(Commands.literal("create")
+                .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
+                        .then(Commands.argument("map", StringArgumentType.string())
+                                .then(Commands.argument("from", BlockPosArgument.blockPos())
+                                        .then(Commands.argument("to", BlockPosArgument.blockPos())
+                                                .executes(context -> createMap(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "type"),
+                                                        StringArgumentType.getString(context, "map"),
+                                                        BlockPosArgument.getLoadedBlockPos(context, "from"),
+                                                        BlockPosArgument.getLoadedBlockPos(context, "to"))))))));
+
+        root.then(Commands.literal("delete")
+                .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
+                        .then(Commands.argument("map", StringArgumentType.string())
+                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
+                                .executes(context -> deleteMap(
                                         context.getSource(),
-                                        StringArgumentType.getString(context, "type")))))
-                .then(Commands.literal("create")
-                        .then(Commands.argument("type", StringArgumentType.word())
-                                .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                                .then(Commands.argument("map", StringArgumentType.string())
-                                        .then(Commands.argument("from", BlockPosArgument.blockPos())
-                                                .then(Commands.argument("to", BlockPosArgument.blockPos())
-                                                        .executes(context -> createMap(
+                                        StringArgumentType.getString(context, "type"),
+                                        StringArgumentType.getString(context, "map"))))));
+
+        LiteralArgumentBuilder<CommandSourceStack> spawn = Commands.literal("spawn");
+        spawn.then(Commands.literal("list")
+                .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
+                        .then(Commands.argument("map", StringArgumentType.string())
+                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
+                                .then(Commands.argument("team", StringArgumentType.word())
+                                        .suggests(TEAM_SUGGESTIONS)
+                                        .then(Commands.argument("kind", StringArgumentType.word())
+                                                .suggests(SPAWN_KIND_SUGGESTIONS)
+                                                .executes(context -> listSpawnPoints(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "type"),
+                                                        StringArgumentType.getString(context, "map"),
+                                                        StringArgumentType.getString(context, "team"),
+                                                        StringArgumentType.getString(context, "kind"))))))));
+        spawn.then(Commands.literal("add")
+                .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
+                        .then(Commands.argument("map", StringArgumentType.string())
+                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
+                                .then(Commands.argument("team", StringArgumentType.word())
+                                        .suggests(TEAM_SUGGESTIONS)
+                                        .then(Commands.argument("kind", StringArgumentType.word())
+                                                .suggests(SPAWN_KIND_SUGGESTIONS)
+                                                .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                                                        .executes(context -> addSpawnPoint(
                                                                 context.getSource(),
                                                                 StringArgumentType.getString(context, "type"),
                                                                 StringArgumentType.getString(context, "map"),
-                                                                BlockPosArgument.getLoadedBlockPos(context, "from"),
-                                                                BlockPosArgument.getLoadedBlockPos(context, "to"))))))))
-                .then(Commands.literal("delete")
-                        .then(Commands.argument("type", StringArgumentType.word())
-                                .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                                .then(Commands.argument("map", StringArgumentType.string())
-                                        .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                        .executes(context -> deleteMap(
-                                                context.getSource(),
-                                                StringArgumentType.getString(context, "type"),
-                                                StringArgumentType.getString(context, "map"))))))
-                .then(Commands.literal("spawn")
-                        .then(Commands.literal("list")
-                                .then(Commands.argument("type", StringArgumentType.word())
-                                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                                        .then(Commands.argument("map", StringArgumentType.string())
-                                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                                .then(Commands.argument("team", StringArgumentType.word())
-                                                        .suggests(TEAM_SUGGESTIONS)
-                                                        .then(Commands.argument("kind", StringArgumentType.word())
-                                                                .suggests(SPAWN_KIND_SUGGESTIONS)
-                                                                .executes(context -> listSpawnPoints(
-                                                                        context.getSource(),
-                                                                        StringArgumentType.getString(context, "type"),
-                                                                        StringArgumentType.getString(context, "map"),
-                                                                        StringArgumentType.getString(context, "team"),
-                                                                        StringArgumentType.getString(context, "kind"))))))))
-                        .then(Commands.literal("add")
-                                .then(Commands.argument("type", StringArgumentType.word())
-                                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                                        .then(Commands.argument("map", StringArgumentType.string())
-                                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                                .then(Commands.argument("team", StringArgumentType.word())
-                                                        .suggests(TEAM_SUGGESTIONS)
-                                                        .then(Commands.argument("kind", StringArgumentType.word())
-                                                                .suggests(SPAWN_KIND_SUGGESTIONS)
-                                                                .then(Commands.argument("pos", BlockPosArgument.blockPos())
-                                                                        .executes(context -> addSpawnPoint(
-                                                                                context.getSource(),
-                                                                                StringArgumentType.getString(context, "type"),
-                                                                                StringArgumentType.getString(context, "map"),
-                                                                                StringArgumentType.getString(context, "team"),
-                                                                                StringArgumentType.getString(context, "kind"),
-                                                                                BlockPosArgument.getLoadedBlockPos(context, "pos")))))))))
-                        .then(Commands.literal("remove")
-                                .then(Commands.argument("type", StringArgumentType.word())
-                                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                                        .then(Commands.argument("map", StringArgumentType.string())
-                                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                                .then(Commands.argument("team", StringArgumentType.word())
-                                                        .suggests(TEAM_SUGGESTIONS)
-                                                        .then(Commands.argument("kind", StringArgumentType.word())
-                                                                .suggests(SPAWN_KIND_SUGGESTIONS)
-                                                                .then(Commands.argument("index", IntegerArgumentType.integer(1))
-                                                                        .executes(context -> removeSpawnPoint(
-                                                                                context.getSource(),
-                                                                                StringArgumentType.getString(context, "type"),
-                                                                                StringArgumentType.getString(context, "map"),
-                                                                                StringArgumentType.getString(context, "team"),
-                                                                                StringArgumentType.getString(context, "kind"),
-                                                                                IntegerArgumentType.getInteger(context, "index")))))))))
-                        .then(Commands.literal("clear")
-                                .then(Commands.argument("type", StringArgumentType.word())
-                                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                                        .then(Commands.argument("map", StringArgumentType.string())
-                                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                                .then(Commands.argument("team", StringArgumentType.word())
-                                                        .suggests(TEAM_SUGGESTIONS)
-                                                        .then(Commands.argument("kind", StringArgumentType.word())
-                                                                .suggests(SPAWN_KIND_SUGGESTIONS)
-                                                                .executes(context -> clearSpawnPoints(
-                                                                        context.getSource(),
-                                                                        StringArgumentType.getString(context, "type"),
-                                                                        StringArgumentType.getString(context, "map"),
-                                                                        StringArgumentType.getString(context, "team"),
-                                                                        StringArgumentType.getString(context, "kind")))))))))
-                .then(Commands.literal("endtp")
-                        .then(Commands.literal("show")
-                                .then(Commands.argument("map", StringArgumentType.string())
-                                        .suggests(ALL_MAP_SUGGESTIONS)
-                                        .executes(context -> showMatchEndTeleport(
-                                                context.getSource(),
-                                                StringArgumentType.getString(context, "map")))))
-                        .then(Commands.literal("set")
-                                .then(Commands.argument("map", StringArgumentType.string())
-                                        .suggests(ALL_MAP_SUGGESTIONS)
-                                        .then(Commands.argument("pos", BlockPosArgument.blockPos())
-                                                .executes(context -> setMatchEndTeleport(
+                                                                StringArgumentType.getString(context, "team"),
+                                                                StringArgumentType.getString(context, "kind"),
+                                                                BlockPosArgument.getLoadedBlockPos(context, "pos")))))))));
+        spawn.then(Commands.literal("remove")
+                .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
+                        .then(Commands.argument("map", StringArgumentType.string())
+                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
+                                .then(Commands.argument("team", StringArgumentType.word())
+                                        .suggests(TEAM_SUGGESTIONS)
+                                        .then(Commands.argument("kind", StringArgumentType.word())
+                                                .suggests(SPAWN_KIND_SUGGESTIONS)
+                                                .then(Commands.argument("index", IntegerArgumentType.integer(1))
+                                                        .executes(context -> removeSpawnPoint(
+                                                                context.getSource(),
+                                                                StringArgumentType.getString(context, "type"),
+                                                                StringArgumentType.getString(context, "map"),
+                                                                StringArgumentType.getString(context, "team"),
+                                                                StringArgumentType.getString(context, "kind"),
+                                                                IntegerArgumentType.getInteger(context, "index")))))))));
+        spawn.then(Commands.literal("clear")
+                .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
+                        .then(Commands.argument("map", StringArgumentType.string())
+                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
+                                .then(Commands.argument("team", StringArgumentType.word())
+                                        .suggests(TEAM_SUGGESTIONS)
+                                        .then(Commands.argument("kind", StringArgumentType.word())
+                                                .suggests(SPAWN_KIND_SUGGESTIONS)
+                                                .executes(context -> clearSpawnPoints(
                                                         context.getSource(),
+                                                        StringArgumentType.getString(context, "type"),
                                                         StringArgumentType.getString(context, "map"),
-                                                        BlockPosArgument.getLoadedBlockPos(context, "pos"))))))
-                        .then(Commands.literal("clear")
-                                .then(Commands.argument("map", StringArgumentType.string())
-                                        .suggests(ALL_MAP_SUGGESTIONS)
-                                        .executes(context -> clearMatchEndTeleport(
-                                                context.getSource(),
-                                                StringArgumentType.getString(context, "map"))))));
+                                                        StringArgumentType.getString(context, "team"),
+                                                        StringArgumentType.getString(context, "kind"))))))));
+        spawn.then(Commands.literal("merge")
+                .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
+                        .then(Commands.argument("map", StringArgumentType.string())
+                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
+                                .executes(context -> mergeDynamicSpawnPoints(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "type"),
+                                        StringArgumentType.getString(context, "map"))))));
+        root.then(spawn);
+
+        LiteralArgumentBuilder<CommandSourceStack> endtp = Commands.literal("endtp");
+        endtp.then(Commands.literal("show")
+                .then(Commands.argument("map", StringArgumentType.string())
+                        .suggests(ALL_MAP_SUGGESTIONS)
+                        .executes(context -> showMatchEndTeleport(
+                                context.getSource(),
+                                StringArgumentType.getString(context, "map")))));
+        endtp.then(Commands.literal("set")
+                .then(Commands.argument("map", StringArgumentType.string())
+                        .suggests(ALL_MAP_SUGGESTIONS)
+                        .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                                .executes(context -> setMatchEndTeleport(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "map"),
+                                        BlockPosArgument.getLoadedBlockPos(context, "pos"))))));
+        root.then(endtp);
+
+        return root;
     }
 
     private static int listTypes(CommandSourceStack source) {
@@ -435,6 +450,70 @@ public final class MapManagementCommand {
         return removedCount;
     }
 
+    private static int mergeDynamicSpawnPoints(CommandSourceStack source, String rawType, String mapName) {
+        BaseMap map = requireMap(source, rawType, mapName);
+        if (map == null) {
+            return 0;
+        }
+        if (!TdmGameTypes.supportsDynamicRespawnPoints(map.getGameType())) {
+            source.sendFailure(Component.translatable(
+                    "command.codpattern.map.spawn.merge.unsupported_mode",
+                    map.getGameType()));
+            return 0;
+        }
+
+        List<BaseTeam> teams = map.getMapTeams().getTeams();
+        if (teams.size() != 2) {
+            source.sendFailure(Component.translatable(
+                    "command.codpattern.map.spawn.merge.invalid_team_count",
+                    map.getGameType(),
+                    map.getMapName(),
+                    teams.size()));
+            return 0;
+        }
+
+        DynamicSpawnMergeService.MergeResult mergeResult =
+                DynamicSpawnMergeService.mergeDynamicSpawnCandidates(teams);
+        if (mergeResult.uniqueDynamicPointCount() <= 0) {
+            source.sendFailure(Component.translatable(
+                    "command.codpattern.map.spawn.merge.none",
+                    map.getGameType(),
+                    map.getMapName()));
+            return 0;
+        }
+
+        Map<BaseTeam, TeamSpawnProfile> previousProfiles = captureTeamSpawnProfiles(teams);
+        for (BaseTeam team : teams) {
+            TeamSpawnProfile currentProfile = team.getSpawnProfile();
+            team.setSpawnProfile(new TeamSpawnProfile(
+                    currentProfile.initialSpawnPoints(),
+                    mergeResult.dynamicPointsByTeam().getOrDefault(team.name, List.of())
+            ));
+            team.clearPlayerSpawnPointAssignments();
+        }
+
+        try {
+            CodMapPersistence.saveMapOrRollback(map, () -> restoreTeamSpawnProfiles(previousProfiles));
+        } catch (RuntimeException e) {
+            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
+            return 0;
+        }
+
+        map.syncToClient();
+        BaseTeam firstTeam = teams.get(0);
+        BaseTeam secondTeam = teams.get(1);
+        source.sendSuccess(() -> Component.translatable(
+                "command.codpattern.map.spawn.merge.success",
+                map.getGameType(),
+                map.getMapName(),
+                mergeResult.uniqueDynamicPointCount(),
+                firstTeam.name,
+                mergeResult.countForTeam(firstTeam.name),
+                secondTeam.name,
+                mergeResult.countForTeam(secondTeam.name)), true);
+        return mergeResult.uniqueDynamicPointCount();
+    }
+
     private static int showMatchEndTeleport(CommandSourceStack source, String mapName) {
         BaseMap map = requireUniqueMap(source, mapName);
         if (map == null) {
@@ -461,9 +540,6 @@ public final class MapManagementCommand {
         if (map == null) {
             return 0;
         }
-        if (!validateMapPosition(source, map, pos)) {
-            return 0;
-        }
         SpawnPointData point = new SpawnPointData(
                 source.getLevel().dimension(),
                 pos,
@@ -482,26 +558,6 @@ public final class MapManagementCommand {
                 "command.codpattern.map.endtp.set",
                 map.getMapName(),
                 MapCreatorTool.formatPos(pos)), true);
-        return 1;
-    }
-
-    private static int clearMatchEndTeleport(CommandSourceStack source, String mapName) {
-        BaseMap map = requireUniqueMap(source, mapName);
-        if (map == null) {
-            return 0;
-        }
-        Optional<SpawnPointData> previousPoint = readMatchEndTeleportPoint(map);
-        writeMatchEndTeleportPoint(map, null);
-        try {
-            CodMapPersistence.saveMapOrRollback(map, () -> writeMatchEndTeleportPoint(map, previousPoint.orElse(null)));
-        } catch (RuntimeException e) {
-            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
-            return 0;
-        }
-        map.syncToClient();
-        source.sendSuccess(() -> Component.translatable(
-                "command.codpattern.map.endtp.cleared",
-                map.getMapName()), true);
         return 1;
     }
 
@@ -693,5 +749,28 @@ public final class MapManagementCommand {
                 .filter(map -> mapName.equals(map.getMapName()))
                 .forEach(matches::add));
         return matches;
+    }
+
+    private static Map<BaseTeam, TeamSpawnProfile> captureTeamSpawnProfiles(List<BaseTeam> teams) {
+        Map<BaseTeam, TeamSpawnProfile> previousProfiles = new LinkedHashMap<>();
+        for (BaseTeam team : teams) {
+            if (team != null) {
+                previousProfiles.put(team, team.getSpawnProfile());
+            }
+        }
+        return previousProfiles;
+    }
+
+    private static void restoreTeamSpawnProfiles(Map<BaseTeam, TeamSpawnProfile> previousProfiles) {
+        if (previousProfiles == null) {
+            return;
+        }
+        previousProfiles.forEach((team, profile) -> {
+            if (team == null) {
+                return;
+            }
+            team.setSpawnProfile(profile);
+            team.clearPlayerSpawnPointAssignments();
+        });
     }
 }

@@ -51,6 +51,7 @@ final class CodTdmMapComposition {
                 clearPlayerInventoryAction,
                 scheduleRespawnAction,
                 matchState::phase,
+                hasMatchEndTeleportPointSupplier,
                 mapNameSupplier,
                 startGameAction,
                 transitionToEndedAction

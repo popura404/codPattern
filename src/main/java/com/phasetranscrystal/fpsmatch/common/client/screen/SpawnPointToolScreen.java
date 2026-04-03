@@ -1,9 +1,11 @@
 package com.phasetranscrystal.fpsmatch.common.client.screen;
 
+import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenSpawnPointToolScreenS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.SpawnPointToolActionC2SPacket;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
+import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -14,7 +16,7 @@ import java.util.List;
 
 public class SpawnPointToolScreen extends Screen {
     private static final int PANEL_WIDTH = 326;
-    private static final int PANEL_HEIGHT = 248;
+    private static final int PANEL_HEIGHT = 272;
     private static final int SCREEN_OVERLAY = 0x5A000000;
     private static final int PANEL_BACKGROUND = 0xD0191D22;
     private static final int PANEL_BORDER = 0xFFB58A42;
@@ -38,6 +40,7 @@ public class SpawnPointToolScreen extends Screen {
     private Button nextButton;
     private Button deleteButton;
     private Button clearButton;
+    private Button mergeButton;
 
     public SpawnPointToolScreen(OpenSpawnPointToolScreenS2CPacket data) {
         super(Component.translatable("gui.fpsm.spawn_point_tool.title"));
@@ -88,16 +91,22 @@ public class SpawnPointToolScreen extends Screen {
                 Component.translatable("gui.fpsm.spawn_point_tool.delete"),
                 button -> sendAction(SpawnPointToolActionC2SPacket.Action.DELETE_SELECTED))
                 .pos(left + 18, top + 198)
-                .size(140, 20)
+                .size(94, 20)
                 .build());
         this.clearButton = this.addRenderableWidget(new Button.Builder(
                 Component.translatable("gui.fpsm.spawn_point_tool.clear"),
                 button -> sendAction(SpawnPointToolActionC2SPacket.Action.CLEAR_TEAM))
-                .pos(left + 168, top + 198)
-                .size(140, 20)
+                .pos(left + 116, top + 198)
+                .size(94, 20)
+                .build());
+        this.mergeButton = this.addRenderableWidget(new Button.Builder(
+                Component.translatable("gui.fpsm.spawn_point_tool.merge"),
+                button -> sendAction(SpawnPointToolActionC2SPacket.Action.MERGE_DYNAMIC))
+                .pos(left + 214, top + 198)
+                .size(94, 20)
                 .build());
         this.addRenderableWidget(new Button.Builder(Component.translatable("gui.fpsm.close"), button -> onClose())
-                .pos(left + 18, top + 222)
+                .pos(left + 18, top + 246)
                 .size(290, 20)
                 .build());
 
@@ -219,6 +228,7 @@ public class SpawnPointToolScreen extends Screen {
         this.nextButton.active = hasPoints;
         this.deleteButton.active = hasPoints;
         this.clearButton.active = hasPoints;
+        this.mergeButton.active = canMergeDynamicPoints();
     }
 
     private Component currentPointLabel() {
@@ -248,5 +258,12 @@ public class SpawnPointToolScreen extends Screen {
                 this.selectedKind,
                 this.selectedIndex
         ));
+    }
+
+    private boolean canMergeDynamicPoints() {
+        return TdmGameTypes.supportsDynamicRespawnPoints(selectedType)
+                && SpawnPointKind.DYNAMIC_CANDIDATE.serializedName().equals(selectedKind)
+                && !selectedMap.isBlank()
+                && availableTeams.size() == 2;
     }
 }

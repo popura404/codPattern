@@ -24,6 +24,8 @@ public final class VoteService {
 
         boolean isPlayerReady(UUID playerId);
 
+        boolean hasMatchEndTeleportPoint();
+
         int getMinPlayersToStart();
 
         int getVotePercentageToStart();
@@ -203,6 +205,12 @@ public final class VoteService {
                     .count();
             if (unreadyCount > 0) {
                 hooks.notifyPlayer(initiatorPlayer, Component.translatable("message.codpattern.vote.players_not_ready"));
+                return false;
+            }
+            if (!hooks.hasMatchEndTeleportPoint()) {
+                hooks.notifyPlayer(initiatorPlayer, Component.translatable(
+                        "message.codpattern.vote.missing_end_teleport",
+                        hooks.getMapName()));
                 return false;
             }
         }

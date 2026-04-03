@@ -13,6 +13,7 @@ import net.minecraft.world.entity.player.Player;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -66,6 +67,7 @@ final class CodTdmHooksComposition {
             Consumer<ServerPlayer> clearPlayerInventoryAction,
             Consumer<ServerPlayer> scheduleRespawnAction,
             Supplier<TdmGamePhase> phaseSupplier,
+            BooleanSupplier hasMatchEndTeleportPointSupplier,
             Supplier<String> mapNameSupplier,
             Runnable startGameAction,
             Runnable transitionToEndedAction
@@ -93,6 +95,7 @@ final class CodTdmHooksComposition {
                         mapPort::findPlayerById,
                         joinedPlayersSupplier,
                         phaseSupplier,
+                        hasMatchEndTeleportPointSupplier,
                         mapNameSupplier,
                         startGameAction,
                         transitionToEndedAction
