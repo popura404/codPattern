@@ -244,8 +244,8 @@ public class SpawnPointToolScreen extends Screen {
         }
         SpawnPointData data = spawnPoints.get(selectedIndex);
         return Component.literal(String.format(
-                "X %d Y %d Z %d  Yaw %.1f Pitch %.1f",
-                data.getX(), data.getY(), data.getZ(), data.getYaw(), data.getPitch()
+                "X %d Y %d Z %d  Yaw %.1f",
+                data.getX(), data.getY(), data.getZ(), data.getYaw()
         ));
     }
 

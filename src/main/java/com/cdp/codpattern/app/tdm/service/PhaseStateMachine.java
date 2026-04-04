@@ -37,9 +37,11 @@ public final class PhaseStateMachine {
 
         Iterable<ServerPlayer> getJoinedPlayers();
 
-        void teleportPlayerToMatchEndPoint(ServerPlayer player);
+        boolean teleportPlayerToMatchEndPoint(ServerPlayer player);
 
         void notifyMissingEndTeleportPoint(ServerPlayer player);
+
+        void notifyUnusableEndTeleportPoint(ServerPlayer player);
 
         void resetGame();
     }
@@ -162,7 +164,9 @@ public final class PhaseStateMachine {
         if (nextPhaseTimer >= END_PHASE_TOTAL_TICKS) {
             if (hooks.hasMatchEndTeleportPoint()) {
                 for (ServerPlayer player : hooks.getJoinedPlayers()) {
-                    hooks.teleportPlayerToMatchEndPoint(player);
+                    if (!hooks.teleportPlayerToMatchEndPoint(player)) {
+                        hooks.notifyUnusableEndTeleportPoint(player);
+                    }
                 }
             } else {
                 for (ServerPlayer player : hooks.getJoinedPlayers()) {

@@ -40,7 +40,13 @@ final class CodTdmTeamMembershipCoordinator {
         // Match-end teleport is only meaningful while a round is active or in the end-summary phase.
         // Once the room has reset back to WAITING, leaving the room should not re-run endtp logic.
         if (!port.isWaitingPhase()) {
-            leaveRoomEffects.handleTeleportResult(player, port.teleportPlayerToMatchEndPoint(player));
+            if (!port.hasMatchEndTeleportPoint()) {
+                leaveRoomEffects.notifyMissingEndTeleport(player);
+            } else if (!port.teleportPlayerToMatchEndPoint(player)) {
+                leaveRoomEffects.notifyUnusableEndTeleport(player);
+            } else {
+                leaveRoomEffects.playTeleportSound(player);
+            }
         }
         leaveRoomEffects.sendLeaveStatePackets(player);
         port.clearPlayerInventory(player);

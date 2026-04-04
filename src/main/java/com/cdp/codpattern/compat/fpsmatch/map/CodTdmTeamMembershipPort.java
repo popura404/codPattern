@@ -14,6 +14,8 @@ interface CodTdmTeamMembershipPort {
 
     void removePlayerFromVote(UUID playerId);
 
+    boolean hasMatchEndTeleportPoint();
+
     boolean teleportPlayerToMatchEndPoint(ServerPlayer player);
 
     void clearPlayerInventory(ServerPlayer player);

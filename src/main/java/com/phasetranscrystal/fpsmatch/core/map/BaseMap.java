@@ -197,7 +197,7 @@ public abstract class BaseMap {
                 data.getY(),
                 data.getZ() + 0.5D,
                 data.getYaw(),
-                data.getPitch()
+                0.0F
         );
         player.setDeltaMovement(player.getDeltaMovement().multiply(1.0D, 0.0D, 1.0D));
         player.setOnGround(true);

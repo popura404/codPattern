@@ -17,6 +17,7 @@ final record CodTdmTeamMembershipMapPortAdapter(
         Consumer<UUID> clearTransientPlayerStateAction,
         Consumer<UUID> clearPlayerCombatStatsAction,
         Consumer<UUID> removePlayerFromVoteAction,
+        BooleanSupplier hasMatchEndTeleportPointSupplier,
         Function<ServerPlayer, Boolean> teleportPlayerToMatchEndPointAction,
         Consumer<ServerPlayer> clearPlayerInventoryAction,
         Runnable syncToClientAction,
@@ -52,6 +53,11 @@ final record CodTdmTeamMembershipMapPortAdapter(
     @Override
     public void removePlayerFromVote(UUID playerId) {
         removePlayerFromVoteAction.accept(playerId);
+    }
+
+    @Override
+    public boolean hasMatchEndTeleportPoint() {
+        return hasMatchEndTeleportPointSupplier.getAsBoolean();
     }
 
     @Override

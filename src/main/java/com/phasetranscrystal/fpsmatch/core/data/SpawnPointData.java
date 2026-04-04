@@ -11,11 +11,13 @@ import net.minecraft.world.level.Level;
 import java.util.Objects;
 
 public class SpawnPointData {
+    private static final float DEFAULT_PITCH = 0.0F;
+
     public static final Codec<SpawnPointData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("Dimension").forGetter(data -> data.getDimension().location().toString()),
             BlockPos.CODEC.optionalFieldOf("Position", BlockPos.ZERO).forGetter(SpawnPointData::getPosition),
             Codec.FLOAT.fieldOf("Yaw").forGetter(SpawnPointData::getYaw),
-            Codec.FLOAT.fieldOf("Pitch").forGetter(SpawnPointData::getPitch),
+            Codec.FLOAT.optionalFieldOf("Pitch", DEFAULT_PITCH).forGetter(SpawnPointData::getPitch),
             SpawnPointKind.CODEC.optionalFieldOf("Kind", SpawnPointKind.INITIAL).forGetter(SpawnPointData::getKind)
     ).apply(instance, (dimensionId, position, yaw, pitch, kind) -> {
         ResourceLocation location = ResourceLocation.tryParse(dimensionId);
@@ -28,6 +30,7 @@ public class SpawnPointData {
     private final ResourceKey<Level> dimension;
     private final BlockPos position;
     private final float yaw;
+    // Legacy-only. Spawn and teleport logic now uses yaw only.
     private final float pitch;
     private final SpawnPointKind kind;
 
@@ -95,13 +98,12 @@ public class SpawnPointData {
         return Objects.equals(dimension, other.dimension)
                 && Objects.equals(position, other.position)
                 && Float.compare(yaw, other.yaw) == 0
-                && Float.compare(pitch, other.pitch) == 0
                 && kind == other.kind;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(dimension, position, yaw, pitch, kind);
+        return Objects.hash(dimension, position, yaw, kind);
     }
 
     @Override

@@ -54,7 +54,7 @@ final class CodTdmHooksComposition {
 
         Iterable<ServerPlayer> joinedPlayers();
 
-        void teleportPlayerToMatchEndPoint(ServerPlayer player);
+        boolean teleportPlayerToMatchEndPoint(ServerPlayer player);
 
         String mapName();
 

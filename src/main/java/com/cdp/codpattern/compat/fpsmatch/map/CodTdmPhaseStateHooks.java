@@ -77,14 +77,21 @@ final class CodTdmPhaseStateHooks implements PhaseStateMachine.Hooks {
     }
 
     @Override
-    public void teleportPlayerToMatchEndPoint(ServerPlayer player) {
-        port.teleportPlayerToMatchEndPoint(player);
+    public boolean teleportPlayerToMatchEndPoint(ServerPlayer player) {
+        return port.teleportPlayerToMatchEndPoint(player);
     }
 
     @Override
     public void notifyMissingEndTeleportPoint(ServerPlayer player) {
         player.sendSystemMessage(Component.translatable(
                 "message.codpattern.game.warning_no_end_teleport",
+                port.mapName()));
+    }
+
+    @Override
+    public void notifyUnusableEndTeleportPoint(ServerPlayer player) {
+        player.sendSystemMessage(Component.translatable(
+                "message.codpattern.game.warning_end_teleport_unusable",
                 port.mapName()));
     }
 

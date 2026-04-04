@@ -17,7 +17,7 @@ interface CodTdmPhaseHooksPort {
 
     Iterable<ServerPlayer> getJoinedPlayers();
 
-    void teleportPlayerToMatchEndPoint(ServerPlayer player);
+    boolean teleportPlayerToMatchEndPoint(ServerPlayer player);
 
     String mapName();
 

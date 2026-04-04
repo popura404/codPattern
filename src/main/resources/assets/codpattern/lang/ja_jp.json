@@ -58,6 +58,7 @@
     "message.codpattern.game.equipped_backpack": "§6装備中バックパック: §e%s",
     "message.codpattern.game.warning_no_spawn": "§c警告: チーム %s にスポーン地点がありません!",
     "message.codpattern.game.warning_no_end_teleport": "§c警告: マップ %s に終了テレポート地点がないため、帰還テレポートをスキップしました!",
+    "message.codpattern.game.warning_end_teleport_unusable": "§c警告: マップ %s の終了テレポート地点が使用できないため、帰還テレポートに失敗しました!",
     "message.codpattern.game.already_started": "§cゲームはすでに開始済み、または進行中です!",
     "message.codpattern.game.already_voted": "§eすでに投票済みです!",
     "message.codpattern.game.vote_in_progress": "§e投票がすでに進行中です。先にそちらを完了してください。",
@@ -286,7 +287,7 @@
     "message.codpattern.map.create_save_failed_rollback": "§cマップ %s/%s の保存に失敗したため、作成をロールバックしました",
     "command.codpattern.map.invalid_kind": "無効なスポーン地点タイプ: %s",
     "command.codpattern.map.spawn.list.header": "マップ %s/%s チーム %s の %s スポーン地点は %s 個です",
-    "command.codpattern.map.spawn.list.entry": "#%s %s (%s, %s, %s) yaw=%s pitch=%s",
+    "command.codpattern.map.spawn.list.entry": "#%s %s (%s, %s, %s) yaw=%s",
     "command.codpattern.map.spawn.list.none": "スポーン地点がありません",
     "command.codpattern.map.spawn.invalid_index": "無効なスポーン地点番号: %s",
     "command.codpattern.map.spawn.removed": "%s スポーン地点 #%s を削除しました: %s",
@@ -297,6 +298,6 @@
     "command.codpattern.map.spawn.merge.success": "マップ %s/%s の動的スポーン地点 %s 個を統合し、両チームへ同じ集合を反映しました: %s=%s, %s=%s",
     "command.codpattern.map.endtp.set": "マップ %s の試合終了テレポート地点を設定しました: %s",
     "command.codpattern.map.endtp.cleared": "マップ %s の試合終了テレポート地点を削除しました",
-    "command.codpattern.map.endtp.show": "マップ %s の試合終了テレポート地点: %s %s yaw=%s pitch=%s",
+    "command.codpattern.map.endtp.show": "マップ %s の試合終了テレポート地点: %s %s yaw=%s",
     "command.codpattern.map.endtp.none": "マップ %s に試合終了テレポート地点はありません"
 }

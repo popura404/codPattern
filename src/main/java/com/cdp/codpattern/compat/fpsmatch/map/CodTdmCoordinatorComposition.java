@@ -11,6 +11,7 @@ import net.minecraft.server.level.ServerPlayer;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -72,6 +73,7 @@ final class CodTdmCoordinatorComposition {
             Consumer<ServerPlayer> scheduleRespawnAction,
             Consumer<ServerPlayer> clearPlayerInventoryAction,
             Consumer<ServerPlayer> leaveFromBaseMapAction,
+            BooleanSupplier hasMatchEndTeleportPointSupplier,
             Function<ServerPlayer, Boolean> teleportToMatchEndPointAction,
             Runnable resetGameAction
     ) {
@@ -95,6 +97,7 @@ final class CodTdmCoordinatorComposition {
                         playerState::clearTransientPlayerState,
                         playerState::removePlayerCombatStats,
                         voteCoordinator::removePlayer,
+                        hasMatchEndTeleportPointSupplier,
                         teleportToMatchEndPointAction,
                         clearPlayerInventoryAction,
                         mapPort::syncToClient,

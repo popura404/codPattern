@@ -65,6 +65,7 @@ final class CodTdmMapComposition {
                 scheduleRespawnAction,
                 clearPlayerInventoryAction,
                 leaveFromBaseMapAction,
+                hasMatchEndTeleportPointSupplier,
                 teleportToMatchEndPointAction,
                 resetGameAction
         );

@@ -323,8 +323,7 @@ public final class MapManagementCommand {
                     point.getX(),
                     point.getY(),
                     point.getZ(),
-                    formatAngle(point.getYaw()),
-                    formatAngle(point.getPitch())), false);
+                    formatAngle(point.getYaw())), false);
         }
         return spawnPoints.size();
     }
@@ -352,7 +351,7 @@ public final class MapManagementCommand {
                 source.getLevel().dimension(),
                 pos,
                 currentYaw(source),
-                currentPitch(source),
+                0.0F,
                 kind);
         if (!team.addSpawnPointDataIfAbsent(spawnPoint)) {
             source.sendFailure(Component.translatable("message.fpsm.spawn_point_tool.duplicate"));
@@ -530,8 +529,7 @@ public final class MapManagementCommand {
                 map.getMapName(),
                 data.getDimension().location(),
                 MapCreatorTool.formatPos(data.getPosition()),
-                formatAngle(data.getYaw()),
-                formatAngle(data.getPitch())), false);
+                formatAngle(data.getYaw())), false);
         return 1;
     }
 
@@ -544,7 +542,7 @@ public final class MapManagementCommand {
                 source.getLevel().dimension(),
                 pos,
                 currentYaw(source),
-                currentPitch(source));
+                0.0F);
         Optional<SpawnPointData> previousPoint = readMatchEndTeleportPoint(map);
         writeMatchEndTeleportPoint(map, point);
         try {
@@ -686,11 +684,6 @@ public final class MapManagementCommand {
     private static float currentYaw(CommandSourceStack source) {
         Vec2 rotation = source.getRotation();
         return rotation == null ? 0.0F : rotation.y;
-    }
-
-    private static float currentPitch(CommandSourceStack source) {
-        Vec2 rotation = source.getRotation();
-        return rotation == null ? 0.0F : rotation.x;
     }
 
     private static String formatAngle(float value) {

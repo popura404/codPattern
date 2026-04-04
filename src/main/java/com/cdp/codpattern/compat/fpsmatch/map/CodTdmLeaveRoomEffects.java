@@ -23,14 +23,19 @@ final class CodTdmLeaveRoomEffects {
         this.mapNameSupplier = mapNameSupplier;
     }
 
-    void handleTeleportResult(ServerPlayer player, boolean teleported) {
-        if (!teleported) {
-            player.sendSystemMessage(Component.translatable(
-                    "message.codpattern.game.warning_no_end_teleport",
-                    mapNameSupplier.get()));
-            return;
-        }
+    void notifyMissingEndTeleport(ServerPlayer player) {
+        player.sendSystemMessage(Component.translatable(
+                "message.codpattern.game.warning_no_end_teleport",
+                mapNameSupplier.get()));
+    }
 
+    void notifyUnusableEndTeleport(ServerPlayer player) {
+        player.sendSystemMessage(Component.translatable(
+                "message.codpattern.game.warning_end_teleport_unusable",
+                mapNameSupplier.get()));
+    }
+
+    void playTeleportSound(ServerPlayer player) {
         serverLevel.playSound(
                 null,
                 player.getX(),

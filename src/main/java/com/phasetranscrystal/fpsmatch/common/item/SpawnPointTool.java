@@ -107,7 +107,8 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
                         getHeldPreviewPointKey(player, team.name, i),
                         Component.literal(team.name + " #" + (i + 1)),
                         pointColor,
-                        Vec3.atCenterOf(data.getPosition())
+                        Vec3.atCenterOf(data.getPosition()),
+                        data.getYaw()
                 ));
             }
         }
@@ -147,8 +148,7 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
                         .append(point.getX()).append(',')
                         .append(point.getY()).append(',')
                         .append(point.getZ()).append(',')
-                        .append(point.getYaw()).append(',')
-                        .append(point.getPitch());
+                        .append(point.getYaw());
             }
         }
         return builder.toString();
@@ -198,7 +198,7 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
                 player.serverLevel().dimension(),
                 clickedPos.above(),
                 player.getYRot(),
-                player.getXRot(),
+                0.0F,
                 selectedKind
         );
         if (!team.addSpawnPointDataIfAbsent(spawnPointData)) {

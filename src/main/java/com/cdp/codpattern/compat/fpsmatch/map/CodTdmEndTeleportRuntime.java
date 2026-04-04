@@ -3,15 +3,15 @@ package com.cdp.codpattern.compat.fpsmatch.map;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import net.minecraft.server.level.ServerPlayer;
 
-import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
 
 final class CodTdmEndTeleportRuntime {
     private final CodTdmMapSetupState mapSetupState;
-    private final BiConsumer<ServerPlayer, SpawnPointData> teleportToPointAction;
+    private final BiPredicate<ServerPlayer, SpawnPointData> teleportToPointAction;
 
     CodTdmEndTeleportRuntime(
             CodTdmMapSetupState mapSetupState,
-            BiConsumer<ServerPlayer, SpawnPointData> teleportToPointAction
+            BiPredicate<ServerPlayer, SpawnPointData> teleportToPointAction
     ) {
         this.mapSetupState = mapSetupState;
         this.teleportToPointAction = teleportToPointAction;
@@ -33,7 +33,6 @@ final class CodTdmEndTeleportRuntime {
         if (!hasMatchEndTeleportPoint()) {
             return false;
         }
-        teleportToPointAction.accept(player, getMatchEndTeleportPoint());
-        return true;
+        return teleportToPointAction.test(player, getMatchEndTeleportPoint());
     }
 }

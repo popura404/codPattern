@@ -3,14 +3,14 @@ package com.cdp.codpattern.compat.fpsmatch.map;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 final record CodTdmPhaseStateMapPortAdapter(
         CodTdmRoundLifecycleCoordinator roundLifecycleCoordinator,
         BooleanSupplier hasMatchEndTeleportPointSupplier,
         Supplier<Iterable<ServerPlayer>> joinedPlayersSupplier,
-        Consumer<ServerPlayer> teleportToMatchEndPointAction,
+        Function<ServerPlayer, Boolean> teleportToMatchEndPointAction,
         Supplier<String> mapNameSupplier,
         Runnable resetGameAction,
         Runnable onMatchEndedAction
@@ -52,8 +52,8 @@ final record CodTdmPhaseStateMapPortAdapter(
     }
 
     @Override
-    public void teleportPlayerToMatchEndPoint(ServerPlayer player) {
-        teleportToMatchEndPointAction.accept(player);
+    public boolean teleportPlayerToMatchEndPoint(ServerPlayer player) {
+        return teleportToMatchEndPointAction.apply(player);
     }
 
     @Override

@@ -58,6 +58,7 @@
     "message.codpattern.game.equipped_backpack": "§6已裝備背包: §e%s",
     "message.codpattern.game.warning_no_spawn": "§c警告: 隊伍 %s 沒有設定復活點！",
     "message.codpattern.game.warning_no_end_teleport": "§c警告: 地圖 %s 未設定結束傳送點，無法回傳！",
+    "message.codpattern.game.warning_end_teleport_unusable": "§c警告: 地圖 %s 的結束傳送點不可用，回傳失敗！",
     "message.codpattern.game.already_started": "§c遊戲已經開始或正在進行中！",
     "message.codpattern.game.already_voted": "§e你已經投票了！",
     "message.codpattern.game.vote_in_progress": "§e目前已有進行中的投票，請先完成該投票。",
@@ -286,7 +287,7 @@
     "message.codpattern.map.create_save_failed_rollback": "§c地圖 %s/%s 儲存失敗，已回滾建立",
     "command.codpattern.map.invalid_kind": "無效的重生點類型: %s",
     "command.codpattern.map.spawn.list.header": "地圖 %s/%s 隊伍 %s 的 %s 重生點，共 %s 個",
-    "command.codpattern.map.spawn.list.entry": "#%s %s (%s, %s, %s) yaw=%s pitch=%s",
+    "command.codpattern.map.spawn.list.entry": "#%s %s (%s, %s, %s) yaw=%s",
     "command.codpattern.map.spawn.list.none": "目前沒有重生點",
     "command.codpattern.map.spawn.invalid_index": "無效的重生點序號: %s",
     "command.codpattern.map.spawn.removed": "已刪除 %s 重生點 #%s: %s",
@@ -297,6 +298,6 @@
     "command.codpattern.map.spawn.merge.success": "已將地圖 %s/%s 的 %s 個動態重生點合併後同步到兩隊: %s=%s, %s=%s",
     "command.codpattern.map.endtp.set": "已為地圖 %s 設定結束傳送點: %s",
     "command.codpattern.map.endtp.cleared": "已清除地圖 %s 的結束傳送點",
-    "command.codpattern.map.endtp.show": "地圖 %s 的結束傳送點: %s %s yaw=%s pitch=%s",
+    "command.codpattern.map.endtp.show": "地圖 %s 的結束傳送點: %s %s yaw=%s",
     "command.codpattern.map.endtp.none": "地圖 %s 目前未設定結束傳送點"
 }

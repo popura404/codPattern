@@ -9,7 +9,11 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-public record RenderablePoint(String key, Component name, int color, Vec3 position) {
+public record RenderablePoint(String key, Component name, int color, Vec3 position, float yaw) {
+    public RenderablePoint(String key, Component name, int color, Vec3 position) {
+        this(key, name, color, position, Float.NaN);
+    }
+
     public void render(PoseStack poseStack, MultiBufferSource bufferSource) {
         VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.lines());
         float red = ((color >> 16) & 0xFF) / 255.0F;
@@ -40,6 +44,38 @@ public record RenderablePoint(String key, Component name, int color, Vec3 positi
                 vertexConsumer,
                 verticalLine.minX, verticalLine.minY, verticalLine.minZ,
                 verticalLine.maxX, verticalLine.maxY, verticalLine.maxZ,
+                red, green, blue, 1.0F,
+                Math.max(red * 0.55F, 0.1F),
+                Math.max(green * 0.55F, 0.1F),
+                Math.max(blue * 0.55F, 0.1F)
+        );
+
+        if (hasOrientation()) {
+            renderFacingMarker(poseStack, vertexConsumer, red, green, blue);
+        }
+    }
+
+    private boolean hasOrientation() {
+        return !Float.isNaN(yaw);
+    }
+
+    private void renderFacingMarker(PoseStack poseStack, VertexConsumer vertexConsumer, float red, float green, float blue) {
+        Vec3 forward = Vec3.directionFromRotation(0.0F, yaw);
+        Vec3 horizontalForward = new Vec3(forward.x, 0.0D, forward.z);
+        if (horizontalForward.lengthSqr() <= 1.0E-6D) {
+            return;
+        }
+
+        Vec3 tipCenter = position.add(horizontalForward.normalize().scale(0.48D)).add(0.0D, 0.08D, 0.0D);
+        AABB tipBox = new AABB(
+                tipCenter.x - 0.09D, tipCenter.y - 0.09D, tipCenter.z - 0.09D,
+                tipCenter.x + 0.09D, tipCenter.y + 0.09D, tipCenter.z + 0.09D
+        );
+        LevelRenderer.renderLineBox(
+                poseStack,
+                vertexConsumer,
+                tipBox.minX, tipBox.minY, tipBox.minZ,
+                tipBox.maxX, tipBox.maxY, tipBox.maxZ,
                 red, green, blue, 1.0F,
                 Math.max(red * 0.55F, 0.1F),
                 Math.max(green * 0.55F, 0.1F),
