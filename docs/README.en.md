@@ -2,7 +2,7 @@
 
 [Repository README](../README.md) | [中文文档](README.md) | [Detailed Guide](GUIDE.md) | [Q&A (Chinese)](QANDA.md) | [Changelog](CHANGES.md)
 
-> Release status: Beta. Validate in a staging environment before production rollout, and back up the world save, `serverconfig/codpattern/`, and `fpsmatch/` first.
+> Release status: Beta. This documentation currently covers `0.6.10b`. Validate in a staging environment before production rollout, and back up the world save, `serverconfig/codpattern/`, and `fpsmatch/` first.
 
 ## Overview
 
@@ -37,11 +37,11 @@ The project uses a server-authoritative design. Loadouts, filters, room state, a
 
 - Adds a unified room entry to the pause menu.
 - Supports both `frontline` and `teamdeathmatch`.
-- Supports map area creation, spawn-point setup, match-end teleport setup, and persistence.
+- Supports map area creation, `INITIAL / DYNAMIC_CANDIDATE` spawn-point setup, dynamic candidate merging, match-end teleport setup, and persistence.
 - Room joining is only allowed during the `WAITING` phase.
 - Supports ready state, start vote, end vote, phase transitions, and room-list synchronization.
-- `teamdeathmatch` includes dynamic respawn candidates and spawn safety validation.
-- Includes kill feed, score display, death cam, respawn invincibility, combat regen, ally/enemy highlights, enemy health bars, and result pages.
+- `teamdeathmatch` includes dynamic respawn candidate merging, looser spawn safety checks, and warnings for missing or unusable match-end teleports.
+- Includes kill feed, score display, death cam, respawn invincibility, combat regen, ally/enemy highlights, world-space enemy health bars, and result pages.
 
 ### Persistence, Compatibility, and Localization
 
@@ -73,8 +73,10 @@ The project uses a server-authoritative design. Loadouts, filters, room state, a
   - Deletes the map and its persisted data.
 - `/cdp map spawn <list|add|remove|clear|merge> ...`
   - Manages `INITIAL` / `DYNAMIC_CANDIDATE` spawn points and supports merging dynamic respawn candidates for a specific mode/map.
-- `/cdp map endtp <show|set> <map> [pos]`
-  - Manages the match-end teleport point; `set` overwrites the existing one and may point outside the map area.
+- `/cdp map endtp show <map>`
+  - Shows the current match-end teleport point for a specific map.
+- `/cdp map endtp set`
+  - Writes the executor's current position and yaw into every registered map as the match-end teleport point; runtime validation still checks that the landing spot is usable.
 
 ## Configuration and Directories
 

@@ -188,13 +188,7 @@ public final class MapManagementCommand {
                                 context.getSource(),
                                 StringArgumentType.getString(context, "map")))));
         endtp.then(Commands.literal("set")
-                .then(Commands.argument("map", StringArgumentType.string())
-                        .suggests(ALL_MAP_SUGGESTIONS)
-                        .then(Commands.argument("pos", BlockPosArgument.blockPos())
-                                .executes(context -> setMatchEndTeleport(
-                                        context.getSource(),
-                                        StringArgumentType.getString(context, "map"),
-                                        BlockPosArgument.getLoadedBlockPos(context, "pos"))))));
+                .executes(context -> setMatchEndTeleportForAllMaps(context.getSource())));
         root.then(endtp);
 
         return root;
@@ -533,30 +527,54 @@ public final class MapManagementCommand {
         return 1;
     }
 
-    private static int setMatchEndTeleport(CommandSourceStack source, String mapName, BlockPos pos) {
-        BaseMap map = requireUniqueMap(source, mapName);
-        if (map == null) {
+    private static int setMatchEndTeleportForAllMaps(CommandSourceStack source) {
+        List<BaseMap> maps = FPSMCore.getInstance().getAllMaps().values().stream()
+                .flatMap(List::stream)
+                .distinct()
+                .toList();
+        if (maps.isEmpty()) {
+            source.sendFailure(Component.translatable("command.codpattern.map.endtp.set_all.none"));
             return 0;
         }
+
+        BlockPos pos = BlockPos.containing(source.getPosition());
         SpawnPointData point = new SpawnPointData(
                 source.getLevel().dimension(),
                 pos,
                 currentYaw(source),
                 0.0F);
-        Optional<SpawnPointData> previousPoint = readMatchEndTeleportPoint(map);
-        writeMatchEndTeleportPoint(map, point);
+
+        Map<BaseMap, SpawnPointData> previousPoints = new LinkedHashMap<>();
+        List<BaseMap> savedMaps = new ArrayList<>();
+        for (BaseMap map : maps) {
+            previousPoints.put(map, readMatchEndTeleportPoint(map).orElse(null));
+            writeMatchEndTeleportPoint(map, point);
+        }
+
         try {
-            CodMapPersistence.saveMapOrRollback(map, () -> writeMatchEndTeleportPoint(map, previousPoint.orElse(null)));
+            for (BaseMap map : maps) {
+                CodMapPersistence.saveMap(map);
+                savedMaps.add(map);
+            }
         } catch (RuntimeException e) {
-            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
+            previousPoints.forEach(MapManagementCommand::writeMatchEndTeleportPoint);
+            for (BaseMap savedMap : savedMaps) {
+                try {
+                    CodMapPersistence.saveMap(savedMap);
+                } catch (RuntimeException ignored) {
+                }
+            }
+            previousPoints.keySet().forEach(BaseMap::syncToClient);
+            source.sendFailure(Component.translatable("message.codpattern.map.save_failed_batch"));
             return 0;
         }
-        map.syncToClient();
+
+        maps.forEach(BaseMap::syncToClient);
         source.sendSuccess(() -> Component.translatable(
-                "command.codpattern.map.endtp.set",
-                map.getMapName(),
+                "command.codpattern.map.endtp.set_all",
+                maps.size(),
                 MapCreatorTool.formatPos(pos)), true);
-        return 1;
+        return maps.size();
     }
 
     private static String resolveGameType(CommandSourceStack source, String rawType) {
