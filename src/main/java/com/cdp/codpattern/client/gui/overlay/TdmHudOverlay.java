@@ -64,8 +64,6 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int DEATH_CAM_PANEL_BOTTOM_MARGIN = 40;
     private static final int DEATH_CAM_PANEL_MIN_CENTER_OFFSET = 18;
     private static final int DEATH_CAM_PANEL_TEXT_PADDING = 12;
-    private static final int ENEMY_BAR_SCREEN_Y_OFFSET = 10;
-    private static final double ENEMY_BAR_HEAD_OFFSET = 0.18D;
     private static final double INVINCIBILITY_MARKER_HEAD_OFFSET = 0.92D;
 
     public static final TdmHudOverlay INSTANCE = new TdmHudOverlay();
@@ -885,8 +883,6 @@ public class TdmHudOverlay implements IGuiOverlay {
                 || !snapshot.localPlayerId().equals(localPlayer.getUUID())) {
             return;
         }
-        TdmCombatMarkerTracker markerTracker = TdmCombatMarkerTracker.INSTANCE;
-
         for (Map.Entry<UUID, String> entry : snapshot.teamByPlayer().entrySet()) {
             UUID playerId = entry.getKey();
             if (playerId == null || playerId.equals(localPlayer.getUUID()) || !snapshot.isLiving(playerId)) {
@@ -912,19 +908,6 @@ public class TdmHudOverlay implements IGuiOverlay {
                 }
             }
 
-            if (playing
-                    && snapshot.isEnemy(playerId)
-                    && markerTracker.shouldRenderEnemyHealthBar(playerId)) {
-                ScreenProjection barProjection = projectWorldToScreen(
-                        minecraft,
-                        partialTick,
-                        interpolatePlayerHeadPos(tracked, partialTick, ENEMY_BAR_HEAD_OFFSET),
-                        screenWidth,
-                        screenHeight);
-                if (barProjection != null) {
-                    drawEnemyHealthBar(graphics, localPlayer, tracked, barProjection, screenWidth, screenHeight);
-                }
-            }
         }
     }
 
@@ -942,33 +925,6 @@ public class TdmHudOverlay implements IGuiOverlay {
         graphics.fill(left - 2, top - 2, right + 2, bottom + 2, withAlpha(INVINCIBILITY_MARKER_OUTLINE, pulseAlpha));
         graphics.fill(left - 1, top - 1, right + 1, bottom + 1, withAlpha(0xFF000000, 110));
         graphics.fill(left, top, right, bottom, withAlpha(INVINCIBILITY_MARKER_COLOR, fillAlpha));
-    }
-
-    private void drawEnemyHealthBar(GuiGraphics graphics, LocalPlayer localPlayer, Player enemy, ScreenProjection projection,
-            int screenWidth, int screenHeight) {
-        float maxHealth = Math.max(1.0f, enemy.getMaxHealth());
-        float healthRatio = Mth.clamp(enemy.getHealth() / maxHealth, 0.0f, 1.0f);
-
-        float distance = localPlayer.distanceTo(enemy);
-        float distanceScale = Mth.clamp(1.25f - (distance / 80.0f), 0.6f, 1.25f);
-        int barWidth = Math.max(22, Math.round((34.0f * 4.0f / 3.0f) * distanceScale));
-        int barHeight = Math.max(1, Math.round((3.0f * 0.5f) * distanceScale));
-
-        int left = projection.x() - barWidth / 2;
-        int top = projection.y() - ENEMY_BAR_SCREEN_Y_OFFSET;
-        int right = left + barWidth;
-        int bottom = top + barHeight;
-        if (right < 0 || left > screenWidth || bottom < 0 || top > screenHeight) {
-            return;
-        }
-
-        graphics.fill(left - 1, top - 1, right + 1, bottom + 1, withAlpha(0xFF000000, 180));
-        graphics.fill(left, top, right, bottom, withAlpha(0xFF2B0E0E, 155));
-
-        int fillWidth = Math.round(barWidth * healthRatio);
-        if (fillWidth > 0) {
-            graphics.fill(left, top, left + fillWidth, bottom, withAlpha(0xFFFF3A3A, 230));
-        }
     }
 
     private ScreenProjection projectWorldToScreen(Minecraft minecraft,
