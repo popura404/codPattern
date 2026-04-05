@@ -39,7 +39,8 @@ public final class TdmCombatMarkerWorldRenderer {
     private static final int BAR_OUTLINE_PX = 1;
     private static final int BAR_Y_OFFSET_PX = 34;
     private static final int TEXT_GAP_PX = 4;
-    private static final float ID_TEXT_SCALE = 2.25f;
+    private static final float ENEMY_ID_TEXT_SCALE = 2.25f;
+    private static final float TEAMMATE_ID_TEXT_SCALE = ENEMY_ID_TEXT_SCALE * 0.7f;
     private static final int BAR_OUTLINE_COLOR = 0xB4000000;
     private static final int BAR_BACKGROUND_COLOR = 0x9B2B0E0E;
     private static final int BAR_FILL_COLOR = 0xE6FF3A3A;
@@ -179,7 +180,14 @@ public final class TdmCombatMarkerWorldRenderer {
         poseStack.scale(-pixelScale, -pixelScale, pixelScale);
 
         drawHealthBar(poseStack, healthRatio);
-        drawLabelText(poseStack, bufferSource, font, idText, enemyTextTop(), ENEMY_TEXT_COLOR);
+        drawLabelText(
+                poseStack,
+                bufferSource,
+                font,
+                idText,
+                enemyTextTop(),
+                ENEMY_TEXT_COLOR,
+                ENEMY_ID_TEXT_SCALE);
 
         poseStack.popPose();
     }
@@ -196,7 +204,14 @@ public final class TdmCombatMarkerWorldRenderer {
         poseStack.mulPose(minecraft.getEntityRenderDispatcher().cameraOrientation());
         poseStack.scale(-pixelScale, -pixelScale, pixelScale);
 
-        drawLabelText(poseStack, bufferSource, font, idText, enemyTextTop(), TEAMMATE_TEXT_COLOR);
+        drawLabelText(
+                poseStack,
+                bufferSource,
+                font,
+                idText,
+                enemyTextTop(),
+                TEAMMATE_TEXT_COLOR,
+                TEAMMATE_ID_TEXT_SCALE);
 
         poseStack.popPose();
     }
@@ -226,14 +241,15 @@ public final class TdmCombatMarkerWorldRenderer {
             Font font,
             String idText,
             float textTop,
-            int textColor) {
+            int textColor,
+            float textScale) {
         if (idText == null || idText.isBlank()) {
             return;
         }
 
         poseStack.pushPose();
         poseStack.translate(0.0f, textTop, 0.0f);
-        poseStack.scale(ID_TEXT_SCALE, ID_TEXT_SCALE, 1.0f);
+        poseStack.scale(textScale, textScale, 1.0f);
 
         Matrix4f matrix = poseStack.last().pose();
         float textX = -font.width(idText) / 2.0f;
