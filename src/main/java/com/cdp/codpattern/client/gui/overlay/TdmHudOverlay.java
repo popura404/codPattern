@@ -70,6 +70,12 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int DEATH_CAM_PANEL_MIN_CENTER_OFFSET = 18;
     private static final int DEATH_CAM_PANEL_TEXT_PADDING = 12;
     private static final double INVINCIBILITY_MARKER_HEAD_OFFSET = 0.92D;
+    private static final int THROWABLE_HUD_ICON_SIZE = 16;
+    private static final int THROWABLE_HUD_SLOT_GAP = 14;
+    private static final int THROWABLE_HUD_TEXT_GAP = 2;
+    private static final int THROWABLE_HUD_BOTTOM_MARGIN = 10;
+    private static final int THROWABLE_HUD_RIGHT_RESERVED_WIDTH = 116;
+    private static final int THROWABLE_HUD_RIGHT_GAP = 10;
 
     public static final TdmHudOverlay INSTANCE = new TdmHudOverlay();
 
@@ -428,33 +434,39 @@ public class TdmHudOverlay implements IGuiOverlay {
         }
 
         int activeSlot = ThrowableInventoryService.getActiveSlot(player);
-        int baseY = screenHeight - 24;
-        int startX = (screenWidth / 2) + 102;
-        int slotSize = 20;
-        int gap = 4;
+        String[] keyTexts = new String[ThrowableInventoryState.SLOT_COUNT];
+        int keyColumnWidth = 0;
+        for (int i = 0; i < ThrowableInventoryState.SLOT_COUNT; i++) {
+            keyTexts[i] = ThrowableKeyMappings.getBoundLabel(i).getString();
+            keyColumnWidth = Math.max(keyColumnWidth, font.width(keyTexts[i]));
+        }
+
+        int slotWidth = keyColumnWidth + 4 + THROWABLE_HUD_ICON_SIZE;
+        int totalWidth = (ThrowableInventoryState.SLOT_COUNT * slotWidth)
+                + ((ThrowableInventoryState.SLOT_COUNT - 1) * THROWABLE_HUD_SLOT_GAP);
+        int startX = screenWidth - THROWABLE_HUD_RIGHT_RESERVED_WIDTH - THROWABLE_HUD_RIGHT_GAP - totalWidth;
+        int iconY = screenHeight - THROWABLE_HUD_BOTTOM_MARGIN - font.lineHeight - THROWABLE_HUD_TEXT_GAP
+                - THROWABLE_HUD_ICON_SIZE;
+        int keyY = iconY + ((THROWABLE_HUD_ICON_SIZE - font.lineHeight) / 2);
+        int countY = iconY + THROWABLE_HUD_ICON_SIZE + THROWABLE_HUD_TEXT_GAP;
 
         for (int i = 0; i < ThrowableInventoryState.SLOT_COUNT; i++) {
-            int x = startX + (i * (slotSize + gap));
-            int y = baseY;
+            int slotX = startX + (i * (slotWidth + THROWABLE_HUD_SLOT_GAP));
+            int iconX = slotX + keyColumnWidth + 4;
             boolean active = activeSlot == i;
-            int borderColor = active ? 0xFFE6B85C : 0xFF4A5057;
-            int fillColor = active ? 0xAA1A232D : 0x9910161D;
-
-            graphics.fill(x, y, x + slotSize, y + slotSize, fillColor);
-            graphics.fill(x, y, x + slotSize, y + 1, borderColor);
-            graphics.fill(x, y + slotSize - 1, x + slotSize, y + slotSize, borderColor);
-            graphics.fill(x, y, x + 1, y + slotSize, borderColor);
-            graphics.fill(x + slotSize - 1, y, x + slotSize, y + slotSize, borderColor);
 
             ItemStack stack = ThrowableInventoryService.getDisplayStack(player, i);
             if (!stack.isEmpty()) {
-                graphics.renderItem(stack, x + 2, y + 2);
-                graphics.renderItemDecorations(font, stack, x + 2, y + 2);
+                graphics.renderItem(stack, iconX, iconY);
             }
 
-            String keyText = ThrowableKeyMappings.getBoundLabel(i).getString();
-            graphics.drawString(font, keyText, x + (slotSize - font.width(keyText)) / 2, y - 9,
+            graphics.drawString(font, keyTexts[i], slotX + keyColumnWidth - font.width(keyTexts[i]), keyY,
                     active ? 0xFFF8D27B : 0xFFB8C0CA, false);
+
+            String countText = String.valueOf(stack.getCount());
+            graphics.drawString(font, countText,
+                    iconX + ((THROWABLE_HUD_ICON_SIZE - font.width(countText)) / 2), countY,
+                    stack.isEmpty() ? 0xFF6E7681 : (active ? 0xFFF2F4F7 : 0xFFD9DDE3), false);
         }
     }
 
