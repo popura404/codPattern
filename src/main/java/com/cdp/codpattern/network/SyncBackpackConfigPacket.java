@@ -1,11 +1,9 @@
 package com.cdp.codpattern.network;
 
-import com.cdp.codpattern.network.handler.ClientPacketHandler;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.network.handler.ClientPacketBridge;
 import com.google.gson.Gson;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -33,8 +31,7 @@ public class SyncBackpackConfigPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                    () -> () -> ClientPacketHandler.handleSyncBackpackConfig(configJson));
+            ClientPacketBridge.syncBackpackConfig(configJson);
         });
         ctx.get().setPacketHandled(true);
     }

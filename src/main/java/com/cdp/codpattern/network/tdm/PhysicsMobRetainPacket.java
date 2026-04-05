@@ -1,9 +1,7 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.network.handler.ClientPacketHandler;
+import com.cdp.codpattern.network.handler.ClientPacketBridge;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -73,19 +71,18 @@ public class PhysicsMobRetainPacket {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
-                ClientPacketHandler.handlePhysicsMobRetain(
-                        entityId,
-                        x,
-                        y,
-                        z,
-                        yRot,
-                        xRot,
-                        yHeadRot,
-                        yBodyRot,
-                        motionX,
-                        motionY,
-                        motionZ)));
+        ctx.get().enqueueWork(() -> ClientPacketBridge.physicsMobRetain(
+                entityId,
+                x,
+                y,
+                z,
+                yRot,
+                xRot,
+                yHeadRot,
+                yBodyRot,
+                motionX,
+                motionY,
+                motionZ));
         ctx.get().setPacketHandled(true);
     }
 }

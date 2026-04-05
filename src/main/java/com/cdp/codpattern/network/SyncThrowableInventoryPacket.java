@@ -1,8 +1,7 @@
 package com.cdp.codpattern.network;
 
-import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryState;
-import net.minecraft.client.Minecraft;
+import com.cdp.codpattern.network.handler.ClientPacketBridge;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.network.NetworkEvent;
@@ -41,12 +40,7 @@ public class SyncThrowableInventoryPacket {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            Minecraft minecraft = Minecraft.getInstance();
-            if (minecraft.player != null) {
-                ThrowableInventoryService.applyClientSync(minecraft.player, stacks, activeSlot);
-            }
-        });
+        ctx.get().enqueueWork(() -> ClientPacketBridge.syncThrowableInventory(stacks, activeSlot));
         ctx.get().setPacketHandled(true);
     }
 }

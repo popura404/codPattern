@@ -1,10 +1,8 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.network.handler.ClientPacketHandler;
+import com.cdp.codpattern.network.handler.ClientPacketBridge;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -41,8 +39,7 @@ public class KillFeedPacket {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                () -> () -> ClientPacketHandler.handleKillFeed(killerName, victimName, weaponStack, blunder)));
+        ctx.get().enqueueWork(() -> ClientPacketBridge.killFeed(killerName, victimName, weaponStack, blunder));
         ctx.get().setPacketHandled(true);
     }
 }

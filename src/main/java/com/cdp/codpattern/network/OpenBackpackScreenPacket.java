@@ -1,9 +1,7 @@
 package com.cdp.codpattern.network;
 
-import com.cdp.codpattern.network.handler.ClientPacketHandler;
+import com.cdp.codpattern.network.handler.ClientPacketBridge;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -20,8 +18,7 @@ public class OpenBackpackScreenPacket {
 
     public static void handle(OpenBackpackScreenPacket packet, Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            // 使用 DistExecutor 确保只在客户端执行
-            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> ClientPacketHandler::handleOpenBackpackScreen);
+            ClientPacketBridge.openBackpackScreen();
         });
         ctx.get().setPacketHandled(true);
     }

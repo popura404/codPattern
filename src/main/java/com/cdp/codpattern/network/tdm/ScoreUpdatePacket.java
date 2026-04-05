@@ -1,9 +1,7 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.network.handler.ClientPacketHandler;
+import com.cdp.codpattern.network.handler.ClientPacketBridge;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.HashMap;
@@ -75,9 +73,7 @@ public class ScoreUpdatePacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                    () -> () -> ClientPacketHandler.handleScoreUpdate(teamScores, team1Score, team2Score,
-                            gameTimeTicks));
+            ClientPacketBridge.scoreUpdate(teamScores, team1Score, team2Score, gameTimeTicks);
         });
         ctx.get().setPacketHandled(true);
     }

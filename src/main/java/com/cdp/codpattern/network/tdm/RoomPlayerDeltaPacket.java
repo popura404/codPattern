@@ -1,10 +1,8 @@
 package com.cdp.codpattern.network.tdm;
 
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
-import com.cdp.codpattern.network.handler.ClientPacketHandler;
+import com.cdp.codpattern.network.handler.ClientPacketBridge;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.ArrayList;
@@ -59,8 +57,7 @@ public class RoomPlayerDeltaPacket {
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                    () -> () -> ClientPacketHandler.handleRoomPlayerDelta(roomKey, rosterVersion, updates));
+            ClientPacketBridge.roomPlayerDelta(roomKey, rosterVersion, updates);
         });
         ctx.get().setPacketHandled(true);
     }

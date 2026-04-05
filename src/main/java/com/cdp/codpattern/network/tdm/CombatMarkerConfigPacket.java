@@ -1,9 +1,7 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.network.handler.ClientPacketHandler;
+import com.cdp.codpattern.network.handler.ClientPacketBridge;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
@@ -46,12 +44,11 @@ public class CombatMarkerConfigPacket {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                () -> () -> ClientPacketHandler.handleCombatMarkerConfig(
-                        focusHalfAngleDegrees,
-                        focusRequiredTicks,
-                        barMaxDistance,
-                        barVisibleGraceTicks)));
+        ctx.get().enqueueWork(() -> ClientPacketBridge.combatMarkerConfig(
+                focusHalfAngleDegrees,
+                focusRequiredTicks,
+                barMaxDistance,
+                barVisibleGraceTicks));
         ctx.get().setPacketHandled(true);
     }
 }

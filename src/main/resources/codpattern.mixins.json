@@ -2,6 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "com.cdp.codpattern.mixin",
+  "plugin": "com.cdp.codpattern.mixin.CodPatternMixinPlugin",
   "compatibilityLevel": "JAVA_17",
   "refmap": "codpattern.refmap.json",
   "mixins": [
