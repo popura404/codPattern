@@ -1,5 +1,6 @@
 package com.cdp.codpattern.app.tdm.service;
 
+import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
@@ -28,6 +29,7 @@ public final class KitDistributionService {
         }
 
         player.getInventory().clearContent();
+        ThrowableInventoryService.clearRuntime(player);
 
         BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(
                 player.getStringUUID(), ConfigPath.SERVERBACKPACK.getPath(player.server));
@@ -49,8 +51,8 @@ public final class KitDistributionService {
             giveBackpackItem(player, backpack, filterConfig, "primary", 0, ammoMultiple);
             giveBackpackItem(player, backpack, filterConfig, "secondary", 1, ammoMultiple);
             if (throwablesEnabled) {
-                giveBackpackItem(player, backpack, filterConfig, "tactical", 2, 0);
-                giveBackpackItem(player, backpack, filterConfig, "lethal", 3, 0);
+                giveThrowableItem(player, backpack, filterConfig, "tactical", ThrowableInventoryService.SLOT_ONE);
+                giveThrowableItem(player, backpack, filterConfig, "lethal", ThrowableInventoryService.SLOT_TWO);
             }
 
             player.sendSystemMessage(
@@ -60,6 +62,7 @@ public final class KitDistributionService {
 
         player.inventoryMenu.broadcastChanges();
         player.inventoryMenu.slotsChanged(player.getInventory());
+        ThrowableInventoryService.sync(player);
     }
 
     private static void giveBackpackItem(ServerPlayer player, BackpackConfig.Backpack backpack,
@@ -97,6 +100,39 @@ public final class KitDistributionService {
         }
 
         player.getInventory().setItem(slot, stack);
+    }
+
+    private static void giveThrowableItem(ServerPlayer player, BackpackConfig.Backpack backpack,
+            WeaponFilterConfig filterConfig, String key, int dedicatedSlot) {
+        BackpackConfig.Backpack.ItemData itemData = backpack.getItem_MAP().get(key);
+        if (itemData == null) {
+            return;
+        }
+
+        ResourceLocation itemId = ResourceLocation.tryParse(itemData.getItem());
+        if (itemId == null) {
+            return;
+        }
+
+        Item item = BuiltInRegistries.ITEM.get(itemId);
+        if (item == null || item == Items.AIR) {
+            return;
+        }
+
+        ItemStack stack = new ItemStack(item, Math.max(1, itemData.getCount()));
+        if (itemData.getNbt() != null && !itemData.getNbt().isEmpty()) {
+            try {
+                CompoundTag tag = TagParser.parseTag(itemData.getNbt());
+                stack.setTag(tag);
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {
+            return;
+        }
+
+        ThrowableInventoryService.seedThrowableSlot(player, dedicatedSlot, stack);
     }
 
     private static BackpackConfig.Backpack resolveBackpack(BackpackConfig.PlayerBackpackData playerData) {

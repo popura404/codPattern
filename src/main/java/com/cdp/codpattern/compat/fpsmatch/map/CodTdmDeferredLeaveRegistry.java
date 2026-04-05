@@ -1,5 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.GameType;
 
@@ -26,10 +27,12 @@ public final class CodTdmDeferredLeaveRegistry {
         }
         player.setGameMode(GameType.ADVENTURE);
         player.getInventory().clearContent();
+        ThrowableInventoryService.clearRuntime(player);
         player.containerMenu.broadcastChanges();
         player.setHealth(player.getMaxHealth());
         player.getFoodData().setFoodLevel(20);
         player.removeAllEffects();
+        ThrowableInventoryService.sync(player);
         return true;
     }
 }

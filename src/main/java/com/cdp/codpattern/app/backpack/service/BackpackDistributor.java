@@ -1,5 +1,6 @@
 package com.cdp.codpattern.app.backpack.service;
 
+import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
@@ -66,6 +67,7 @@ public class BackpackDistributor {
         }
 
         player.getInventory().clearContent();
+        ThrowableInventoryService.clearRuntime(player);
 
         for (Map.Entry<String, BackpackConfig.Backpack.ItemData> entry :
                 backpack.getItem_MAP().entrySet()) {
@@ -114,15 +116,16 @@ public class BackpackDistributor {
             } else if (("tactical".equals(weaponType) || "lethal".equals(weaponType))
                     && filterConfig.isThrowablesEnabled()) {
                 if ("tactical".equals(weaponType)) {
-                    player.getInventory().setItem(2, stack);
+                    ThrowableInventoryService.seedThrowableSlot(player, ThrowableInventoryService.SLOT_ONE, stack);
                 } else {
-                    player.getInventory().setItem(3, stack);
+                    ThrowableInventoryService.seedThrowableSlot(player, ThrowableInventoryService.SLOT_TWO, stack);
                 }
             }
         }
 
         player.inventoryMenu.broadcastChanges();
         player.inventoryMenu.slotsChanged(player.getInventory());
+        ThrowableInventoryService.sync(player);
 
         player.sendSystemMessage(Component.translatable(
                 "message.codpattern.game.equipped_backpack",

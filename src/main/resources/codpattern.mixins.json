@@ -5,9 +5,13 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "codpattern.refmap.json",
   "mixins": [
+    "accessor.AbstractContainerMenuAccessor",
+    "inventory.InventoryMenuMixin",
     "taczaddon.LiberateAttachmentMixin"
   ],
   "client": [
+    "accessor.AbstractContainerScreenAccessor",
+    "inventory.InventoryScreenMixin",
     "tacz.GunRefitScreenMixin"
   ],
   "server": []

@@ -5,7 +5,12 @@ import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.TdmCombatMarkerTracker;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
+import com.cdp.codpattern.client.input.ThrowableKeyMappings;
 import com.cdp.codpattern.client.state.KillFeedEntry;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
+import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
+import com.cdp.codpattern.core.throwable.ThrowableInventoryState;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.mojang.authlib.GameProfile;
@@ -94,6 +99,7 @@ public class TdmHudOverlay implements IGuiOverlay {
         renderKillFeed(graphics, font, screenWidth, screenHeight);
         renderPhaseAnnouncement(graphics, font, centerX, screenHeight);
         renderCountdownFocus(graphics, font, centerX, screenHeight);
+        renderThrowableSlots(graphics, font, screenWidth, screenHeight);
         renderCombatMarkers(graphics, partialTick, screenWidth, screenHeight);
         renderEndgameSplash(graphics, font, centerX, screenWidth, screenHeight);
         renderDeathCamPanel(graphics, font, centerX, screenWidth, screenHeight);
@@ -404,6 +410,52 @@ public class TdmHudOverlay implements IGuiOverlay {
         drawScaledCenteredString(graphics, font, String.valueOf(secondsLeft), centerX, numberY, color, scale);
         drawCenteredString(graphics, font, Component.translatable("hud.codpattern.tdm.countdown_hint").getString(),
                 centerX, numberY + 86, 0xFFE4E4E4);
+    }
+
+    private void renderThrowableSlots(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
+        if (!ClientTdmState.hasRoomContext()) {
+            return;
+        }
+
+        WeaponFilterConfig config = WeaponFilterClientCache.get();
+        if (config != null && !config.isThrowablesEnabled()) {
+            return;
+        }
+
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null) {
+            return;
+        }
+
+        int activeSlot = ThrowableInventoryService.getActiveSlot(player);
+        int baseY = screenHeight - 24;
+        int startX = (screenWidth / 2) + 102;
+        int slotSize = 20;
+        int gap = 4;
+
+        for (int i = 0; i < ThrowableInventoryState.SLOT_COUNT; i++) {
+            int x = startX + (i * (slotSize + gap));
+            int y = baseY;
+            boolean active = activeSlot == i;
+            int borderColor = active ? 0xFFE6B85C : 0xFF4A5057;
+            int fillColor = active ? 0xAA1A232D : 0x9910161D;
+
+            graphics.fill(x, y, x + slotSize, y + slotSize, fillColor);
+            graphics.fill(x, y, x + slotSize, y + 1, borderColor);
+            graphics.fill(x, y + slotSize - 1, x + slotSize, y + slotSize, borderColor);
+            graphics.fill(x, y, x + 1, y + slotSize, borderColor);
+            graphics.fill(x + slotSize - 1, y, x + slotSize, y + slotSize, borderColor);
+
+            ItemStack stack = ThrowableInventoryService.getDisplayStack(player, i);
+            if (!stack.isEmpty()) {
+                graphics.renderItem(stack, x + 2, y + 2);
+                graphics.renderItemDecorations(font, stack, x + 2, y + 2);
+            }
+
+            String keyText = ThrowableKeyMappings.getBoundLabel(i).getString();
+            graphics.drawString(font, keyText, x + (slotSize - font.width(keyText)) / 2, y - 9,
+                    active ? 0xFFF8D27B : 0xFFB8C0CA, false);
+        }
     }
 
     private void renderEndgameSplash(GuiGraphics graphics, Font font, int centerX, int screenWidth, int screenHeight) {
