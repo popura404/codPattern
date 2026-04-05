@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client;
 
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
+import com.cdp.codpattern.mixin.accessor.EntityAccessor;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -257,6 +258,8 @@ public final class TdmCombatMarkerTracker {
         if (player == null || player.isRemoved()) {
             return;
         }
+        // Client rendering checks the shared glowing flag, not just hasGlowingTag.
+        ((EntityAccessor) player).codpattern$invokeSetSharedFlag(6, glowing);
         player.setGlowingTag(glowing);
     }
 

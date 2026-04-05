@@ -11,6 +11,7 @@
     "taczaddon.LiberateAttachmentMixin"
   ],
   "client": [
+    "accessor.EntityAccessor",
     "accessor.AbstractContainerScreenAccessor",
     "inventory.InventoryScreenMixin",
     "tacz.GunRefitScreenMixin"

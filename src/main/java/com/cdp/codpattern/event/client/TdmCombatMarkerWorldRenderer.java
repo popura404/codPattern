@@ -44,7 +44,7 @@ public final class TdmCombatMarkerWorldRenderer {
     private static final int BAR_OUTLINE_COLOR = 0xB4000000;
     private static final int BAR_BACKGROUND_COLOR = 0x9B2B0E0E;
     private static final int BAR_FILL_COLOR = 0xE6FF3A3A;
-    private static final int ENEMY_TEXT_COLOR = 0xFFF2F2F2;
+    private static final int ENEMY_TEXT_COLOR = 0xFFFF5A5A;
     private static final int TEAMMATE_TEXT_COLOR = 0xFFD8E7FF;
     private static final int TEXT_BACKGROUND_COLOR = 0x66000000;
 
