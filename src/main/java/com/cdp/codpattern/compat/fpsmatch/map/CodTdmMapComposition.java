@@ -85,6 +85,7 @@ final class CodTdmMapComposition {
                         joinedPlayersSupplier,
                         player -> teleportToMatchEndPointAction.apply(player),
                         mapNameSupplier,
+                        coordinatorMapPort::gameType,
                         resetGameAction,
                         matchResultExporter::exportOnMatchEnded
                 )

@@ -1,5 +1,7 @@
 package com.phasetranscrystal.fpsmatch.core.map;
 
+import com.cdp.codpattern.app.tdm.service.WarmupMovementLockService;
+import com.cdp.codpattern.compat.fpsmatch.map.RoomRespawnStateRegistry;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
@@ -98,6 +100,8 @@ public abstract class BaseMap {
     public void leave(ServerPlayer player) {
         mapTeams.leaveTeam(player);
         player.setGameMode(GameType.ADVENTURE);
+        WarmupMovementLockService.unlock(player);
+        RoomRespawnStateRegistry.restore(player);
     }
 
     public void onPlayerLoggedOut(ServerPlayer player) {
@@ -157,6 +161,7 @@ public abstract class BaseMap {
                             }
                             continue;
                         }
+                        RoomRespawnStateRegistry.captureIfAbsent(player);
                         player.setRespawnPosition(currentPoint.getDimension(), currentPoint.getPosition(),
                                 currentPoint.getYaw(), true, false);
                         team.markSpawnUsed(player.getUUID(), currentPoint);

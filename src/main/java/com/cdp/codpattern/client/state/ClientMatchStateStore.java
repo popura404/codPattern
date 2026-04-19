@@ -239,7 +239,7 @@ public final class ClientMatchStateStore {
         lastPhaseSyncAtMs = System.currentTimeMillis();
         String oldPhase = currentPhase;
         if (!phase.equals(oldPhase)) {
-            if (phase.equals("WARMUP") || phase.equals("PLAYING")) {
+            if (phase.equals("WARMUP")) {
                 startFadeOut();
                 playTeleportSound = true;
             }

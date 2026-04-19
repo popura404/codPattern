@@ -19,9 +19,17 @@ public final class PhaseStateMachine {
 
         void broadcastScoreUpdate(ScoreUpdatePacket packet);
 
+        void showCountdownActionBar(int secondsLeft);
+
+        void clearCountdownActionBar();
+
         void teleportAllPlayersToSpawn();
 
         void giveAllPlayersKits();
+
+        void lockWarmupMovement();
+
+        void unlockAllRoomPlayersMovement();
 
         void clearAllPlayersInventory();
 
@@ -42,6 +50,8 @@ public final class PhaseStateMachine {
         void notifyMissingEndTeleportPoint(ServerPlayer player);
 
         void notifyUnusableEndTeleportPoint(ServerPlayer player);
+
+        void showPlayingIntro();
 
         void resetGame();
     }
@@ -65,18 +75,23 @@ public final class PhaseStateMachine {
         int nextGameTimeTicks = gameTimeTicks;
 
         switch (newPhase) {
-            case COUNTDOWN -> hooks.broadcastCountdown(new CountdownPacket(config.getPreGameCountdownTicks(), false));
+            case COUNTDOWN -> {
+                hooks.broadcastCountdown(new CountdownPacket(config.getPreGameCountdownTicks(), false));
+                hooks.showCountdownActionBar(secondsFromTicks(config.getPreGameCountdownTicks()));
+            }
             case WARMUP -> {
                 hooks.restoreAllRoomPlayersToAdventure();
                 hooks.teleportAllPlayersToSpawn();
                 hooks.giveAllPlayersKits();
+                hooks.clearCountdownActionBar();
+                hooks.lockWarmupMovement();
             }
             case PLAYING -> {
                 nextGameTimeTicks = 0;
-                hooks.teleportAllPlayersToSpawn();
-                hooks.giveAllPlayersKits();
+                hooks.unlockAllRoomPlayersMovement();
             }
             case ENDED -> {
+                hooks.unlockAllRoomPlayersMovement();
                 hooks.notifyMatchEnded();
                 hooks.onMatchEnded();
                 hooks.clearAllPlayersInventory();
@@ -99,7 +114,7 @@ public final class PhaseStateMachine {
         return switch (phase) {
             case WAITING -> new TickResult(phaseTimer, gameTimeTicks, Optional.empty(), false);
             case COUNTDOWN -> tickCountdown(phaseTimer, gameTimeTicks, config, hooks);
-            case WARMUP -> tickWarmup(phaseTimer, gameTimeTicks, config);
+            case WARMUP -> tickWarmup(phaseTimer, gameTimeTicks, config, hooks);
             case PLAYING -> tickPlaying(phaseTimer, gameTimeTicks, teamScores, hooks);
             case ENDED -> tickEnded(phaseTimer, gameTimeTicks, hooks);
         };
@@ -126,6 +141,7 @@ public final class PhaseStateMachine {
         int remaining = totalTicks - nextPhaseTimer;
 
         if (remaining > 0 && remaining % 20 == 0) {
+            hooks.showCountdownActionBar(secondsFromTicks(remaining));
             int timeUntilBlackout = totalTicks - config.getBlackoutStartTicks();
             if (nextPhaseTimer < timeUntilBlackout) {
                 hooks.broadcastCountdown(new CountdownPacket(remaining, false));
@@ -143,7 +159,13 @@ public final class PhaseStateMachine {
         return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.empty(), false);
     }
 
-    private static TickResult tickWarmup(int phaseTimer, int gameTimeTicks, CodTdmConfig config) {
+    private static TickResult tickWarmup(
+            int phaseTimer,
+            int gameTimeTicks,
+            CodTdmConfig config,
+            Hooks hooks
+    ) {
+        hooks.lockWarmupMovement();
         int nextPhaseTimer = phaseTimer + 1;
         if (nextPhaseTimer >= config.getWarmupTimeTicks()) {
             return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.of(TdmGamePhase.PLAYING), false);
@@ -156,6 +178,9 @@ public final class PhaseStateMachine {
             Map<String, Integer> teamScores,
             Hooks hooks) {
         int nextGameTimeTicks = ScoreService.tickPlaying(gameTimeTicks, teamScores, hooks::broadcastScoreUpdate);
+        if (nextGameTimeTicks == 60) {
+            hooks.showPlayingIntro();
+        }
         return new TickResult(phaseTimer, nextGameTimeTicks, Optional.empty(), false);
     }
 
@@ -177,5 +202,9 @@ public final class PhaseStateMachine {
             return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.empty(), true);
         }
         return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.empty(), false);
+    }
+
+    private static int secondsFromTicks(int ticks) {
+        return Math.max(1, (Math.max(0, ticks) + 19) / 20);
     }
 }

@@ -12,9 +12,20 @@ final record CodTdmPhaseStateMapPortAdapter(
         Supplier<Iterable<ServerPlayer>> joinedPlayersSupplier,
         Function<ServerPlayer, Boolean> teleportToMatchEndPointAction,
         Supplier<String> mapNameSupplier,
+        Supplier<String> gameTypeSupplier,
         Runnable resetGameAction,
         Runnable onMatchEndedAction
 ) implements CodTdmHooksComposition.PhasePort {
+
+    @Override
+    public void showCountdownActionBar(int secondsLeft) {
+        roundLifecycleCoordinator.showCountdownActionBar(secondsLeft);
+    }
+
+    @Override
+    public void clearCountdownActionBar() {
+        roundLifecycleCoordinator.clearCountdownActionBar();
+    }
 
     @Override
     public void teleportAllPlayersToSpawn() {
@@ -24,6 +35,16 @@ final record CodTdmPhaseStateMapPortAdapter(
     @Override
     public void giveAllPlayersKits() {
         roundLifecycleCoordinator.giveAllPlayersKits();
+    }
+
+    @Override
+    public void lockWarmupMovement() {
+        roundLifecycleCoordinator.lockWarmupMovement();
+    }
+
+    @Override
+    public void unlockAllRoomPlayersMovement() {
+        roundLifecycleCoordinator.unlockAllRoomPlayersMovement();
     }
 
     @Override
@@ -59,6 +80,11 @@ final record CodTdmPhaseStateMapPortAdapter(
     @Override
     public String mapName() {
         return mapNameSupplier.get();
+    }
+
+    @Override
+    public String gameType() {
+        return gameTypeSupplier.get();
     }
 
     @Override

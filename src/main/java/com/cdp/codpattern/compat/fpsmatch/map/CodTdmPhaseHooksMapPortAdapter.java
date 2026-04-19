@@ -7,8 +7,12 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 final record CodTdmPhaseHooksMapPortAdapter(
+        java.util.function.IntConsumer showCountdownActionBarAction,
+        Runnable clearCountdownActionBarAction,
         Runnable teleportAllPlayersToSpawnAction,
         Runnable giveAllPlayersKitsAction,
+        Runnable lockWarmupMovementAction,
+        Runnable unlockAllRoomPlayersMovementAction,
         Runnable clearAllPlayersInventoryAction,
         Runnable restoreAllRoomPlayersToAdventureAction,
         Runnable onMatchEndedAction,
@@ -16,8 +20,19 @@ final record CodTdmPhaseHooksMapPortAdapter(
         Supplier<Iterable<ServerPlayer>> joinedPlayersSupplier,
         Function<ServerPlayer, Boolean> teleportPlayerToMatchEndPointAction,
         Supplier<String> mapNameSupplier,
+        Supplier<String> gameTypeSupplier,
         Runnable resetGameAction
 ) implements CodTdmPhaseHooksPort {
+
+    @Override
+    public void showCountdownActionBar(int secondsLeft) {
+        showCountdownActionBarAction.accept(secondsLeft);
+    }
+
+    @Override
+    public void clearCountdownActionBar() {
+        clearCountdownActionBarAction.run();
+    }
 
     @Override
     public void teleportAllPlayersToSpawn() {
@@ -27,6 +42,16 @@ final record CodTdmPhaseHooksMapPortAdapter(
     @Override
     public void giveAllPlayersKits() {
         giveAllPlayersKitsAction.run();
+    }
+
+    @Override
+    public void lockWarmupMovement() {
+        lockWarmupMovementAction.run();
+    }
+
+    @Override
+    public void unlockAllRoomPlayersMovement() {
+        unlockAllRoomPlayersMovementAction.run();
     }
 
     @Override
@@ -62,6 +87,11 @@ final record CodTdmPhaseHooksMapPortAdapter(
     @Override
     public String mapName() {
         return mapNameSupplier.get();
+    }
+
+    @Override
+    public String gameType() {
+        return gameTypeSupplier.get();
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.tdm.service.WarmupMovementLockService;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.GameType;
@@ -26,6 +27,8 @@ public final class CodTdmDeferredLeaveRegistry {
             return false;
         }
         player.setGameMode(GameType.ADVENTURE);
+        WarmupMovementLockService.unlock(player);
+        RoomRespawnStateRegistry.restore(player);
         player.getInventory().clearContent();
         ThrowableInventoryService.clearRuntime(player);
         player.containerMenu.broadcastChanges();

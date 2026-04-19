@@ -1,9 +1,17 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
+import com.cdp.codpattern.config.tdm.CodTdmConfig;
 import com.cdp.codpattern.network.tdm.CountdownPacket;
 import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.server.level.ServerPlayer;
 
 final class CodTdmPhaseStateHooks implements PhaseStateMachine.Hooks {
@@ -32,6 +40,18 @@ final class CodTdmPhaseStateHooks implements PhaseStateMachine.Hooks {
     }
 
     @Override
+    public void showCountdownActionBar(int secondsLeft) {
+        port.getJoinedPlayers().forEach(player -> player.displayClientMessage(
+                Component.translatable("hud.codpattern.tdm.actionbar.countdown", secondsLeft),
+                true));
+    }
+
+    @Override
+    public void clearCountdownActionBar() {
+        port.getJoinedPlayers().forEach(player -> player.displayClientMessage(Component.empty(), true));
+    }
+
+    @Override
     public void teleportAllPlayersToSpawn() {
         port.teleportAllPlayersToSpawn();
     }
@@ -39,6 +59,16 @@ final class CodTdmPhaseStateHooks implements PhaseStateMachine.Hooks {
     @Override
     public void giveAllPlayersKits() {
         port.giveAllPlayersKits();
+    }
+
+    @Override
+    public void lockWarmupMovement() {
+        port.lockWarmupMovement();
+    }
+
+    @Override
+    public void unlockAllRoomPlayersMovement() {
+        port.unlockAllRoomPlayersMovement();
     }
 
     @Override
@@ -96,7 +126,31 @@ final class CodTdmPhaseStateHooks implements PhaseStateMachine.Hooks {
     }
 
     @Override
+    public void showPlayingIntro() {
+        Component title = Component.translatable(GameModeRegistry.getOrDefault(port.gameType()).displayNameKey());
+        Component subtitle = Component.translatable(resolveObjectiveKey(port.gameType()),
+                CodTdmConfig.getConfig().getScoreLimit());
+        ClientboundSetTitlesAnimationPacket animationPacket = new ClientboundSetTitlesAnimationPacket(8, 42, 16);
+        ClientboundSetTitleTextPacket titlePacket = new ClientboundSetTitleTextPacket(title);
+        ClientboundSetSubtitleTextPacket subtitlePacket = new ClientboundSetSubtitleTextPacket(subtitle);
+
+        for (ServerPlayer player : port.getJoinedPlayers()) {
+            player.connection.send(animationPacket);
+            player.connection.send(titlePacket);
+            player.connection.send(subtitlePacket);
+            player.playNotifySound(SoundEvents.RAID_HORN.get(), SoundSource.PLAYERS, 0.85f, 1.0f);
+        }
+    }
+
+    @Override
     public void resetGame() {
         port.resetGame();
+    }
+
+    private String resolveObjectiveKey(String gameType) {
+        if (TdmGameTypes.isTeamDeathMatch(gameType)) {
+            return "hud.codpattern.tdm.intro.teamdeathmatch.objective";
+        }
+        return "hud.codpattern.tdm.intro.frontline.objective";
     }
 }

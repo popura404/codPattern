@@ -40,9 +40,17 @@ final class CodTdmHooksComposition {
     }
 
     interface PhasePort {
+        void showCountdownActionBar(int secondsLeft);
+
+        void clearCountdownActionBar();
+
         void teleportAllPlayersToSpawn();
 
         void giveAllPlayersKits();
+
+        void lockWarmupMovement();
+
+        void unlockAllRoomPlayersMovement();
 
         void clearAllPlayersInventory();
 
@@ -57,6 +65,8 @@ final class CodTdmHooksComposition {
         boolean teleportPlayerToMatchEndPoint(ServerPlayer player);
 
         String mapName();
+
+        String gameType();
 
         void resetGame();
     }
@@ -119,8 +129,12 @@ final class CodTdmHooksComposition {
     ) {
         return CodTdmMapHooks.createPhaseHooks(
                 new CodTdmPhaseHooksMapPortAdapter(
+                        phasePort::showCountdownActionBar,
+                        phasePort::clearCountdownActionBar,
                         phasePort::teleportAllPlayersToSpawn,
                         phasePort::giveAllPlayersKits,
+                        phasePort::lockWarmupMovement,
+                        phasePort::unlockAllRoomPlayersMovement,
                         phasePort::clearAllPlayersInventory,
                         phasePort::restoreAllRoomPlayersToAdventure,
                         phasePort::onMatchEnded,
@@ -128,6 +142,7 @@ final class CodTdmHooksComposition {
                         phasePort::joinedPlayers,
                         phasePort::teleportPlayerToMatchEndPoint,
                         phasePort::mapName,
+                        phasePort::gameType,
                         phasePort::resetGame
                 ),
                 playerState,

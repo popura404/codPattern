@@ -1,5 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.tdm.service.WarmupMovementLockService;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.GameType;
 
@@ -18,6 +19,25 @@ final class CodTdmRoundLifecycleCoordinator {
     void restoreAllRoomPlayersToAdventure() {
         port.getJoinedPlayers().forEach(player -> player.setGameMode(GameType.ADVENTURE));
         port.getSpectatorPlayers().forEach(player -> player.setGameMode(GameType.ADVENTURE));
+    }
+
+    void showCountdownActionBar(int secondsLeft) {
+        port.getJoinedPlayers().forEach(player -> player.displayClientMessage(
+                Component.translatable("hud.codpattern.tdm.actionbar.countdown", secondsLeft),
+                true));
+    }
+
+    void clearCountdownActionBar() {
+        port.getJoinedPlayers().forEach(player -> player.displayClientMessage(Component.empty(), true));
+    }
+
+    void lockWarmupMovement() {
+        port.getJoinedPlayers().forEach(WarmupMovementLockService::lock);
+    }
+
+    void unlockAllRoomPlayersMovement() {
+        port.getJoinedPlayers().forEach(WarmupMovementLockService::unlock);
+        port.getSpectatorPlayers().forEach(WarmupMovementLockService::unlock);
     }
 
     void teleportAllPlayersToSpawn() {

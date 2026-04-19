@@ -52,5 +52,6 @@ final class CodTdmLeaveRoomEffects {
         ModNetworkChannel.sendToPlayer(new GamePhasePacket(TdmGamePhase.WAITING.name(), 0), player);
         ModNetworkChannel.sendToPlayer(DeathCamPacket.clear(), player);
         ModNetworkChannel.sendToPlayer(new ScoreUpdatePacket(0, 0, 0), player);
+        player.displayClientMessage(Component.empty(), true);
     }
 }

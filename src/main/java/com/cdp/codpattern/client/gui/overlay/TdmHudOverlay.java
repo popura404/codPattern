@@ -402,19 +402,15 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private void renderCountdownFocus(GuiGraphics graphics, Font font, int centerX, int screenHeight) {
-        if (!"COUNTDOWN".equals(ClientTdmState.currentPhase())) {
+        if (!"WARMUP".equals(ClientTdmState.currentPhase())) {
             return;
         }
         int secondsLeft = Math.max(1, (ClientTdmState.remainingTimeTicks() + 19) / 20);
-        if (secondsLeft > 10) {
-            return;
-        }
-
-        float scale = secondsLeft <= 3 ? 5.7f : 4.9f;
+        float scale = secondsLeft >= 100 ? 3.7f : (secondsLeft <= 3 ? 5.7f : 4.9f);
         int color = secondsLeft <= 3 ? 0xFFFF6A4E : 0xFFFFE28A;
         int numberY = screenHeight / 2 - 72;
         drawScaledCenteredString(graphics, font, String.valueOf(secondsLeft), centerX, numberY, color, scale);
-        drawCenteredString(graphics, font, Component.translatable("hud.codpattern.tdm.countdown_hint").getString(),
+        drawCenteredString(graphics, font, Component.translatable("hud.codpattern.tdm.warmup_hint").getString(),
                 centerX, numberY + 86, 0xFFE4E4E4);
     }
 
