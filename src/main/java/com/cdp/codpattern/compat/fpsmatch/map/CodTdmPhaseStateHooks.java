@@ -130,7 +130,7 @@ final class CodTdmPhaseStateHooks implements PhaseStateMachine.Hooks {
         Component title = Component.translatable(GameModeRegistry.getOrDefault(port.gameType()).displayNameKey());
         Component subtitle = Component.translatable(resolveObjectiveKey(port.gameType()),
                 CodTdmConfig.getConfig().getScoreLimit());
-        ClientboundSetTitlesAnimationPacket animationPacket = new ClientboundSetTitlesAnimationPacket(8, 42, 16);
+        ClientboundSetTitlesAnimationPacket animationPacket = new ClientboundSetTitlesAnimationPacket(4, 42, 16);
         ClientboundSetTitleTextPacket titlePacket = new ClientboundSetTitleTextPacket(title);
         ClientboundSetSubtitleTextPacket subtitlePacket = new ClientboundSetSubtitleTextPacket(subtitle);
 

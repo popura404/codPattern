@@ -126,6 +126,10 @@ public final class ClientTdmState {
         return STORE.getBlackoutAlpha();
     }
 
+    public static float getBlackoutInfoAlpha() {
+        return STORE.getBlackoutInfoAlpha();
+    }
+
     public static boolean isBlackoutActive() {
         return STORE.isBlackoutActive();
     }
@@ -182,6 +186,10 @@ public final class ClientTdmState {
         return STORE.team2Score();
     }
 
+    public static int gameTimeTicks() {
+        return STORE.gameTimeTicks();
+    }
+
     public static String announcementKey() {
         return STORE.announcementKey();
     }
@@ -204,5 +212,9 @@ public final class ClientTdmState {
 
     public static BlackoutPhase blackoutPhase() {
         return STORE.blackoutPhase();
+    }
+
+    public static String syncedMapName() {
+        return STORE.syncedMapName();
     }
 }

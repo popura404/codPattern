@@ -23,8 +23,6 @@ public final class ClientMatchStateStore {
     private static final int KILL_FEED_ENTRY_DURATION = 250;
     private static final int KILL_FEED_FADE_TICKS = 10;
     private static final int MAX_KILL_FEED_ENTRIES = 6;
-    private static final float FADE_IN_RATIO = 0.4f;
-    private static final int FADE_OUT_DURATION = 30;
 
     private String currentPhase = "WAITING";
     private int remainingTimeTicks = 0;
@@ -37,8 +35,6 @@ public final class ClientMatchStateStore {
     private ClientTdmState.BlackoutPhase blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
     private int blackoutTicksRemaining = 0;
     private int blackoutTotalTicks = 0;
-    private int fadeOutTicksRemaining = 0;
-    private int fadeOutTotalTicks = 0;
     private boolean playCountdownTickSound = false;
     private boolean playTeleportSound = false;
     private String previousPhase = "WAITING";
@@ -239,10 +235,6 @@ public final class ClientMatchStateStore {
         lastPhaseSyncAtMs = System.currentTimeMillis();
         String oldPhase = currentPhase;
         if (!phase.equals(oldPhase)) {
-            if (phase.equals("WARMUP")) {
-                startFadeOut();
-                playTeleportSound = true;
-            }
             if (!"PLAYING".equals(phase)) {
                 clearDeathCam();
             }
@@ -328,8 +320,6 @@ public final class ClientMatchStateStore {
         blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
         blackoutTicksRemaining = 0;
         blackoutTotalTicks = 0;
-        fadeOutTicksRemaining = 0;
-        fadeOutTotalTicks = 0;
         playCountdownTickSound = false;
         playTeleportSound = false;
         previousPhase = "WAITING";
@@ -398,9 +388,8 @@ public final class ClientMatchStateStore {
         blackout = black;
 
         if (black && count > 0) {
-            blackoutTotalTicks = count;
-            blackoutTicksRemaining = count;
-            blackoutPhase = ClientTdmState.BlackoutPhase.FADE_IN;
+            startBlackoutSequence();
+            playTeleportSound = true;
         }
 
         if (!black && count > 0) {
@@ -430,28 +419,29 @@ public final class ClientMatchStateStore {
                 if (blackoutTicksRemaining <= 0 || blackoutTotalTicks <= 0) {
                     return 0.0f;
                 }
-                float progress = 1.0f - ((float) blackoutTicksRemaining / blackoutTotalTicks);
-                if (progress < FADE_IN_RATIO) {
-                    float t = progress / FADE_IN_RATIO;
-                    return smoothstep(t);
-                } else {
-                    return 1.0f;
-                }
+                return smoothstep(phaseProgress());
             }
             case HOLD -> {
                 return 1.0f;
             }
             case FADE_OUT -> {
-                if (fadeOutTicksRemaining <= 0 || fadeOutTotalTicks <= 0) {
+                if (blackoutTicksRemaining <= 0 || blackoutTotalTicks <= 0) {
                     return 0.0f;
                 }
-                float t = (float) fadeOutTicksRemaining / fadeOutTotalTicks;
-                return smoothstep(t);
+                return smoothstep(phaseRemainingProgress());
             }
             default -> {
                 return 0.0f;
             }
         }
+    }
+
+    public float getBlackoutInfoAlpha() {
+        return switch (blackoutPhase) {
+            case HOLD -> smoothstep(phaseProgress());
+            case FADE_OUT -> smoothstep(phaseRemainingProgress());
+            default -> 0.0f;
+        };
     }
 
     public boolean isBlackoutActive() {
@@ -513,28 +503,20 @@ public final class ClientMatchStateStore {
         tickKillFeed();
 
         switch (blackoutPhase) {
-            case FADE_IN -> {
-                if (blackoutTicksRemaining > 0) {
-                    blackoutTicksRemaining--;
-                } else {
-                    blackoutPhase = ClientTdmState.BlackoutPhase.HOLD;
-                }
-            }
-            case FADE_OUT -> {
-                if (fadeOutTicksRemaining > 0) {
-                    fadeOutTicksRemaining--;
-                } else {
-                    blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
-                    fadeOutTotalTicks = 0;
-                }
-            }
+            case FADE_IN -> tickBlackoutPhase(ClientTdmState.BlackoutPhase.HOLD, PhaseStateMachine.PREPARE_BLACKOUT_HOLD_TICKS);
+            case HOLD -> tickBlackoutPhase(ClientTdmState.BlackoutPhase.FADE_OUT,
+                    PhaseStateMachine.PREPARE_BLACKOUT_FADE_OUT_TICKS);
+            case FADE_OUT -> tickBlackoutPhase(ClientTdmState.BlackoutPhase.NONE, 0);
             default -> {
             }
         }
 
         playPendingSounds();
 
-        if ("COUNTDOWN".equals(currentPhase) && remainingTimeTicks > 0 && remainingTimeTicks % 20 == 0) {
+        if ("COUNTDOWN".equals(currentPhase)
+                && remainingTimeTicks > 0
+                && remainingTimeTicks % 20 == 0
+                && !isBlackoutActive()) {
             playCountdownTickSound = true;
         }
     }
@@ -566,12 +548,47 @@ public final class ClientMatchStateStore {
         };
     }
 
-    private void startFadeOut() {
-        blackoutPhase = ClientTdmState.BlackoutPhase.FADE_OUT;
-        fadeOutTotalTicks = FADE_OUT_DURATION;
-        fadeOutTicksRemaining = FADE_OUT_DURATION;
-        blackoutTicksRemaining = 0;
-        blackoutTotalTicks = 0;
+    private void startBlackoutSequence() {
+        setBlackoutPhase(ClientTdmState.BlackoutPhase.FADE_IN, PhaseStateMachine.PREPARE_BLACKOUT_FADE_IN_TICKS);
+    }
+
+    private void tickBlackoutPhase(ClientTdmState.BlackoutPhase nextPhase, int nextDurationTicks) {
+        if (blackoutTicksRemaining > 0) {
+            blackoutTicksRemaining--;
+        }
+        if (blackoutTicksRemaining > 0) {
+            return;
+        }
+
+        if (nextPhase == ClientTdmState.BlackoutPhase.NONE) {
+            blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
+            blackoutTotalTicks = 0;
+            blackoutTicksRemaining = 0;
+            blackout = false;
+            return;
+        }
+
+        setBlackoutPhase(nextPhase, nextDurationTicks);
+    }
+
+    private void setBlackoutPhase(ClientTdmState.BlackoutPhase phase, int durationTicks) {
+        blackoutPhase = phase;
+        blackoutTotalTicks = Math.max(0, durationTicks);
+        blackoutTicksRemaining = blackoutTotalTicks;
+    }
+
+    private float phaseProgress() {
+        if (blackoutTotalTicks <= 0) {
+            return 0.0f;
+        }
+        return 1.0f - ((float) blackoutTicksRemaining / blackoutTotalTicks);
+    }
+
+    private float phaseRemainingProgress() {
+        if (blackoutTotalTicks <= 0) {
+            return 0.0f;
+        }
+        return (float) blackoutTicksRemaining / blackoutTotalTicks;
     }
 
     private void tickKillFeed() {

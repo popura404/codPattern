@@ -98,9 +98,12 @@ public class TdmHudOverlay implements IGuiOverlay {
         }
 
         Font font = Minecraft.getInstance().font;
+        if (ClientTdmState.isBlackoutActive()) {
+            renderBlackout(graphics, font, screenWidth, screenHeight);
+            return;
+        }
         int centerX = screenWidth / 2;
 
-        renderBlackout(graphics, font, screenWidth, screenHeight);
         renderLeftScorePanel(graphics, font, screenWidth, screenHeight);
         renderKillFeed(graphics, font, screenWidth, screenHeight);
         renderPhaseAnnouncement(graphics, font, centerX, screenHeight);
@@ -135,12 +138,27 @@ public class TdmHudOverlay implements IGuiOverlay {
         }
 
         graphics.fill(0, 0, screenWidth, screenHeight, alphaInt << 24);
-        if (alpha > 0.55f) {
-            String text = ClientTdmState.blackoutPhase() == ClientTdmState.BlackoutPhase.FADE_OUT
-                    ? Component.translatable("hud.codpattern.tdm.blackout.ready").getString()
-                    : Component.translatable("hud.codpattern.tdm.blackout.teleport").getString();
-            drawCenteredString(graphics, font, text, screenWidth / 2, screenHeight / 2 - 8, 0xFFF5F5F5);
+        float infoAlpha = ClientTdmState.getBlackoutInfoAlpha();
+        int infoAlphaInt = clamp((int) (infoAlpha * 255.0f), 0, 255);
+        if (infoAlphaInt <= 0) {
+            return;
         }
+
+        String mapName = ClientTdmState.syncedMapName();
+        if (mapName == null || mapName.isBlank()) {
+            mapName = ClientTdmState.roomContextName();
+        }
+        String timeText = formatTime(ClientTdmState.gameTimeTicks());
+
+        int marginLeft = 20;
+        int baseY = screenHeight - 62;
+        float mapScale = 2.0f;
+        String fittedMapName = GuiTextHelper.ellipsize(font, mapName == null ? "" : mapName,
+                Math.max(1, (int) ((screenWidth - marginLeft - 20) / mapScale)));
+        if (!fittedMapName.isEmpty()) {
+            drawScaledString(graphics, font, fittedMapName, marginLeft, baseY, withAlpha(0xFFFFFFFF, infoAlphaInt), mapScale);
+        }
+        graphics.drawString(font, timeText, marginLeft, baseY + 28, withAlpha(0xFFEAEAEA, infoAlphaInt), true);
     }
 
     private void renderLeftScorePanel(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
@@ -408,10 +426,8 @@ public class TdmHudOverlay implements IGuiOverlay {
         int secondsLeft = Math.max(1, (ClientTdmState.remainingTimeTicks() + 19) / 20);
         float scale = secondsLeft >= 100 ? 3.7f : (secondsLeft <= 3 ? 5.7f : 4.9f);
         int color = secondsLeft <= 3 ? 0xFFFF6A4E : 0xFFFFE28A;
-        int numberY = screenHeight / 2 - 72;
+        int numberY = screenHeight / 2 - Math.round((font.lineHeight * scale) / 2.0f);
         drawScaledCenteredString(graphics, font, String.valueOf(secondsLeft), centerX, numberY, color, scale);
-        drawCenteredString(graphics, font, Component.translatable("hud.codpattern.tdm.warmup_hint").getString(),
-                centerX, numberY + 86, 0xFFE4E4E4);
     }
 
     private void renderThrowableSlots(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
@@ -1323,6 +1339,14 @@ public class TdmHudOverlay implements IGuiOverlay {
 
     private void drawCenteredString(GuiGraphics graphics, Font font, String text, int centerX, int y, int color) {
         graphics.drawString(font, text, centerX - font.width(text) / 2, y, color, true);
+    }
+
+    private void drawScaledString(GuiGraphics graphics, Font font, String text, int x, int y, int color, float scale) {
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 0.0f);
+        graphics.pose().scale(scale, scale, 1.0f);
+        graphics.drawString(font, text, 0, 0, color, true);
+        graphics.pose().popPose();
     }
 
     private void drawScaledCenteredString(GuiGraphics graphics, Font font, String text, int centerX, int y, int color,
