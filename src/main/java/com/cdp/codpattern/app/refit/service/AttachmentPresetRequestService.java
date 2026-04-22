@@ -23,8 +23,10 @@ import net.minecraft.world.item.ItemStack;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public final class AttachmentPresetRequestService {
     public record Result(SyncAttachmentPresetPacket packet, boolean presetLoaded, int sandboxAttachmentCount,
@@ -60,10 +62,11 @@ public final class AttachmentPresetRequestService {
             return Optional.empty();
         }
 
-        ItemStack gunStack = buildItemStack(itemData);
-        if (!TaczGatewayProvider.gateway().isValidGun(gunStack)) {
+        ItemStack originalGunStack = buildItemStack(itemData);
+        if (!TaczGatewayProvider.gateway().isValidGun(originalGunStack)) {
             return Optional.empty();
         }
+        ItemStack gunStack = originalGunStack.copy();
 
         TaczAddonRefitCompat.sanitizeGunForBackpackRefitSession(gunStack);
 
@@ -91,8 +94,15 @@ public final class AttachmentPresetRequestService {
             return Optional.empty();
         }
         List<ItemStack> playerOwnedAttachments = collectPlayerOwnedAttachments(player, gunStack, filterConfig);
+        List<ItemStack> addonCompatibleAttachments = collectAddonCompatibleAttachments(
+                player,
+                originalGunStack,
+                gunStack,
+                filterConfig,
+                playerOwnedAttachments);
+        List<ItemStack> sandboxAttachments = mergeAttachmentCandidates(playerOwnedAttachments, addonCompatibleAttachments);
         AttachmentEditSession session = AttachmentEditSessionManager.startSession(
-                player, bagId, slot, gunStack, playerOwnedAttachments);
+                player, bagId, slot, gunStack, sandboxAttachments);
         SyncAttachmentPresetPacket packet = new SyncAttachmentPresetPacket(
                 bagId,
                 slot,
@@ -120,6 +130,51 @@ public final class AttachmentPresetRequestService {
             }
         }
         return attachments;
+    }
+
+    private static List<ItemStack> collectAddonCompatibleAttachments(ServerPlayer player,
+            ItemStack originalGunStack,
+            ItemStack workingGunStack,
+            WeaponFilterConfig filterConfig,
+            List<ItemStack> existingCandidates) {
+        List<ItemStack> candidates = new ArrayList<>();
+        Set<String> existingAttachmentIds = new HashSet<>();
+        for (ItemStack existing : existingCandidates) {
+            TaczGatewayProvider.gateway().resolveAttachmentId(existing).ifPresent(existingAttachmentIds::add);
+        }
+
+        for (ItemStack candidate : TaczAddonRefitCompat.resolveBackpackRefitCandidates(player, originalGunStack)) {
+            if (candidate == null || candidate.isEmpty()) {
+                continue;
+            }
+            Optional<String> attachmentIdOpt = TaczGatewayProvider.gateway().resolveAttachmentId(candidate);
+            if (attachmentIdOpt.isEmpty()) {
+                continue;
+            }
+            if (existingAttachmentIds.contains(attachmentIdOpt.get())) {
+                continue;
+            }
+            if (BackpackAttachmentFilter.isAttachmentBlocked(filterConfig, candidate)) {
+                continue;
+            }
+            if (!TaczGatewayProvider.gateway().canAttach(workingGunStack, candidate)) {
+                continue;
+            }
+            candidates.add(candidate.copy());
+            existingAttachmentIds.add(attachmentIdOpt.get());
+        }
+        return candidates;
+    }
+
+    private static List<ItemStack> mergeAttachmentCandidates(List<ItemStack> playerOwnedAttachments,
+            List<ItemStack> addonCompatibleAttachments) {
+        if (addonCompatibleAttachments.isEmpty()) {
+            return playerOwnedAttachments;
+        }
+        List<ItemStack> merged = new ArrayList<>(playerOwnedAttachments.size() + addonCompatibleAttachments.size());
+        merged.addAll(playerOwnedAttachments);
+        merged.addAll(addonCompatibleAttachments);
+        return merged;
     }
 
     private static ItemStack buildItemStack(BackpackConfig.Backpack.ItemData itemData) {

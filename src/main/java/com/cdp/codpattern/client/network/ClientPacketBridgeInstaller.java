@@ -40,6 +40,11 @@ public final class ClientPacketBridgeInstaller {
             }
 
             @Override
+            public void syncAttachmentCandidates(int bagId, String slot, List<ItemStack> attachmentCandidates) {
+                ClientPacketHandler.handleSyncAttachmentCandidates(bagId, slot, attachmentCandidates);
+            }
+
+            @Override
             public void updateWeaponResult(boolean success, String code, String message) {
                 ClientPacketHandler.handleUpdateWeaponResult(success, code, message);
             }

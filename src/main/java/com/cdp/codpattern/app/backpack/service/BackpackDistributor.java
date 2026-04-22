@@ -2,6 +2,7 @@ package com.cdp.codpattern.app.backpack.service;
 
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
@@ -11,7 +12,6 @@ import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.mojang.logging.LogUtils;
 import com.cdp.codpattern.config.backpack.BackpackNameHelper;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.TagParser;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -90,15 +90,10 @@ public class BackpackDistributor {
                 continue;
             }
 
-            ItemStack stack = new ItemStack(item, Math.max(1, itemData.getCount()));
-
-            if (itemData.getNbt() != null && !itemData.getNbt().isEmpty()) {
-                try {
-                    //处理物品nbt
-                    stack.setTag(TagParser.parseTag(itemData.getNbt()));
-                } catch (Exception e) {
-                    LOGGER.warn("Failed to parse NBT for item {} (player={})", itemId, player.getGameProfile().getName(), e);
-                }
+            ItemStack stack = BackpackItemStackFactory.create(itemData);
+            if (stack.isEmpty()) {
+                LOGGER.warn("Failed to build backpack item {} for player {}", itemId, player.getGameProfile().getName());
+                continue;
             }
 
             if (BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {

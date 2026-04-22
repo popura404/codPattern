@@ -2,6 +2,7 @@ package com.cdp.codpattern.adapter.forge.network;
 
 import com.cdp.codpattern.network.RequestAttachmentPresetPacket;
 import com.cdp.codpattern.network.SaveAttachmentPresetPacket;
+import com.cdp.codpattern.network.SyncAttachmentCandidatesPacket;
 import com.cdp.codpattern.network.SyncAttachmentPresetPacket;
 import com.cdp.codpattern.network.UpdateWeaponPacket;
 import com.cdp.codpattern.network.UpdateWeaponResultPacket;
@@ -28,6 +29,12 @@ final class RefitPacketRegistrar {
                 .decoder(SyncAttachmentPresetPacket::decode)
                 .encoder(SyncAttachmentPresetPacket::encode)
                 .consumerMainThread(SyncAttachmentPresetPacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(SyncAttachmentCandidatesPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncAttachmentCandidatesPacket::decode)
+                .encoder(SyncAttachmentCandidatesPacket::encode)
+                .consumerMainThread(SyncAttachmentCandidatesPacket::handle)
                 .add();
 
         ModNetworkChannel.CHANNEL.messageBuilder(SaveAttachmentPresetPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_SERVER)

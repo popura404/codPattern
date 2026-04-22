@@ -11,19 +11,21 @@ public class AttachmentEditSession {
     private final int editHotbarSlot;
     private final int originalSelectedSlot;
     private final List<ItemStack> inventorySnapshot;
+    private final AttachmentRefitInventory refitInventory;
     private final long startedAtMs;
     private final long timeoutAtMs;
     private final int sandboxAttachmentCount;
     private final int truncatedAttachmentCount;
 
     public AttachmentEditSession(int bagId, String slot, int editHotbarSlot, int originalSelectedSlot,
-            List<ItemStack> inventorySnapshot, long startedAtMs, long timeoutAtMs, int sandboxAttachmentCount,
-            int truncatedAttachmentCount) {
+            List<ItemStack> inventorySnapshot, AttachmentRefitInventory refitInventory, long startedAtMs,
+            long timeoutAtMs, int sandboxAttachmentCount, int truncatedAttachmentCount) {
         this.bagId = bagId;
         this.slot = slot;
         this.editHotbarSlot = editHotbarSlot;
         this.originalSelectedSlot = originalSelectedSlot;
         this.inventorySnapshot = new ArrayList<>(inventorySnapshot);
+        this.refitInventory = refitInventory;
         this.startedAtMs = startedAtMs;
         this.timeoutAtMs = timeoutAtMs;
         this.sandboxAttachmentCount = sandboxAttachmentCount;
@@ -48,6 +50,10 @@ public class AttachmentEditSession {
 
     public List<ItemStack> getInventorySnapshot() {
         return inventorySnapshot;
+    }
+
+    public AttachmentRefitInventory getRefitInventory() {
+        return refitInventory;
     }
 
     public long getStartedAtMs() {

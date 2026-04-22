@@ -4,6 +4,7 @@ import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
+import com.cdp.codpattern.core.refit.BackpackRefitSessionContext;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,6 +16,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Pseudo
 @Mixin(targets = "com.mafuyu404.taczaddon.common.LiberateAttachment", remap = false)
 public abstract class LiberateAttachmentMixin {
+    @Inject(method = "useVirtualInventory", at = @At("HEAD"), cancellable = true, require = 0)
+    private static void codpattern$preferBackpackSessionInventory(
+            Inventory sourceInventory,
+            CallbackInfoReturnable<Inventory> cir) {
+        if (sourceInventory == null || !BackpackRefitSessionContext.isBackpackRefitActive(sourceInventory.player)) {
+            return;
+        }
+        cir.setReturnValue(sourceInventory);
+    }
+
     @Inject(method = "useVirtualInventory", at = @At("RETURN"), cancellable = true, require = 0)
     private static void codpattern$stripBlockedAttachmentsFromVirtualInventory(
             Inventory sourceInventory,

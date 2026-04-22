@@ -108,6 +108,10 @@ public class ClientPacketHandler {
         AttachmentRefitClientState.onPresetSync(bagId, slot, presetPayload, expectedGunId);
     }
 
+    public static void handleSyncAttachmentCandidates(int bagId, String slot, List<ItemStack> attachmentCandidates) {
+        AttachmentRefitClientState.onAttachmentCandidatesSync(bagId, slot, attachmentCandidates);
+    }
+
     public static void handleUpdateWeaponResult(boolean success, String code, String message) {
         if (success || Minecraft.getInstance().player == null) {
             return;

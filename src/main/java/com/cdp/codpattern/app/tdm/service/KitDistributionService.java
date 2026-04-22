@@ -4,14 +4,13 @@ import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.backpack.BackpackNameHelper;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.TagParser;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -82,13 +81,9 @@ public final class KitDistributionService {
             return;
         }
 
-        ItemStack stack = new ItemStack(item, Math.max(1, itemData.getCount()));
-        if (itemData.getNbt() != null && !itemData.getNbt().isEmpty()) {
-            try {
-                CompoundTag tag = TagParser.parseTag(itemData.getNbt());
-                stack.setTag(tag);
-            } catch (Exception ignored) {
-            }
+        ItemStack stack = BackpackItemStackFactory.create(itemData);
+        if (stack.isEmpty()) {
+            return;
         }
 
         if (BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {
@@ -119,13 +114,9 @@ public final class KitDistributionService {
             return;
         }
 
-        ItemStack stack = new ItemStack(item, Math.max(1, itemData.getCount()));
-        if (itemData.getNbt() != null && !itemData.getNbt().isEmpty()) {
-            try {
-                CompoundTag tag = TagParser.parseTag(itemData.getNbt());
-                stack.setTag(tag);
-            } catch (Exception ignored) {
-            }
+        ItemStack stack = BackpackItemStackFactory.create(itemData);
+        if (stack.isEmpty()) {
+            return;
         }
 
         if (BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {

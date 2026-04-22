@@ -17,20 +17,19 @@ import org.jetbrains.annotations.NotNull;
  * 配件配置按钮
  */
 public class AttachmentConfigButton extends Button {
-
-    private final int bagId;
-    private final String slot;
     private int focusedTimes = 0;
 
-    public AttachmentConfigButton(int x, int y, int width, int height, int bagId, String slot) {
+    public AttachmentConfigButton(int x, int y, int width, int height, int bagId, String slot, String requestedGunId) {
         super(x, y, width, height, Component.translatable("screen.codpattern.attachment_config.button"),
                 button -> {
-                    AttachmentRefitClientState.setParentScreen(Minecraft.getInstance().screen);
+                    AttachmentRefitClientState.prepareOpenRequest(
+                            bagId,
+                            slot,
+                            requestedGunId,
+                            Minecraft.getInstance().screen);
                     ModNetworkChannel.sendToServer(new RequestAttachmentPresetPacket(bagId, slot));
                 },
                 DEFAULT_NARRATION);
-        this.bagId = bagId;
-        this.slot = slot;
     }
 
     @Override
@@ -101,11 +100,4 @@ public class AttachmentConfigButton extends Button {
                 this.getX() + this.width + borderWidth, this.getY() + this.height, color);
     }
 
-    public int getBagId() {
-        return bagId;
-    }
-
-    public String getSlot() {
-        return slot;
-    }
 }

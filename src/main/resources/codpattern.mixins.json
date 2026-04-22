@@ -7,7 +7,10 @@
   "refmap": "codpattern.refmap.json",
   "mixins": [
     "accessor.AbstractContainerMenuAccessor",
+    "accessor.InventoryAccessor",
     "inventory.InventoryMenuMixin",
+    "tacz.ClientMessageRefitGunMixin",
+    "tacz.ClientMessageUnloadAttachmentMixin",
     "taczaddon.LiberateAttachmentMixin"
   ],
   "client": [

@@ -55,7 +55,9 @@ public final class AttachmentPresetSaveService {
         int finalPayloadLength = 0;
 
         try {
-            ItemStack gunStack = player.getInventory().getItem(session.getEditHotbarSlot());
+            ItemStack gunStack = session.getRefitInventory() == null
+                    ? player.getInventory().getItem(session.getEditHotbarSlot())
+                    : session.getRefitInventory().getItem(session.getEditHotbarSlot());
             if (!TaczGatewayProvider.gateway().isGun(gunStack)) {
                 throw new SaveFailureException("message.codpattern.refit.save_failed_not_gun");
             }
@@ -82,8 +84,11 @@ public final class AttachmentPresetSaveService {
             mutatedBackpack = backpack;
             previousItem = backpack.getItem_MAP().get(slot);
             String normalizedPreset = builtPresetPayload.isBlank() ? null : builtPresetPayload;
+            String preservedItemId = previousItem != null ? previousItem.getItem() : itemId;
+            int preservedCount = previousItem != null ? Math.max(1, previousItem.getCount()) : 1;
+            String preservedNbt = previousItem != null ? previousItem.getNbt() : nbtString;
             backpack.getItem_MAP().put(slot,
-                    new BackpackConfig.Backpack.ItemData(itemId, 1, nbtString, normalizedPreset));
+                    new BackpackConfig.Backpack.ItemData(preservedItemId, preservedCount, preservedNbt, normalizedPreset));
             BackpackConfigRepository.save();
 
             saved = true;

@@ -6,6 +6,7 @@ import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
 import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
 import com.cdp.codpattern.config.backpack.BackpackNameHelper;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
@@ -17,8 +18,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.sounds.SoundManager;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.TagParser;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
@@ -104,18 +103,10 @@ public class BackPackSelectButton extends Button {
                 if (item == null || item == Items.AIR) {
                     continue;
                 }
-                ItemStack weaponStack = new ItemStack(item);
-
-                if (itemData.getNbt() != null && !itemData.getNbt().isEmpty()) {
-                    try {
-                        CompoundTag tag = TagParser.parseTag(itemData.getNbt());
-                        weaponStack.setTag(tag);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
+                ItemStack weaponStack = BackpackItemStackFactory.create(itemData);
+                if (weaponStack.isEmpty()) {
+                    continue;
                 }
-
-                weaponStack.setCount(itemData.getCount());
 
                 if (filterConfig != null && BackpackNamespaceFilter.isBlocked(filterConfig, weaponStack, itemId)) {
                     continue;

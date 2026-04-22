@@ -1,7 +1,6 @@
 package com.cdp.codpattern.mixin.tacz;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
-import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.network.SyncAttachmentCandidatesPacket;
 import com.tacz.guns.network.message.ClientMessageUnloadAttachment;
@@ -43,13 +42,12 @@ public abstract class ClientMessageUnloadAttachmentMixin {
         if (player == null) {
             return;
         }
-        AttachmentEditSession session = AttachmentEditSessionManager.getSession(player.getUUID());
-        if (session == null) {
+        if (AttachmentEditSessionManager.getSession(player.getUUID()) == null) {
             return;
         }
         ModNetworkChannel.sendToPlayer(new SyncAttachmentCandidatesPacket(
-                session.getBagId(),
-                session.getSlot(),
-                session.snapshotAttachmentCandidates()), player);
+                AttachmentEditSessionManager.getSession(player.getUUID()).getBagId(),
+                AttachmentEditSessionManager.getSession(player.getUUID()).getSlot(),
+                AttachmentEditSessionManager.snapshotAttachmentCandidates(player)), player);
     }
 }

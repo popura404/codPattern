@@ -7,15 +7,13 @@ import com.cdp.codpattern.client.gui.refit.AttachmentConfigButton;
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.TagParser;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
@@ -92,14 +90,10 @@ public class WeaponMenuScreen extends Screen {
             if (itemId == null) {
                 return new ItemStack(Items.AIR);
             }
-            ItemStack stack = new ItemStack(BuiltInRegistries.ITEM.get(itemId), itemData.getCount());
-            String nbt = itemData.getNbt();
-            if (nbt != null && !nbt.isEmpty()) {
-                try {
-                    stack.setTag(TagParser.parseTag(nbt));
-                } catch (CommandSyntaxException e) {
-                    LOGGER.warn("Invalid NBT for item {} in backpack {}", itemId, this.BAGSERIAL, e);
-                }
+            ItemStack stack = BackpackItemStackFactory.create(itemData);
+            if (stack.isEmpty()) {
+                LOGGER.warn("Invalid item data for item {} in backpack {}", itemId, this.BAGSERIAL);
+                return ItemStack.EMPTY;
             }
             WeaponFilterConfig filterConfig = WeaponFilterClientCache.get();
             if (filterConfig != null && BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {
@@ -386,6 +380,8 @@ public class WeaponMenuScreen extends Screen {
 
     private void addAttachmentButton(String slot) {
         int x = "primary".equals(slot) ? primaryX : secondaryX;
+        ItemStack gunStack = "primary".equals(slot) ? primaryItemStack : secondaryItemStack;
+        String requestedGunId = TaczGatewayProvider.gateway().resolveGunId(gunStack).orElse("");
         AttachmentConfigButton button = attachmentButtonMap.get(slot);
         if (button == null) {
             button = new AttachmentConfigButton(
@@ -394,7 +390,8 @@ public class WeaponMenuScreen extends Screen {
                     buttonWidth,
                     configButtonHeight,
                     this.BAGSERIAL,
-                    slot
+                    slot,
+                    requestedGunId
             );
             attachmentButtonMap.put(slot, button);
         }

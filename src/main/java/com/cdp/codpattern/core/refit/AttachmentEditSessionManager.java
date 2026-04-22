@@ -1,5 +1,6 @@
 package com.cdp.codpattern.core.refit;
 
+import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.mojang.logging.LogUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetCarriedItemPacket;
@@ -57,7 +58,13 @@ public class AttachmentEditSessionManager {
         inventory.selected = editSlot;
         player.connection.send(new ClientboundSetCarriedItemPacket(editSlot));
         player.inventoryMenu.broadcastChanges();
+        player.inventoryMenu.slotsChanged(player.getInventory());
 
+        AttachmentRefitInventory refitInventory = new AttachmentRefitInventory(
+                player,
+                editSlot,
+                inventory.getItem(editSlot),
+                new ArrayList<>(snapshotAttachments(sandboxAttachments)));
         long now = System.currentTimeMillis();
         AttachmentEditSession session = new AttachmentEditSession(
                 bagId,
@@ -65,11 +72,13 @@ public class AttachmentEditSessionManager {
                 editSlot,
                 originalSelected,
                 snapshot,
+                refitInventory,
                 now,
                 now + SESSION_TIMEOUT_MS,
                 insertedAttachments,
                 truncatedAttachments);
         SESSIONS.put(player.getUUID(), session);
+        BackpackRefitSessionContext.markServerActive(player.getUUID());
         LOGGER.info("Attachment edit session started: player={} bagId={} slot={} hotbar={} attachments={} truncated={}",
                 player.getGameProfile().getName(), bagId, slot, editSlot, insertedAttachments, truncatedAttachments);
         return session;
@@ -81,6 +90,44 @@ public class AttachmentEditSessionManager {
 
     public static boolean hasSession(UUID playerId) {
         return SESSIONS.containsKey(playerId);
+    }
+
+    public static Inventory getRefitInventory(ServerPlayer player) {
+        if (player == null) {
+            return null;
+        }
+        AttachmentEditSession session = SESSIONS.get(player.getUUID());
+        return session == null ? null : session.getRefitInventory();
+    }
+
+    public static List<ItemStack> snapshotAttachmentCandidates(ServerPlayer player) {
+        if (player == null) {
+            return List.of();
+        }
+        AttachmentEditSession session = SESSIONS.get(player.getUUID());
+        if (session == null) {
+            return List.of();
+        }
+
+        List<ItemStack> snapshot = new ArrayList<>();
+        Inventory inventory = session.getRefitInventory();
+        if (inventory == null) {
+            return List.of();
+        }
+        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
+            if (slot == session.getEditHotbarSlot()) {
+                continue;
+            }
+            ItemStack stack = inventory.getItem(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            if (TaczGatewayProvider.gateway().resolveAttachmentId(stack).isEmpty()) {
+                continue;
+            }
+            snapshot.add(stack.copy());
+        }
+        return snapshot;
     }
 
     public static void endSession(ServerPlayer player) {
@@ -97,6 +144,7 @@ public class AttachmentEditSessionManager {
 
     private static void endSessionInternal(ServerPlayer player, boolean abnormal, String reason, boolean notifyPlayer) {
         AttachmentEditSession session = SESSIONS.remove(player.getUUID());
+        BackpackRefitSessionContext.clearServerActive(player.getUUID());
         if (session == null) {
             return;
         }
@@ -106,6 +154,7 @@ public class AttachmentEditSessionManager {
         player.getInventory().selected = selected;
         player.connection.send(new ClientboundSetCarriedItemPacket(selected));
         player.inventoryMenu.broadcastChanges();
+        player.inventoryMenu.slotsChanged(player.getInventory());
 
         if (abnormal && notifyPlayer) {
             player.sendSystemMessage(Component.translatable("message.codpattern.refit.session_rollback", reason));
@@ -139,6 +188,20 @@ public class AttachmentEditSessionManager {
         List<ItemStack> snapshot = new ArrayList<>(inventory.getContainerSize());
         for (int i = 0; i < inventory.getContainerSize(); i++) {
             snapshot.add(inventory.getItem(i).copy());
+        }
+        return snapshot;
+    }
+
+    private static List<ItemStack> snapshotAttachments(List<ItemStack> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return List.of();
+        }
+        List<ItemStack> snapshot = new ArrayList<>(attachments.size());
+        for (ItemStack attachment : attachments) {
+            if (attachment == null || attachment.isEmpty()) {
+                continue;
+            }
+            snapshot.add(attachment.copy());
         }
         return snapshot;
     }

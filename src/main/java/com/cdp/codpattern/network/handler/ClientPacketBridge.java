@@ -35,6 +35,10 @@ public final class ClientPacketBridge {
         handler.syncAttachmentPreset(bagId, slot, presetPayload, expectedGunId);
     }
 
+    public static void syncAttachmentCandidates(int bagId, String slot, List<ItemStack> attachmentCandidates) {
+        handler.syncAttachmentCandidates(bagId, slot, attachmentCandidates);
+    }
+
     public static void updateWeaponResult(boolean success, String code, String message) {
         handler.updateWeaponResult(success, code, message);
     }
@@ -119,6 +123,9 @@ public final class ClientPacketBridge {
         }
 
         default void syncAttachmentPreset(int bagId, String slot, String presetPayload, String expectedGunId) {
+        }
+
+        default void syncAttachmentCandidates(int bagId, String slot, List<ItemStack> attachmentCandidates) {
         }
 
         default void updateWeaponResult(boolean success, String code, String message) {
