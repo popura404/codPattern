@@ -97,8 +97,9 @@ public final class ClientPacketBridgeInstaller {
             }
 
             @Override
-            public void deathCam(String killerName, int respawnDelayTicks) {
-                ClientPacketHandler.handleDeathCam(killerName, respawnDelayTicks);
+            public void deathCam(String killerName, int deathCamTicks, int respawnDelayTicks, float lockedYaw,
+                    float lockedPitch) {
+                ClientPacketHandler.handleDeathCam(killerName, deathCamTicks, respawnDelayTicks, lockedYaw, lockedPitch);
             }
 
             @Override

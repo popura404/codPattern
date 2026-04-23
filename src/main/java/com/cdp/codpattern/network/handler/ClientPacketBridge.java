@@ -76,8 +76,8 @@ public final class ClientPacketBridge {
         handler.popupNotice(title, message);
     }
 
-    public static void deathCam(String killerName, int respawnDelayTicks) {
-        handler.deathCam(killerName, respawnDelayTicks);
+    public static void deathCam(String killerName, int deathCamTicks, int respawnDelayTicks, float lockedYaw, float lockedPitch) {
+        handler.deathCam(killerName, deathCamTicks, respawnDelayTicks, lockedYaw, lockedPitch);
     }
 
     public static void killFeed(String killerName, String victimName, ItemStack weaponStack, boolean blunder) {
@@ -154,7 +154,7 @@ public final class ClientPacketBridge {
         default void popupNotice(Component title, Component message) {
         }
 
-        default void deathCam(String killerName, int respawnDelayTicks) {
+        default void deathCam(String killerName, int deathCamTicks, int respawnDelayTicks, float lockedYaw, float lockedPitch) {
         }
 
         default void killFeed(String killerName, String victimName, ItemStack weaponStack, boolean blunder) {

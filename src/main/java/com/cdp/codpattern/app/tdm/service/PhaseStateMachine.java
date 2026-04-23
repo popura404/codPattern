@@ -13,13 +13,15 @@ public final class PhaseStateMachine {
     public static final int END_SUMMARY_PAGE_TICKS = 100;
     public static final int END_SUMMARY_PAGE_COUNT = 3;
     public static final int END_PHASE_TOTAL_TICKS = END_SUMMARY_PAGE_TICKS * END_SUMMARY_PAGE_COUNT;
+    public static final int PRE_GAME_COUNTDOWN_TICKS = 200;
     public static final int PREPARE_DURATION_TICKS = 400;
-    public static final int PREPARE_BLACKOUT_FADE_IN_TICKS = 20;
+    public static final int PREPARE_BLACKOUT_FADE_IN_TICKS = 60;
     public static final int PREPARE_BLACKOUT_HOLD_TICKS = 100;
-    public static final int PREPARE_BLACKOUT_FADE_OUT_TICKS = 20;
+    public static final int PREPARE_BLACKOUT_FADE_OUT_TICKS = 60;
     public static final int PREPARE_BLACKOUT_TOTAL_TICKS = PREPARE_BLACKOUT_FADE_IN_TICKS
             + PREPARE_BLACKOUT_HOLD_TICKS
             + PREPARE_BLACKOUT_FADE_OUT_TICKS;
+    public static final int PREPARE_BLACKOUT_START_TICK = PRE_GAME_COUNTDOWN_TICKS - PREPARE_BLACKOUT_FADE_IN_TICKS;
 
     public interface Hooks {
         void broadcastCountdown(CountdownPacket packet);
@@ -83,15 +85,14 @@ public final class PhaseStateMachine {
 
         switch (newPhase) {
             case COUNTDOWN -> {
-                if (config.getPreGameCountdownTicks() <= PREPARE_BLACKOUT_TOTAL_TICKS) {
-                    startPrepareBlackout(hooks);
-                } else {
-                    hooks.broadcastCountdown(new CountdownPacket(config.getPreGameCountdownTicks(), false));
-                    hooks.showCountdownActionBar(secondsFromTicks(config.getPreGameCountdownTicks()));
-                }
+                hooks.broadcastCountdown(new CountdownPacket(PRE_GAME_COUNTDOWN_TICKS, false));
+                hooks.clearCountdownActionBar();
             }
             case WARMUP -> {
                 hooks.clearCountdownActionBar();
+                hooks.restoreAllRoomPlayersToAdventure();
+                hooks.teleportAllPlayersToSpawn();
+                hooks.giveAllPlayersKits();
                 hooks.lockWarmupMovement();
             }
             case PLAYING -> {
@@ -133,7 +134,7 @@ public final class PhaseStateMachine {
             int gameTimeTicks,
             CodTdmConfig config) {
         return switch (phase) {
-            case COUNTDOWN -> Math.max(0, config.getPreGameCountdownTicks() - phaseTimer);
+            case COUNTDOWN -> Math.max(0, PRE_GAME_COUNTDOWN_TICKS - phaseTimer);
             case WARMUP -> Math.max(0, PREPARE_DURATION_TICKS - phaseTimer);
             case PLAYING -> Math.max(0, (config.getTimeLimitSeconds() * 20) - gameTimeTicks);
             default -> 0;
@@ -145,22 +146,18 @@ public final class PhaseStateMachine {
             CodTdmConfig config,
             Hooks hooks) {
         int nextPhaseTimer = phaseTimer + 1;
-        int totalTicks = config.getPreGameCountdownTicks();
-        int remaining = totalTicks - nextPhaseTimer;
-        int blackoutStartTick = Math.max(0, totalTicks - PREPARE_BLACKOUT_TOTAL_TICKS);
+        int remaining = PRE_GAME_COUNTDOWN_TICKS - nextPhaseTimer;
 
-        if (remaining > 0 && remaining % 20 == 0) {
-            if (nextPhaseTimer < blackoutStartTick) {
-                hooks.showCountdownActionBar(secondsFromTicks(remaining));
-                hooks.broadcastCountdown(new CountdownPacket(remaining, false));
-            }
+        if (remaining > 0 && remaining % 20 == 0 && nextPhaseTimer < PREPARE_BLACKOUT_START_TICK) {
+            hooks.broadcastCountdown(new CountdownPacket(remaining, false));
         }
 
-        if (blackoutStartTick > 0 && nextPhaseTimer == blackoutStartTick) {
-            startPrepareBlackout(hooks);
+        if (nextPhaseTimer == PREPARE_BLACKOUT_START_TICK) {
+            hooks.clearCountdownActionBar();
+            hooks.broadcastCountdown(new CountdownPacket(PREPARE_BLACKOUT_TOTAL_TICKS, true));
         }
 
-        if (nextPhaseTimer >= totalTicks) {
+        if (nextPhaseTimer >= PRE_GAME_COUNTDOWN_TICKS) {
             return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.of(TdmGamePhase.WARMUP), false);
         }
         return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.empty(), false);
@@ -213,14 +210,5 @@ public final class PhaseStateMachine {
 
     private static int secondsFromTicks(int ticks) {
         return Math.max(1, (Math.max(0, ticks) + 19) / 20);
-    }
-
-    private static void startPrepareBlackout(Hooks hooks) {
-        hooks.clearCountdownActionBar();
-        hooks.restoreAllRoomPlayersToAdventure();
-        hooks.teleportAllPlayersToSpawn();
-        hooks.giveAllPlayersKits();
-        hooks.lockWarmupMovement();
-        hooks.broadcastCountdown(new CountdownPacket(PREPARE_BLACKOUT_TOTAL_TICKS, true));
     }
 }

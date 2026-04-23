@@ -94,8 +94,8 @@ public final class ClientTdmState {
         STORE.updateCountdown(count, black);
     }
 
-    public static void setDeathCam(String killer, int duration) {
-        STORE.setDeathCam(killer, duration);
+    public static void setDeathCam(String killer, int duration, boolean updateViewLock, float lockedYaw, float lockedPitch) {
+        STORE.setDeathCam(killer, duration, updateViewLock, lockedYaw, lockedPitch);
     }
 
     public static void clearDeathCam() {

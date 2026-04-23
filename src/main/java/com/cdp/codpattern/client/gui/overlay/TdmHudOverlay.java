@@ -76,7 +76,6 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int THROWABLE_HUD_BOTTOM_MARGIN = 10;
     private static final int THROWABLE_HUD_RIGHT_RESERVED_WIDTH = 116;
     private static final int THROWABLE_HUD_RIGHT_GAP = 10;
-
     public static final TdmHudOverlay INSTANCE = new TdmHudOverlay();
 
     private record ResultCandidate(String teamName, PlayerInfo player) {
@@ -99,7 +98,6 @@ public class TdmHudOverlay implements IGuiOverlay {
 
         Font font = Minecraft.getInstance().font;
         if (ClientTdmState.isBlackoutActive()) {
-            renderBlackout(graphics, font, screenWidth, screenHeight);
             return;
         }
         int centerX = screenWidth / 2;
@@ -107,7 +105,6 @@ public class TdmHudOverlay implements IGuiOverlay {
         renderLeftScorePanel(graphics, font, screenWidth, screenHeight);
         renderKillFeed(graphics, font, screenWidth, screenHeight);
         renderPhaseAnnouncement(graphics, font, centerX, screenHeight);
-        renderCountdownFocus(graphics, font, centerX, screenHeight);
         renderThrowableSlots(graphics, font, screenWidth, screenHeight);
         renderCombatMarkers(graphics, partialTick, screenWidth, screenHeight);
         renderEndgameSplash(graphics, font, centerX, screenWidth, screenHeight);
@@ -127,40 +124,6 @@ public class TdmHudOverlay implements IGuiOverlay {
                 && getSpecgruScore() == 0);
     }
 
-    private void renderBlackout(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
-        if (!ClientTdmState.isBlackoutActive()) {
-            return;
-        }
-        float alpha = ClientTdmState.getBlackoutAlpha();
-        int alphaInt = clamp((int) (alpha * 255.0f), 0, 255);
-        if (alphaInt <= 0) {
-            return;
-        }
-
-        graphics.fill(0, 0, screenWidth, screenHeight, alphaInt << 24);
-        float infoAlpha = ClientTdmState.getBlackoutInfoAlpha();
-        int infoAlphaInt = clamp((int) (infoAlpha * 255.0f), 0, 255);
-        if (infoAlphaInt <= 0) {
-            return;
-        }
-
-        String mapName = ClientTdmState.syncedMapName();
-        if (mapName == null || mapName.isBlank()) {
-            mapName = ClientTdmState.roomContextName();
-        }
-        String timeText = formatTime(ClientTdmState.gameTimeTicks());
-
-        int marginLeft = 20;
-        int baseY = screenHeight - 62;
-        float mapScale = 2.0f;
-        String fittedMapName = GuiTextHelper.ellipsize(font, mapName == null ? "" : mapName,
-                Math.max(1, (int) ((screenWidth - marginLeft - 20) / mapScale)));
-        if (!fittedMapName.isEmpty()) {
-            drawScaledString(graphics, font, fittedMapName, marginLeft, baseY, withAlpha(0xFFFFFFFF, infoAlphaInt), mapScale);
-        }
-        graphics.drawString(font, timeText, marginLeft, baseY + 28, withAlpha(0xFFEAEAEA, infoAlphaInt), true);
-    }
-
     private void renderLeftScorePanel(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
         int x = 8;
         int y = screenHeight >= 500 ? 92 : 70;
@@ -168,7 +131,8 @@ public class TdmHudOverlay implements IGuiOverlay {
         int rowHeight = 18;
         int rowGap = 3;
         int timerY = y + (rowHeight * 2) + rowGap + 4;
-        int phaseY = timerY + 10;
+        String timerText = buildTimerText();
+        int phaseY = timerText.isBlank() ? timerY : timerY + 10;
         if (x + rowWidth >= screenWidth || phaseY >= screenHeight) {
             return;
         }
@@ -183,7 +147,9 @@ public class TdmHudOverlay implements IGuiOverlay {
         renderScoreRow(graphics, font, x, y + rowHeight + rowGap, rowWidth, rowHeight, teamShort("specgru"),
                 specgruScore, (float) specgruScore / maxScore, 0xFF66A6FF, pulseStrength);
 
-        graphics.drawString(font, buildTimerText(), x, timerY, 0xFFB08A3E, false);
+        if (!timerText.isBlank()) {
+            graphics.drawString(font, timerText, x, timerY, 0xFFB08A3E, false);
+        }
         graphics.drawString(font, phaseShortText(ClientTdmState.currentPhase()), x, phaseY, 0xFF8F8F8F, false);
 
         int phaseGlow = (int) (ClientTdmState.getPhaseFlashStrength() * 95.0f);
@@ -232,7 +198,8 @@ public class TdmHudOverlay implements IGuiOverlay {
         int rowHeight = 18;
         int rowGap = 3;
         int timerY = scoreY + (rowHeight * 2) + rowGap + 4;
-        int phaseY = timerY + 10;
+        String timerText = buildTimerText();
+        int phaseY = timerText.isBlank() ? timerY : timerY + 10;
         int contentHeight = Math.max(GuiTextHelper.referenceScaled(KILL_FEED_MIN_ROW_HEIGHT),
                 Math.max(GuiTextHelper.referenceScaled(KILL_FEED_ICON_BASE_SIZE), killFeedLineHeight(font)));
         int verticalPadding = GuiTextHelper.referenceScaled(KILL_FEED_BACKGROUND_VERTICAL_PADDING);
@@ -417,17 +384,6 @@ public class TdmHudOverlay implements IGuiOverlay {
         graphics.fill(x, y + boxHeight - 2, x + boxWidth, y + boxHeight,
                 (alpha << 24) | (phaseAccentColor() & 0x00FFFFFF));
         drawCenteredString(graphics, font, text, centerX, y + 6, (alpha << 24) | 0x00F5F5F5);
-    }
-
-    private void renderCountdownFocus(GuiGraphics graphics, Font font, int centerX, int screenHeight) {
-        if (!"WARMUP".equals(ClientTdmState.currentPhase())) {
-            return;
-        }
-        int secondsLeft = Math.max(1, (ClientTdmState.remainingTimeTicks() + 19) / 20);
-        float scale = secondsLeft >= 100 ? 3.7f : (secondsLeft <= 3 ? 5.7f : 4.9f);
-        int color = secondsLeft <= 3 ? 0xFFFF6A4E : 0xFFFFE28A;
-        int numberY = screenHeight / 2 - Math.round((font.lineHeight * scale) / 2.0f);
-        drawScaledCenteredString(graphics, font, String.valueOf(secondsLeft), centerX, numberY, color, scale);
     }
 
     private void renderThrowableSlots(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
@@ -1102,9 +1058,8 @@ public class TdmHudOverlay implements IGuiOverlay {
 
     private String buildTimerText() {
         return switch (ClientTdmState.currentPhase()) {
-            case "PLAYING", "COUNTDOWN", "WARMUP" -> formatTime(ClientTdmState.remainingTimeTicks());
-            case "ENDED" -> "00:00";
-            default -> "--:--";
+            case "PLAYING" -> formatTime(ClientTdmState.remainingTimeTicks());
+            default -> "";
         };
     }
 

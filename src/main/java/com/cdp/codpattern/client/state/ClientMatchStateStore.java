@@ -35,6 +35,8 @@ public final class ClientMatchStateStore {
     private ClientTdmState.BlackoutPhase blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
     private int blackoutTicksRemaining = 0;
     private int blackoutTotalTicks = 0;
+    private int blackoutFadeTicks = 0;
+    private int blackoutHoldTicks = 0;
     private boolean playCountdownTickSound = false;
     private boolean playTeleportSound = false;
     private String previousPhase = "WAITING";
@@ -48,6 +50,9 @@ public final class ClientMatchStateStore {
     private boolean dead = false;
     private String killerName = "";
     private int deathCamTicks = 0;
+    private boolean deathCamViewLocked = false;
+    private float deathCamLockedYaw = 0.0f;
+    private float deathCamLockedPitch = 0.0f;
     private String roomContextName = "";
     private String syncedMapName = "";
     private int rosterVersion = 0;
@@ -241,6 +246,9 @@ public final class ClientMatchStateStore {
             if (!isKillFeedPhase(phase)) {
                 clearKillFeed();
             }
+            if ("WARMUP".equals(phase)) {
+                playTeleportSound = true;
+            }
             phaseFlashTicks = PHASE_FLASH_DURATION;
             triggerPhaseAnnouncement(phase);
             queuePhaseCue(phase);
@@ -320,6 +328,8 @@ public final class ClientMatchStateStore {
         blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
         blackoutTicksRemaining = 0;
         blackoutTotalTicks = 0;
+        blackoutFadeTicks = 0;
+        blackoutHoldTicks = 0;
         playCountdownTickSound = false;
         playTeleportSound = false;
         previousPhase = "WAITING";
@@ -388,8 +398,7 @@ public final class ClientMatchStateStore {
         blackout = black;
 
         if (black && count > 0) {
-            startBlackoutSequence();
-            playTeleportSound = true;
+            startBlackoutSequence(count);
         }
 
         if (!black && count > 0) {
@@ -397,7 +406,7 @@ public final class ClientMatchStateStore {
         }
     }
 
-    public void setDeathCam(String killer, int duration) {
+    public void setDeathCam(String killer, int duration, boolean updateViewLock, float lockedYaw, float lockedPitch) {
         dead = true;
         if (killer != null && !killer.isBlank()) {
             killerName = killer;
@@ -405,12 +414,21 @@ public final class ClientMatchStateStore {
             killerName = Component.translatable("common.codpattern.unknown_player").getString();
         }
         deathCamTicks = Math.max(0, duration);
+        if (updateViewLock && !Float.isNaN(lockedYaw) && !Float.isNaN(lockedPitch)) {
+            deathCamViewLocked = true;
+            deathCamLockedYaw = lockedYaw;
+            deathCamLockedPitch = lockedPitch;
+            applyDeathCamViewLock(Minecraft.getInstance().player);
+        }
     }
 
     public void clearDeathCam() {
         dead = false;
         killerName = "";
         deathCamTicks = 0;
+        deathCamViewLocked = false;
+        deathCamLockedYaw = 0.0f;
+        deathCamLockedPitch = 0.0f;
     }
 
     public float getBlackoutAlpha() {
@@ -438,6 +456,7 @@ public final class ClientMatchStateStore {
 
     public float getBlackoutInfoAlpha() {
         return switch (blackoutPhase) {
+            case FADE_IN -> smoothstep(phaseProgress());
             case HOLD -> smoothstep(phaseProgress());
             case FADE_OUT -> smoothstep(phaseRemainingProgress());
             default -> 0.0f;
@@ -500,10 +519,21 @@ public final class ClientMatchStateStore {
         if (deathCamTicks > 0) {
             deathCamTicks--;
         }
+        if (dead && deathCamViewLocked) {
+            applyDeathCamViewLock(Minecraft.getInstance().player);
+        }
         tickKillFeed();
 
         switch (blackoutPhase) {
-            case FADE_IN -> tickBlackoutPhase(ClientTdmState.BlackoutPhase.HOLD, PhaseStateMachine.PREPARE_BLACKOUT_HOLD_TICKS);
+            case FADE_IN -> {
+                ClientTdmState.BlackoutPhase nextPhase = blackoutHoldTicks > 0
+                        ? ClientTdmState.BlackoutPhase.HOLD
+                        : ClientTdmState.BlackoutPhase.FADE_OUT;
+                int nextDuration = blackoutHoldTicks > 0
+                        ? blackoutHoldTicks
+                        : PhaseStateMachine.PREPARE_BLACKOUT_FADE_OUT_TICKS;
+                tickBlackoutPhase(nextPhase, nextDuration);
+            }
             case HOLD -> tickBlackoutPhase(ClientTdmState.BlackoutPhase.FADE_OUT,
                     PhaseStateMachine.PREPARE_BLACKOUT_FADE_OUT_TICKS);
             case FADE_OUT -> tickBlackoutPhase(ClientTdmState.BlackoutPhase.NONE, 0);
@@ -548,8 +578,22 @@ public final class ClientMatchStateStore {
         };
     }
 
-    private void startBlackoutSequence() {
-        setBlackoutPhase(ClientTdmState.BlackoutPhase.FADE_IN, PhaseStateMachine.PREPARE_BLACKOUT_FADE_IN_TICKS);
+    private void startBlackoutSequence(int totalTicks) {
+        int sanitizedTotalTicks = Math.max(0, totalTicks);
+        if (sanitizedTotalTicks <= 0) {
+            blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
+            blackoutTotalTicks = 0;
+            blackoutTicksRemaining = 0;
+            blackoutFadeTicks = 0;
+            blackoutHoldTicks = 0;
+            blackout = false;
+            return;
+        }
+
+        blackoutFadeTicks = Math.max(1, PhaseStateMachine.PREPARE_BLACKOUT_FADE_IN_TICKS);
+        blackoutHoldTicks = Math.max(0,
+                sanitizedTotalTicks - blackoutFadeTicks - Math.max(1, PhaseStateMachine.PREPARE_BLACKOUT_FADE_OUT_TICKS));
+        setBlackoutPhase(ClientTdmState.BlackoutPhase.FADE_IN, blackoutFadeTicks);
     }
 
     private void tickBlackoutPhase(ClientTdmState.BlackoutPhase nextPhase, int nextDurationTicks) {
@@ -564,6 +608,8 @@ public final class ClientMatchStateStore {
             blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
             blackoutTotalTicks = 0;
             blackoutTicksRemaining = 0;
+            blackoutFadeTicks = 0;
+            blackoutHoldTicks = 0;
             blackout = false;
             return;
         }
@@ -599,6 +645,20 @@ public final class ClientMatchStateStore {
                 killFeedEntries.remove(i);
             }
         }
+    }
+
+    private void applyDeathCamViewLock(LocalPlayer player) {
+        if (player == null) {
+            return;
+        }
+        player.setYRot(deathCamLockedYaw);
+        player.yRotO = deathCamLockedYaw;
+        player.setYHeadRot(deathCamLockedYaw);
+        player.yHeadRotO = deathCamLockedYaw;
+        player.setYBodyRot(deathCamLockedYaw);
+        player.yBodyRotO = deathCamLockedYaw;
+        player.setXRot(deathCamLockedPitch);
+        player.xRotO = deathCamLockedPitch;
     }
 
     private void playPendingSounds() {

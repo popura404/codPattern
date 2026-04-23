@@ -18,7 +18,7 @@ public final class TdmWarmupMovementLockHandler {
         if (!(event.getEntity() instanceof LocalPlayer player)) {
             return;
         }
-        if (!ClientTdmState.hasRoomContext() || !"WARMUP".equals(ClientTdmState.currentPhase())) {
+        if (!shouldLockMovement()) {
             return;
         }
 
@@ -31,5 +31,12 @@ public final class TdmWarmupMovementLockHandler {
         event.getInput().jumping = false;
         event.getInput().shiftKeyDown = false;
         player.setSprinting(false);
+    }
+
+    private static boolean shouldLockMovement() {
+        if (ClientTdmState.isDead()) {
+            return true;
+        }
+        return ClientTdmState.hasRoomContext() && "WARMUP".equals(ClientTdmState.currentPhase());
     }
 }

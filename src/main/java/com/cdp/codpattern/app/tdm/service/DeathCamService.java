@@ -34,7 +34,6 @@ public final class DeathCamService {
                     if (sp.position().distanceToSqr(camPos) > 0.01) {
                         sp.teleportTo(serverLevel, camPos.x, camPos.y, camPos.z, Set.of(), sp.getYRot(), sp.getXRot());
                     }
-                    sp.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, deathPos);
                 }
             }
         }

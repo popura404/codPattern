@@ -59,7 +59,9 @@ public final class PlayerDeathService {
         UUID killerId = hasRealKiller ? killer.getUUID() : player.getUUID();
         String killerName = hasRealKiller ? killer.getGameProfile().getName() : "";
 
-        hooks.sendDeathCamPacket(player, new DeathCamPacket(killerId, killerName, deathCamTicks, respawnDelayTicks));
+        hooks.sendDeathCamPacket(player,
+                new DeathCamPacket(killerId, killerName, deathCamTicks, respawnDelayTicks, player.getYRot(),
+                        player.getXRot()));
         hooks.registerDeathCam(player.getUUID(), killerId, deathPos, camPos, deathCamTicks);
         hooks.scheduleRespawn(player);
     }

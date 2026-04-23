@@ -7,6 +7,7 @@ import com.cdp.codpattern.client.TdmCombatMarkerTracker;
 import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
 import com.cdp.codpattern.client.gui.screen.NoticePopupScreen;
 import com.cdp.codpattern.client.gui.screen.PopupNoticeHelper;
+import com.cdp.codpattern.client.gui.screen.TdmBlackoutScreen;
 import com.cdp.codpattern.client.gui.screen.TdmRoomScreen;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomData;
 import com.cdp.codpattern.client.refit.AttachmentRefitClientState;
@@ -42,6 +43,8 @@ import java.util.Map;
 @OnlyIn(Dist.CLIENT)
 public class ClientPacketHandler {
     private static final Gson GSON = new Gson();
+    private static Screen activeVoteDialogScreen;
+    private static Screen activeVoteDialogPreviousScreen;
 
     public static void handleOpenBackpackScreen() {
         Minecraft minecraft = Minecraft.getInstance();
@@ -59,6 +62,7 @@ public class ClientPacketHandler {
             return;
         }
 
+        closeActiveVoteDialog(minecraft);
         Screen previous = minecraft.screen;
         boolean startVote = "START".equalsIgnoreCase(voteType);
         Component title = startVote
@@ -70,14 +74,20 @@ public class ClientPacketHandler {
                 : Component.translatable("screen.codpattern.vote_dialog.message_end", initiatorName, roomName,
                         requiredVotes, totalVoters);
 
-        minecraft.setScreen(new ConfirmScreen(accepted -> {
+        final ConfirmScreen[] voteDialogHolder = new ConfirmScreen[1];
+        ConfirmScreen voteDialog = new ConfirmScreen(accepted -> {
+            clearActiveVoteDialog(voteDialogHolder[0]);
             minecraft.setScreen(previous);
             ModNetworkChannel.sendToServer(new VoteResponsePacket(voteId, accepted));
         },
                 title,
                 message,
                 Component.translatable("screen.codpattern.vote_dialog.accept"),
-                Component.translatable("screen.codpattern.vote_dialog.reject")));
+                Component.translatable("screen.codpattern.vote_dialog.reject"));
+        voteDialogHolder[0] = voteDialog;
+        activeVoteDialogScreen = voteDialog;
+        activeVoteDialogPreviousScreen = previous;
+        minecraft.setScreen(voteDialog);
     }
 
     public static void handlePopupNotice(Component title, Component message) {
@@ -182,13 +192,13 @@ public class ClientPacketHandler {
         });
     }
 
-    public static void handleDeathCam(String killerName, int respawnDelayTicks) {
+    public static void handleDeathCam(String killerName, int deathCamTicks, int respawnDelayTicks, float lockedYaw, float lockedPitch) {
         Minecraft.getInstance().execute(() -> {
             if (respawnDelayTicks <= 0) {
                 ClientTdmState.clearDeathCam();
                 return;
             }
-            ClientTdmState.setDeathCam(killerName, respawnDelayTicks);
+            ClientTdmState.setDeathCam(killerName, respawnDelayTicks, deathCamTicks > 0, lockedYaw, lockedPitch);
         });
     }
 
@@ -197,11 +207,25 @@ public class ClientPacketHandler {
     }
 
     public static void handleGamePhase(String phase, int remainingTicks) {
-        Minecraft.getInstance().execute(() -> ClientTdmState.updatePhase(phase, remainingTicks));
+        Minecraft.getInstance().execute(() -> {
+            Minecraft minecraft = Minecraft.getInstance();
+            if ("WARMUP".equals(phase) || "ENDED".equals(phase)) {
+                closeActiveVoteDialog(minecraft);
+            }
+            ClientTdmState.updatePhase(phase, remainingTicks);
+            TdmBlackoutScreen.sync(minecraft);
+        });
     }
 
     public static void handleCountdown(int countdown, boolean blackout) {
-        Minecraft.getInstance().execute(() -> ClientTdmState.updateCountdown(countdown, blackout));
+        Minecraft.getInstance().execute(() -> {
+            Minecraft minecraft = Minecraft.getInstance();
+            if (blackout) {
+                closeActiveVoteDialog(minecraft);
+            }
+            ClientTdmState.updateCountdown(countdown, blackout);
+            TdmBlackoutScreen.sync(minecraft);
+        });
     }
 
     public static void handleScoreUpdate(Map<String, Integer> teamScores, int team1Score, int team2Score,
@@ -315,6 +339,25 @@ public class ClientPacketHandler {
 
         double injectedUpwardVelocity = 10.0 / length;
         return originalMotionY - injectedUpwardVelocity / 10.0;
+    }
+
+    private static void closeActiveVoteDialog(Minecraft minecraft) {
+        Screen dialogScreen = activeVoteDialogScreen;
+        if (dialogScreen == null) {
+            return;
+        }
+        clearActiveVoteDialog(dialogScreen);
+        if (minecraft.screen == dialogScreen) {
+            minecraft.setScreen(null);
+        }
+    }
+
+    private static void clearActiveVoteDialog(Screen dialogScreen) {
+        if (activeVoteDialogScreen != dialogScreen) {
+            return;
+        }
+        activeVoteDialogScreen = null;
+        activeVoteDialogPreviousScreen = null;
     }
 
     private static Component resolveWeaponUpdateFailure(String code, String message) {
