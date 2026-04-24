@@ -19,7 +19,8 @@ public final class PlayerDeathService {
 
         void sendDeathCamPacket(ServerPlayer player, DeathCamPacket packet);
 
-        void registerDeathCam(UUID playerId, UUID killerId, Vec3 deathPosition, Vec3 cameraPosition, int deathCamTicks);
+        void registerDeathCam(UUID playerId, UUID killerId, Vec3 deathPosition, Vec3 cameraPosition,
+                float lockedYaw, float lockedPitch, int deathCamTicks);
 
         void scheduleRespawn(ServerPlayer player);
     }
@@ -52,6 +53,8 @@ public final class PlayerDeathService {
         Vec3 look = player.getLookAngle();
         Vec3 camPos = deathPos.add(look.scale(-2.6)).add(0, 0.75, 0);
         hooks.moveToDeathCam(player, camPos, deathPos);
+        float lockedYaw = player.getYRot();
+        float lockedPitch = player.getXRot();
 
         int deathCamTicks = Math.max(0, config.getDeathCamTicks());
         int respawnDelayTicks = Math.max(1, config.getRespawnDelayTicks());
@@ -60,9 +63,8 @@ public final class PlayerDeathService {
         String killerName = hasRealKiller ? killer.getGameProfile().getName() : "";
 
         hooks.sendDeathCamPacket(player,
-                new DeathCamPacket(killerId, killerName, deathCamTicks, respawnDelayTicks, player.getYRot(),
-                        player.getXRot()));
-        hooks.registerDeathCam(player.getUUID(), killerId, deathPos, camPos, deathCamTicks);
+                new DeathCamPacket(killerId, killerName, deathCamTicks, respawnDelayTicks, lockedYaw, lockedPitch));
+        hooks.registerDeathCam(player.getUUID(), killerId, deathPos, camPos, lockedYaw, lockedPitch, deathCamTicks);
         hooks.scheduleRespawn(player);
     }
 }

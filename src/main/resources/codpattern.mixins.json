@@ -16,6 +16,7 @@
   "client": [
     "accessor.EntityAccessor",
     "accessor.AbstractContainerScreenAccessor",
+    "client.MouseHandlerMixin",
     "inventory.InventoryScreenMixin",
     "tacz.GunRefitScreenMixin"
   ],

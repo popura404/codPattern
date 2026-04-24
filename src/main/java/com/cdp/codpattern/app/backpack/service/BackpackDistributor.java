@@ -29,15 +29,25 @@ public class BackpackDistributor {
      * 分发物品逻辑处理
      */
     public static void distributeBackpackItems(ServerPlayer player) {
-        distributeBackpackItems(player, false);
+        distributeBackpackItems(player, false, true);
+    }
+
+    /** 静默分发物品，不向玩家发送背包装备提示。 */
+    public static void distributeBackpackItemsSilently(ServerPlayer player) {
+        distributeBackpackItems(player, false, false);
     }
 
     /** 强制发放 */
     public static void forceDistributeBackpackItems(ServerPlayer player) {
-        distributeBackpackItems(player, true);
+        distributeBackpackItems(player, true, true);
     }
 
-    private static void distributeBackpackItems(ServerPlayer player, boolean forceDistribute) {
+    /** 强制静默发放，不向玩家发送背包装备提示。 */
+    public static void forceDistributeBackpackItemsSilently(ServerPlayer player) {
+        distributeBackpackItems(player, true, false);
+    }
+
+    private static void distributeBackpackItems(ServerPlayer player, boolean forceDistribute, boolean notifyPlayer) {
         if (player.server == null) {
             return;
         }
@@ -122,9 +132,11 @@ public class BackpackDistributor {
         player.inventoryMenu.slotsChanged(player.getInventory());
         ThrowableInventoryService.sync(player);
 
-        player.sendSystemMessage(Component.translatable(
-                "message.codpattern.game.equipped_backpack",
-                BackpackNameHelper.displayNameComponent(backpack, playerData.getSelectedBackpack())));
+        if (notifyPlayer) {
+            player.sendSystemMessage(Component.translatable(
+                    "message.codpattern.game.equipped_backpack",
+                    BackpackNameHelper.displayNameComponent(backpack, playerData.getSelectedBackpack())));
+        }
     }
 
     private static BackpackConfig.Backpack resolveBackpack(BackpackConfig.PlayerBackpackData playerData) {

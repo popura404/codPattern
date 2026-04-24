@@ -11,6 +11,8 @@ interface CodTdmPhaseHooksPort {
 
     void giveAllPlayersKits();
 
+    void giveAllPlayersKitsSilently();
+
     void lockWarmupMovement();
 
     void unlockAllRoomPlayersMovement();

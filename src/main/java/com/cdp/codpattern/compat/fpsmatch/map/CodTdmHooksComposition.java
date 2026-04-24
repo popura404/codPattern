@@ -48,6 +48,8 @@ final class CodTdmHooksComposition {
 
         void giveAllPlayersKits();
 
+        void giveAllPlayersKitsSilently();
+
         void lockWarmupMovement();
 
         void unlockAllRoomPlayersMovement();
@@ -133,6 +135,7 @@ final class CodTdmHooksComposition {
                         phasePort::clearCountdownActionBar,
                         phasePort::teleportAllPlayersToSpawn,
                         phasePort::giveAllPlayersKits,
+                        phasePort::giveAllPlayersKitsSilently,
                         phasePort::lockWarmupMovement,
                         phasePort::unlockAllRoomPlayersMovement,
                         phasePort::clearAllPlayersInventory,

@@ -3,6 +3,7 @@ package com.cdp.codpattern.event.client;
 import com.cdp.codpattern.CodPattern;
 import com.cdp.codpattern.client.ClientTdmState;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.MovementInputUpdateEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -31,6 +32,7 @@ public final class TdmWarmupMovementLockHandler {
         event.getInput().jumping = false;
         event.getInput().shiftKeyDown = false;
         player.setSprinting(false);
+        player.setDeltaMovement(Vec3.ZERO);
     }
 
     private static boolean shouldLockMovement() {

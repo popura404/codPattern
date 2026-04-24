@@ -61,6 +61,8 @@ final class CodTdmCoordinatorComposition {
 
         void givePlayerKits(ServerPlayer player);
 
+        void givePlayerKitsSilently(ServerPlayer player);
+
         List<TeamPlayerSnapshotService.TeamRoster> teamRosters();
     }
 
@@ -130,6 +132,7 @@ final class CodTdmCoordinatorComposition {
                         mapPort::randomizeAllTeamSpawnsAndCollectMissingTeams,
                         mapPort::teleportPlayerToRoundStartPoint,
                         mapPort::givePlayerKits,
+                        mapPort::givePlayerKitsSilently,
                         clearPlayerInventoryAction,
                         scheduleRespawnAction
                 )

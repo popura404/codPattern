@@ -62,6 +62,11 @@ final class CodTdmPhaseStateHooks implements PhaseStateMachine.Hooks {
     }
 
     @Override
+    public void giveAllPlayersKitsSilently() {
+        port.giveAllPlayersKitsSilently();
+    }
+
+    @Override
     public void lockWarmupMovement() {
         port.lockWarmupMovement();
     }

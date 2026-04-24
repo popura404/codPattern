@@ -36,6 +36,8 @@ public final class PhaseStateMachine {
 
         void giveAllPlayersKits();
 
+        void giveAllPlayersKitsSilently();
+
         void lockWarmupMovement();
 
         void unlockAllRoomPlayersMovement();
@@ -92,7 +94,7 @@ public final class PhaseStateMachine {
                 hooks.clearCountdownActionBar();
                 hooks.restoreAllRoomPlayersToAdventure();
                 hooks.teleportAllPlayersToSpawn();
-                hooks.giveAllPlayersKits();
+                hooks.giveAllPlayersKitsSilently();
                 hooks.lockWarmupMovement();
             }
             case PLAYING -> {

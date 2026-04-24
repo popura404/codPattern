@@ -37,6 +37,10 @@ final record CodTdmKitsRuntime(
         KitDistributionService.distributePlayerKits(player);
     }
 
+    void givePlayerKitsSilently(ServerPlayer player) {
+        KitDistributionService.distributePlayerKitsSilently(player);
+    }
+
     Map<String, List<ItemStack>> startKitsSnapshot() {
         return mapSetupState.startKitsSnapshot();
     }

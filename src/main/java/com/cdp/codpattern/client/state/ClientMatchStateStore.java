@@ -114,6 +114,24 @@ public final class ClientMatchStateStore {
         return deathCamTicks;
     }
 
+    public boolean isDeathCamViewLocked() {
+        return dead && deathCamViewLocked;
+    }
+
+    public float deathCamLockedYaw() {
+        return deathCamLockedYaw;
+    }
+
+    public float deathCamLockedPitch() {
+        return deathCamLockedPitch;
+    }
+
+    public void enforceDeathCamViewLock() {
+        if (dead && deathCamViewLocked) {
+            applyDeathCamViewLock(Minecraft.getInstance().player);
+        }
+    }
+
     public int endSummaryPageIndex() {
         if (!"ENDED".equals(currentPhase)) {
             return 0;
@@ -414,7 +432,8 @@ public final class ClientMatchStateStore {
             killerName = Component.translatable("common.codpattern.unknown_player").getString();
         }
         deathCamTicks = Math.max(0, duration);
-        if (updateViewLock && !Float.isNaN(lockedYaw) && !Float.isNaN(lockedPitch)) {
+        boolean hasLockedRotation = !Float.isNaN(lockedYaw) && !Float.isNaN(lockedPitch);
+        if ((updateViewLock || hasLockedRotation) && hasLockedRotation) {
             deathCamViewLocked = true;
             deathCamLockedYaw = lockedYaw;
             deathCamLockedPitch = lockedPitch;

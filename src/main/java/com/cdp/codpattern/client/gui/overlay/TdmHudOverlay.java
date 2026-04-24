@@ -28,6 +28,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
@@ -76,6 +77,10 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int THROWABLE_HUD_BOTTOM_MARGIN = 10;
     private static final int THROWABLE_HUD_RIGHT_RESERVED_WIDTH = 116;
     private static final int THROWABLE_HUD_RIGHT_GAP = 10;
+    private static final int COUNTDOWN_ACTION_BAR_Y_OFFSET = 68;
+    private static final int WARMUP_MAP_MARGIN_LEFT = 20;
+    private static final int WARMUP_MAP_INFO_BOTTOM_OFFSET = 62;
+    private static final float WARMUP_MAP_NAME_SCALE = 2.0f;
     public static final TdmHudOverlay INSTANCE = new TdmHudOverlay();
 
     private record ResultCandidate(String teamName, PlayerInfo player) {
@@ -97,6 +102,7 @@ public class TdmHudOverlay implements IGuiOverlay {
         }
 
         Font font = Minecraft.getInstance().font;
+        renderCountdownOverlay(graphics, font, screenWidth, screenHeight);
         if (ClientTdmState.isBlackoutActive()) {
             return;
         }
@@ -122,6 +128,93 @@ public class TdmHudOverlay implements IGuiOverlay {
                 && ClientTdmState.remainingTimeTicks() <= 0
                 && getKortacScore() == 0
                 && getSpecgruScore() == 0);
+    }
+
+    private void renderCountdownOverlay(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
+        String phase = ClientTdmState.currentPhase();
+        if (!"COUNTDOWN".equals(phase) && !"WARMUP".equals(phase)) {
+            return;
+        }
+
+        int blackoutAlpha = clamp((int) (ClientTdmState.getBlackoutAlpha() * 255.0f), 0, 255);
+        if (blackoutAlpha > 0) {
+            graphics.fill(0, 0, screenWidth, screenHeight, blackoutAlpha << 24);
+        }
+
+        if ("COUNTDOWN".equals(phase)) {
+            renderActionbarCountdown(graphics, font, screenWidth, screenHeight);
+            return;
+        }
+
+        renderWarmupCountdown(graphics, font, screenWidth, screenHeight);
+        renderWarmupMapInfo(graphics, font, screenWidth, screenHeight);
+    }
+
+    private void renderActionbarCountdown(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
+        int secondsLeft = Math.max(1, (ClientTdmState.remainingTimeTicks() + 19) / 20);
+        String message = Component.translatable("hud.codpattern.tdm.actionbar.countdown", secondsLeft).getString();
+        if (message.isBlank()) {
+            return;
+        }
+
+        int messageWidth = font.width(message);
+        int centerX = screenWidth / 2;
+        int y = screenHeight - COUNTDOWN_ACTION_BAR_Y_OFFSET;
+        graphics.fill(
+                centerX - messageWidth / 2 - 4,
+                y - 4,
+                centerX + messageWidth / 2 + 4,
+                y + font.lineHeight + 4,
+                0x55000000);
+        graphics.drawString(font, message, centerX - messageWidth / 2, y, 0xFFFFFFFF, true);
+    }
+
+    private void renderWarmupCountdown(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
+        int secondsLeft = Math.max(1, (ClientTdmState.remainingTimeTicks() + 19) / 20);
+        String text = String.valueOf(secondsLeft);
+        float scale = 4.9f;
+        int y = screenHeight / 2 - Math.round((font.lineHeight * scale) / 2.0f);
+
+        graphics.pose().pushPose();
+        graphics.pose().translate(screenWidth / 2.0f, y, 0.0f);
+        graphics.pose().scale(scale, scale, 1.0f);
+        graphics.drawString(font, text, -font.width(text) / 2, 0, 0xFFFFE28A, true);
+        graphics.pose().popPose();
+    }
+
+    private void renderWarmupMapInfo(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
+        Minecraft minecraft = Minecraft.getInstance();
+        String mapName = ClientTdmState.syncedMapName();
+        if (mapName == null || mapName.isBlank()) {
+            mapName = ClientTdmState.roomContextName();
+        }
+        String worldTime = formatWorldTime(minecraft.level);
+        int baseY = screenHeight - WARMUP_MAP_INFO_BOTTOM_OFFSET;
+        String fittedMapName = GuiTextHelper.ellipsize(
+                font,
+                mapName == null ? "" : mapName,
+                Math.max(1, (int) ((screenWidth - WARMUP_MAP_MARGIN_LEFT - 20) / WARMUP_MAP_NAME_SCALE)));
+
+        if (!fittedMapName.isEmpty()) {
+            graphics.pose().pushPose();
+            graphics.pose().translate(WARMUP_MAP_MARGIN_LEFT, baseY, 0.0f);
+            graphics.pose().scale(WARMUP_MAP_NAME_SCALE, WARMUP_MAP_NAME_SCALE, 1.0f);
+            graphics.drawString(font, fittedMapName, 0, 0, 0xFFFFFFFF, true);
+            graphics.pose().popPose();
+        }
+
+        graphics.drawString(font, worldTime, WARMUP_MAP_MARGIN_LEFT, baseY + 28, 0xFFEAEAEA, true);
+    }
+
+    private String formatWorldTime(Level level) {
+        if (level == null) {
+            return "--:--";
+        }
+
+        long dayTicks = Math.floorMod(level.getDayTime() + 6000L, 24000L);
+        int hours = (int) (dayTicks / 1000L);
+        int minutes = (int) ((dayTicks % 1000L) * 60L / 1000L);
+        return String.format(Locale.ROOT, "%02d:%02d", hours, minutes);
     }
 
     private void renderLeftScorePanel(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {

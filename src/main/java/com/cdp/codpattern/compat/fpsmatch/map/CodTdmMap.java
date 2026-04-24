@@ -110,6 +110,10 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         kitsRuntime.givePlayerKits(player);
     }
 
+    public void givePlayerKitsSilently(ServerPlayer player) {
+        kitsRuntime.givePlayerKitsSilently(player);
+    }
+
     // GiveStartKitsMap 实现
 
     @Override

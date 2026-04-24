@@ -45,6 +45,7 @@ final class CodTdmMapComponentsAssembler {
                 () -> CodTdmMapTeamViews.randomizeAllTeamSpawnsAndCollectMissingTeams(map),
                 map::teleportPlayerToRoundStartPoint,
                 map::givePlayerKits,
+                map::givePlayerKitsSilently,
                 () -> CodTdmMapTeamViews.teamRosters(map)
         );
         return CodTdmMapComposition.compose(

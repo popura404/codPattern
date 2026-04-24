@@ -210,6 +210,22 @@ public final class ClientTdmState {
         return STORE.deathCamTicks();
     }
 
+    public static boolean isDeathCamViewLocked() {
+        return STORE.isDeathCamViewLocked();
+    }
+
+    public static float deathCamLockedYaw() {
+        return STORE.deathCamLockedYaw();
+    }
+
+    public static float deathCamLockedPitch() {
+        return STORE.deathCamLockedPitch();
+    }
+
+    public static void enforceDeathCamViewLock() {
+        STORE.enforceDeathCamViewLock();
+    }
+
     public static BlackoutPhase blackoutPhase() {
         return STORE.blackoutPhase();
     }

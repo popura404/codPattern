@@ -68,6 +68,15 @@ final class CodTdmRoundLifecycleCoordinator {
         });
     }
 
+    void giveAllPlayersKitsSilently() {
+        port.getJoinedPlayers().forEach(player -> {
+            if (phaseStartRespawningPlayers.contains(player.getUUID())) {
+                return;
+            }
+            port.givePlayerKitsSilently(player);
+        });
+    }
+
     void clearAllPlayersInventory() {
         port.getJoinedPlayers().forEach(port::clearPlayerInventory);
     }

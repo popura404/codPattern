@@ -23,6 +23,14 @@ public final class KitDistributionService {
     }
 
     public static void distributePlayerKits(ServerPlayer player) {
+        distributePlayerKits(player, true);
+    }
+
+    public static void distributePlayerKitsSilently(ServerPlayer player) {
+        distributePlayerKits(player, false);
+    }
+
+    private static void distributePlayerKits(ServerPlayer player, boolean notifyPlayer) {
         if (player.server == null) {
             return;
         }
@@ -54,9 +62,11 @@ public final class KitDistributionService {
                 giveThrowableItem(player, backpack, filterConfig, "lethal", ThrowableInventoryService.SLOT_TWO);
             }
 
-            player.sendSystemMessage(
-                    Component.translatable("message.codpattern.game.equipped_backpack",
-                            BackpackNameHelper.displayNameComponent(backpack, playerData.getSelectedBackpack())));
+            if (notifyPlayer) {
+                player.sendSystemMessage(
+                        Component.translatable("message.codpattern.game.equipped_backpack",
+                                BackpackNameHelper.displayNameComponent(backpack, playerData.getSelectedBackpack())));
+            }
         }
 
         player.inventoryMenu.broadcastChanges();

@@ -38,6 +38,11 @@ final record CodTdmPhaseStateMapPortAdapter(
     }
 
     @Override
+    public void giveAllPlayersKitsSilently() {
+        roundLifecycleCoordinator.giveAllPlayersKitsSilently();
+    }
+
+    @Override
     public void lockWarmupMovement() {
         roundLifecycleCoordinator.lockWarmupMovement();
     }

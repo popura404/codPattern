@@ -57,13 +57,15 @@ final class CodTdmPlayerDeathHooks implements PlayerDeathService.Hooks {
 
     @Override
     public void registerDeathCam(UUID playerId, UUID killerId, Vec3 deathPosition, Vec3 cameraPosition,
-            int deathCamTicks) {
+            float lockedYaw, float lockedPitch, int deathCamTicks) {
         DeathCamService.registerDeathCam(
                 playerState.deathCamPlayers(),
                 playerId,
                 killerId,
                 deathPosition,
                 cameraPosition,
+                lockedYaw,
+                lockedPitch,
                 deathCamTicks
         );
     }

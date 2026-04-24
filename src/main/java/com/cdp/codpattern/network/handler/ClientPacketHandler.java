@@ -7,7 +7,6 @@ import com.cdp.codpattern.client.TdmCombatMarkerTracker;
 import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
 import com.cdp.codpattern.client.gui.screen.NoticePopupScreen;
 import com.cdp.codpattern.client.gui.screen.PopupNoticeHelper;
-import com.cdp.codpattern.client.gui.screen.TdmBlackoutScreen;
 import com.cdp.codpattern.client.gui.screen.TdmRoomScreen;
 import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomData;
 import com.cdp.codpattern.client.refit.AttachmentRefitClientState;
@@ -209,22 +208,22 @@ public class ClientPacketHandler {
     public static void handleGamePhase(String phase, int remainingTicks) {
         Minecraft.getInstance().execute(() -> {
             Minecraft minecraft = Minecraft.getInstance();
-            if ("WARMUP".equals(phase) || "ENDED".equals(phase)) {
+            if ("COUNTDOWN".equals(phase) || "WARMUP".equals(phase)) {
+                closeMatchStartScreens(minecraft);
+            } else if ("ENDED".equals(phase)) {
                 closeActiveVoteDialog(minecraft);
             }
             ClientTdmState.updatePhase(phase, remainingTicks);
-            TdmBlackoutScreen.sync(minecraft);
         });
     }
 
     public static void handleCountdown(int countdown, boolean blackout) {
         Minecraft.getInstance().execute(() -> {
             Minecraft minecraft = Minecraft.getInstance();
-            if (blackout) {
-                closeActiveVoteDialog(minecraft);
+            if (countdown > 0 || blackout) {
+                closeMatchStartScreens(minecraft);
             }
             ClientTdmState.updateCountdown(countdown, blackout);
-            TdmBlackoutScreen.sync(minecraft);
         });
     }
 
@@ -348,6 +347,13 @@ public class ClientPacketHandler {
         }
         clearActiveVoteDialog(dialogScreen);
         if (minecraft.screen == dialogScreen) {
+            minecraft.setScreen(null);
+        }
+    }
+
+    private static void closeMatchStartScreens(Minecraft minecraft) {
+        closeActiveVoteDialog(minecraft);
+        if (minecraft.screen != null) {
             minecraft.setScreen(null);
         }
     }

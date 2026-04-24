@@ -11,6 +11,7 @@ final record CodTdmPhaseHooksMapPortAdapter(
         Runnable clearCountdownActionBarAction,
         Runnable teleportAllPlayersToSpawnAction,
         Runnable giveAllPlayersKitsAction,
+        Runnable giveAllPlayersKitsSilentlyAction,
         Runnable lockWarmupMovementAction,
         Runnable unlockAllRoomPlayersMovementAction,
         Runnable clearAllPlayersInventoryAction,
@@ -42,6 +43,11 @@ final record CodTdmPhaseHooksMapPortAdapter(
     @Override
     public void giveAllPlayersKits() {
         giveAllPlayersKitsAction.run();
+    }
+
+    @Override
+    public void giveAllPlayersKitsSilently() {
+        giveAllPlayersKitsSilentlyAction.run();
     }
 
     @Override

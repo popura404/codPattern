@@ -31,6 +31,7 @@ final record CodTdmCoordinatorMapPortAdapter(
         Supplier<List<String>> missingSpawnTeamsSupplier,
         Predicate<ServerPlayer> teleportPlayerToRoundStartAction,
         Consumer<ServerPlayer> givePlayerKitsAction,
+        Consumer<ServerPlayer> givePlayerKitsSilentlyAction,
         Supplier<List<TeamPlayerSnapshotService.TeamRoster>> teamRostersSupplier
 ) implements CodTdmCoordinatorComposition.MapPort {
 
@@ -112,6 +113,11 @@ final record CodTdmCoordinatorMapPortAdapter(
     @Override
     public void givePlayerKits(ServerPlayer player) {
         givePlayerKitsAction.accept(player);
+    }
+
+    @Override
+    public void givePlayerKitsSilently(ServerPlayer player) {
+        givePlayerKitsSilentlyAction.accept(player);
     }
 
     @Override

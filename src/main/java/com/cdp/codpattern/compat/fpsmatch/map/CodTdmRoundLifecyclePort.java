@@ -15,6 +15,8 @@ interface CodTdmRoundLifecyclePort {
 
     void givePlayerKits(ServerPlayer player);
 
+    void givePlayerKitsSilently(ServerPlayer player);
+
     void clearPlayerInventory(ServerPlayer player);
 
     void scheduleRespawn(ServerPlayer player);
