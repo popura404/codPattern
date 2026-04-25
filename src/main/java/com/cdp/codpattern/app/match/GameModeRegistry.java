@@ -78,4 +78,8 @@ public final class GameModeRegistry {
                 List.of()
         ));
     }
+
+    public static List<ModeDescriptor> orderedModes() {
+        return List.copyOf(DESCRIPTORS.values());
+    }
 }

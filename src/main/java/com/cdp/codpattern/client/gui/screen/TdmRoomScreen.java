@@ -1,6 +1,10 @@
 package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
+import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
@@ -24,6 +28,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -46,6 +51,7 @@ public class TdmRoomScreen extends Screen {
     private final TdmRoomSessionState roomState = new TdmRoomSessionState();
     private final TdmRoomUiState uiState = new TdmRoomUiState();
     private final TdmRoomActionController actionController;
+    private final String modeFilterGameType;
 
     // 房间列表区域
     private int roomListX;
@@ -83,7 +89,12 @@ public class TdmRoomScreen extends Screen {
     private int fullActionBottomY;
 
     public TdmRoomScreen() {
+        this(null);
+    }
+
+    public TdmRoomScreen(String modeFilterGameType) {
         super(Component.translatable("screen.codpattern.room.title"));
+        this.modeFilterGameType = normalizeModeFilter(modeFilterGameType);
         this.actionController = new TdmRoomActionController(roomState, uiState, this::updateButtonStates);
     }
 
@@ -257,7 +268,7 @@ public class TdmRoomScreen extends Screen {
         GuiTextHelper.drawReferenceCenteredString(
                 graphics,
                 mc.font,
-                Component.translatable("screen.codpattern.room.header"),
+                Component.translatable(resolveRoomHeaderKey()),
                 this.width / 2,
                 scaled(20),
                 titleColor,
@@ -275,8 +286,9 @@ public class TdmRoomScreen extends Screen {
         super.tick();
         actionController.tick();
         restoreJoinedRoomFromClientStateIfNeeded();
-        roomState.refreshJoinedRoomLiveState();
+        refreshJoinedRoomLiveState();
         flushPendingRoomListUpdate(false);
+        sanitizeRoomStateForModeFilter();
         refreshInfoContextTransition(false);
         updateButtonStates();
     }
@@ -302,6 +314,7 @@ public class TdmRoomScreen extends Screen {
                 roomListHeight,
                 roomItemHeight(),
                 roomState.lobbySummaryState(),
+                modeFilterGameType,
                 roomState.selectedRoom(),
                 roomState.joinedRoom(),
                 roomListScrollOffset,
@@ -415,7 +428,8 @@ public class TdmRoomScreen extends Screen {
 
     private void applyRoomListUpdate(Map<String, TdmRoomData> rooms) {
         Set<String> previous = new HashSet<>(roomState.rooms().keySet());
-        actionController.updateRoomList(pendingRoomListSnapshotVersion, rooms);
+        actionController.updateRoomList(pendingRoomListSnapshotVersion, filterRoomsByMode(rooms));
+        sanitizeRoomStateForModeFilter();
 
         long now = System.currentTimeMillis();
         for (String roomName : roomState.rooms().keySet()) {
@@ -434,14 +448,27 @@ public class TdmRoomScreen extends Screen {
      * 更新当前房间的玩家列表
      */
     public void updatePlayerList(String roomKey, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
+        if (!matchesModeFilter(roomKey, roomState.rooms().get(roomKey))) {
+            sanitizeRoomStateForModeFilter();
+            return;
+        }
         actionController.updatePlayerList(roomKey, rosterVersion, teamPlayers);
+        sanitizeRoomStateForModeFilter();
     }
 
     public void updatePlayerDelta(String roomKey, int rosterVersion) {
+        if (!matchesModeFilter(roomKey, roomState.rooms().get(roomKey))) {
+            sanitizeRoomStateForModeFilter();
+            return;
+        }
         actionController.updatePlayerDelta(roomKey, rosterVersion);
+        sanitizeRoomStateForModeFilter();
     }
 
     public void updatePreviewPlayerList(String roomKey, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
+        if (!matchesModeFilter(roomKey, roomState.rooms().get(roomKey))) {
+            return;
+        }
         actionController.updatePreviewPlayerList(roomKey, rosterVersion, teamPlayers);
     }
 
@@ -450,15 +477,19 @@ public class TdmRoomScreen extends Screen {
      */
     public void setJoinedRoom(String roomKey) {
         actionController.setJoinedRoom(roomKey);
+        sanitizeRoomStateForModeFilter();
     }
 
     public void handleJoinResult(boolean success, String roomKey, String reasonCode, String reasonMessage) {
         actionController.handleJoinResult(success, roomKey, reasonCode, reasonMessage);
+        sanitizeRoomStateForModeFilter();
     }
 
     public void handleLeaveResult(boolean success, String roomKey, String reasonCode, String reasonMessage) {
         actionController.handleLeaveResult(success, roomKey, reasonCode, reasonMessage);
+        sanitizeRoomStateForModeFilter();
     }
+
     @Override
     public void onClose() {
         pendingRoomListUpdate = null;
@@ -497,18 +528,114 @@ public class TdmRoomScreen extends Screen {
     }
 
     private void restoreJoinedRoomFromClientStateIfNeeded() {
-        if (!roomState.restoreJoinedRoomFromClientState()) {
+        if (roomState.joinedRoom() != null && !roomState.joinedRoom().isBlank()) {
+            sanitizeRoomStateForModeFilter();
             return;
         }
-        String restoredJoinedRoom = roomState.joinedRoom();
+        String restoredJoinedRoom = ClientTdmState.roomContextName();
+        if (!matchesModeFilter(restoredJoinedRoom, roomState.rooms().get(restoredJoinedRoom))) {
+            return;
+        }
+        roomState.setJoinedRoom(restoredJoinedRoom);
         if ((roomState.selectedRoom() == null || roomState.selectedRoom().isBlank())
                 && restoredJoinedRoom != null
                 && !restoredJoinedRoom.isBlank()) {
             roomState.setSelectedRoom(restoredJoinedRoom);
         }
-        roomState.refreshJoinedRoomLiveState();
+        refreshJoinedRoomLiveState();
         ModNetworkChannel.sendToServer(new RequestRoomRosterResyncPacket());
         refreshInfoContextTransition(true);
+    }
+
+    private void refreshJoinedRoomLiveState() {
+        String joinedRoom = roomState.joinedRoom();
+        if (joinedRoom == null || joinedRoom.isBlank()) {
+            roomState.joinedRoomLiveState().clear();
+            return;
+        }
+        String clientRoomContext = ClientTdmState.roomContextName();
+        if (clientRoomContext != null
+                && !clientRoomContext.isBlank()
+                && !joinedRoom.equals(clientRoomContext)) {
+            if (!matchesModeFilter(clientRoomContext, roomState.rooms().get(clientRoomContext))) {
+                clearJoinedRoomForFilterMismatch(joinedRoom);
+                return;
+            }
+            roomState.setJoinedRoom(clientRoomContext);
+            joinedRoom = clientRoomContext;
+        }
+        if (!matchesModeFilter(joinedRoom, roomState.rooms().get(joinedRoom))) {
+            clearJoinedRoomForFilterMismatch(joinedRoom);
+            return;
+        }
+        roomState.joinedRoomLiveState().setRoomKey(joinedRoom);
+        roomState.joinedRoomLiveState().refreshFromClientState();
+    }
+
+    private void sanitizeRoomStateForModeFilter() {
+        if (modeFilterGameType == null || modeFilterGameType.isBlank()) {
+            return;
+        }
+        String joinedRoom = roomState.joinedRoom();
+        if (joinedRoom != null
+                && !joinedRoom.isBlank()
+                && !matchesModeFilter(joinedRoom, roomState.rooms().get(joinedRoom))) {
+            clearJoinedRoomForFilterMismatch(joinedRoom);
+        }
+        String selectedRoom = roomState.selectedRoom();
+        if (selectedRoom != null
+                && !selectedRoom.isBlank()
+                && !matchesModeFilter(selectedRoom, roomState.rooms().get(selectedRoom))) {
+            roomState.setSelectedRoom(null);
+        }
+        if ((roomState.selectedRoom() == null || roomState.selectedRoom().isBlank())
+                && roomState.joinedRoom() != null
+                && !roomState.joinedRoom().isBlank()) {
+            roomState.setSelectedRoom(roomState.joinedRoom());
+        }
+    }
+
+    private void clearJoinedRoomForFilterMismatch(String joinedRoom) {
+        roomState.setJoinedRoom(null);
+        roomState.joinedRoomLiveState().clear();
+        if (joinedRoom != null && joinedRoom.equals(roomState.selectedRoom())) {
+            roomState.setSelectedRoom(null);
+        }
+    }
+
+    private Map<String, TdmRoomData> filterRoomsByMode(Map<String, TdmRoomData> rooms) {
+        if (modeFilterGameType == null || modeFilterGameType.isBlank() || rooms == null || rooms.isEmpty()) {
+            return rooms == null ? new HashMap<>() : new HashMap<>(rooms);
+        }
+        Map<String, TdmRoomData> filtered = new LinkedHashMap<>();
+        for (Map.Entry<String, TdmRoomData> entry : rooms.entrySet()) {
+            if (matchesModeFilter(entry.getKey(), entry.getValue())) {
+                filtered.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return filtered;
+    }
+
+    private boolean matchesModeFilter(String roomKey, TdmRoomData roomData) {
+        if (modeFilterGameType == null || modeFilterGameType.isBlank()) {
+            return true;
+        }
+        String roomGameType = roomData == null ? null : roomData.gameType;
+        if (roomGameType == null || roomGameType.isBlank()) {
+            try {
+                roomGameType = RoomId.decode(roomKey).gameType();
+            } catch (IllegalArgumentException ignored) {
+                return false;
+            }
+        }
+        return modeFilterGameType.equals(TdmGameTypes.canonicalize(roomGameType));
+    }
+
+    private String resolveRoomHeaderKey() {
+        if (modeFilterGameType == null || modeFilterGameType.isBlank()) {
+            return "screen.codpattern.room.header";
+        }
+        return GameModeRegistry.getOrDefault(modeFilterGameType).roomHeaderKey();
     }
 
     private String currentInfoContextKey() {
@@ -548,6 +675,14 @@ public class TdmRoomScreen extends Screen {
         long elapsed = System.currentTimeMillis() - openedAtMs;
         float raw = Math.min(1.0f, Math.max(0.0f, elapsed / (float) ENTER_ANIMATION_MS));
         return 0.2f + (raw * 0.8f);
+    }
+
+    private static String normalizeModeFilter(String modeFilterGameType) {
+        if (modeFilterGameType == null || modeFilterGameType.isBlank()) {
+            return null;
+        }
+        String canonical = TdmGameTypes.canonicalize(modeFilterGameType);
+        return canonical.isBlank() ? null : canonical;
     }
 
     private static int clamp(int value, int min, int max) {

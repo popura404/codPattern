@@ -90,6 +90,7 @@ public final class TdmRoomListRenderer {
             int roomListHeight,
             int roomItemHeight,
             LobbySummaryState lobbySummaryState,
+            String modeFilterGameType,
             String selectedRoom,
             String joinedRoom,
             int scrollOffset,
@@ -164,7 +165,7 @@ public final class TdmRoomListRenderer {
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,
-                    Component.translatable("screen.codpattern.room.create_hint"),
+                    Component.translatable("screen.codpattern.tdm_room.create_hint"),
                     roomListX + panelPadding,
                     emptyY + referenceLineHeight + GuiTextHelper.referenceScaled(3),
                     scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
@@ -172,7 +173,7 @@ public final class TdmRoomListRenderer {
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,
-                    Component.translatable("screen.codpattern.room.create_command"),
+                    resolveCreateCommand(modeFilterGameType),
                     roomListX + panelPadding,
                     emptyY + (referenceLineHeight + GuiTextHelper.referenceScaled(3)) * 2,
                     scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
@@ -638,6 +639,13 @@ public final class TdmRoomListRenderer {
 
     private static int footerSectionHeight() {
         return GuiTextHelper.referenceScaled(BASE_FOOTER_SECTION_HEIGHT);
+    }
+
+    private static Component resolveCreateCommand(String modeFilterGameType) {
+        if (modeFilterGameType == null || modeFilterGameType.isBlank()) {
+            return Component.translatable("screen.codpattern.room.create_command");
+        }
+        return Component.translatable("screen.codpattern.tdm_room.create_command_filtered", modeFilterGameType);
     }
 
     private static int scaleAlpha(int color, float factor) {

@@ -1,6 +1,6 @@
 package com.cdp.codpattern.client.gui.refit;
 
-import com.cdp.codpattern.client.gui.screen.TdmRoomScreen;
+import com.cdp.codpattern.client.gui.screen.TdmModeSelectScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
@@ -12,7 +12,7 @@ public class TdmRoomButton {
     public static Button create(int x, int y, int w, int h) {
         return Button.builder(Component.translatable("screen.codpattern.tdm.room_button"), button -> {
             Minecraft minecraft = Minecraft.getInstance();
-            minecraft.setScreen(new TdmRoomScreen());
+            minecraft.setScreen(new TdmModeSelectScreen(minecraft.screen));
         }).bounds(x, y, w, h).build();
     }
 }
