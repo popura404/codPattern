@@ -80,20 +80,20 @@ public class TdmModeSelectButton extends Button {
                     y,
                     right,
                     bottom,
-                    withAlpha(CodTheme.SELECTED_BORDER, 26 + (int) (28.0f * pulse)),
+                    withAlpha(accentColor, 26 + (int) (28.0f * pulse)),
                     withAlpha(accentColor, 10 + (int) (34.0f * pulse)));
         }
 
         graphics.fill(x, y, x + accentWidth, bottom,
-                previewing ? CodTheme.SELECTED_BORDER : withAlpha(accentColor, 228));
+                withAlpha(accentColor, previewing ? 255 : 228));
         graphics.fill(x, y, right, y + 1, withAlpha(0xFFFFFFFF, hovered ? 110 : 54));
         graphics.fill(x, bottom - 1, right, bottom, withAlpha(accentColor, previewing ? 205 : 132));
         graphics.fill(x, y, x + 1, bottom, withAlpha(0xFFFFFFFF, 24));
         graphics.fill(right - 1, y, right, bottom, withAlpha(accentColor, 68));
 
         if (previewing) {
-            graphics.fill(right - GuiTextHelper.referenceScaled(14), y, right, y + 1, CodTheme.SELECTED_BORDER);
-            graphics.fill(right - 1, y, right, y + GuiTextHelper.referenceScaled(8), CodTheme.SELECTED_BORDER);
+            graphics.fill(right - GuiTextHelper.referenceScaled(14), y, right, y + 1, withAlpha(accentColor, 255));
+            graphics.fill(right - 1, y, right, y + GuiTextHelper.referenceScaled(8), withAlpha(accentColor, 255));
         }
 
         graphics.fill(innerLeft, innerTop, innerRight, innerTop + 1, withAlpha(0xFFFFFFFF, 14));
@@ -110,7 +110,7 @@ public class TdmModeSelectButton extends Button {
                 x + padding,
                 codeY,
                 this.width - padding * 2,
-                hovered || previewing ? CodTheme.TEXT_HOVER : CodTheme.TEXT_SECONDARY,
+                hovered || previewing ? withAlpha(accentColor, 235) : CodTheme.TEXT_SECONDARY,
                 false);
 
         int titleY = y + GuiTextHelper.referenceScaled(18);
@@ -133,7 +133,7 @@ public class TdmModeSelectButton extends Button {
                 right - padding,
                 footerY,
                 Math.max(GuiTextHelper.referenceScaled(40), this.width - padding * 2),
-                previewing ? CodTheme.SELECTED_TEXT : withAlpha(accentColor, 220),
+                previewing ? withAlpha(accentColor, 255) : withAlpha(accentColor, 220),
                 false);
     }
 

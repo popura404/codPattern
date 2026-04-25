@@ -52,6 +52,7 @@ public class TdmRoomScreen extends Screen {
     private final TdmRoomUiState uiState = new TdmRoomUiState();
     private final TdmRoomActionController actionController;
     private final String modeFilterGameType;
+    private final Screen previousScreen;
 
     // 房间列表区域
     private int roomListX;
@@ -89,12 +90,17 @@ public class TdmRoomScreen extends Screen {
     private int fullActionBottomY;
 
     public TdmRoomScreen() {
-        this(null);
+        this(null, null);
     }
 
     public TdmRoomScreen(String modeFilterGameType) {
+        this(modeFilterGameType, null);
+    }
+
+    public TdmRoomScreen(String modeFilterGameType, Screen previousScreen) {
         super(Component.translatable("screen.codpattern.room.title"));
         this.modeFilterGameType = normalizeModeFilter(modeFilterGameType);
+        this.previousScreen = previousScreen;
         this.actionController = new TdmRoomActionController(roomState, uiState, this::updateButtonStates);
     }
 
@@ -497,6 +503,10 @@ public class TdmRoomScreen extends Screen {
         roomListRenderResult = TdmRoomListRenderer.RenderResult.empty();
         actionController.unsubscribeRoomList();
         actionController.reset();
+        if (this.minecraft != null && previousScreen != null) {
+            this.minecraft.setScreen(previousScreen);
+            return;
+        }
         super.onClose();
     }
 

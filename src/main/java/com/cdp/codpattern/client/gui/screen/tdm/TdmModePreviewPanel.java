@@ -113,10 +113,10 @@ public final class TdmModePreviewPanel {
     public static int accentColor(String gameType) {
         String canonical = TdmGameTypes.canonicalize(gameType);
         if (TdmGameTypes.FRONTLINE.equals(canonical)) {
-            return 0xFFE35A5A;
+            return 0xFF62F08A;
         }
         if (TdmGameTypes.TEAM_DEATHMATCH.equals(canonical)) {
-            return 0xFF66A6FF;
+            return 0xFF5FC7C3;
         }
         return FALLBACK_ACCENTS[Math.abs(canonical.hashCode()) % FALLBACK_ACCENTS.length];
     }

@@ -504,7 +504,7 @@ public class TdmModeSelectScreen extends Screen {
         currentBackgroundMode = descriptor;
         previousBackgroundMode = null;
         backgroundTransitionStartedAtMs = 0L;
-        Minecraft.getInstance().setScreen(new TdmRoomScreen(descriptor.gameType()));
+        Minecraft.getInstance().setScreen(new TdmRoomScreen(descriptor.gameType(), this));
     }
 
     private void scrollLeft() {
