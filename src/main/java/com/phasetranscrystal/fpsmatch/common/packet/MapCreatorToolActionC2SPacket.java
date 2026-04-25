@@ -5,6 +5,7 @@ import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.mojang.datafixers.util.Function3;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.MapCreatorTool;
+import com.phasetranscrystal.fpsmatch.common.item.tool.ToolAccessHelper;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
@@ -67,6 +68,9 @@ public class MapCreatorToolActionC2SPacket {
 
             ItemStack stack = player.getMainHandItem();
             if (!(stack.getItem() instanceof MapCreatorTool)) {
+                return;
+            }
+            if (!ToolAccessHelper.ensureAdminAccess(player)) {
                 return;
             }
 

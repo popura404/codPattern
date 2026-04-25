@@ -4,13 +4,10 @@ import com.phasetranscrystal.fpsmatch.FPSMatch;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 
-@Mod.EventBusSubscriber(modid = FPSMatch.MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class FPSMItemRegister {
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, FPSMatch.MODID);
 
@@ -27,9 +24,8 @@ public final class FPSMItemRegister {
     private FPSMItemRegister() {
     }
 
-    @SubscribeEvent
     public static void onBuildCreativeModeTabContents(BuildCreativeModeTabContentsEvent event) {
-        if (CreativeModeTabs.TOOLS_AND_UTILITIES.equals(event.getTabKey())) {
+        if (event.hasPermissions() && CreativeModeTabs.TOOLS_AND_UTILITIES.equals(event.getTabKey())) {
             event.accept(MAP_CREATOR_TOOL);
             event.accept(SPAWN_POINT_TOOL);
         }

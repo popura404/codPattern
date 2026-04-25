@@ -349,6 +349,7 @@
     "message.fpsm.map_creator_tool.duplicate_map": "地图 %s 已存在",
     "message.fpsm.map_creator_tool.set_pos1": "已将点 1 设置为 %s",
     "message.fpsm.map_creator_tool.set_pos2": "已将点 2 设置为 %s",
+    "message.fpsm.tool.admin_required": "需要管理员权限才能使用该工具",
     "message.fpsm.spawn_point_tool.missing_selection": "请先选择类型、地图和队伍",
     "message.fpsm.spawn_point_tool.map_not_found": "未找到地图: %s",
     "message.fpsm.spawn_point_tool.dimension_mismatch": "当前维度与目标地图所在维度不一致",

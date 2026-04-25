@@ -323,5 +323,6 @@
     "command.codpattern.map.endtp.set_all.none": "試合終了テレポート地点を設定できるマップがありません",
     "command.codpattern.map.endtp.cleared": "マップ %s の試合終了テレポート地点を削除しました",
     "command.codpattern.map.endtp.show": "マップ %s の試合終了テレポート地点: %s %s yaw=%s",
-    "command.codpattern.map.endtp.none": "マップ %s に試合終了テレポート地点はありません"
+    "command.codpattern.map.endtp.none": "マップ %s に試合終了テレポート地点はありません",
+    "message.fpsm.tool.admin_required": "このツールの使用には管理者権限が必要です"
 }

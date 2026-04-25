@@ -3,6 +3,7 @@ package com.phasetranscrystal.fpsmatch.common;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.MapCreatorTool;
 import com.phasetranscrystal.fpsmatch.common.item.SpawnPointTool;
+import com.phasetranscrystal.fpsmatch.common.item.tool.ToolAccessHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.event.TickEvent;
@@ -17,6 +18,12 @@ public final class FPSMEvents {
     @SubscribeEvent
     public static void onPlayerTickEvent(TickEvent.PlayerTickEvent event) {
         if (event.phase != TickEvent.Phase.END || !(event.player instanceof ServerPlayer player)) {
+            return;
+        }
+
+        if (!ToolAccessHelper.hasAdminAccess(player)) {
+            MapCreatorTool.clearHeldPreview(player);
+            SpawnPointTool.clearHeldPreview(player);
             return;
         }
 

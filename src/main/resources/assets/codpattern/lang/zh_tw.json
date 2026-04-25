@@ -323,5 +323,6 @@
     "command.codpattern.map.endtp.set_all.none": "目前沒有可設定結束傳送點的地圖",
     "command.codpattern.map.endtp.cleared": "已清除地圖 %s 的結束傳送點",
     "command.codpattern.map.endtp.show": "地圖 %s 的結束傳送點: %s %s yaw=%s",
-    "command.codpattern.map.endtp.none": "地圖 %s 目前未設定結束傳送點"
+    "command.codpattern.map.endtp.none": "地圖 %s 目前未設定結束傳送點",
+    "message.fpsm.tool.admin_required": "需要管理員權限才能使用此工具"
 }

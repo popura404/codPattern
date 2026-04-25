@@ -5,6 +5,7 @@ import com.cdp.codpattern.app.tdm.service.DynamicSpawnMergeService;
 import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.SpawnPointTool;
+import com.phasetranscrystal.fpsmatch.common.item.tool.ToolAccessHelper;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
@@ -102,6 +103,9 @@ public class SpawnPointToolActionC2SPacket {
 
             ItemStack stack = player.getMainHandItem();
             if (!(stack.getItem() instanceof SpawnPointTool)) {
+                return;
+            }
+            if (!ToolAccessHelper.ensureAdminAccess(player)) {
                 return;
             }
 

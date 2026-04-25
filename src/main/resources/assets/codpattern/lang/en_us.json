@@ -349,6 +349,7 @@
     "message.fpsm.map_creator_tool.duplicate_map": "Map %s already exists",
     "message.fpsm.map_creator_tool.set_pos1": "Set Pos1 to %s",
     "message.fpsm.map_creator_tool.set_pos2": "Set Pos2 to %s",
+    "message.fpsm.tool.admin_required": "Administrator permission is required to use this tool",
     "message.fpsm.spawn_point_tool.missing_selection": "Please select type, map and team first",
     "message.fpsm.spawn_point_tool.map_not_found": "Map not found: %s",
     "message.fpsm.spawn_point_tool.dimension_mismatch": "Current dimension does not match the target map",

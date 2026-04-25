@@ -14,6 +14,7 @@ public class CodPattern {
     public CodPattern() {
         var modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         modEventBus.addListener(this::setup);
+        modEventBus.addListener(FPSMItemRegister::onBuildCreativeModeTabContents);
         FPSMItemRegister.ITEMS.register(modEventBus);
         MinecraftForge.EVENT_BUS.register(this);
     }

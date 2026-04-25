@@ -3,6 +3,7 @@ package com.cdp.codpattern.compat.fpsmatch.map;
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
+import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
@@ -112,6 +113,12 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
 
     public void givePlayerKitsSilently(ServerPlayer player) {
         kitsRuntime.givePlayerKitsSilently(player);
+    }
+
+    @Override
+    public void clearPlayerInventory(ServerPlayer player) {
+        super.clearPlayerInventory(player);
+        ThrowableInventoryService.clearRuntime(player, true);
     }
 
     // GiveStartKitsMap 实现

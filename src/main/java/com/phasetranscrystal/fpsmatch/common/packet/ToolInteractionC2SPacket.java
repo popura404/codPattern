@@ -1,6 +1,7 @@
 package com.phasetranscrystal.fpsmatch.common.packet;
 
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionAction;
+import com.phasetranscrystal.fpsmatch.common.item.tool.ToolAccessHelper;
 import com.phasetranscrystal.fpsmatch.common.item.tool.WorldToolItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -42,6 +43,9 @@ public class ToolInteractionC2SPacket {
 
             ItemStack stack = player.getMainHandItem();
             if (stack.getItem() instanceof WorldToolItem worldToolItem) {
+                if (!ToolAccessHelper.ensureAdminAccess(player)) {
+                    return;
+                }
                 worldToolItem.handleWorldInteraction(player, stack, action, clickedPos);
             }
         });
