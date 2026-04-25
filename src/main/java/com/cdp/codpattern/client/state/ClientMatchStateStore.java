@@ -23,6 +23,7 @@ public final class ClientMatchStateStore {
     private static final int KILL_FEED_ENTRY_DURATION = 250;
     private static final int KILL_FEED_FADE_TICKS = 10;
     private static final int MAX_KILL_FEED_ENTRIES = 6;
+    private static final int BLACKOUT_INFO_FADE_IN_TICKS = 50;
 
     private String currentPhase = "WAITING";
     private int remainingTimeTicks = 0;
@@ -475,8 +476,8 @@ public final class ClientMatchStateStore {
 
     public float getBlackoutInfoAlpha() {
         return switch (blackoutPhase) {
-            case FADE_IN -> smoothstep(phaseProgress());
-            case HOLD -> smoothstep(phaseProgress());
+            case FADE_IN -> 0.0f;
+            case HOLD -> smoothstep(blackoutInfoHoldProgress());
             case FADE_OUT -> smoothstep(phaseRemainingProgress());
             default -> 0.0f;
         };
@@ -654,6 +655,15 @@ public final class ClientMatchStateStore {
             return 0.0f;
         }
         return (float) blackoutTicksRemaining / blackoutTotalTicks;
+    }
+
+    private float blackoutInfoHoldProgress() {
+        if (blackoutTotalTicks <= 0) {
+            return 0.0f;
+        }
+        int fadeTicks = Math.max(1, Math.min(BLACKOUT_INFO_FADE_IN_TICKS, blackoutTotalTicks));
+        int elapsedTicks = Math.max(0, blackoutTotalTicks - blackoutTicksRemaining);
+        return Math.min(1.0f, (float) elapsedTicks / fadeTicks);
     }
 
     private void tickKillFeed() {

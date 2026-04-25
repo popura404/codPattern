@@ -1,5 +1,7 @@
 package com.cdp.codpattern.client.gui.screen;
 
+import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import net.minecraft.client.Minecraft;
@@ -17,6 +19,7 @@ public class TdmBlackoutScreen extends Screen {
     private static final int ACTION_BAR_Y_OFFSET = 68;
     private static final int MAP_MARGIN_LEFT = 20;
     private static final int MAP_INFO_BOTTOM_OFFSET = 62;
+    private static final int MAP_INFO_LINE_GAP = 28;
     private static final float MAP_NAME_SCALE = 2.0f;
 
     public TdmBlackoutScreen() {
@@ -115,26 +118,66 @@ public class TdmBlackoutScreen extends Screen {
     }
 
     private void renderMapInfo(GuiGraphics graphics, Font font, Minecraft minecraft) {
-        String mapName = ClientTdmState.syncedMapName();
-        if (mapName == null || mapName.isBlank()) {
-            mapName = ClientTdmState.roomContextName();
+        int infoAlpha = Mth.clamp((int) (ClientTdmState.getBlackoutInfoAlpha() * 255.0f), 0, 255);
+        if (infoAlpha <= 0) {
+            return;
         }
+
+        RoomDisplayInfo displayInfo = resolveRoomDisplayInfo();
+        String modeName = resolveModeName(displayInfo.gameType());
+        String mapName = displayInfo.mapName();
         String worldTime = formatWorldTime(minecraft.level);
-        int baseY = this.height - MAP_INFO_BOTTOM_OFFSET;
-        String fittedMapName = GuiTextHelper.ellipsize(
+        int baseY = this.height - MAP_INFO_BOTTOM_OFFSET - MAP_INFO_LINE_GAP;
+
+        renderScaledMapInfoLine(graphics, font, modeName, baseY, withAlpha(0xFFFFFFFF, infoAlpha));
+        renderScaledMapInfoLine(graphics, font, mapName, baseY + MAP_INFO_LINE_GAP, withAlpha(0xFFFFFFFF, infoAlpha));
+        graphics.drawString(font, worldTime, MAP_MARGIN_LEFT, baseY + MAP_INFO_LINE_GAP * 2,
+                withAlpha(0xFFEAEAEA, infoAlpha), true);
+    }
+
+    private void renderScaledMapInfoLine(GuiGraphics graphics, Font font, String text, int y, int color) {
+        String fittedText = GuiTextHelper.ellipsize(
                 font,
-                mapName == null ? "" : mapName,
+                text == null ? "" : text,
                 Math.max(1, (int) ((this.width - MAP_MARGIN_LEFT - 20) / MAP_NAME_SCALE)));
 
-        if (!fittedMapName.isEmpty()) {
-            graphics.pose().pushPose();
-            graphics.pose().translate(MAP_MARGIN_LEFT, baseY, 0.0f);
-            graphics.pose().scale(MAP_NAME_SCALE, MAP_NAME_SCALE, 1.0f);
-            graphics.drawString(font, fittedMapName, 0, 0, 0xFFFFFFFF, true);
-            graphics.pose().popPose();
+        if (fittedText.isEmpty()) {
+            return;
         }
 
-        graphics.drawString(font, worldTime, MAP_MARGIN_LEFT, baseY + 28, 0xFFEAEAEA, true);
+        graphics.pose().pushPose();
+        graphics.pose().translate(MAP_MARGIN_LEFT, y, 0.0f);
+        graphics.pose().scale(MAP_NAME_SCALE, MAP_NAME_SCALE, 1.0f);
+        graphics.drawString(font, fittedText, 0, 0, color, true);
+        graphics.pose().popPose();
+    }
+
+    private RoomDisplayInfo resolveRoomDisplayInfo() {
+        String roomContext = ClientTdmState.syncedMapName();
+        if (roomContext == null || roomContext.isBlank()) {
+            roomContext = ClientTdmState.roomContextName();
+        }
+        if (roomContext == null || roomContext.isBlank()) {
+            return new RoomDisplayInfo("", "");
+        }
+
+        try {
+            RoomId roomId = RoomId.decode(roomContext);
+            return new RoomDisplayInfo(roomId.gameType(), roomId.mapName());
+        } catch (IllegalArgumentException ignored) {
+            return new RoomDisplayInfo("", roomContext);
+        }
+    }
+
+    private String resolveModeName(String gameType) {
+        String normalized = gameType == null ? "" : gameType.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isBlank()) {
+            return "";
+        }
+        String displayNameKey = "tdm".equals(normalized)
+                ? "mode.codpattern.teamdeathmatch"
+                : GameModeRegistry.getOrDefault(normalized).displayNameKey();
+        return Component.translatable(displayNameKey).getString();
     }
 
     private String formatWorldTime(Level level) {
@@ -146,5 +189,12 @@ public class TdmBlackoutScreen extends Screen {
         int hours = (int) (dayTicks / 1000L);
         int minutes = (int) ((dayTicks % 1000L) * 60L / 1000L);
         return String.format(Locale.ROOT, "%02d:%02d", hours, minutes);
+    }
+
+    private int withAlpha(int color, int alpha) {
+        return (Mth.clamp(alpha, 0, 255) << 24) | (color & 0x00FFFFFF);
+    }
+
+    private record RoomDisplayInfo(String gameType, String mapName) {
     }
 }

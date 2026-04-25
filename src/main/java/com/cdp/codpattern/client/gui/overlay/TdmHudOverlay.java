@@ -1,5 +1,7 @@
 package com.cdp.codpattern.client.gui.overlay;
 
+import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 import com.cdp.codpattern.client.ClientTdmState;
@@ -80,6 +82,7 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int COUNTDOWN_ACTION_BAR_Y_OFFSET = 68;
     private static final int WARMUP_MAP_MARGIN_LEFT = 20;
     private static final int WARMUP_MAP_INFO_BOTTOM_OFFSET = 62;
+    private static final int WARMUP_MAP_INFO_LINE_GAP = 28;
     private static final float WARMUP_MAP_NAME_SCALE = 2.0f;
     public static final TdmHudOverlay INSTANCE = new TdmHudOverlay();
 
@@ -93,6 +96,9 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private record KillFeedRowLayout(int killerMaxWidth, int centerWidth, int victimMaxWidth, int firstGap, int secondGap) {
+    }
+
+    private record RoomDisplayInfo(String gameType, String mapName) {
     }
 
     @Override
@@ -184,26 +190,69 @@ public class TdmHudOverlay implements IGuiOverlay {
 
     private void renderWarmupMapInfo(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
         Minecraft minecraft = Minecraft.getInstance();
-        String mapName = ClientTdmState.syncedMapName();
-        if (mapName == null || mapName.isBlank()) {
-            mapName = ClientTdmState.roomContextName();
+        int infoAlpha = clamp((int) (ClientTdmState.getBlackoutInfoAlpha() * 255.0f), 0, 255);
+        if (infoAlpha <= 0) {
+            return;
         }
+
+        RoomDisplayInfo displayInfo = resolveRoomDisplayInfo();
+        String modeName = resolveModeName(displayInfo.gameType());
+        String mapName = displayInfo.mapName();
         String worldTime = formatWorldTime(minecraft.level);
-        int baseY = screenHeight - WARMUP_MAP_INFO_BOTTOM_OFFSET;
-        String fittedMapName = GuiTextHelper.ellipsize(
+        int baseY = screenHeight - WARMUP_MAP_INFO_BOTTOM_OFFSET - WARMUP_MAP_INFO_LINE_GAP;
+
+        renderWarmupScaledMapInfoLine(graphics, font, modeName, screenWidth, baseY,
+                withAlpha(0xFFFFFFFF, infoAlpha));
+        renderWarmupScaledMapInfoLine(graphics, font, mapName, screenWidth, baseY + WARMUP_MAP_INFO_LINE_GAP,
+                withAlpha(0xFFFFFFFF, infoAlpha));
+        graphics.drawString(font, worldTime, WARMUP_MAP_MARGIN_LEFT, baseY + WARMUP_MAP_INFO_LINE_GAP * 2,
+                withAlpha(0xFFEAEAEA, infoAlpha), true);
+    }
+
+    private void renderWarmupScaledMapInfoLine(GuiGraphics graphics, Font font, String text, int screenWidth, int y,
+            int color) {
+        String fittedText = GuiTextHelper.ellipsize(
                 font,
-                mapName == null ? "" : mapName,
+                text == null ? "" : text,
                 Math.max(1, (int) ((screenWidth - WARMUP_MAP_MARGIN_LEFT - 20) / WARMUP_MAP_NAME_SCALE)));
 
-        if (!fittedMapName.isEmpty()) {
-            graphics.pose().pushPose();
-            graphics.pose().translate(WARMUP_MAP_MARGIN_LEFT, baseY, 0.0f);
-            graphics.pose().scale(WARMUP_MAP_NAME_SCALE, WARMUP_MAP_NAME_SCALE, 1.0f);
-            graphics.drawString(font, fittedMapName, 0, 0, 0xFFFFFFFF, true);
-            graphics.pose().popPose();
+        if (fittedText.isEmpty()) {
+            return;
         }
 
-        graphics.drawString(font, worldTime, WARMUP_MAP_MARGIN_LEFT, baseY + 28, 0xFFEAEAEA, true);
+        graphics.pose().pushPose();
+        graphics.pose().translate(WARMUP_MAP_MARGIN_LEFT, y, 0.0f);
+        graphics.pose().scale(WARMUP_MAP_NAME_SCALE, WARMUP_MAP_NAME_SCALE, 1.0f);
+        graphics.drawString(font, fittedText, 0, 0, color, true);
+        graphics.pose().popPose();
+    }
+
+    private RoomDisplayInfo resolveRoomDisplayInfo() {
+        String roomContext = ClientTdmState.syncedMapName();
+        if (roomContext == null || roomContext.isBlank()) {
+            roomContext = ClientTdmState.roomContextName();
+        }
+        if (roomContext == null || roomContext.isBlank()) {
+            return new RoomDisplayInfo("", "");
+        }
+
+        try {
+            RoomId roomId = RoomId.decode(roomContext);
+            return new RoomDisplayInfo(roomId.gameType(), roomId.mapName());
+        } catch (IllegalArgumentException ignored) {
+            return new RoomDisplayInfo("", roomContext);
+        }
+    }
+
+    private String resolveModeName(String gameType) {
+        String normalized = gameType == null ? "" : gameType.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isBlank()) {
+            return "";
+        }
+        String displayNameKey = "tdm".equals(normalized)
+                ? "mode.codpattern.teamdeathmatch"
+                : GameModeRegistry.getOrDefault(normalized).displayNameKey();
+        return Component.translatable(displayNameKey).getString();
     }
 
     private String formatWorldTime(Level level) {
