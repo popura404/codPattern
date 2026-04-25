@@ -3,6 +3,7 @@ package com.cdp.codpattern.client.gui.screen.backpack;
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.client.gui.refit.BackPackSelectButton;
+import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -94,7 +95,8 @@ public final class BackpackWeaponPreviewPanel {
                 scaleAlpha(0x20404040, alphaFactor));
 
         WeaponFilterConfig filterConfig = WeaponFilterClientCache.get();
-        boolean throwablesEnabled = filterConfig == null || filterConfig.isThrowablesEnabled();
+        boolean throwablesEnabled = (filterConfig == null || filterConfig.isThrowablesEnabled())
+                && LrTacticalGatewayProvider.gateway().isLoaded();
 
         for (Map.Entry<String, BackPackSelectButton.WeaponInfo> entry : weaponInfo.entrySet()) {
             String type = entry.getKey();

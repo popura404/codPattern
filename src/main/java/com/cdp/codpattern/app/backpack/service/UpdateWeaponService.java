@@ -5,6 +5,7 @@ import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
+import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -25,10 +26,8 @@ public final class UpdateWeaponService {
     private static final Set<String> ALLOWED_SLOTS = Set.of("primary", "secondary", "tactical", "lethal");
     private static final String THROWABLE_ITEM_ID = "lrtactical:throwable";
     private static final String THROWABLE_ID_TAG = "ThrowableId";
-    private static final String MELEE_ITEM_ID = "lrtactical:melee";
     private static final String MELEE_WEAPON_ID_TAG = "MeleeWeaponId";
     private static final String MELEE_TAB = "melee";
-    private static final String LR_MELEE_INTERFACE = "me.xjqsh.lrtactical.api.item.IMeleeWeapon";
 
     public record Result(BackpackConfig.PlayerBackpackData playerData, boolean success, String slot, String code,
             String message) {
@@ -63,9 +62,10 @@ public final class UpdateWeaponService {
             return fail(playerData, weaponSlot, slotResult.code(), slotResult.message());
         }
 
-        ValidationResult itemResult = validateItem(itemId);
-        if (!itemResult.success()) {
-            return fail(playerData, weaponSlot, itemResult.code(), itemResult.message());
+        WeaponFilterConfig filterConfig = WeaponFilterConfigRepository.loadOrCreate(filterPath);
+        ValidationResult throwableAvailabilityResult = validateThrowableAvailability(weaponSlot, filterConfig);
+        if (!throwableAvailabilityResult.success()) {
+            return fail(playerData, weaponSlot, throwableAvailabilityResult.code(), throwableAvailabilityResult.message());
         }
 
         CompoundTag parsedNbt;
@@ -75,13 +75,18 @@ public final class UpdateWeaponService {
             return fail(playerData, weaponSlot, "NBT_INVALID", "");
         }
 
-        WeaponFilterConfig filterConfig = WeaponFilterConfigRepository.loadOrCreate(filterPath);
+        ValidationResult itemResult = validateItem(itemId);
+        if (!itemResult.success()) {
+            return fail(playerData, weaponSlot, itemResult.code(), itemResult.message());
+        }
+
         ValidationResult categoryResult = validateCategory(weaponSlot, itemId, parsedNbt, filterConfig);
         if (!categoryResult.success()) {
             return fail(playerData, weaponSlot, categoryResult.code(), categoryResult.message());
         }
 
-        backpack.getItem_MAP().put(weaponSlot, new BackpackConfig.Backpack.ItemData(itemId, 1, nbt));
+        String canonicalNbt = parsedNbt.isEmpty() ? "" : parsedNbt.toString();
+        backpack.getItem_MAP().put(weaponSlot, new BackpackConfig.Backpack.ItemData(itemId, 1, canonicalNbt));
         BackpackConfigRepository.save();
 
         return new Result(playerData, true, weaponSlot, "OK", "");
@@ -99,12 +104,28 @@ public final class UpdateWeaponService {
     }
 
     private static ValidationResult validateItem(String itemId) {
+        if (itemId == null || itemId.isBlank()) {
+            return ValidationResult.fail("ITEM_ID_INVALID", "");
+        }
         ResourceLocation resourceLocation = ResourceLocation.tryParse(itemId);
         if (resourceLocation == null) {
             return ValidationResult.fail("ITEM_ID_INVALID", "");
         }
         if (resolveRegisteredItem(resourceLocation) == null) {
             return ValidationResult.fail("ITEM_NOT_REGISTERED", "");
+        }
+        return ValidationResult.ok();
+    }
+
+    private static ValidationResult validateThrowableAvailability(String slot, WeaponFilterConfig filterConfig) {
+        if (!isThrowableSlot(slot)) {
+            return ValidationResult.ok();
+        }
+        if (!LrTacticalGatewayProvider.gateway().isLoaded()) {
+            return ValidationResult.fail("THROWABLES_UNAVAILABLE", "");
+        }
+        if (filterConfig != null && !filterConfig.isThrowablesEnabled()) {
+            return ValidationResult.fail("THROWABLES_DISABLED", "");
         }
         return ValidationResult.ok();
     }
@@ -143,9 +164,15 @@ public final class UpdateWeaponService {
             if (allowedTypes != null && !allowedTypes.isEmpty() && !allowedTypes.contains(weaponCategory)) {
                 return ValidationResult.fail("ITEM_CATEGORY_INVALID", "");
             }
+            if (BackpackAttachmentFilter.findFirstBlockedInstalledAttachmentId(filterConfig, candidateStack).isPresent()) {
+                return ValidationResult.fail("ATTACHMENT_BLOCKED", "");
+            }
             return ValidationResult.ok();
         }
 
+        if (!LrTacticalGatewayProvider.gateway().isLoaded()) {
+            return ValidationResult.fail("THROWABLES_UNAVAILABLE", "");
+        }
         if (!filterConfig.isThrowablesEnabled()) {
             return ValidationResult.fail("THROWABLES_DISABLED", "");
         }
@@ -164,32 +191,21 @@ public final class UpdateWeaponService {
             return gunTypeOpt;
         }
 
-        if (isLrTacticalMelee(itemId, weaponStack, nbtTag)) {
+        if (isLrTacticalMelee(weaponStack, nbtTag)) {
             return Optional.of(MELEE_TAB);
         }
         return Optional.empty();
     }
 
-    private static boolean isLrTacticalMelee(String itemId, ItemStack stack, CompoundTag nbtTag) {
+    private static boolean isLrTacticalMelee(ItemStack stack, CompoundTag nbtTag) {
         if (nbtTag == null || !nbtTag.contains(MELEE_WEAPON_ID_TAG, Tag.TAG_STRING)) {
             return false;
         }
-        if (MELEE_ITEM_ID.equals(itemId)) {
-            return true;
-        }
-        return implementsInterface(stack.getItem().getClass(), LR_MELEE_INTERFACE);
+        return LrTacticalGatewayProvider.gateway().isMeleeWeapon(stack);
     }
 
-    private static boolean implementsInterface(Class<?> type, String interfaceName) {
-        if (type == null) {
-            return false;
-        }
-        for (Class<?> iface : type.getInterfaces()) {
-            if (interfaceName.equals(iface.getName()) || implementsInterface(iface, interfaceName)) {
-                return true;
-            }
-        }
-        return implementsInterface(type.getSuperclass(), interfaceName);
+    private static boolean isThrowableSlot(String slot) {
+        return "tactical".equals(slot) || "lethal".equals(slot);
     }
 
     private static Item resolveRegisteredItem(ResourceLocation resourceLocation) {

@@ -2,6 +2,7 @@ package com.cdp.codpattern.core.throwable;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
+import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
@@ -262,7 +263,8 @@ public final class ThrowableInventoryService {
         }
         WeaponFilterConfig config = WeaponFilterConfigRepository.loadOrCreate(
                 ConfigPath.SERVER_FILTER.getPath(player.server));
-        return config == null || config.isThrowablesEnabled();
+        return (config == null || config.isThrowablesEnabled())
+                && LrTacticalGatewayProvider.gateway().isLoaded();
     }
 
     private static int clampHotbarSlot(int slot) {

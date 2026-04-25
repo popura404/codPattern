@@ -28,7 +28,16 @@ COD Pattern 当前把以下功能收在同一套服务端逻辑里：
 - Forge: `47.4.0+`
 - Java: `17`
 - 必需依赖: `TaCZ 1.1.6+`
-- 可选联动: `LR Tactical`、`Physics Mod`、`tacz-addon 1.1.6`
+- 可选联动: `LR Tactical 0.3.0+`、`Physics Mod`、`tacz-addon 1.1.6`
+
+LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投掷物选择、投掷物专用槽和默认投掷物发放不可用，但服务端、客户端和非投掷物流程应继续正常运行。安装 LR Tactical 后，默认投掷物背包、投掷物槽位和 LR 物品选择恢复可用。
+
+本地运行矩阵：
+
+- 无 LR：`./gradlew runServer -PwithLrTactical=false`
+- 有 LR：`./gradlew runServer -PwithLrTactical=true`
+
+混装环境不推荐：服务器安装 LR Tactical 而客户端未安装时，客户端无法正常使用 LR 物品内容。
 
 ### 2.2 主要数据目录
 
@@ -108,7 +117,7 @@ COD Pattern 当前把以下功能收在同一套服务端逻辑里：
 - 背包 2: `ak47` + `deagle`
 - 背包 3: `m4a1` + `p320`
 - 新增背包默认主副武器: `m4a1` + `p320`
-- 默认投掷物: `lrtactical:m67` 与 `lrtactical:smoke_grenade`
+- 默认投掷物: 安装 LR Tactical 时为 `lrtactical:m67` 与 `lrtactical:smoke_grenade`；未安装 LR Tactical 时，`tactical` / `lethal` 键仍保留，但值为空物品数据。
 
 ### 4.2 背包增删改选的实际规则
 
@@ -159,7 +168,8 @@ COD Pattern 当前把以下功能收在同一套服务端逻辑里：
 - 玩家是旁观者时，不发放。
 - 非强制发放时，玩家不在房间内，不发放。
 - 枪械如果命中 `blockedItemNamespaces` 或 `blockedWeaponIds`，该槽位直接跳过。
-- `tactical` / `lethal` 只有在 `throwablesEnabled` 为 `true` 时才发放。
+- `tactical` / `lethal` 只有在 `throwablesEnabled` 为 `true` 且 LR Tactical 已安装时才发放。
+- 发放前会防御性清理旧配置中已安装的黑名单配件，并在服务端日志记录玩家、槽位和物品 ID。
 
 `/cdp distribute` 使用的是强制发放分支：
 
@@ -178,6 +188,7 @@ COD Pattern 当前把以下功能收在同一套服务端逻辑里：
 4. `nbt` 是否能被 `TagParser` 正常解析。
 5. 物品是否命中枪械黑名单。
 6. 槽位和物品分类是否匹配。
+7. `primary` / `secondary` 的已安装配件是否命中附件黑名单。
 
 分类匹配规则：
 
@@ -186,13 +197,15 @@ COD Pattern 当前把以下功能收在同一套服务端逻辑里：
   - 如果不是枪，但符合 LR Tactical 近战判定，则归到 `melee`。
   - 最终分类必须包含在对应的 `primaryWeaponTabs` 或 `secondaryWeaponTabs` 里。
 - `tactical` / `lethal`
+  - 必须安装 LR Tactical
   - 必须启用 `throwablesEnabled`
   - 物品 ID 必须是 `lrtactical:throwable`
   - `nbt` 里必须包含 `ThrowableId`
 
 写入方式：
 
-- 服务端通过校验后，直接把 `itemId` 和 `nbt` 写回 `backpack_config.json`
+- 服务端通过校验后，把 `itemId` 和服务端解析后的规范 SNBT 写回 `backpack_config.json`
+- 如果武器 NBT 中已经安装了服务器禁用的配件，本次写入会被拒绝，背包配置不变
 - 配件预设不在这一步处理
 
 ### 4.5 `/cdp update` 实际会做什么

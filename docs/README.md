@@ -49,7 +49,8 @@ COD Pattern 是一个面向 **TaCZ + 内置 FPSM 兼容核心** 的模组，提�
 - 武器筛选保存在 `serverconfig/codpattern/backpack_rules/weapon_filter.json`
 - TDM 配置保存在 `serverconfig/codpattern/tdm_rules/config.json`
 - 地图数据保存在 `<游戏目录>/fpsmatch/<世界名>/...`
-- 支持 LR Tactical、Physics Mod、`tacz-addon 1.1.6`
+- 可选联动：LR Tactical 0.3.0+、Physics Mod、`tacz-addon 1.1.6`
+- 未安装 LR Tactical 时，COD Pattern 会禁用 LR 近战、投掷物选择、投掷物槽位和默认投掷物发放；安装后这些功能恢复可用。
 - 已提供 `zh_cn / zh_tw / en_us / ja_jp` 语言资源
 
 ## 命令与入口

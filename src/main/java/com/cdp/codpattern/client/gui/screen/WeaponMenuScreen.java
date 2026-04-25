@@ -5,6 +5,7 @@ import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.client.gui.refit.AttachmentConfigButton;
 import com.cdp.codpattern.client.gui.refit.FlatColorButton;
+import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
@@ -295,9 +296,7 @@ public class WeaponMenuScreen extends Screen {
                 this.tacticalItemStack,
                 this.UNIT_LENGTH,
                 button -> {
-                    Minecraft.getInstance().setScreen(
-                            new WeaponScreen(this, this.backpack, this.BAGSERIAL, "tactical")
-                    );
+                    openThrowableScreenIfAvailable("tactical");
                 }
         ) {
             @Override
@@ -323,9 +322,7 @@ public class WeaponMenuScreen extends Screen {
                 this.lethalItemStack,
                 this.UNIT_LENGTH,
                 button -> {
-                    Minecraft.getInstance().setScreen(
-                            new WeaponScreen(this, this.backpack, this.BAGSERIAL, "lethal")
-                    );
+                    openThrowableScreenIfAvailable("lethal");
                 }
         ) {
             @Override
@@ -338,6 +335,28 @@ public class WeaponMenuScreen extends Screen {
         };
         lethalButton.setHidePackName(true);  // 投掷物不显示蓝色包名
         addRenderableWidget(lethalButton);
+    }
+
+    private void openThrowableScreenIfAvailable(String slot) {
+        Component unavailableMessage = resolveThrowableUnavailableMessage();
+        if (unavailableMessage != null) {
+            if (Minecraft.getInstance().player != null) {
+                Minecraft.getInstance().player.displayClientMessage(unavailableMessage, true);
+            }
+            return;
+        }
+        Minecraft.getInstance().setScreen(new WeaponScreen(this, this.backpack, this.BAGSERIAL, slot));
+    }
+
+    private Component resolveThrowableUnavailableMessage() {
+        WeaponFilterConfig filterConfig = WeaponFilterClientCache.get();
+        if (filterConfig != null && !filterConfig.isThrowablesEnabled()) {
+            return Component.translatable("message.codpattern.weapon_update.error.throwables_disabled");
+        }
+        if (!LrTacticalGatewayProvider.gateway().isLoaded()) {
+            return Component.translatable("message.codpattern.weapon_update.error.throwables_unavailable");
+        }
+        return null;
     }
 
     private void handleAttachmentButtonHover() {

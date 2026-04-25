@@ -8,6 +8,7 @@ import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
+import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.mojang.logging.LogUtils;
 import com.cdp.codpattern.config.backpack.BackpackNameHelper;
@@ -60,6 +61,8 @@ public class BackpackDistributor {
             return;
         }
         int ammoMultiple = resolveAmmoMultiple(filterConfig);
+        boolean throwablesAvailable = filterConfig.isThrowablesEnabled()
+                && LrTacticalGatewayProvider.gateway().isLoaded();
 
         //不是喜欢的冒险生存创造玩家，直接不发
         if (player.isSpectator()) return;
@@ -111,6 +114,10 @@ public class BackpackDistributor {
             }
 
             if (TaczGatewayProvider.gateway().isGun(stack)) {
+                if (BackpackAttachmentFilter.removeBlockedInstalledAttachments(filterConfig, stack)) {
+                    LOGGER.warn("Removed blocked attachment from backpack item player={} slot={} item={}",
+                            player.getGameProfile().getName(), weaponType, itemId);
+                }
                 TaczGatewayProvider.gateway().configureGunAmmo(stack, ammoMultiple);
             }
 
@@ -119,7 +126,7 @@ public class BackpackDistributor {
             } else if ("secondary".equals(weaponType)) {
                 player.getInventory().setItem(1, stack);
             } else if (("tactical".equals(weaponType) || "lethal".equals(weaponType))
-                    && filterConfig.isThrowablesEnabled()) {
+                    && throwablesAvailable) {
                 if ("tactical".equals(weaponType)) {
                     ThrowableInventoryService.seedThrowableSlot(player, ThrowableInventoryService.SLOT_ONE, stack);
                 } else {

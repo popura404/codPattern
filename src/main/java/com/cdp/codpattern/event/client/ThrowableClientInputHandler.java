@@ -4,6 +4,7 @@ import com.cdp.codpattern.CodPattern;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.input.ThrowableKeyMappings;
+import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
@@ -164,7 +165,8 @@ public final class ThrowableClientInputHandler {
             return false;
         }
         WeaponFilterConfig config = WeaponFilterClientCache.get();
-        return config == null || config.isThrowablesEnabled();
+        return (config == null || config.isThrowablesEnabled())
+                && LrTacticalGatewayProvider.gateway().isLoaded();
     }
 
     private static boolean hasActiveThrowableInteraction(LocalPlayer player) {

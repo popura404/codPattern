@@ -95,11 +95,15 @@ def requestedTaskNames = gradle.startParameter.taskNames.collect { it.toLowerCas
 def dedicatedServerRunRequested = requestedTaskNames.any { taskName ->
     taskName.contains('runserver') || taskName.contains('gametestserver')
 }
+def withLrTactical = (findProperty('withLrTactical') ?: 'false').toString().toBoolean()
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     implementation fg.deobf("curse.maven:timeless-and-classics-zero-1028108:6654541-sources-6654543")
-    implementation fg.deobf("maven.modrinth:lr-tactical:0.3.0")
+    compileOnly fg.deobf("maven.modrinth:lr-tactical:0.3.0")
+    if (withLrTactical) {
+        runtimeOnly fg.deobf("maven.modrinth:lr-tactical:0.3.0")
+    }
     //implementation fg.deobf("maven.modrinth:cloth-config:11.1.136+forge")
     if (!dedicatedServerRunRequested) {
         runtimeOnly fg.deobf("maven.modrinth:physicsmod:JkM3OTEl")

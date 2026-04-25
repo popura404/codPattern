@@ -378,8 +378,10 @@ public class ClientPacketHandler {
             case "NBT_INVALID" -> Component.translatable("message.codpattern.weapon_update.error.nbt_invalid");
             case "ITEM_BLOCKED" -> Component.translatable("message.codpattern.weapon_update.error.item_blocked");
             case "ITEM_NAMESPACE_BLOCKED" -> Component.translatable("message.codpattern.weapon_update.error.item_namespace_blocked");
+            case "ATTACHMENT_BLOCKED" -> Component.translatable("message.codpattern.weapon_update.error.attachment_blocked");
             case "ITEM_CATEGORY_INVALID" -> Component.translatable("message.codpattern.weapon_update.error.item_category_invalid");
             case "THROWABLES_DISABLED" -> Component.translatable("message.codpattern.weapon_update.error.throwables_disabled");
+            case "THROWABLES_UNAVAILABLE" -> Component.translatable("message.codpattern.weapon_update.error.throwables_unavailable");
             default -> Component.translatable("message.codpattern.weapon_update.error.unknown",
                     code == null || code.isBlank() ? "UNKNOWN" : code);
         };

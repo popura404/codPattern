@@ -49,7 +49,8 @@ The project uses a server-authoritative design. Loadouts, filters, room state, a
 - Weapon filters are stored in `serverconfig/codpattern/backpack_rules/weapon_filter.json`
 - TDM config is stored in `serverconfig/codpattern/tdm_rules/config.json`
 - Map data is stored under `<game dir>/fpsmatch/<world name>/...`
-- Supports LR Tactical, Physics Mod, and `tacz-addon 1.1.6`
+- Optional integrations: LR Tactical 0.3.0+, Physics Mod, and `tacz-addon 1.1.6`
+- Without LR Tactical, COD Pattern disables LR melee, throwable selection, dedicated throwable slots, and default throwable distribution. With it installed, those features are available.
 - Bundles `zh_cn / zh_tw / en_us / ja_jp` language resources
 
 ## Commands and Entrypoints

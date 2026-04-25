@@ -1,5 +1,7 @@
 package com.cdp.codpattern.config.backpack;
 
+import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
+
 import java.util.*;
 
 public class BackpackConfig {
@@ -128,24 +130,24 @@ public class BackpackConfig {
             Backpack backpack1 = new Backpack("");
             backpack1.setItem_MAP("primary", itemDataP1);
             backpack1.setItem_MAP("secondary", itemDataS1);
-            backpack1.setItem_MAP("tactical", itemDataTactical);
-            backpack1.setItem_MAP("lethal", itemDataLethal);
+            backpack1.setItem_MAP("tactical", getItemDataTactical());
+            backpack1.setItem_MAP("lethal", getItemDataLethal());
             newData.getBackpacks_MAP().put(1, backpack1);
 
             // 背包2
             Backpack backpack2 = new Backpack("");
             backpack2.setItem_MAP("primary", itemDataP2);
             backpack2.setItem_MAP("secondary", itemDataS2);
-            backpack2.setItem_MAP("tactical", itemDataTactical);
-            backpack2.setItem_MAP("lethal", itemDataLethal);
+            backpack2.setItem_MAP("tactical", getItemDataTactical());
+            backpack2.setItem_MAP("lethal", getItemDataLethal());
             newData.getBackpacks_MAP().put(2, backpack2);
 
             // 背包3
             Backpack backpack3 = new Backpack("");
             backpack3.setItem_MAP("primary", itemDataP3);
             backpack3.setItem_MAP("secondary", itemDataS3);
-            backpack3.setItem_MAP("tactical", itemDataTactical);
-            backpack3.setItem_MAP("lethal", itemDataLethal);
+            backpack3.setItem_MAP("tactical", getItemDataTactical());
+            backpack3.setItem_MAP("lethal", getItemDataLethal());
             newData.getBackpacks_MAP().put(3, backpack3);
 
             // 默认选择背包1
@@ -171,10 +173,18 @@ public class BackpackConfig {
     }
 
     public static Backpack.ItemData getItemDataTactical() {
-        return itemDataTactical;
+        return LrTacticalGatewayProvider.gateway().isLoaded()
+                ? itemDataTactical
+                : emptyItemData();
     }
 
     public static Backpack.ItemData getItemDataLethal() {
-        return itemDataLethal;
+        return LrTacticalGatewayProvider.gateway().isLoaded()
+                ? itemDataLethal
+                : emptyItemData();
+    }
+
+    private static Backpack.ItemData emptyItemData() {
+        return new Backpack.ItemData("", 1, "");
     }
 }

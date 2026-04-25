@@ -5,6 +5,7 @@ import com.cdp.codpattern.client.gui.refit.WeaponSelectionButton;
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
+import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
 import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
@@ -87,7 +88,7 @@ public class WeaponScreen extends Screen {
 
         // 战术/杀伤投掷物只显示投掷物列表
         if ("tactical".equals(slotType) || "lethal".equals(slotType)) {
-            if (filterConfig == null || !filterConfig.isThrowablesEnabled()) {
+            if (!areThrowablesAvailable(filterConfig)) {
                 return;
             }
 
@@ -111,6 +112,11 @@ public class WeaponScreen extends Screen {
                 weaponsByTab.put(tabName, items);
             }
         }
+    }
+
+    private boolean areThrowablesAvailable(@Nullable WeaponFilterConfig filterConfig) {
+        return (filterConfig == null || filterConfig.isThrowablesEnabled())
+                && LrTacticalGatewayProvider.gateway().isLoaded();
     }
 
     private List<ItemStack> getItemsFromTab(String tabName, @Nullable WeaponFilterConfig filterConfig) {

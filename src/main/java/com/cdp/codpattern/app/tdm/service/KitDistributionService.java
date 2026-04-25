@@ -1,8 +1,10 @@
 package com.cdp.codpattern.app.tdm.service;
 
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
-import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
+import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
+import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
+import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
@@ -10,6 +12,7 @@ import com.cdp.codpattern.config.backpack.BackpackNameHelper;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
+import com.mojang.logging.LogUtils;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -17,8 +20,11 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import org.slf4j.Logger;
 
 public final class KitDistributionService {
+    private static final Logger LOGGER = LogUtils.getLogger();
+
     private KitDistributionService() {
     }
 
@@ -52,7 +58,8 @@ public final class KitDistributionService {
                 ? filterConfig.getAmmunitionPerMagazineMultiple()
                 : 6;
         ammoMultiple = Math.max(0, ammoMultiple);
-        boolean throwablesEnabled = (filterConfig == null) || filterConfig.isThrowablesEnabled();
+        boolean throwablesEnabled = (filterConfig == null || filterConfig.isThrowablesEnabled())
+                && LrTacticalGatewayProvider.gateway().isLoaded();
 
         if (backpack != null) {
             giveBackpackItem(player, backpack, filterConfig, "primary", 0, ammoMultiple);
@@ -101,6 +108,10 @@ public final class KitDistributionService {
         }
 
         if (TaczGatewayProvider.gateway().isGun(stack)) {
+            if (BackpackAttachmentFilter.removeBlockedInstalledAttachments(filterConfig, stack)) {
+                LOGGER.warn("Removed blocked attachment from backpack item player={} slot={} item={}",
+                        player.getGameProfile().getName(), key, itemId);
+            }
             TaczGatewayProvider.gateway().configureGunAmmo(stack, ammoMultiple);
         }
 
