@@ -6,12 +6,9 @@ import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-
-import java.util.Locale;
 
 public final class TdmModePreviewPanel {
     private static final ResourceLocation SHARED_PREVIEW = ResourceLocation.fromNamespaceAndPath(
@@ -19,193 +16,112 @@ public final class TdmModePreviewPanel {
             "textures/gui/modes/shared_preview.png");
     private static final int PREVIEW_TEXTURE_WIDTH = 3840;
     private static final int PREVIEW_TEXTURE_HEIGHT = 2160;
+    private static final int[] FALLBACK_ACCENTS = {
+            0xFF88D6FF,
+            0xFFFFB347,
+            0xFF78F2BE,
+            0xFFE685FF
+    };
 
     private TdmModePreviewPanel() {
     }
 
-    public static void render(
-            GuiGraphics graphics,
-            Minecraft mc,
-            int x,
-            int y,
-            int width,
-            int height,
-            ModeDescriptor descriptor,
-            int accentColor,
-            float alphaFactor) {
-        int frameLeft = x - GuiTextHelper.referenceScaled(3);
-        int frameTop = y - GuiTextHelper.referenceScaled(3);
-        int frameRight = x + width + GuiTextHelper.referenceScaled(3);
-        int frameBottom = y + height + GuiTextHelper.referenceScaled(3);
-        int innerInset = GuiTextHelper.referenceScaled(6);
-        int innerLeft = x + innerInset;
-        int innerTop = y + innerInset;
-        int innerRight = x + width - innerInset;
-        int innerBottom = y + height - innerInset;
-        int innerWidth = Math.max(1, innerRight - innerLeft);
-        int innerHeight = Math.max(1, innerBottom - innerTop);
+    public static void renderFullscreenBase(GuiGraphics graphics, int screenWidth, int screenHeight, float alphaFactor) {
+        if (screenWidth <= 0 || screenHeight <= 0 || alphaFactor <= 0.0f) {
+            return;
+        }
 
-        graphics.fillGradient(
-                frameLeft,
-                frameTop,
-                frameRight,
-                frameBottom,
-                scaleAlpha(CodTheme.PANEL_BG, alphaFactor),
-                scaleAlpha(0xD0101010, alphaFactor));
-        graphics.fill(frameLeft, frameTop, frameRight, frameTop + 1, scaleAlpha(CodTheme.BORDER_SUBTLE, alphaFactor));
-        graphics.fill(frameLeft, frameBottom - 1, frameRight, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, alphaFactor));
-        graphics.fill(frameLeft, frameTop, frameLeft + 1, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, alphaFactor));
-        graphics.fill(frameRight - 1, frameTop, frameRight, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, alphaFactor));
+        float clampedAlpha = Math.max(0.0f, Math.min(1.0f, alphaFactor));
+        float scale = screenHeight / (float) PREVIEW_TEXTURE_HEIGHT;
+        int drawWidth = Math.max(1, Math.round(PREVIEW_TEXTURE_WIDTH * scale));
+        int drawX = (screenWidth - drawWidth) / 2;
 
         RenderSystem.enableBlend();
-        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, Math.max(0.0f, Math.min(1.0f, alphaFactor)));
+        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, clampedAlpha);
         graphics.blit(
                 SHARED_PREVIEW,
-                innerLeft,
-                innerTop,
+                drawX,
                 0,
-                0,
-                innerWidth,
-                innerHeight,
+                drawWidth,
+                screenHeight,
+                0.0f,
+                0.0f,
+                PREVIEW_TEXTURE_WIDTH,
+                PREVIEW_TEXTURE_HEIGHT,
                 PREVIEW_TEXTURE_WIDTH,
                 PREVIEW_TEXTURE_HEIGHT);
         RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
 
         graphics.fillGradient(
-                innerLeft,
-                innerTop,
-                innerRight,
-                innerBottom,
-                scaleAlpha(withAlpha(accentColor, 54), alphaFactor),
-                scaleAlpha(0xA0101010, alphaFactor));
-        graphics.fill(innerLeft, innerTop, innerLeft + GuiTextHelper.referenceScaled(4), innerBottom,
-                scaleAlpha(withAlpha(accentColor, 220), alphaFactor));
-        graphics.fill(innerLeft, innerTop, innerRight, innerTop + 1, scaleAlpha(withAlpha(0xFFFFFFFF, 120), alphaFactor));
-        graphics.fill(innerLeft, innerBottom - 1, innerRight, innerBottom, scaleAlpha(withAlpha(accentColor, 160), alphaFactor));
-
-        renderVariantOverlay(graphics, innerLeft, innerTop, innerRight, innerBottom, descriptor.gameType(), accentColor, alphaFactor);
-        renderText(graphics, mc, innerLeft, innerTop, innerWidth, innerHeight, descriptor, accentColor, alphaFactor);
+                0,
+                0,
+                screenWidth,
+                screenHeight,
+                scaleAlpha(0x34040608, clampedAlpha),
+                scaleAlpha(0x9C090A0C, clampedAlpha));
     }
 
-    private static void renderVariantOverlay(
+    public static void renderFullscreenModeLayer(
             GuiGraphics graphics,
-            int left,
-            int top,
-            int right,
-            int bottom,
-            String gameType,
-            int accentColor,
-            float alphaFactor) {
-        int variant = overlayVariant(gameType);
-        int inset = GuiTextHelper.referenceScaled(10);
-
-        if (variant == 0) {
-            int spacing = GuiTextHelper.referenceScaled(9);
-            for (int y = top + inset; y < bottom - inset; y += spacing) {
-                graphics.fill(left + inset, y, right - inset, y + 1, scaleAlpha(withAlpha(accentColor, 36), alphaFactor));
-            }
-            return;
-        }
-
-        if (variant == 1) {
-            int barWidth = GuiTextHelper.referenceScaled(22);
-            int barGap = GuiTextHelper.referenceScaled(14);
-            int currentX = right - inset - barWidth;
-            while (currentX > left + inset) {
-                graphics.fillGradient(
-                        currentX,
-                        top + inset,
-                        currentX + barWidth,
-                        bottom - inset,
-                        scaleAlpha(withAlpha(accentColor, 54), alphaFactor),
-                        scaleAlpha(withAlpha(0xFF060A0E, 10), alphaFactor));
-                currentX -= barWidth + barGap;
-            }
-            return;
-        }
-
-        int stripeWidth = GuiTextHelper.referenceScaled(42);
-        int stripeHeight = GuiTextHelper.referenceScaled(8);
-        int startY = top + inset;
-        while (startY < bottom - inset) {
-            graphics.fillGradient(
-                    left + inset,
-                    startY,
-                    left + inset + stripeWidth,
-                    startY + stripeHeight,
-                    scaleAlpha(withAlpha(accentColor, 68), alphaFactor),
-                    scaleAlpha(withAlpha(0xFF000000, 0), alphaFactor));
-            startY += stripeHeight + GuiTextHelper.referenceScaled(10);
-        }
-    }
-
-    private static void renderText(
-            GuiGraphics graphics,
-            Minecraft mc,
-            int left,
-            int top,
-            int width,
-            int height,
+            int screenWidth,
+            int screenHeight,
             ModeDescriptor descriptor,
-            int accentColor,
             float alphaFactor) {
-        int contentX = left + GuiTextHelper.referenceScaled(18);
-        int contentRight = left + width - GuiTextHelper.referenceScaled(16);
-        int modeCodeY = top + GuiTextHelper.referenceScaled(14);
-        int titleY = top + GuiTextHelper.referenceScaled(34);
-        int bodyY = titleY + GuiTextHelper.referenceLineHeight(mc.font, 1.6f) + GuiTextHelper.referenceScaled(10);
-        int footerY = top + height - GuiTextHelper.referenceLineHeight(mc.font) * 2 - GuiTextHelper.referenceScaled(18);
-        int textWidth = Math.max(GuiTextHelper.referenceScaled(60), contentRight - contentX);
+        if (descriptor == null || alphaFactor <= 0.0f) {
+            return;
+        }
 
-        GuiTextHelper.drawReferenceEllipsizedString(
-                graphics,
-                mc.font,
-                descriptor.gameType().toUpperCase(Locale.ROOT),
-                contentX,
-                modeCodeY,
-                textWidth,
-                scaleAlpha(withAlpha(accentColor, 225), alphaFactor),
-                false);
-        GuiTextHelper.drawReferenceScaledEllipsizedString(
-                graphics,
-                mc.font,
-                Component.translatable(descriptor.displayNameKey()),
-                contentX,
-                titleY,
-                textWidth,
-                1.6f,
-                scaleAlpha(CodTheme.TEXT_PRIMARY, alphaFactor),
-                true);
-        GuiTextHelper.drawReferenceEllipsizedString(
-                graphics,
-                mc.font,
-                resolveModeDescription(descriptor.gameType()),
-                contentX,
-                bodyY,
-                textWidth,
-                scaleAlpha(0xFFE8E8E8, alphaFactor),
-                false);
-        GuiTextHelper.drawReferenceEllipsizedString(
-                graphics,
-                mc.font,
-                Component.translatable("screen.codpattern.mode_select.preview_hint"),
-                contentX,
-                footerY,
-                textWidth,
-                scaleAlpha(CodTheme.TEXT_SECONDARY, alphaFactor),
-                false);
-        GuiTextHelper.drawReferenceEllipsizedString(
-                graphics,
-                mc.font,
-                Component.translatable("screen.codpattern.mode_select.open"),
-                contentX,
-                footerY + GuiTextHelper.referenceLineHeight(mc.font) + GuiTextHelper.referenceScaled(4),
-                textWidth,
-                scaleAlpha(withAlpha(accentColor, 235), alphaFactor),
-                false);
+        int accentColor = accentColor(descriptor.gameType());
+        float clampedAlpha = Math.max(0.0f, Math.min(1.0f, alphaFactor));
+        int centerX = screenWidth / 2;
+        int leftInset = GuiTextHelper.referenceScaled(18);
+        int topInset = GuiTextHelper.referenceScaled(18);
+        int rightInset = screenWidth - leftInset;
+        int bottomInset = screenHeight - GuiTextHelper.referenceScaled(18);
+
+        graphics.fillGradient(
+                0,
+                0,
+                screenWidth,
+                screenHeight,
+                scaleAlpha(withAlpha(accentColor, 24), clampedAlpha),
+                scaleAlpha(0x76090D10, clampedAlpha));
+        graphics.fillGradient(
+                0,
+                0,
+                centerX,
+                screenHeight,
+                scaleAlpha(withAlpha(accentColor, 22), clampedAlpha),
+                0x00000000);
+        graphics.fillGradient(
+                centerX,
+                0,
+                screenWidth,
+                screenHeight,
+                0x00000000,
+                scaleAlpha(withAlpha(0xFF050608, 98), clampedAlpha));
+
+        renderVariantOverlay(graphics, descriptor.gameType(), accentColor, screenWidth, screenHeight, clampedAlpha);
+
+        graphics.fill(0, 0, screenWidth, 1, scaleAlpha(withAlpha(0xFFFFFFFF, 86), clampedAlpha));
+        graphics.fill(0, screenHeight - 1, screenWidth, screenHeight, scaleAlpha(withAlpha(accentColor, 148), clampedAlpha));
+        graphics.fill(0, 0, GuiTextHelper.referenceScaled(2), screenHeight, scaleAlpha(withAlpha(accentColor, 90), clampedAlpha));
+        graphics.fill(screenWidth - 1, topInset, screenWidth, bottomInset, scaleAlpha(withAlpha(accentColor, 60), clampedAlpha));
+        graphics.fill(leftInset, topInset, rightInset, topInset + 1, scaleAlpha(CodTheme.BORDER_SUBTLE, clampedAlpha));
     }
 
-    private static Component resolveModeDescription(String gameType) {
+    public static int accentColor(String gameType) {
+        String canonical = TdmGameTypes.canonicalize(gameType);
+        if (TdmGameTypes.FRONTLINE.equals(canonical)) {
+            return 0xFFE35A5A;
+        }
+        if (TdmGameTypes.TEAM_DEATHMATCH.equals(canonical)) {
+            return 0xFF66A6FF;
+        }
+        return FALLBACK_ACCENTS[Math.abs(canonical.hashCode()) % FALLBACK_ACCENTS.length];
+    }
+
+    public static Component resolveModeDescription(String gameType) {
         String canonical = TdmGameTypes.canonicalize(gameType);
         if (TdmGameTypes.FRONTLINE.equals(canonical)) {
             return Component.translatable("screen.codpattern.mode_select.hover_frontline");
@@ -216,15 +132,115 @@ public final class TdmModePreviewPanel {
         return Component.translatable("screen.codpattern.mode_select.preview_hint");
     }
 
-    private static int overlayVariant(String gameType) {
+    private static void renderVariantOverlay(
+            GuiGraphics graphics,
+            String gameType,
+            int accentColor,
+            int screenWidth,
+            int screenHeight,
+            float alphaFactor) {
         String canonical = TdmGameTypes.canonicalize(gameType);
         if (TdmGameTypes.FRONTLINE.equals(canonical)) {
-            return 0;
+            renderFrontlineOverlay(graphics, accentColor, screenWidth, screenHeight, alphaFactor);
+            return;
         }
         if (TdmGameTypes.TEAM_DEATHMATCH.equals(canonical)) {
-            return 1;
+            renderTeamDeathmatchOverlay(graphics, accentColor, screenWidth, screenHeight, alphaFactor);
+            return;
         }
-        return Math.abs(canonical.hashCode()) % 3;
+        renderFallbackOverlay(graphics, accentColor, screenWidth, screenHeight, alphaFactor);
+    }
+
+    private static void renderFrontlineOverlay(
+            GuiGraphics graphics,
+            int accentColor,
+            int screenWidth,
+            int screenHeight,
+            float alphaFactor) {
+        int lineSpacing = Math.max(6, GuiTextHelper.referenceScaled(10));
+        int left = GuiTextHelper.referenceScaled(18);
+        int right = screenWidth - GuiTextHelper.referenceScaled(36);
+        int startY = screenHeight / 3;
+        for (int y = startY; y < screenHeight - GuiTextHelper.referenceScaled(54); y += lineSpacing) {
+            int endX = right - ((y - startY) / lineSpacing % 5) * GuiTextHelper.referenceScaled(22);
+            graphics.fill(
+                    left,
+                    y,
+                    endX,
+                    y + 1,
+                    scaleAlpha(withAlpha(accentColor, 32), alphaFactor));
+        }
+
+        int wedgeWidth = Math.max(GuiTextHelper.referenceScaled(72), screenWidth / 5);
+        graphics.fillGradient(
+                left,
+                GuiTextHelper.referenceScaled(34),
+                left + wedgeWidth,
+                screenHeight - GuiTextHelper.referenceScaled(72),
+                scaleAlpha(withAlpha(accentColor, 56), alphaFactor),
+                0x00000000);
+    }
+
+    private static void renderTeamDeathmatchOverlay(
+            GuiGraphics graphics,
+            int accentColor,
+            int screenWidth,
+            int screenHeight,
+            float alphaFactor) {
+        int stripeWidth = Math.max(10, GuiTextHelper.referenceScaled(18));
+        int stripeGap = Math.max(6, GuiTextHelper.referenceScaled(12));
+        int right = screenWidth - GuiTextHelper.referenceScaled(26);
+        int top = GuiTextHelper.referenceScaled(36);
+        int bottom = screenHeight - GuiTextHelper.referenceScaled(54);
+        int startX = screenWidth / 2 + GuiTextHelper.referenceScaled(26);
+
+        for (int x = startX; x < right; x += stripeWidth + stripeGap) {
+            graphics.fillGradient(
+                    x,
+                    top,
+                    x + stripeWidth,
+                    bottom,
+                    scaleAlpha(withAlpha(accentColor, 54), alphaFactor),
+                    scaleAlpha(withAlpha(0xFF050608, 4), alphaFactor));
+        }
+
+        int gridSpacing = Math.max(14, GuiTextHelper.referenceScaled(22));
+        int gridLeft = startX;
+        int gridRight = right;
+        int gridTop = screenHeight / 4;
+        int gridBottom = bottom - GuiTextHelper.referenceScaled(12);
+        for (int x = gridLeft; x < gridRight; x += gridSpacing) {
+            graphics.fill(x, gridTop, x + 1, gridBottom, scaleAlpha(withAlpha(accentColor, 24), alphaFactor));
+        }
+        for (int y = gridTop; y < gridBottom; y += gridSpacing) {
+            graphics.fill(gridLeft, y, gridRight, y + 1, scaleAlpha(withAlpha(accentColor, 16), alphaFactor));
+        }
+    }
+
+    private static void renderFallbackOverlay(
+            GuiGraphics graphics,
+            int accentColor,
+            int screenWidth,
+            int screenHeight,
+            float alphaFactor) {
+        int stripeHeight = Math.max(6, GuiTextHelper.referenceScaled(8));
+        int gap = Math.max(8, GuiTextHelper.referenceScaled(12));
+        int left = GuiTextHelper.referenceScaled(24);
+        int maxWidth = Math.max(GuiTextHelper.referenceScaled(92), screenWidth / 4);
+        int y = GuiTextHelper.referenceScaled(42);
+        int step = 0;
+        while (y < screenHeight - GuiTextHelper.referenceScaled(68)) {
+            int stripeWidth = Math.max(GuiTextHelper.referenceScaled(36), maxWidth - step * GuiTextHelper.referenceScaled(16));
+            graphics.fillGradient(
+                    left,
+                    y,
+                    left + stripeWidth,
+                    y + stripeHeight,
+                    scaleAlpha(withAlpha(accentColor, 52), alphaFactor),
+                    0x00000000);
+            y += stripeHeight + gap;
+            step = (step + 1) % 4;
+        }
     }
 
     private static int scaleAlpha(int color, float factor) {

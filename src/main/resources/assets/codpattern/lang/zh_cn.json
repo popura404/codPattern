@@ -265,6 +265,8 @@
     "screen.codpattern.mode_select.available_modes": "可用模式: %s",
     "screen.codpattern.mode_select.hover_frontline": "推进战线，进入后只显示 frontline 地图",
     "screen.codpattern.mode_select.hover_teamdeathmatch": "快速交战，进入后只显示 teamdeathmatch 地图",
+    "screen.codpattern.mode_select.scroll_left": "向左滚动模式列表",
+    "screen.codpattern.mode_select.scroll_right": "向右滚动模式列表",
     "screen.codpattern.tdm_room.notice.phase_locked_join_game": "当前阶段不可加入游戏",
     "screen.codpattern.tdm_room.notice.timeout.join_room": "加入房间请求超时",
     "screen.codpattern.tdm_room.notice.timeout.leave_room": "离开房间请求超时",
