@@ -260,7 +260,7 @@
     "screen.codpattern.mode_select.title": "模式选择",
     "screen.codpattern.mode_select.header": "§e§l模式选择",
     "screen.codpattern.mode_select.hint": "[悬停] 预览  [点击] 进入对应地图页",
-    "screen.codpattern.mode_select.preview_hint": "选择后，房间页只显示该模式对应地图",
+    "screen.codpattern.mode_select.preview_hint": ">>>>>",
     "screen.codpattern.mode_select.open": "点击进入",
     "screen.codpattern.mode_select.available_modes": "可用模式: %s",
     "screen.codpattern.mode_select.hover_frontline": "基地复活，压线夺分",

@@ -1,0 +1,9 @@
+{
+  "tdm.countdown_20s": {
+    "sounds": [
+      {
+        "name": "codpattern:20s_se"
+      }
+    ]
+  }
+}

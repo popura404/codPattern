@@ -11,17 +11,28 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
 public final class TdmModePreviewPanel {
-    private static final ResourceLocation SHARED_PREVIEW = ResourceLocation.fromNamespaceAndPath(
-            CodPattern.MODID,
-            "textures/gui/modes/shared_preview.png");
-    private static final int PREVIEW_TEXTURE_WIDTH = 3840;
-    private static final int PREVIEW_TEXTURE_HEIGHT = 2160;
+    private static final PreviewTexture SHARED_PREVIEW = new PreviewTexture(
+            ResourceLocation.fromNamespaceAndPath(CodPattern.MODID, "textures/gui/modes/shared_preview.png"),
+            3840,
+            2160);
+    private static final PreviewTexture FRONTLINE_PREVIEW = new PreviewTexture(
+            ResourceLocation.fromNamespaceAndPath(CodPattern.MODID, "textures/gui/modes/frontline_preview.png"),
+            16001,
+            9001);
+    private static final PreviewTexture TEAM_DEATHMATCH_PREVIEW = new PreviewTexture(
+            ResourceLocation.fromNamespaceAndPath(CodPattern.MODID, "textures/gui/modes/team_death_match_preview.png"),
+            16047,
+            9001);
+    private static final float MODE_OVERLAY_ALPHA_FACTOR = 0.40f;
     private static final int[] FALLBACK_ACCENTS = {
             0xFF88D6FF,
             0xFFFFB347,
             0xFF78F2BE,
             0xFFE685FF
     };
+
+    private record PreviewTexture(ResourceLocation location, int width, int height) {
+    }
 
     private TdmModePreviewPanel() {
     }
@@ -32,25 +43,7 @@ public final class TdmModePreviewPanel {
         }
 
         float clampedAlpha = Math.max(0.0f, Math.min(1.0f, alphaFactor));
-        float scale = screenHeight / (float) PREVIEW_TEXTURE_HEIGHT;
-        int drawWidth = Math.max(1, Math.round(PREVIEW_TEXTURE_WIDTH * scale));
-        int drawX = (screenWidth - drawWidth) / 2;
-
-        RenderSystem.enableBlend();
-        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, clampedAlpha);
-        graphics.blit(
-                SHARED_PREVIEW,
-                drawX,
-                0,
-                drawWidth,
-                screenHeight,
-                0.0f,
-                0.0f,
-                PREVIEW_TEXTURE_WIDTH,
-                PREVIEW_TEXTURE_HEIGHT,
-                PREVIEW_TEXTURE_WIDTH,
-                PREVIEW_TEXTURE_HEIGHT);
-        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
+        renderFullscreenTexture(graphics, SHARED_PREVIEW, screenWidth, screenHeight, clampedAlpha);
 
         graphics.fillGradient(
                 0,
@@ -73,25 +66,28 @@ public final class TdmModePreviewPanel {
 
         int accentColor = accentColor(descriptor.gameType());
         float clampedAlpha = Math.max(0.0f, Math.min(1.0f, alphaFactor));
+        float overlayAlpha = clampedAlpha * MODE_OVERLAY_ALPHA_FACTOR;
         int centerX = screenWidth / 2;
         int leftInset = GuiTextHelper.referenceScaled(18);
         int topInset = GuiTextHelper.referenceScaled(18);
         int rightInset = screenWidth - leftInset;
         int bottomInset = screenHeight - GuiTextHelper.referenceScaled(18);
 
+        renderFullscreenTexture(graphics, resolvePreviewTexture(descriptor.gameType()), screenWidth, screenHeight,
+                clampedAlpha);
         graphics.fillGradient(
                 0,
                 0,
                 screenWidth,
                 screenHeight,
-                scaleAlpha(withAlpha(accentColor, 24), clampedAlpha),
-                scaleAlpha(0x76090D10, clampedAlpha));
+                scaleAlpha(withAlpha(accentColor, 24), overlayAlpha),
+                scaleAlpha(0x76090D10, overlayAlpha));
         graphics.fillGradient(
                 0,
                 0,
                 centerX,
                 screenHeight,
-                scaleAlpha(withAlpha(accentColor, 22), clampedAlpha),
+                scaleAlpha(withAlpha(accentColor, 22), overlayAlpha),
                 0x00000000);
         graphics.fillGradient(
                 centerX,
@@ -99,15 +95,15 @@ public final class TdmModePreviewPanel {
                 screenWidth,
                 screenHeight,
                 0x00000000,
-                scaleAlpha(withAlpha(0xFF050608, 98), clampedAlpha));
+                scaleAlpha(withAlpha(0xFF050608, 98), overlayAlpha));
 
-        renderVariantOverlay(graphics, descriptor.gameType(), accentColor, screenWidth, screenHeight, clampedAlpha);
+        renderVariantOverlay(graphics, descriptor.gameType(), accentColor, screenWidth, screenHeight, overlayAlpha);
 
-        graphics.fill(0, 0, screenWidth, 1, scaleAlpha(withAlpha(0xFFFFFFFF, 86), clampedAlpha));
-        graphics.fill(0, screenHeight - 1, screenWidth, screenHeight, scaleAlpha(withAlpha(accentColor, 148), clampedAlpha));
-        graphics.fill(0, 0, GuiTextHelper.referenceScaled(2), screenHeight, scaleAlpha(withAlpha(accentColor, 90), clampedAlpha));
-        graphics.fill(screenWidth - 1, topInset, screenWidth, bottomInset, scaleAlpha(withAlpha(accentColor, 60), clampedAlpha));
-        graphics.fill(leftInset, topInset, rightInset, topInset + 1, scaleAlpha(CodTheme.BORDER_SUBTLE, clampedAlpha));
+        graphics.fill(0, 0, screenWidth, 1, scaleAlpha(withAlpha(0xFFFFFFFF, 86), overlayAlpha));
+        graphics.fill(0, screenHeight - 1, screenWidth, screenHeight, scaleAlpha(withAlpha(accentColor, 148), overlayAlpha));
+        graphics.fill(0, 0, GuiTextHelper.referenceScaled(2), screenHeight, scaleAlpha(withAlpha(accentColor, 90), overlayAlpha));
+        graphics.fill(screenWidth - 1, topInset, screenWidth, bottomInset, scaleAlpha(withAlpha(accentColor, 60), overlayAlpha));
+        graphics.fill(leftInset, topInset, rightInset, topInset + 1, scaleAlpha(CodTheme.BORDER_SUBTLE, overlayAlpha));
     }
 
     public static int accentColor(String gameType) {
@@ -241,6 +237,49 @@ public final class TdmModePreviewPanel {
             y += stripeHeight + gap;
             step = (step + 1) % 4;
         }
+    }
+
+    private static PreviewTexture resolvePreviewTexture(String gameType) {
+        String canonical = TdmGameTypes.canonicalize(gameType);
+        if (TdmGameTypes.FRONTLINE.equals(canonical)) {
+            return FRONTLINE_PREVIEW;
+        }
+        if (TdmGameTypes.TEAM_DEATHMATCH.equals(canonical)) {
+            return TEAM_DEATHMATCH_PREVIEW;
+        }
+        return SHARED_PREVIEW;
+    }
+
+    private static void renderFullscreenTexture(
+            GuiGraphics graphics,
+            PreviewTexture texture,
+            int screenWidth,
+            int screenHeight,
+            float alphaFactor) {
+        if (texture == null || alphaFactor <= 0.0f || screenWidth <= 0 || screenHeight <= 0) {
+            return;
+        }
+
+        float clampedAlpha = Math.max(0.0f, Math.min(1.0f, alphaFactor));
+        float scale = screenHeight / (float) texture.height();
+        int drawWidth = Math.max(1, Math.round(texture.width() * scale));
+        int drawX = (screenWidth - drawWidth) / 2;
+
+        RenderSystem.enableBlend();
+        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, clampedAlpha);
+        graphics.blit(
+                texture.location(),
+                drawX,
+                0,
+                drawWidth,
+                screenHeight,
+                0.0f,
+                0.0f,
+                texture.width(),
+                texture.height(),
+                texture.width(),
+                texture.height());
+        RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
     }
 
     private static int scaleAlpha(int color, float factor) {

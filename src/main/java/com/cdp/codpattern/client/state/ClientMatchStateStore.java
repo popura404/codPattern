@@ -1,5 +1,6 @@
 package com.cdp.codpattern.client.state;
 
+import com.cdp.codpattern.CodPattern;
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
@@ -7,6 +8,8 @@ import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.item.ItemStack;
@@ -24,6 +27,8 @@ public final class ClientMatchStateStore {
     private static final int KILL_FEED_FADE_TICKS = 10;
     private static final int MAX_KILL_FEED_ENTRIES = 6;
     private static final int BLACKOUT_INFO_FADE_IN_TICKS = 50;
+    private static final SoundEvent COUNTDOWN_20S_SOUND = SoundEvent.createVariableRangeEvent(
+            ResourceLocation.fromNamespaceAndPath(CodPattern.MODID, "tdm.countdown_20s"));
 
     private String currentPhase = "WAITING";
     private int remainingTimeTicks = 0;
@@ -711,8 +716,7 @@ public final class ClientMatchStateStore {
             switch (pendingPhaseCue) {
                 case "countdown" -> player.playNotifySound(SoundEvents.NOTE_BLOCK_HAT.get(), SoundSource.PLAYERS, 0.7f,
                         0.9f);
-                case "warmup" -> player.playNotifySound(SoundEvents.NOTE_BLOCK_PLING.get(), SoundSource.PLAYERS, 0.75f,
-                        0.95f);
+                case "warmup" -> player.playNotifySound(COUNTDOWN_20S_SOUND, SoundSource.PLAYERS, 0.85f, 1.0f);
                 case "playing" -> player.playNotifySound(SoundEvents.NOTE_BLOCK_BELL.get(), SoundSource.PLAYERS, 0.9f,
                         1.15f);
                 case "ended" -> {
