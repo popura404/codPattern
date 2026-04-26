@@ -86,13 +86,31 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final float WARMUP_MAP_NAME_SCALE = 2.0f;
     private static final int PLAYER_STATUS_MARGIN_LEFT = 8;
     private static final int PLAYER_STATUS_MARGIN_RIGHT = 8;
-    private static final int PLAYER_STATUS_BOTTOM_MARGIN = 8;
+    private static final int PLAYER_STATUS_BOTTOM_MARGIN = 16;
     private static final int PLAYER_STATUS_BAR_WIDTH = 148;
     private static final int PLAYER_STATUS_BAR_MIN_WIDTH = 72;
-    private static final int PLAYER_STATUS_BAR_HEIGHT = 3;
+    private static final int PLAYER_STATUS_BAR_HEIGHT = 2;
     private static final int PLAYER_STATUS_TEXT_GAP = 3;
     private static final int PLAYER_STATUS_HEALTH_COLOR = 0xFFE53935;
+    private static final int DAMAGE_VIGNETTE_MAX_ALPHA = 78;
+    private static final int DAMAGE_VIGNETTE_DURATION_MULTIPLIER = 2;
+    private static final int DAMAGE_VIGNETTE_EDGE_THICKNESS = 50;
+    private static final int DAMAGE_VIGNETTE_EDGE_SEGMENTS = 16;
+    private static final int DAMAGE_VIGNETTE_COLOR = 0xFFE02020;
+    private static final float LOW_HEALTH_BREATH_THRESHOLD = 0.35f;
+    private static final int LOW_HEALTH_BREATH_MIN_ALPHA = 16;
+    private static final int LOW_HEALTH_BREATH_MAX_ALPHA = 64;
+    private static final int LOW_HEALTH_BREATH_EDGE_THICKNESS = 76;
+    private static final float LOW_HEALTH_BREATH_PERIOD_TICKS = 32.0f;
+    private static final int LOW_HEALTH_BREATH_COLOR = 0xFFD91414;
+    private static final int LOW_HEALTH_DARKEN_MAX_ALPHA = 89;
     public static final TdmHudOverlay INSTANCE = new TdmHudOverlay();
+
+    private UUID damageVignettePlayerId;
+    private int damageVignetteTicksRemaining = 0;
+    private int damageVignetteTotalTicks = 0;
+    private int lastDamageVignettePlayerTick = -1;
+    private int lastObservedHurtTime = 0;
 
     private record ResultCandidate(String teamName, PlayerInfo player) {
     }
@@ -132,6 +150,8 @@ public class TdmHudOverlay implements IGuiOverlay {
         }
         int centerX = screenWidth / 2;
 
+        renderLowHealthBreath(graphics, partialTick, screenWidth, screenHeight);
+        renderDamageVignette(graphics, partialTick, screenWidth, screenHeight);
         renderLeftScorePanel(graphics, font, screenWidth, screenHeight);
         renderKillFeed(graphics, font, screenWidth, screenHeight);
         renderPhaseAnnouncement(graphics, font, centerX, screenHeight);
@@ -355,6 +375,154 @@ public class TdmHudOverlay implements IGuiOverlay {
         int pulseAlpha = (int) (pulse * 60.0f);
         if (pulseAlpha > 0) {
             graphics.fill(x, y, x + width, y + height, (clamp(pulseAlpha, 0, 255) << 24) | 0x00FFD463);
+        }
+    }
+
+    private void renderLowHealthBreath(GuiGraphics graphics, float partialTick, int screenWidth, int screenHeight) {
+        if (!shouldReplaceVanillaPlayerHud()) {
+            return;
+        }
+
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null || player.getHealth() <= 0.0f) {
+            return;
+        }
+
+        float maxHealth = Math.max(1.0f, player.getMaxHealth());
+        float healthRatio = Mth.clamp(player.getHealth() / maxHealth, 0.0f, 1.0f);
+        if (healthRatio > LOW_HEALTH_BREATH_THRESHOLD) {
+            return;
+        }
+
+        float severity = 1.0f - (healthRatio / LOW_HEALTH_BREATH_THRESHOLD);
+        float wave = 0.5f + 0.5f * Mth.sin(((player.tickCount + partialTick) / LOW_HEALTH_BREATH_PERIOD_TICKS)
+                * Mth.TWO_PI);
+        float pulse = 0.45f + (0.55f * wave);
+        int peakAlpha = Math.round(Mth.lerp(severity, LOW_HEALTH_BREATH_MIN_ALPHA, LOW_HEALTH_BREATH_MAX_ALPHA));
+        int alpha = clamp(Math.round(peakAlpha * pulse), 0, LOW_HEALTH_BREATH_MAX_ALPHA);
+        int darkenAlpha = clamp(Math.round(LOW_HEALTH_DARKEN_MAX_ALPHA * severity * pulse),
+                0,
+                LOW_HEALTH_DARKEN_MAX_ALPHA);
+        if (darkenAlpha > 0) {
+            graphics.fill(0, 0, screenWidth, screenHeight, darkenAlpha << 24);
+        }
+        drawScreenEdgeVignette(graphics, screenWidth, screenHeight, LOW_HEALTH_BREATH_EDGE_THICKNESS,
+                alpha, LOW_HEALTH_BREATH_COLOR);
+    }
+
+    private void renderDamageVignette(GuiGraphics graphics, float partialTick, int screenWidth, int screenHeight) {
+        if (!shouldReplaceVanillaPlayerHud()) {
+            resetDamageVignetteState();
+            return;
+        }
+
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null) {
+            resetDamageVignetteState();
+            return;
+        }
+
+        updateDamageVignetteState(player);
+        if (damageVignetteTicksRemaining <= 0 || damageVignetteTotalTicks <= 0) {
+            return;
+        }
+
+        float remaining = Mth.clamp(
+                (damageVignetteTicksRemaining - partialTick) / (float) damageVignetteTotalTicks,
+                0.0f,
+                1.0f);
+        int alpha = clamp(Math.round(DAMAGE_VIGNETTE_MAX_ALPHA * remaining), 0, DAMAGE_VIGNETTE_MAX_ALPHA);
+        if (alpha <= 0) {
+            return;
+        }
+
+        drawScreenEdgeVignette(graphics, screenWidth, screenHeight, DAMAGE_VIGNETTE_EDGE_THICKNESS,
+                alpha, DAMAGE_VIGNETTE_COLOR);
+    }
+
+    private void updateDamageVignetteState(LocalPlayer player) {
+        UUID playerId = player.getUUID();
+        if (!playerId.equals(damageVignettePlayerId)) {
+            resetDamageVignetteState();
+            damageVignettePlayerId = playerId;
+        }
+
+        int playerTick = player.tickCount;
+        if (lastDamageVignettePlayerTick < 0) {
+            lastDamageVignettePlayerTick = playerTick;
+        } else if (playerTick > lastDamageVignettePlayerTick) {
+            int elapsedTicks = playerTick - lastDamageVignettePlayerTick;
+            damageVignetteTicksRemaining = Math.max(0, damageVignetteTicksRemaining - elapsedTicks);
+            lastDamageVignettePlayerTick = playerTick;
+        } else if (playerTick < lastDamageVignettePlayerTick) {
+            resetDamageVignetteState();
+            damageVignettePlayerId = playerId;
+            lastDamageVignettePlayerTick = playerTick;
+        }
+
+        int hurtTime = Math.max(0, player.hurtTime);
+        if (hurtTime > 0 && (lastObservedHurtTime <= 0 || hurtTime > lastObservedHurtTime)) {
+            int totalTicks = Math.max(1, player.hurtDuration * DAMAGE_VIGNETTE_DURATION_MULTIPLIER);
+            damageVignetteTotalTicks = totalTicks;
+            damageVignetteTicksRemaining = totalTicks;
+        }
+        lastObservedHurtTime = hurtTime;
+    }
+
+    private void resetDamageVignetteState() {
+        damageVignettePlayerId = null;
+        damageVignetteTicksRemaining = 0;
+        damageVignetteTotalTicks = 0;
+        lastDamageVignettePlayerTick = -1;
+        lastObservedHurtTime = 0;
+    }
+
+    private void drawScreenEdgeVignette(GuiGraphics graphics, int screenWidth, int screenHeight,
+            int thickness, int alpha, int color) {
+        if (alpha <= 0 || screenWidth <= 0 || screenHeight <= 0) {
+            return;
+        }
+
+        int horizontalThickness = Math.min(thickness, Math.max(0, screenWidth / 2));
+        int verticalThickness = Math.min(thickness, Math.max(0, screenHeight / 2));
+        int edgeColor = withAlpha(color, alpha);
+        int transparentColor = withAlpha(color, 0);
+
+        if (verticalThickness > 0) {
+            graphics.fillGradient(0, 0, screenWidth, verticalThickness, edgeColor, transparentColor);
+            graphics.fillGradient(0, screenHeight - verticalThickness, screenWidth, screenHeight,
+                    transparentColor, edgeColor);
+        }
+        if (horizontalThickness > 0) {
+            drawHorizontalVignetteEdge(graphics, 0, verticalThickness, horizontalThickness,
+                    Math.max(verticalThickness, screenHeight - verticalThickness), alpha, true, color);
+            drawHorizontalVignetteEdge(graphics, screenWidth - horizontalThickness, verticalThickness, screenWidth,
+                    Math.max(verticalThickness, screenHeight - verticalThickness), alpha, false, color);
+        }
+    }
+
+    private void drawHorizontalVignetteEdge(GuiGraphics graphics, int left, int top, int right, int bottom,
+            int alpha, boolean fadeRight, int color) {
+        int width = right - left;
+        if (width <= 0 || bottom <= top) {
+            return;
+        }
+
+        int segments = Math.max(1, Math.min(DAMAGE_VIGNETTE_EDGE_SEGMENTS, width));
+        for (int i = 0; i < segments; i++) {
+            int segmentLeft = left + (width * i) / segments;
+            int segmentRight = left + (width * (i + 1)) / segments;
+            if (segmentRight <= segmentLeft) {
+                continue;
+            }
+
+            float edgeProgress = (segments == 1) ? 0.0f : (float) i / (segments - 1);
+            float fade = fadeRight ? 1.0f - edgeProgress : edgeProgress;
+            int segmentAlpha = clamp(Math.round(alpha * fade), 0, alpha);
+            if (segmentAlpha <= 0) {
+                continue;
+            }
+            graphics.fill(segmentLeft, top, segmentRight, bottom, withAlpha(color, segmentAlpha));
         }
     }
 
