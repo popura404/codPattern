@@ -44,7 +44,9 @@ public final class ClientMatchStateStore {
     private int blackoutFadeTicks = 0;
     private int blackoutHoldTicks = 0;
     private boolean playCountdownTickSound = false;
+    private boolean playWarmupCountdownSound = false;
     private boolean playTeleportSound = false;
+    private int lastWarmupCountdownSoundSecond = -1;
     private String previousPhase = "WAITING";
     private String pendingPhaseCue = "";
     private int scorePulseTicks = 0;
@@ -272,6 +274,10 @@ public final class ClientMatchStateStore {
             }
             if ("WARMUP".equals(phase)) {
                 playTeleportSound = true;
+                lastWarmupCountdownSoundSecond = -1;
+            } else {
+                playWarmupCountdownSound = false;
+                lastWarmupCountdownSoundSecond = -1;
             }
             phaseFlashTicks = PHASE_FLASH_DURATION;
             triggerPhaseAnnouncement(phase);
@@ -355,7 +361,9 @@ public final class ClientMatchStateStore {
         blackoutFadeTicks = 0;
         blackoutHoldTicks = 0;
         playCountdownTickSound = false;
+        playWarmupCountdownSound = false;
         playTeleportSound = false;
+        lastWarmupCountdownSoundSecond = -1;
         previousPhase = "WAITING";
         pendingPhaseCue = "";
         scorePulseTicks = 0;
@@ -566,6 +574,7 @@ public final class ClientMatchStateStore {
             }
         }
 
+        queueWarmupCountdownSound();
         playPendingSounds();
 
         if ("COUNTDOWN".equals(currentPhase)
@@ -596,11 +605,24 @@ public final class ClientMatchStateStore {
     private void queuePhaseCue(String phase) {
         pendingPhaseCue = switch (phase) {
             case "COUNTDOWN" -> "countdown";
-            case "WARMUP" -> "warmup";
             case "PLAYING" -> "playing";
             case "ENDED" -> "ended";
             default -> "";
         };
+    }
+
+    private void queueWarmupCountdownSound() {
+        if (!"WARMUP".equals(currentPhase) || remainingTimeTicks <= 0) {
+            return;
+        }
+
+        int secondsLeft = Math.max(1, (remainingTimeTicks + 19) / 20);
+        if (secondsLeft == lastWarmupCountdownSoundSecond) {
+            return;
+        }
+
+        lastWarmupCountdownSoundSecond = secondsLeft;
+        playWarmupCountdownSound = true;
     }
 
     private void startBlackoutSequence(int totalTicks) {
@@ -712,11 +734,15 @@ public final class ClientMatchStateStore {
             }
         }
 
+        if (playWarmupCountdownSound) {
+            playWarmupCountdownSound = false;
+            player.playNotifySound(COUNTDOWN_20S_SOUND, SoundSource.PLAYERS, 0.85f, 1.0f);
+        }
+
         if (!pendingPhaseCue.isEmpty()) {
             switch (pendingPhaseCue) {
                 case "countdown" -> player.playNotifySound(SoundEvents.NOTE_BLOCK_HAT.get(), SoundSource.PLAYERS, 0.7f,
                         0.9f);
-                case "warmup" -> player.playNotifySound(COUNTDOWN_20S_SOUND, SoundSource.PLAYERS, 0.85f, 1.0f);
                 case "playing" -> player.playNotifySound(SoundEvents.NOTE_BLOCK_BELL.get(), SoundSource.PLAYERS, 0.9f,
                         1.15f);
                 case "ended" -> {

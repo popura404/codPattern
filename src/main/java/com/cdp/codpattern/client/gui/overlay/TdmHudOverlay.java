@@ -84,6 +84,14 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int WARMUP_MAP_INFO_BOTTOM_OFFSET = 62;
     private static final int WARMUP_MAP_INFO_LINE_GAP = 28;
     private static final float WARMUP_MAP_NAME_SCALE = 2.0f;
+    private static final int PLAYER_STATUS_MARGIN_LEFT = 8;
+    private static final int PLAYER_STATUS_MARGIN_RIGHT = 8;
+    private static final int PLAYER_STATUS_BOTTOM_MARGIN = 8;
+    private static final int PLAYER_STATUS_BAR_WIDTH = 148;
+    private static final int PLAYER_STATUS_BAR_MIN_WIDTH = 72;
+    private static final int PLAYER_STATUS_BAR_HEIGHT = 3;
+    private static final int PLAYER_STATUS_TEXT_GAP = 3;
+    private static final int PLAYER_STATUS_HEALTH_COLOR = 0xFFE53935;
     public static final TdmHudOverlay INSTANCE = new TdmHudOverlay();
 
     private record ResultCandidate(String teamName, PlayerInfo player) {
@@ -99,6 +107,16 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private record RoomDisplayInfo(String gameType, String mapName) {
+    }
+
+    public static boolean shouldReplaceVanillaPlayerHud() {
+        if (!ClientTdmState.hasRoomContext()) {
+            return false;
+        }
+        if (ClientTdmState.isDead()) {
+            return true;
+        }
+        return isMatchHudPhase(ClientTdmState.currentPhase());
     }
 
     @Override
@@ -118,9 +136,24 @@ public class TdmHudOverlay implements IGuiOverlay {
         renderKillFeed(graphics, font, screenWidth, screenHeight);
         renderPhaseAnnouncement(graphics, font, centerX, screenHeight);
         renderThrowableSlots(graphics, font, screenWidth, screenHeight);
+        renderPlayerStatusHud(graphics, font, screenWidth, screenHeight);
         renderCombatMarkers(graphics, partialTick, screenWidth, screenHeight);
         renderEndgameSplash(graphics, font, centerX, screenWidth, screenHeight);
         renderDeathCamPanel(graphics, font, centerX, screenWidth, screenHeight);
+    }
+
+    private static boolean isMatchHudPhase(String phase) {
+        return "COUNTDOWN".equals(phase)
+                || "WARMUP".equals(phase)
+                || "PLAYING".equals(phase)
+                || "ENDED".equals(phase);
+    }
+
+    private boolean shouldRenderPlayerStatusHud() {
+        if (!shouldReplaceVanillaPlayerHud()) {
+            return false;
+        }
+        return !"ENDED".equals(ClientTdmState.currentPhase());
     }
 
     private boolean shouldRenderHud() {
@@ -323,6 +356,69 @@ public class TdmHudOverlay implements IGuiOverlay {
         if (pulseAlpha > 0) {
             graphics.fill(x, y, x + width, y + height, (clamp(pulseAlpha, 0, 255) << 24) | 0x00FFD463);
         }
+    }
+
+    private void renderPlayerStatusHud(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
+        if (!shouldRenderPlayerStatusHud()) {
+            return;
+        }
+
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null) {
+            return;
+        }
+
+        int x = PLAYER_STATUS_MARGIN_LEFT;
+        int maxWidth = screenWidth - x - PLAYER_STATUS_MARGIN_RIGHT;
+        int barWidth = Math.min(PLAYER_STATUS_BAR_WIDTH, maxWidth);
+        if (barWidth < PLAYER_STATUS_BAR_MIN_WIDTH) {
+            return;
+        }
+
+        int textY = screenHeight - PLAYER_STATUS_BOTTOM_MARGIN - font.lineHeight;
+        int barY = textY - PLAYER_STATUS_TEXT_GAP - PLAYER_STATUS_BAR_HEIGHT;
+        if (barY < 0) {
+            return;
+        }
+
+        float maxHealth = Math.max(1.0f, player.getMaxHealth());
+        float healthRatio = Mth.clamp(player.getHealth() / maxHealth, 0.0f, 1.0f);
+        int filledWidth = Math.round(barWidth * healthRatio);
+        if (player.getHealth() > 0.0f && filledWidth <= 0) {
+            filledWidth = 1;
+        }
+
+        graphics.fill(x - 1, barY - 1, x + barWidth + 1, barY + PLAYER_STATUS_BAR_HEIGHT + 1, 0x99000000);
+        graphics.fill(x, barY, x + barWidth, barY + PLAYER_STATUS_BAR_HEIGHT, 0xFFFFFFFF);
+        if (filledWidth > 0) {
+            graphics.fill(x, barY, x + filledWidth, barY + PLAYER_STATUS_BAR_HEIGHT, PLAYER_STATUS_HEALTH_COLOR);
+        }
+
+        String teamName = resolveLocalTeamName(player);
+        String teamText = teamNameLabel(teamName);
+        int teamColor = teamAccent(teamName);
+        int teamMaxWidth = Math.min(font.width(teamText), Math.max(18, barWidth / 2));
+        String fittedTeam = GuiTextHelper.ellipsize(font, teamText, teamMaxWidth);
+        int teamWidth = font.width(fittedTeam);
+
+        String playerId = player.getGameProfile().getName();
+        int idMaxWidth = Math.max(1, barWidth - teamWidth - 5);
+        String fittedPlayerId = GuiTextHelper.ellipsize(font, playerId, idMaxWidth);
+
+        graphics.drawString(font, fittedTeam, x, textY, teamColor, true);
+        graphics.drawString(font, fittedPlayerId, x + teamWidth + 5, textY, 0xFFF4F4F4, true);
+    }
+
+    private String resolveLocalTeamName(LocalPlayer player) {
+        UUID playerId = player.getUUID();
+        for (Map.Entry<String, List<PlayerInfo>> entry : ClientTdmState.teamPlayersSnapshot().entrySet()) {
+            for (PlayerInfo playerInfo : entry.getValue()) {
+                if (playerInfo != null && playerId.equals(playerInfo.uuid())) {
+                    return entry.getKey();
+                }
+            }
+        }
+        return "";
     }
 
     private void renderKillFeed(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
