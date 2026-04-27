@@ -98,12 +98,12 @@ public class TdmHudOverlay implements IGuiOverlay {
     private static final int DAMAGE_VIGNETTE_EDGE_SEGMENTS = 16;
     private static final int DAMAGE_VIGNETTE_COLOR = 0xFFE02020;
     private static final float LOW_HEALTH_BREATH_THRESHOLD = 0.35f;
-    private static final int LOW_HEALTH_BREATH_MIN_ALPHA = 16;
-    private static final int LOW_HEALTH_BREATH_MAX_ALPHA = 64;
-    private static final int LOW_HEALTH_BREATH_EDGE_THICKNESS = 76;
-    private static final float LOW_HEALTH_BREATH_PERIOD_TICKS = 32.0f;
+    private static final int LOW_HEALTH_BREATH_MIN_ALPHA = 30;
+    private static final int LOW_HEALTH_BREATH_MAX_ALPHA = 112;
+    private static final int LOW_HEALTH_BREATH_EDGE_THICKNESS = 92;
+    private static final float LOW_HEALTH_BREATH_PERIOD_TICKS = 18.0f;
     private static final int LOW_HEALTH_BREATH_COLOR = 0xFFD91414;
-    private static final int LOW_HEALTH_DARKEN_MAX_ALPHA = 89;
+    private static final int LOW_HEALTH_DARKEN_MAX_ALPHA = 128;
     public static final TdmHudOverlay INSTANCE = new TdmHudOverlay();
 
     private UUID damageVignettePlayerId;

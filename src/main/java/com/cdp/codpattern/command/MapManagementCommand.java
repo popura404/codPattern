@@ -41,6 +41,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public final class MapManagementCommand {
+    private static final int MAP_PERMISSION_LEVEL = 2;
+    private static final int END_TELEPORT_PERMISSION_LEVEL = 3;
+
     private static final SuggestionProvider<CommandSourceStack> REGISTERED_TYPE_SUGGESTIONS =
             (context, builder) -> SharedSuggestionProvider.suggest(registeredGameTypes(), builder);
     private static final SuggestionProvider<CommandSourceStack> MAP_BY_TYPE_SUGGESTIONS =
@@ -71,7 +74,7 @@ public final class MapManagementCommand {
 
     public static LiteralArgumentBuilder<CommandSourceStack> buildCommand() {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("map")
-                .requires(source -> source.hasPermission(2));
+                .requires(source -> source.hasPermission(MAP_PERMISSION_LEVEL));
 
         root.then(Commands.literal("list")
                 .executes(context -> listTypes(context.getSource()))
@@ -180,7 +183,8 @@ public final class MapManagementCommand {
                                         StringArgumentType.getString(context, "map"))))));
         root.then(spawn);
 
-        LiteralArgumentBuilder<CommandSourceStack> endtp = Commands.literal("endtp");
+        LiteralArgumentBuilder<CommandSourceStack> endtp = Commands.literal("endtp")
+                .requires(source -> source.hasPermission(END_TELEPORT_PERMISSION_LEVEL));
         endtp.then(Commands.literal("show")
                 .then(Commands.argument("map", StringArgumentType.string())
                         .suggests(ALL_MAP_SUGGESTIONS)

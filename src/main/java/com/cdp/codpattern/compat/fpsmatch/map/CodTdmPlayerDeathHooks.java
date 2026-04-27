@@ -48,6 +48,8 @@ final class CodTdmPlayerDeathHooks implements PlayerDeathService.Hooks {
                 player.getXRot()
         );
         player.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, lookAtPosition);
+        player.setXRot(0.0F);
+        player.xRotO = 0.0F;
     }
 
     @Override
