@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
+import com.cdp.codpattern.app.match.model.ModeCapability;
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
@@ -124,6 +125,9 @@ public final class TdmRoomActionController {
         if (roomState.joinedRoom() == null) {
             return;
         }
+        if (!joinedRoomHasCapability(ModeCapability.TEAM_SELECTION)) {
+            return;
+        }
         if (!TdmRoomStateEvaluator.isTeamSwitchAllowed(currentRoomState())) {
             showRoomNotice(Component.translatable("message.codpattern.game.team_switch_locked").getString(),
                     CodTheme.TEXT_DANGER);
@@ -156,6 +160,9 @@ public final class TdmRoomActionController {
         if (roomState.joinedRoom() == null || uiState.hasPendingAction() || !"WAITING".equals(currentRoomState())) {
             return;
         }
+        if (!joinedRoomHasCapability(ModeCapability.READY_STATE)) {
+            return;
+        }
         Minecraft mc = Minecraft.getInstance();
         UUID localPlayerId = mc.player == null ? null : mc.player.getUUID();
         boolean ready = TdmRoomStateEvaluator.isLocalPlayerReady(localPlayerId, roomState.teamPlayers());
@@ -163,10 +170,16 @@ public final class TdmRoomActionController {
     }
 
     public void voteStart() {
+        if (!joinedRoomHasCapability(ModeCapability.START_VOTE)) {
+            return;
+        }
         ModNetworkChannel.sendToServer(new VoteStartPacket());
     }
 
     public void voteEnd() {
+        if (!joinedRoomHasCapability(ModeCapability.END_VOTE)) {
+            return;
+        }
         ModNetworkChannel.sendToServer(new VoteEndPacket());
     }
 
@@ -322,6 +335,15 @@ public final class TdmRoomActionController {
                 && !selectedRoom.isBlank()
                 && !selectedRoom.equals(joinedRoom)
                 && roomState.selectedRoomPreviewState().hasPreview();
+    }
+
+    private boolean joinedRoomHasCapability(ModeCapability capability) {
+        String joinedRoom = roomState.joinedRoom();
+        if (joinedRoom == null || joinedRoom.isBlank()) {
+            return false;
+        }
+        TdmRoomData roomData = roomState.rooms().get(joinedRoom);
+        return roomData == null || roomData.hasCapability(capability);
     }
 
     public String pendingSwitchTargetRoom() {

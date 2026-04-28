@@ -12,7 +12,7 @@ import net.minecraft.server.level.ServerPlayer;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface ModeRoomActionPort extends ModeRoomIdentityPort, ReadyStatePort, VoteControlPort {
+public interface ModeRoomActionPort extends ModeRoomLifecyclePort, ReadyStatePort, VoteControlPort {
     @Override
     RoomId roomId();
 

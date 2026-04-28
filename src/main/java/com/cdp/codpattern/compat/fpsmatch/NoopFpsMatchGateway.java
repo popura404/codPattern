@@ -3,8 +3,12 @@ package com.cdp.codpattern.compat.fpsmatch;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
 import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
+import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
 import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
+import com.cdp.codpattern.app.match.port.ReadyStatePort;
+import com.cdp.codpattern.app.match.port.TeamRoomPort;
+import com.cdp.codpattern.app.match.port.VoteControlPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
 import net.minecraft.core.BlockPos;
@@ -32,12 +36,42 @@ public final class NoopFpsMatchGateway implements FpsMatchGateway {
     }
 
     @Override
+    public Optional<ModeRoomLifecyclePort> findRoomLifecyclePort(RoomId roomId) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<ModeRoomLifecyclePort> findPlayerRoomLifecyclePort(ServerPlayer player) {
+        return Optional.empty();
+    }
+
+    @Override
     public Optional<ModeRoomReadPort> findRoomReadPort(RoomId roomId) {
         return Optional.empty();
     }
 
     @Override
     public Optional<ModeRoomReadPort> findPlayerRoomReadPort(ServerPlayer player) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<TeamRoomPort> findRoomTeamPort(RoomId roomId) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<TeamRoomPort> findPlayerTeamRoomPort(ServerPlayer player) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<ReadyStatePort> findPlayerReadyStatePort(ServerPlayer player) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<VoteControlPort> findPlayerVoteControlPort(ServerPlayer player) {
         return Optional.empty();
     }
 

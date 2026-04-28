@@ -1,6 +1,6 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.app.tdm.service.TdmRoomInteractionService;
+import com.cdp.codpattern.app.match.service.ModeRoomInteractionService;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
@@ -31,7 +31,7 @@ public class VoteEndPacket {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
-                TdmRoomInteractionService.initiateEndVote(player);
+                ModeRoomInteractionService.initiateEndVote(player);
             }
         });
         ctx.get().setPacketHandled(true);

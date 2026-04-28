@@ -1,5 +1,6 @@
 package com.cdp.codpattern.app.match.model;
 
+import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
 
@@ -23,6 +24,7 @@ public final class RoomSummarySnapshots {
                 summaryPort.maxPlayers(),
                 summaryPort.remainingTimeTicks(),
                 summaryPort.metrics(),
+                GameModeRegistry.capabilities(summaryPort.gameType()),
                 List.of(),
                 Optional.empty());
     }
@@ -60,6 +62,7 @@ public final class RoomSummarySnapshots {
                 readPort.maxPlayers(),
                 readPort.remainingTimeTicks(),
                 readPort.metrics(),
+                GameModeRegistry.capabilities(readPort.gameType()),
                 teams,
                 Optional.empty());
     }

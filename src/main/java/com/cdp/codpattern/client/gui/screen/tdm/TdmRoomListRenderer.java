@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
 import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.model.ModeCapability;
 import com.cdp.codpattern.app.match.model.ModeDescriptor;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
@@ -520,7 +521,7 @@ public final class TdmRoomListRenderer {
         MutableComponent title = Component.empty()
                 .append(Component.literal("\u25cf ").withStyle(style -> style.withColor(statusColor(room.state))))
                 .append(Component.literal(room.mapName == null ? "" : room.mapName));
-        if (!room.hasMatchEndTeleportPoint) {
+        if (room.hasCapability(ModeCapability.MATCH_END_TELEPORT) && !room.hasMatchEndTeleportPoint) {
             title.append(Component.literal(" !").withStyle(style -> style.withColor(CodTheme.TEXT_DANGER & 0x00FFFFFF)));
         }
         return title;

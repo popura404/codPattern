@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.model.ModeCapability;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.cdp.codpattern.client.ClientTdmState;
@@ -231,6 +232,11 @@ public class TdmRoomScreen extends Screen {
         String currentRoomState = actionController.currentRoomState();
         boolean hasJoinedRoom = roomState.joinedRoom() != null;
         boolean previewingOtherRoom = actionController.isPreviewingOtherRoom();
+        boolean showCurrentRoomControls = hasJoinedRoom && !previewingOtherRoom;
+        boolean hasTeamSelection = currentJoinedRoomHasCapability(ModeCapability.TEAM_SELECTION);
+        boolean hasReadyState = currentJoinedRoomHasCapability(ModeCapability.READY_STATE);
+        boolean hasStartVote = currentJoinedRoomHasCapability(ModeCapability.START_VOTE);
+        boolean hasEndVote = currentJoinedRoomHasCapability(ModeCapability.END_VOTE);
         boolean localPlayerReady = TdmRoomStateEvaluator.isLocalPlayerReady(
                 Minecraft.getInstance().player == null ? null : Minecraft.getInstance().player.getUUID(),
                 roomState.teamPlayers());
@@ -243,24 +249,60 @@ public class TdmRoomScreen extends Screen {
                 hasJoinedRoom,
                 actionController.hasPendingAction(),
                 currentRoomState,
-                localPlayerReady);
-        boolean showCurrentRoomControls = hasJoinedRoom && !previewingOtherRoom;
+                localPlayerReady,
+                hasTeamSelection,
+                hasReadyState,
+                hasStartVote,
+                hasEndVote);
         if (kortacButton != null) {
-            kortacButton.visible = showCurrentRoomControls;
+            kortacButton.visible = showCurrentRoomControls && hasTeamSelection;
         }
         if (specgruButton != null) {
-            specgruButton.visible = showCurrentRoomControls;
+            specgruButton.visible = showCurrentRoomControls && hasTeamSelection;
         }
         if (readyButton != null) {
-            readyButton.visible = showCurrentRoomControls;
+            readyButton.visible = showCurrentRoomControls && hasReadyState;
         }
         if (voteStartButton != null) {
-            voteStartButton.visible = showCurrentRoomControls;
+            voteStartButton.visible = showCurrentRoomControls && hasStartVote;
         }
         if (voteEndButton != null) {
-            voteEndButton.visible = showCurrentRoomControls;
+            voteEndButton.visible = showCurrentRoomControls && hasEndVote;
         }
-        infoActionBottomY = showCurrentRoomControls ? fullActionBottomY : collapsedActionBottomY;
+        infoActionBottomY = visibleActionBottomY();
+    }
+
+    private boolean currentJoinedRoomHasCapability(ModeCapability capability) {
+        String joinedRoom = roomState.joinedRoom();
+        if (joinedRoom == null || joinedRoom.isBlank()) {
+            return false;
+        }
+        TdmRoomData roomData = roomState.rooms().get(joinedRoom);
+        if (roomData != null) {
+            return roomData.hasCapability(capability);
+        }
+        try {
+            return GameModeRegistry.hasCapability(RoomId.decode(joinedRoom).gameType(), capability);
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
+    private int visibleActionBottomY() {
+        int bottom = collapsedActionBottomY;
+        bottom = Math.max(bottom, bottomOfVisible(kortacButton));
+        bottom = Math.max(bottom, bottomOfVisible(specgruButton));
+        bottom = Math.max(bottom, bottomOfVisible(readyButton));
+        bottom = Math.max(bottom, bottomOfVisible(voteStartButton));
+        bottom = Math.max(bottom, bottomOfVisible(voteEndButton));
+        return bottom;
+    }
+
+    private static int bottomOfVisible(Button button) {
+        if (button == null || !button.visible) {
+            return 0;
+        }
+        return button.getY() + button.getHeight();
     }
 
     @Override

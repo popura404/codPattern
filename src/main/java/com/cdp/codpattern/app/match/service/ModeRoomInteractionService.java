@@ -1,0 +1,182 @@
+package com.cdp.codpattern.app.match.service;
+
+import com.cdp.codpattern.app.match.model.JoinRoomRequest;
+import com.cdp.codpattern.app.match.model.JoinRoomResult;
+import com.cdp.codpattern.app.match.model.LeaveRoomResult;
+import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
+import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
+import com.cdp.codpattern.app.match.port.ReadyStatePort;
+import com.cdp.codpattern.app.match.port.TeamRoomPort;
+import com.cdp.codpattern.app.match.port.VoteControlPort;
+import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
+import com.cdp.codpattern.app.tdm.service.TdmRoomInteractionService;
+import com.cdp.codpattern.compat.fpsmatch.FpsMatchGateway;
+import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+
+import java.util.Optional;
+
+public final class ModeRoomInteractionService {
+    private static final String CODE_MAP_NOT_FOUND = "MAP_NOT_FOUND";
+    private static final String CODE_NOT_IN_ROOM = "NOT_IN_ROOM";
+
+    private ModeRoomInteractionService() {
+    }
+
+    public record JoinResult(boolean success, String roomKey, String code, String message) {
+    }
+
+    public record LeaveResult(boolean success, String roomKey, String code, String message) {
+    }
+
+    public static JoinResult joinRoom(ServerPlayer player, String roomKey, String teamName) {
+        RoomId roomId = decodeRoomId(roomKey);
+        if (roomId == null) {
+            return new JoinResult(false, "", CODE_MAP_NOT_FOUND, "");
+        }
+
+        FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
+        if (isLegacyTdmAction(gateway.findRoomActionPort(roomId))) {
+            return fromTdm(TdmRoomInteractionService.joinRoom(player, roomKey, teamName));
+        }
+
+        Optional<ModeRoomLifecyclePort> lifecyclePort = gateway.findRoomLifecyclePort(roomId);
+        if (lifecyclePort.isEmpty()) {
+            return new JoinResult(false, roomId.encode(), CODE_MAP_NOT_FOUND, "");
+        }
+        return fromResult(lifecyclePort.get().join(player, joinRequest(teamName)));
+    }
+
+    public static LeaveResult leaveRoom(ServerPlayer player) {
+        FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
+        if (isLegacyTdmAction(gateway.findPlayerRoomActionPort(player))) {
+            return fromTdm(TdmRoomInteractionService.leaveRoom(player));
+        }
+
+        Optional<ModeRoomLifecyclePort> lifecyclePort = gateway.findPlayerRoomLifecyclePort(player);
+        if (lifecyclePort.isEmpty()) {
+            return new LeaveResult(false, "", CODE_NOT_IN_ROOM, "");
+        }
+        return fromResult(lifecyclePort.get().leave(player));
+    }
+
+    public static void selectTeamInRoom(ServerPlayer player, String roomKey, String teamName) {
+        RoomId roomId = decodeRoomId(roomKey);
+        if (roomId == null || teamName == null || teamName.isBlank()) {
+            return;
+        }
+
+        FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
+        if (isLegacyTdmAction(gateway.findRoomActionPort(roomId))) {
+            TdmRoomInteractionService.selectTeamInRoom(player, roomKey, teamName);
+            return;
+        }
+
+        Optional<TeamRoomPort> teamPort = gateway.findRoomTeamPort(roomId);
+        if (teamPort.isEmpty()) {
+            return;
+        }
+        if (!teamPort.get().hasTeam(teamName)) {
+            player.sendSystemMessage(Component.translatable("message.codpattern.team.not_found", teamName));
+            return;
+        }
+        teamPort.get().switchTeam(player, teamName);
+    }
+
+    public static Component setReadyState(ServerPlayer player, boolean ready) {
+        FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
+        if (isLegacyTdmAction(gateway.findPlayerRoomActionPort(player))) {
+            return TdmRoomInteractionService.setReadyState(player, ready);
+        }
+
+        Optional<ReadyStatePort> readyPort = gateway.findPlayerReadyStatePort(player);
+        if (readyPort.isEmpty()) {
+            return Component.translatable("message.codpattern.room.not_joined_tdm");
+        }
+        if (readyPort.get().setPlayerReady(player, ready)) {
+            return ready ? Component.translatable("message.codpattern.room.ready")
+                    : Component.translatable("message.codpattern.room.not_ready");
+        }
+        return Component.translatable("message.codpattern.room.ready_change_locked");
+    }
+
+    public static void initiateStartVote(ServerPlayer player) {
+        FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
+        if (isLegacyTdmAction(gateway.findPlayerRoomActionPort(player))) {
+            TdmRoomInteractionService.initiateStartVote(player);
+            return;
+        }
+        gateway.findPlayerVoteControlPort(player)
+                .ifPresent(port -> port.initiateStartVote(player.getUUID()));
+    }
+
+    public static void initiateEndVote(ServerPlayer player) {
+        FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
+        if (isLegacyTdmAction(gateway.findPlayerRoomActionPort(player))) {
+            TdmRoomInteractionService.initiateEndVote(player);
+            return;
+        }
+        gateway.findPlayerVoteControlPort(player)
+                .ifPresent(port -> port.initiateEndVote(player.getUUID()));
+    }
+
+    public static void submitVoteResponse(ServerPlayer player, long voteId, boolean accepted) {
+        FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
+        if (isLegacyTdmAction(gateway.findPlayerRoomActionPort(player))) {
+            TdmRoomInteractionService.submitVoteResponse(player, voteId, accepted);
+            return;
+        }
+        gateway.findPlayerVoteControlPort(player)
+                .ifPresent(port -> port.submitVoteResponse(player.getUUID(), voteId, accepted));
+    }
+
+    private static boolean isLegacyTdmAction(Optional<ModeRoomActionPort> actionPort) {
+        return actionPort.filter(CodTdmActionPort.class::isInstance).isPresent();
+    }
+
+    private static JoinRoomRequest joinRequest(String teamName) {
+        if (teamName == null || teamName.isBlank()) {
+            return JoinRoomRequest.autoTeam();
+        }
+        return JoinRoomRequest.team(teamName.trim());
+    }
+
+    private static JoinResult fromResult(JoinRoomResult result) {
+        RoomId roomId = result == null ? null : result.roomId();
+        return new JoinResult(
+                result != null && result.success(),
+                roomId == null ? "" : roomId.encode(),
+                result == null ? CODE_MAP_NOT_FOUND : result.code(),
+                result == null ? "" : result.message());
+    }
+
+    private static LeaveResult fromResult(LeaveRoomResult result) {
+        RoomId roomId = result == null ? null : result.roomId();
+        return new LeaveResult(
+                result != null && result.success(),
+                roomId == null ? "" : roomId.encode(),
+                result == null ? CODE_NOT_IN_ROOM : result.code(),
+                result == null ? "" : result.message());
+    }
+
+    private static JoinResult fromTdm(TdmRoomInteractionService.JoinResult result) {
+        return new JoinResult(result.success(), result.roomKey(), result.code(), result.message());
+    }
+
+    private static LeaveResult fromTdm(TdmRoomInteractionService.LeaveResult result) {
+        return new LeaveResult(result.success(), result.roomKey(), result.code(), result.message());
+    }
+
+    private static RoomId decodeRoomId(String roomKey) {
+        if (roomKey == null || roomKey.isBlank()) {
+            return null;
+        }
+        try {
+            return RoomId.decode(roomKey);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+}

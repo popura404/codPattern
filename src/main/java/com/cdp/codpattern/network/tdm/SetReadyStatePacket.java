@@ -1,6 +1,6 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.app.tdm.service.TdmRoomInteractionService;
+import com.cdp.codpattern.app.match.service.ModeRoomInteractionService;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -36,7 +36,7 @@ public class SetReadyStatePacket {
             if (player == null) {
                 return;
             }
-            player.sendSystemMessage(TdmRoomInteractionService.setReadyState(player, ready));
+            player.sendSystemMessage(ModeRoomInteractionService.setReadyState(player, ready));
         });
         ctx.get().setPacketHandled(true);
     }

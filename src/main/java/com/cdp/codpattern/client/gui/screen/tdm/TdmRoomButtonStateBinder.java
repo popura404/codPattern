@@ -16,32 +16,36 @@ public final class TdmRoomButtonStateBinder {
             boolean hasJoinedRoom,
             boolean hasPendingAction,
             String currentRoomState,
-            boolean localPlayerReady
+            boolean localPlayerReady,
+            boolean hasTeamSelection,
+            boolean hasReadyState,
+            boolean hasStartVote,
+            boolean hasEndVote
     ) {
         boolean canSwitchTeam = TdmRoomStateEvaluator.isTeamSwitchAllowed(currentRoomState);
         boolean canStartVote = TdmRoomStateEvaluator.canStartVote(currentRoomState);
         boolean canEndVote = TdmRoomStateEvaluator.canEndVote(currentRoomState);
 
         if (readyButton != null) {
-            readyButton.active = hasJoinedRoom && "WAITING".equals(currentRoomState) && !hasPendingAction;
+            readyButton.active = hasReadyState && hasJoinedRoom && "WAITING".equals(currentRoomState) && !hasPendingAction;
             readyButton.setMessage(Component.translatable(
                     localPlayerReady ? "screen.codpattern.tdm.ready_cancel" : "screen.codpattern.tdm.ready"));
         }
 
         if (voteStartButton != null) {
-            voteStartButton.active = hasJoinedRoom && canStartVote && !hasPendingAction;
+            voteStartButton.active = hasStartVote && hasJoinedRoom && canStartVote && !hasPendingAction;
         }
 
         if (voteEndButton != null) {
-            voteEndButton.active = hasJoinedRoom && canEndVote && !hasPendingAction;
+            voteEndButton.active = hasEndVote && hasJoinedRoom && canEndVote && !hasPendingAction;
         }
 
         if (kortacButton != null) {
-            kortacButton.active = hasJoinedRoom && canSwitchTeam && !hasPendingAction;
+            kortacButton.active = hasTeamSelection && hasJoinedRoom && canSwitchTeam && !hasPendingAction;
         }
 
         if (specgruButton != null) {
-            specgruButton.active = hasJoinedRoom && canSwitchTeam && !hasPendingAction;
+            specgruButton.active = hasTeamSelection && hasJoinedRoom && canSwitchTeam && !hasPendingAction;
         }
     }
 }

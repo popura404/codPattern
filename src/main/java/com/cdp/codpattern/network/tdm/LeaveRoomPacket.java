@@ -1,7 +1,7 @@
 package com.cdp.codpattern.network.tdm;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
-import com.cdp.codpattern.app.tdm.service.TdmRoomInteractionService;
+import com.cdp.codpattern.app.match.service.ModeRoomInteractionService;
 import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,7 +34,7 @@ public class LeaveRoomPacket {
             if (player == null) {
                 return;
             }
-            TdmRoomInteractionService.LeaveResult result = TdmRoomInteractionService.leaveRoom(player);
+            ModeRoomInteractionService.LeaveResult result = ModeRoomInteractionService.leaveRoom(player);
             if (result.success()) {
                 CodTdmRoomManager.getInstance().markRoomListDirty();
             }

@@ -1,5 +1,6 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
+import com.cdp.codpattern.app.match.model.RoomSummaryMetric;
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import net.minecraft.network.chat.Component;
 
@@ -48,6 +49,22 @@ public final class TdmRoomTextFormatter {
         int kortacCount = teamPlayerCounts.getOrDefault(TdmTeamNames.KORTAC, 0);
         int specgruCount = teamPlayerCounts.getOrDefault(TdmTeamNames.SPECGRU, 0);
         return kortacCount + "v" + specgruCount;
+    }
+
+    public static Component metricText(RoomSummaryMetric metric) {
+        if (metric == null) {
+            return Component.empty();
+        }
+        return Component.translatable(metric.translationKey())
+                .append(Component.literal(": " + formattedMetricValue(metric)));
+    }
+
+    private static String formattedMetricValue(RoomSummaryMetric metric) {
+        return switch (metric.display()) {
+            case TIME_TICKS -> formatTime(metric.value());
+            case PERCENT -> metric.value() + "%";
+            case NUMBER, SCORE, PLAYER_COUNT -> Integer.toString(metric.value());
+        };
     }
 
     public static int pingBucket(int pingMs) {

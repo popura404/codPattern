@@ -146,7 +146,8 @@ public class ClientPacketHandler {
                             info.teamScores,
                             info.remainingTimeTicks,
                             info.hasMatchEndTeleportPoint,
-                            info.metrics));
+                            info.metrics,
+                            info.capabilities));
                 }
                 tdmScreen.updateRoomList(snapshotVersion, roomDataMap);
             }

@@ -1,6 +1,6 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.app.tdm.service.TdmRoomInteractionService;
+import com.cdp.codpattern.app.match.service.ModeRoomInteractionService;
 import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
@@ -43,7 +43,7 @@ public class JoinRoomPacket {
             if (player == null) {
                 return;
             }
-            TdmRoomInteractionService.JoinResult result = TdmRoomInteractionService.joinRoom(player, roomKey, teamName);
+            ModeRoomInteractionService.JoinResult result = ModeRoomInteractionService.joinRoom(player, roomKey, teamName);
             sendResult(player, result.success(), result.roomKey(), result.code(), result.message());
         });
         ctx.get().setPacketHandled(true);

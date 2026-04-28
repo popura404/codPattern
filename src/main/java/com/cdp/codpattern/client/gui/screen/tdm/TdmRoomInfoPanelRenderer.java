@@ -1,7 +1,9 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
-import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.model.ModeCapability;
+import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.model.RoomSummaryMetric;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
@@ -96,25 +98,44 @@ public final class TdmRoomInfoPanelRenderer {
                 infoActionBottomY + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP));
 
         if (activeRoomSummary != null) {
-            Map<String, Integer> teamScores = showSelectedPreview
-                    ? activeRoomSummary.teamScores
-                    : joinedRoomLiveState.teamScores().isEmpty()
-                    ? activeRoomSummary.teamScores
-                    : joinedRoomLiveState.teamScores();
             String phase = showSelectedPreview ? activeRoomSummary.state : joinedRoomLiveState.phase();
             int remainingTimeTicks = showSelectedPreview
                     ? activeRoomSummary.remainingTimeTicks
                     : joinedRoomLiveState.remainingTimeTicks();
-            GuiTextHelper.drawReferenceString(
-                    graphics,
-                    mc.font,
-                    Component.translatable(
-                            "screen.codpattern.tdm_room.current_score",
-                            TdmRoomTextFormatter.teamScoreText(teamScores)),
-                    contentX,
-                    infoY,
-                    scaleAlpha(0xFFE5E5E5, contentFactor),
-                    false);
+            List<RoomSummaryMetric> metrics = activeRoomSummary.metrics == null
+                    ? List.of()
+                    : activeRoomSummary.metrics;
+            if (!metrics.isEmpty()) {
+                int metricCount = Math.min(4, metrics.size());
+                for (int i = 0; i < metricCount; i++) {
+                    GuiTextHelper.drawReferenceString(
+                            graphics,
+                            mc.font,
+                            TdmRoomTextFormatter.metricText(metrics.get(i)),
+                            contentX,
+                            infoY,
+                            scaleAlpha(0xFFE5E5E5, contentFactor),
+                            false);
+                    infoY += referenceLineHeight + GuiTextHelper.referenceScaled(3);
+                }
+            } else {
+                Map<String, Integer> teamScores = showSelectedPreview
+                        ? activeRoomSummary.teamScores
+                        : joinedRoomLiveState.teamScores().isEmpty()
+                        ? activeRoomSummary.teamScores
+                        : joinedRoomLiveState.teamScores();
+                GuiTextHelper.drawReferenceString(
+                        graphics,
+                        mc.font,
+                        Component.translatable(
+                                "screen.codpattern.tdm_room.current_score",
+                                TdmRoomTextFormatter.teamScoreText(teamScores)),
+                        contentX,
+                        infoY,
+                        scaleAlpha(0xFFE5E5E5, contentFactor),
+                        false);
+                infoY += referenceLineHeight + GuiTextHelper.referenceScaled(3);
+            }
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,
@@ -124,10 +145,10 @@ public final class TdmRoomInfoPanelRenderer {
                                     phase,
                                     remainingTimeTicks)),
                     contentX,
-                    infoY + referenceLineHeight + GuiTextHelper.referenceScaled(3),
+                    infoY,
                     scaleAlpha(0xFFB0B0B0, contentFactor),
                     false);
-            infoY += referenceLineHeight * 2 + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP);
+            infoY += referenceLineHeight + GuiTextHelper.referenceScaled(BASE_INFO_BLOCK_GAP);
             if (!showSelectedPreview && joinedRoomLiveState.isStale(nowMs)) {
                 GuiTextHelper.drawReferenceString(
                         graphics,
@@ -154,7 +175,9 @@ public final class TdmRoomInfoPanelRenderer {
         }
 
         TdmRoomData warningRoom = activeRoomSummary;
-        if (warningRoom != null && !warningRoom.hasMatchEndTeleportPoint) {
+        if (warningRoom != null
+                && warningRoom.hasCapability(ModeCapability.MATCH_END_TELEPORT)
+                && !warningRoom.hasMatchEndTeleportPoint) {
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,

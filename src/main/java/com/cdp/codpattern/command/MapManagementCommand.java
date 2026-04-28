@@ -711,7 +711,8 @@ public final class MapManagementCommand {
 
     private static void writeMatchEndTeleportPoint(BaseMap map, SpawnPointData point) {
         if (map instanceof ModeRoomBackedMap backedMap) {
-            backedMap.roomHandle().actionPort().setMatchEndTeleportPoint(point);
+            backedMap.roomHandle().actionPort()
+                    .ifPresent(actionPort -> actionPort.setMatchEndTeleportPoint(point));
         }
     }
 

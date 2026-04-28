@@ -3,8 +3,12 @@ package com.cdp.codpattern.compat.fpsmatch;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
 import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
+import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
 import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
+import com.cdp.codpattern.app.match.port.ReadyStatePort;
+import com.cdp.codpattern.app.match.port.TeamRoomPort;
+import com.cdp.codpattern.app.match.port.VoteControlPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
 import net.minecraft.core.BlockPos;
@@ -22,9 +26,21 @@ public interface FpsMatchGateway {
 
     Optional<ModeRoomActionPort> findPlayerRoomActionPort(ServerPlayer player);
 
+    Optional<ModeRoomLifecyclePort> findRoomLifecyclePort(RoomId roomId);
+
+    Optional<ModeRoomLifecyclePort> findPlayerRoomLifecyclePort(ServerPlayer player);
+
     Optional<ModeRoomReadPort> findRoomReadPort(RoomId roomId);
 
     Optional<ModeRoomReadPort> findPlayerRoomReadPort(ServerPlayer player);
+
+    Optional<TeamRoomPort> findRoomTeamPort(RoomId roomId);
+
+    Optional<TeamRoomPort> findPlayerTeamRoomPort(ServerPlayer player);
+
+    Optional<ReadyStatePort> findPlayerReadyStatePort(ServerPlayer player);
+
+    Optional<VoteControlPort> findPlayerVoteControlPort(ServerPlayer player);
 
     Optional<ModeCombatEventPort> findPlayerCombatEventPort(ServerPlayer player);
 

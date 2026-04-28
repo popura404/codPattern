@@ -1,10 +1,13 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
+import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.model.ModeCapability;
 import com.cdp.codpattern.app.match.model.RoomSummaryMetric;
 import com.cdp.codpattern.app.match.model.RoomId;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class TdmRoomData {
     public String gameType;
@@ -17,6 +20,7 @@ public class TdmRoomData {
     public int remainingTimeTicks;
     public boolean hasMatchEndTeleportPoint;
     public List<RoomSummaryMetric> metrics;
+    public Set<ModeCapability> capabilities;
 
     public TdmRoomData(String gameType,
             String mapName,
@@ -36,7 +40,8 @@ public class TdmRoomData {
                 teamScores,
                 remainingTimeTicks,
                 hasMatchEndTeleportPoint,
-                List.of());
+                List.of(),
+                Set.of());
     }
 
     public TdmRoomData(String gameType,
@@ -49,6 +54,30 @@ public class TdmRoomData {
             int remainingTimeTicks,
             boolean hasMatchEndTeleportPoint,
             List<RoomSummaryMetric> metrics) {
+        this(gameType,
+                mapName,
+                state,
+                playerCount,
+                maxPlayers,
+                teamPlayerCounts,
+                teamScores,
+                remainingTimeTicks,
+                hasMatchEndTeleportPoint,
+                metrics,
+                Set.of());
+    }
+
+    public TdmRoomData(String gameType,
+            String mapName,
+            String state,
+            int playerCount,
+            int maxPlayers,
+            Map<String, Integer> teamPlayerCounts,
+            Map<String, Integer> teamScores,
+            int remainingTimeTicks,
+            boolean hasMatchEndTeleportPoint,
+            List<RoomSummaryMetric> metrics,
+            Set<ModeCapability> capabilities) {
         this.gameType = gameType;
         this.mapName = mapName;
         this.state = state;
@@ -59,6 +88,7 @@ public class TdmRoomData {
         this.remainingTimeTicks = remainingTimeTicks;
         this.hasMatchEndTeleportPoint = hasMatchEndTeleportPoint;
         this.metrics = metrics == null ? List.of() : List.copyOf(metrics);
+        this.capabilities = capabilities == null ? Set.of() : Set.copyOf(capabilities);
     }
 
     public RoomId roomId() {
@@ -67,5 +97,15 @@ public class TdmRoomData {
 
     public String roomKey() {
         return roomId().encode();
+    }
+
+    public boolean hasCapability(ModeCapability capability) {
+        if (capability == null) {
+            return false;
+        }
+        if (!capabilities.isEmpty()) {
+            return capabilities.contains(capability);
+        }
+        return GameModeRegistry.hasCapability(gameType, capability);
     }
 }

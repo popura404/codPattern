@@ -3,6 +3,7 @@ package com.cdp.codpattern.app.match.model;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 public record RoomSummarySnapshot(
         RoomId roomId,
@@ -11,6 +12,7 @@ public record RoomSummarySnapshot(
         int maxPlayers,
         int remainingTimeTicks,
         List<RoomSummaryMetric> metrics,
+        Set<ModeCapability> capabilities,
         List<TeamSummarySnapshot> teams,
         Optional<ModeClientPayload> modePayload
 ) {
@@ -18,6 +20,7 @@ public record RoomSummarySnapshot(
         Objects.requireNonNull(roomId, "roomId");
         lifecycleStateKey = lifecycleStateKey == null ? "" : lifecycleStateKey;
         metrics = metrics == null ? List.of() : List.copyOf(metrics);
+        capabilities = capabilities == null ? Set.of() : Set.copyOf(capabilities);
         teams = teams == null ? List.of() : List.copyOf(teams);
         modePayload = modePayload == null ? Optional.empty() : modePayload;
     }

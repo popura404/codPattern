@@ -7,8 +7,12 @@ import com.cdp.codpattern.app.match.model.ModeDescriptor;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
 import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
+import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
 import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
+import com.cdp.codpattern.app.match.port.ReadyStatePort;
+import com.cdp.codpattern.app.match.port.TeamRoomPort;
+import com.cdp.codpattern.app.match.port.VoteControlPort;
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
@@ -35,12 +39,22 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
 
     @Override
     public Optional<ModeRoomActionPort> findRoomActionPort(RoomId roomId) {
-        return findRoomHandle(roomId).map(ModeRoomHandle::actionPort);
+        return findRoomHandle(roomId).flatMap(ModeRoomHandle::actionPort);
     }
 
     @Override
     public Optional<ModeRoomActionPort> findPlayerRoomActionPort(ServerPlayer player) {
-        return findPlayerRoomHandle(player).map(ModeRoomHandle::actionPort);
+        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::actionPort);
+    }
+
+    @Override
+    public Optional<ModeRoomLifecyclePort> findRoomLifecyclePort(RoomId roomId) {
+        return findRoomHandle(roomId).map(ModeRoomHandle::lifecyclePort);
+    }
+
+    @Override
+    public Optional<ModeRoomLifecyclePort> findPlayerRoomLifecyclePort(ServerPlayer player) {
+        return findPlayerRoomHandle(player).map(ModeRoomHandle::lifecyclePort);
     }
 
     @Override
@@ -51,6 +65,26 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
     @Override
     public Optional<ModeRoomReadPort> findPlayerRoomReadPort(ServerPlayer player) {
         return findPlayerRoomHandle(player).flatMap(FpsMatchCoreGateway::legacyReadPort);
+    }
+
+    @Override
+    public Optional<TeamRoomPort> findRoomTeamPort(RoomId roomId) {
+        return findRoomHandle(roomId).flatMap(ModeRoomHandle::teamPort);
+    }
+
+    @Override
+    public Optional<TeamRoomPort> findPlayerTeamRoomPort(ServerPlayer player) {
+        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::teamPort);
+    }
+
+    @Override
+    public Optional<ReadyStatePort> findPlayerReadyStatePort(ServerPlayer player) {
+        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::readyPort);
+    }
+
+    @Override
+    public Optional<VoteControlPort> findPlayerVoteControlPort(ServerPlayer player) {
+        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::votePort);
     }
 
     @Override
@@ -102,7 +136,7 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
     public void leaveCurrentMapIfDifferent(ServerPlayer player, String targetMapName) {
         findPlayerRoomHandle(player).ifPresent(handle -> {
             if (!handle.roomId().mapName().equals(targetMapName)) {
-                handle.actionPort().leave(player);
+                handle.lifecyclePort().leave(player);
             }
         });
     }
@@ -110,7 +144,7 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
     @Override
     public Optional<String> leaveCurrentMapIncludingSpectator(ServerPlayer player) {
         Optional<ModeRoomHandle> handleOptional = findPlayerRoomHandle(player);
-        handleOptional.ifPresent(handle -> handle.actionPort().leave(player));
+        handleOptional.ifPresent(handle -> handle.lifecyclePort().leave(player));
         return handleOptional.map(handle -> handle.roomId().mapName());
     }
 
@@ -217,9 +251,11 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
     }
 
     private static Optional<CodTdmActionPort> legacyTdmActionPort(ModeRoomHandle handle) {
-        if (handle != null && handle.actionPort() instanceof CodTdmActionPort actionPort) {
-            return Optional.of(actionPort);
+        if (handle == null) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        return handle.actionPort()
+                .filter(CodTdmActionPort.class::isInstance)
+                .map(CodTdmActionPort.class::cast);
     }
 }
