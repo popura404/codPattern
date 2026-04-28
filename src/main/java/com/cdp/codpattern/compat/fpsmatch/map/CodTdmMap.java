@@ -1,5 +1,10 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.match.ModeRoomBackedMap;
+import com.cdp.codpattern.app.match.ModeRoomHandle;
+import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
+import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
+import com.cdp.codpattern.app.match.port.TeamRoomPort;
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
@@ -20,7 +25,7 @@ import java.util.*;
  * COD Team Deathmatch 地图核心类
  * 实现完整的团队死斗游戏逻辑
  */
-public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, EndTeleportMap<CodTdmMap> {
+public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, EndTeleportMap<CodTdmMap>, ModeRoomBackedMap {
     private final CodTdmMapLifecycleRuntime lifecycleRuntime;
     private final CodTdmActionPort actionPort;
     private final CodTdmReadPort readPort;
@@ -158,6 +163,56 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
     @Override
     public void setMatchEndTeleportPoint(SpawnPointData data) {
         lifecycleRuntime.setMatchEndTeleportPoint(data);
+    }
+
+    @Override
+    public ModeRoomHandle roomHandle() {
+        return createRoomHandle(readPort, actionPort);
+    }
+
+    protected ModeRoomHandle createRoomHandle(ModeRoomReadPort readPort, ModeRoomActionPort actionPort) {
+        return new ModeRoomHandle(
+                readPort.roomId(),
+                readPort,
+                actionPort,
+                Optional.of(teamPort(readPort, actionPort)),
+                Optional.of(actionPort),
+                Optional.of(actionPort),
+                Optional.of(new CodTdmCombatEventAdapter(readPort, actionPort)));
+    }
+
+    private static TeamRoomPort teamPort(ModeRoomReadPort readPort, ModeRoomActionPort actionPort) {
+        return new TeamRoomPort() {
+            @Override
+            public List<com.cdp.codpattern.app.match.model.TeamDescriptor> teamDescriptors() {
+                return readPort.teamDescriptors();
+            }
+
+            @Override
+            public Map<String, Integer> teamPlayerCountsSnapshot() {
+                return readPort.getTeamPlayerCountsSnapshot();
+            }
+
+            @Override
+            public boolean hasTeam(String teamName) {
+                return readPort.hasTeam(teamName);
+            }
+
+            @Override
+            public boolean isTeamFull(String teamName) {
+                return readPort.isTeamFull(teamName);
+            }
+
+            @Override
+            public Optional<String> findTeamNameByPlayer(ServerPlayer player) {
+                return readPort.findTeamNameByPlayer(player);
+            }
+
+            @Override
+            public void switchTeam(ServerPlayer player, String teamName) {
+                actionPort.switchTeam(player, teamName);
+            }
+        };
     }
 
     CodTdmActionPort actionPort() {

@@ -1,10 +1,13 @@
 package com.cdp.codpattern.command;
 
+import com.cdp.codpattern.app.match.ModeRoomBackedMap;
+import com.cdp.codpattern.app.match.ModeRoomHandle;
+import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
+import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceRegistry;
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.tdm.model.TdmMapEditorSchemas;
 import com.cdp.codpattern.app.tdm.service.DynamicSpawnMergeService;
 import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
-import com.cdp.codpattern.compat.fpsmatch.data.CodTacticalTdmMapData;
-import com.cdp.codpattern.compat.fpsmatch.data.CodTdmMapData;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -63,11 +66,7 @@ public final class MapManagementCommand {
                 return SharedSuggestionProvider.suggest(teamNames, builder);
             };
     private static final SuggestionProvider<CommandSourceStack> SPAWN_KIND_SUGGESTIONS =
-            (context, builder) -> SharedSuggestionProvider.suggest(
-                    List.of(
-                            SpawnPointKind.INITIAL.serializedName(),
-                            SpawnPointKind.DYNAMIC_CANDIDATE.serializedName()),
-                    builder);
+            (context, builder) -> SharedSuggestionProvider.suggest(spawnKindsForContextType(context), builder);
 
     private MapManagementCommand() {
     }
@@ -295,7 +294,7 @@ public final class MapManagementCommand {
         if (team == null) {
             return 0;
         }
-        SpawnPointKind kind = resolveSpawnKind(source, rawKind);
+        SpawnPointKind kind = resolveSpawnKind(source, map, rawKind);
         if (kind == null) {
             return 0;
         }
@@ -339,7 +338,7 @@ public final class MapManagementCommand {
         if (team == null) {
             return 0;
         }
-        SpawnPointKind kind = resolveSpawnKind(source, rawKind);
+        SpawnPointKind kind = resolveSpawnKind(source, map, rawKind);
         if (kind == null) {
             return 0;
         }
@@ -381,7 +380,7 @@ public final class MapManagementCommand {
         if (team == null) {
             return 0;
         }
-        SpawnPointKind kind = resolveSpawnKind(source, rawKind);
+        SpawnPointKind kind = resolveSpawnKind(source, map, rawKind);
         if (kind == null) {
             return 0;
         }
@@ -423,7 +422,7 @@ public final class MapManagementCommand {
         if (team == null) {
             return 0;
         }
-        SpawnPointKind kind = resolveSpawnKind(source, rawKind);
+        SpawnPointKind kind = resolveSpawnKind(source, map, rawKind);
         if (kind == null) {
             return 0;
         }
@@ -452,7 +451,7 @@ public final class MapManagementCommand {
         if (map == null) {
             return 0;
         }
-        if (!TdmGameTypes.supportsDynamicRespawnPoints(map.getGameType())) {
+        if (!TdmMapEditorSchemas.supportsDynamicRespawnMerge(map.getGameType())) {
             source.sendFailure(Component.translatable(
                     "command.codpattern.map.spawn.merge.unsupported_mode",
                     map.getGameType()));
@@ -516,6 +515,12 @@ public final class MapManagementCommand {
         if (map == null) {
             return 0;
         }
+        if (!TdmMapEditorSchemas.supportsMatchEndTeleport(map.getGameType())) {
+            source.sendFailure(Component.translatable(
+                    "command.codpattern.map.endtp.unsupported_mode",
+                    map.getGameType()));
+            return 0;
+        }
         Optional<SpawnPointData> point = readMatchEndTeleportPoint(map);
         if (point.isEmpty()) {
             source.sendSuccess(() -> Component.translatable("command.codpattern.map.endtp.none", map.getMapName()), false);
@@ -534,6 +539,7 @@ public final class MapManagementCommand {
     private static int setMatchEndTeleportForAllMaps(CommandSourceStack source) {
         List<BaseMap> maps = FPSMCore.getInstance().getAllMaps().values().stream()
                 .flatMap(List::stream)
+                .filter(map -> TdmMapEditorSchemas.supportsMatchEndTeleport(map.getGameType()))
                 .distinct()
                 .toList();
         if (maps.isEmpty()) {
@@ -631,17 +637,32 @@ public final class MapManagementCommand {
         return team.get();
     }
 
-    private static SpawnPointKind resolveSpawnKind(CommandSourceStack source, String rawKind) {
+    private static SpawnPointKind resolveSpawnKind(CommandSourceStack source, BaseMap map, String rawKind) {
         if (rawKind == null || rawKind.isBlank()) {
-            return SpawnPointKind.INITIAL;
+            return supportedSpawnKindOrFail(source, map, SpawnPointKind.INITIAL, rawKind);
         }
         String normalized = rawKind.trim().toUpperCase(Locale.ROOT);
         for (SpawnPointKind kind : SpawnPointKind.values()) {
             if (kind.serializedName().equalsIgnoreCase(normalized)) {
-                return kind;
+                return supportedSpawnKindOrFail(source, map, kind, rawKind);
             }
         }
         source.sendFailure(Component.translatable("command.codpattern.map.invalid_kind", rawKind));
+        return null;
+    }
+
+    private static SpawnPointKind supportedSpawnKindOrFail(
+            CommandSourceStack source,
+            BaseMap map,
+            SpawnPointKind kind,
+            String rawKind
+    ) {
+        if (map == null || TdmMapEditorSchemas.supportsSpawnPointLayer(map.getGameType(), kind)) {
+            return kind;
+        }
+        source.sendFailure(Component.translatable(
+                "command.codpattern.map.invalid_kind",
+                rawKind == null || rawKind.isBlank() ? kind.serializedName() : rawKind));
         return null;
     }
 
@@ -659,10 +680,9 @@ public final class MapManagementCommand {
 
     private static FPSMDataManager.DeleteStatus deletePersistedMapData(String type, String mapName) {
         FPSMDataManager manager = FPSMCore.getInstance().getFPSMDataManager();
-        if (TdmGameTypes.isTeamDeathMatch(type)) {
-            return manager.deleteData(CodTacticalTdmMapData.MapData.class, mapName);
-        }
-        return manager.deleteData(CodTdmMapData.MapData.class, mapName);
+        return ModeMapPersistenceRegistry.find(type)
+                .map(provider -> provider.delete(mapName, manager))
+                .orElseThrow(() -> new IllegalArgumentException("Unsupported map type: " + type));
     }
 
     private static int removePlayersFromMap(BaseMap map) {
@@ -680,26 +700,18 @@ public final class MapManagementCommand {
     }
 
     private static Optional<SpawnPointData> readMatchEndTeleportPoint(BaseMap map) {
-        if (map instanceof com.cdp.codpattern.compat.fpsmatch.map.CodTacticalTdmMap tacticalMap) {
-            return com.cdp.codpattern.compat.fpsmatch.map.CodTacticalTdmMapAccess.readPort(tacticalMap)
-                    .matchEndTeleportPoint();
-        }
-        if (map instanceof com.cdp.codpattern.compat.fpsmatch.map.CodTdmMap tdmMap) {
-            return com.cdp.codpattern.compat.fpsmatch.map.CodTdmMapAccess.readPort(tdmMap)
-                    .matchEndTeleportPoint();
+        if (map instanceof ModeRoomBackedMap backedMap) {
+            ModeRoomHandle handle = backedMap.roomHandle();
+            if (handle.summaryPort() instanceof ModeRoomReadPort readPort) {
+                return readPort.matchEndTeleportPoint();
+            }
         }
         return Optional.empty();
     }
 
     private static void writeMatchEndTeleportPoint(BaseMap map, SpawnPointData point) {
-        if (map instanceof com.cdp.codpattern.compat.fpsmatch.map.CodTacticalTdmMap tacticalMap) {
-            com.cdp.codpattern.compat.fpsmatch.map.CodTacticalTdmMapAccess.actionPort(tacticalMap)
-                    .setMatchEndTeleportPoint(point);
-            return;
-        }
-        if (map instanceof com.cdp.codpattern.compat.fpsmatch.map.CodTdmMap tdmMap) {
-            com.cdp.codpattern.compat.fpsmatch.map.CodTdmMapAccess.actionPort(tdmMap)
-                    .setMatchEndTeleportPoint(point);
+        if (map instanceof ModeRoomBackedMap backedMap) {
+            backedMap.roomHandle().actionPort().setMatchEndTeleportPoint(point);
         }
     }
 
@@ -732,6 +744,19 @@ public final class MapManagementCommand {
                     .toList();
         } catch (IllegalArgumentException ignored) {
             return List.of();
+        }
+    }
+
+    private static List<String> spawnKindsForContextType(CommandContext<CommandSourceStack> context) {
+        try {
+            String rawType = StringArgumentType.getString(context, "type");
+            String type = TdmGameTypes.canonicalize(rawType);
+            if (!FPSMCore.getInstance().checkGameType(type)) {
+                return List.of();
+            }
+            return TdmMapEditorSchemas.spawnPointLayerKeys(type);
+        } catch (IllegalArgumentException ignored) {
+            return TdmMapEditorSchemas.spawnPointLayerKeys(TdmGameTypes.CDP_TDM);
         }
     }
 

@@ -325,6 +325,7 @@
     "command.codpattern.map.endtp.cleared": "已清除地图 %s 的结束传送点",
     "command.codpattern.map.endtp.show": "地图 %s 的结束传送点: %s %s yaw=%s",
     "command.codpattern.map.endtp.none": "地图 %s 当前未设置结束传送点",
+    "command.codpattern.map.endtp.unsupported_mode": "模式 %s 不支持结束传送点",
     "item.codpattern.map_creator_tool": "地图工具",
     "item.codpattern.spawn_point_tool": "复活点工具",
     "commands.fpsm.create.success": "已创建地图 %s",

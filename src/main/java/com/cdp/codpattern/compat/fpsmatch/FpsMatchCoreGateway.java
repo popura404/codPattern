@@ -1,132 +1,225 @@
 package com.cdp.codpattern.compat.fpsmatch;
 
+import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.ModeRoomBackedMap;
+import com.cdp.codpattern.app.match.ModeRoomHandle;
+import com.cdp.codpattern.app.match.model.ModeDescriptor;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
+import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
 import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
-import com.cdp.codpattern.compat.fpsmatch.map.CodTacticalTdmMapAccess;
-import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMapAccess;
+import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
+import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
+import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public final class FpsMatchCoreGateway implements FpsMatchGateway {
     @Override
     public boolean isInMatch(UUID playerId) {
-        return CodTdmMapAccess.isInMatch(playerId) || CodTacticalTdmMapAccess.isInMatch(playerId);
+        return findRoomHandleByPlayerId(playerId).isPresent();
     }
 
     @Override
     public Optional<ModeRoomActionPort> findRoomActionPort(RoomId roomId) {
-        if (roomId == null) {
-            return Optional.empty();
-        }
-        if (TdmGameTypes.isFrontline(roomId.gameType())) {
-            return CodTdmMapAccess.findActionPortByMapName(roomId.mapName()).map(port -> (ModeRoomActionPort) port);
-        }
-        if (TdmGameTypes.isTeamDeathMatch(roomId.gameType())) {
-            return CodTacticalTdmMapAccess.findActionPortByMapName(roomId.mapName()).map(port -> (ModeRoomActionPort) port);
-        }
-        return Optional.empty();
+        return findRoomHandle(roomId).map(ModeRoomHandle::actionPort);
     }
 
     @Override
     public Optional<ModeRoomActionPort> findPlayerRoomActionPort(ServerPlayer player) {
-        Optional<ModeRoomActionPort> tacticalPort = CodTacticalTdmMapAccess.findActionPortByPlayer(player)
-                .map(port -> (ModeRoomActionPort) port);
-        if (tacticalPort.isPresent()) {
-            return tacticalPort;
-        }
-        return CodTdmMapAccess.findActionPortByPlayer(player).map(port -> (ModeRoomActionPort) port);
+        return findPlayerRoomHandle(player).map(ModeRoomHandle::actionPort);
     }
 
     @Override
     public Optional<ModeRoomReadPort> findRoomReadPort(RoomId roomId) {
-        if (roomId == null) {
-            return Optional.empty();
-        }
-        if (TdmGameTypes.isFrontline(roomId.gameType())) {
-            return CodTdmMapAccess.findReadPortByMapName(roomId.mapName()).map(port -> (ModeRoomReadPort) port);
-        }
-        if (TdmGameTypes.isTeamDeathMatch(roomId.gameType())) {
-            return CodTacticalTdmMapAccess.findReadPortByMapName(roomId.mapName()).map(port -> (ModeRoomReadPort) port);
-        }
-        return Optional.empty();
+        return findRoomHandle(roomId).flatMap(FpsMatchCoreGateway::legacyReadPort);
     }
 
     @Override
     public Optional<ModeRoomReadPort> findPlayerRoomReadPort(ServerPlayer player) {
-        Optional<ModeRoomReadPort> tacticalPort = CodTacticalTdmMapAccess.findReadPortByPlayer(player)
-                .map(port -> (ModeRoomReadPort) port);
-        if (tacticalPort.isPresent()) {
-            return tacticalPort;
+        return findPlayerRoomHandle(player).flatMap(FpsMatchCoreGateway::legacyReadPort);
+    }
+
+    @Override
+    public Optional<ModeCombatEventPort> findPlayerCombatEventPort(ServerPlayer player) {
+        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::combatEventPort);
+    }
+
+    @Override
+    public List<ModeRoomSummaryPort> listRoomSummaryPorts() {
+        List<ModeRoomSummaryPort> ports = new ArrayList<>();
+        for (ModeRoomHandle handle : listRoomHandles()) {
+            ports.add(handle.summaryPort());
         }
-        return CodTdmMapAccess.findReadPortByPlayer(player).map(port -> (ModeRoomReadPort) port);
+        return List.copyOf(ports);
     }
 
     @Override
     public List<ModeRoomReadPort> listRoomReadPorts() {
-        List<ModeRoomReadPort> ports = new java.util.ArrayList<>();
-        CodTdmMapAccess.listReadPorts().forEach(port -> ports.add(port));
-        CodTacticalTdmMapAccess.listReadPorts().forEach(port -> ports.add(port));
+        List<ModeRoomReadPort> ports = new ArrayList<>();
+        for (ModeRoomHandle handle : listRoomHandles()) {
+            legacyReadPort(handle).ifPresent(ports::add);
+        }
         return List.copyOf(ports);
     }
 
     @Override
     public Optional<CodTdmActionPort> findMapActionPortByName(String mapName) {
-        return CodTdmMapAccess.findActionPortByMapName(mapName);
+        return findRoomHandle(RoomId.of(TdmGameTypes.CDP_TDM, mapName))
+                .flatMap(FpsMatchCoreGateway::legacyTdmActionPort);
     }
 
     @Override
     public Optional<CodTdmActionPort> findPlayerTdmActionPort(ServerPlayer player) {
-        Optional<CodTdmActionPort> tacticalPort = CodTacticalTdmMapAccess.findActionPortByPlayer(player)
-                .map(port -> (CodTdmActionPort) port);
-        if (tacticalPort.isPresent()) {
-            return tacticalPort;
-        }
-        return CodTdmMapAccess.findActionPortByPlayer(player).map(port -> (CodTdmActionPort) port);
+        return findPlayerRoomHandle(player).flatMap(FpsMatchCoreGateway::legacyTdmActionPort);
     }
 
     @Override
     public Optional<CodTdmReadPort> findMapReadPortByName(String mapName) {
-        return CodTdmMapAccess.findReadPortByMapName(mapName);
+        return findRoomHandle(RoomId.of(TdmGameTypes.CDP_TDM, mapName))
+                .flatMap(FpsMatchCoreGateway::legacyTdmReadPort);
     }
 
     @Override
     public Optional<CodTdmReadPort> findPlayerTdmReadPort(ServerPlayer player) {
-        Optional<CodTdmReadPort> tacticalPort = CodTacticalTdmMapAccess.findReadPortByPlayer(player)
-                .map(port -> (CodTdmReadPort) port);
-        if (tacticalPort.isPresent()) {
-            return tacticalPort;
-        }
-        return CodTdmMapAccess.findReadPortByPlayer(player).map(port -> (CodTdmReadPort) port);
+        return findPlayerRoomHandle(player).flatMap(FpsMatchCoreGateway::legacyTdmReadPort);
     }
 
     @Override
     public void leaveCurrentMapIfDifferent(ServerPlayer player, String targetMapName) {
-        CodTdmMapAccess.leaveCurrentMapIfDifferent(player, targetMapName);
+        findPlayerRoomHandle(player).ifPresent(handle -> {
+            if (!handle.roomId().mapName().equals(targetMapName)) {
+                handle.actionPort().leave(player);
+            }
+        });
     }
 
     @Override
     public Optional<String> leaveCurrentMapIncludingSpectator(ServerPlayer player) {
-        return CodTdmMapAccess.leaveCurrentMapIncludingSpectator(player);
+        Optional<ModeRoomHandle> handleOptional = findPlayerRoomHandle(player);
+        handleOptional.ifPresent(handle -> handle.actionPort().leave(player));
+        return handleOptional.map(handle -> handle.roomId().mapName());
     }
 
     @Override
     public void createAndRegisterMap(ServerLevel level, String mapName, BlockPos from, BlockPos to) {
-        CodTdmMapAccess.createAndRegisterMap(level, mapName, new AreaData(from, to));
+        FPSMCore core = FPSMCore.getInstance();
+        var factory = core.getPreBuildGame(TdmGameTypes.CDP_TDM);
+        if (factory == null) {
+            return;
+        }
+        core.registerMap(TdmGameTypes.CDP_TDM, factory.apply(level, mapName, new AreaData(from, to)));
     }
 
     @Override
     public List<CodTdmReadPort> listTdmReadPorts() {
-        return CodTdmMapAccess.listReadPorts();
+        List<CodTdmReadPort> ports = new ArrayList<>();
+        for (ModeRoomHandle handle : listRoomHandles()) {
+            if (TdmGameTypes.CDP_TDM.equals(GameModeRegistry.canonicalize(handle.roomId().gameType()))) {
+                legacyTdmReadPort(handle).ifPresent(ports::add);
+            }
+        }
+        return List.copyOf(ports);
     }
 
+    private static Optional<ModeRoomHandle> findRoomHandle(RoomId roomId) {
+        if (roomId == null || !FPSMCore.initialized()) {
+            return Optional.empty();
+        }
+        String canonicalGameType = GameModeRegistry.canonicalize(roomId.gameType());
+        for (ModeRoomHandle handle : listRoomHandles()) {
+            RoomId handleRoomId = handle.roomId();
+            if (handleRoomId.mapName().equals(roomId.mapName())
+                    && GameModeRegistry.canonicalize(handleRoomId.gameType()).equals(canonicalGameType)) {
+                return Optional.of(handle);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<ModeRoomHandle> findPlayerRoomHandle(ServerPlayer player) {
+        if (player == null || !FPSMCore.initialized()) {
+            return Optional.empty();
+        }
+        return FPSMCore.getInstance()
+                .getMapByPlayerWithSpec(player)
+                .flatMap(FpsMatchCoreGateway::roomHandle);
+    }
+
+    private static Optional<ModeRoomHandle> findRoomHandleByPlayerId(UUID playerId) {
+        if (playerId == null || !FPSMCore.initialized()) {
+            return Optional.empty();
+        }
+        return FPSMCore.getInstance()
+                .getPlayerByUUID(playerId)
+                .flatMap(FpsMatchCoreGateway::findPlayerRoomHandle);
+    }
+
+    private static List<ModeRoomHandle> listRoomHandles() {
+        if (!FPSMCore.initialized()) {
+            return List.of();
+        }
+        Map<String, List<BaseMap>> allMaps = FPSMCore.getInstance().getAllMaps();
+        List<ModeRoomHandle> handles = new ArrayList<>();
+        Set<String> handledGameTypes = new LinkedHashSet<>();
+        for (ModeDescriptor descriptor : GameModeRegistry.orderedModes()) {
+            String canonicalGameType = GameModeRegistry.canonicalize(descriptor.gameType());
+            handledGameTypes.add(canonicalGameType);
+            appendRoomHandles(allMaps.getOrDefault(canonicalGameType, List.of()), handles);
+        }
+        for (Map.Entry<String, List<BaseMap>> entry : allMaps.entrySet()) {
+            String canonicalGameType = GameModeRegistry.canonicalize(entry.getKey());
+            if (handledGameTypes.add(canonicalGameType)) {
+                appendRoomHandles(entry.getValue(), handles);
+            }
+        }
+        return List.copyOf(handles);
+    }
+
+    private static void appendRoomHandles(List<BaseMap> maps, List<ModeRoomHandle> handles) {
+        for (BaseMap map : maps) {
+            roomHandle(map).ifPresent(handles::add);
+        }
+    }
+
+    private static Optional<ModeRoomHandle> roomHandle(BaseMap map) {
+        if (map instanceof ModeRoomBackedMap backedMap) {
+            return Optional.ofNullable(backedMap.roomHandle());
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<ModeRoomReadPort> legacyReadPort(ModeRoomHandle handle) {
+        if (handle != null && handle.summaryPort() instanceof ModeRoomReadPort readPort) {
+            return Optional.of(readPort);
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<CodTdmReadPort> legacyTdmReadPort(ModeRoomHandle handle) {
+        if (handle != null && handle.summaryPort() instanceof CodTdmReadPort readPort) {
+            return Optional.of(readPort);
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<CodTdmActionPort> legacyTdmActionPort(ModeRoomHandle handle) {
+        if (handle != null && handle.actionPort() instanceof CodTdmActionPort actionPort) {
+            return Optional.of(actionPort);
+        }
+        return Optional.empty();
+    }
 }

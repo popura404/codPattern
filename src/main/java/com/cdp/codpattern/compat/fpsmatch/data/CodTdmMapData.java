@@ -1,31 +1,27 @@
 package com.cdp.codpattern.compat.fpsmatch.data;
 
+import com.cdp.codpattern.app.match.persistence.CommonModeMapData;
+import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceProvider;
+import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceRegistry;
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
-import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMap;
 import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMapAccess;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
-import com.cdp.codpattern.app.tdm.model.CodTdmTeamPersistenceSnapshot;
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
+import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.save.FPSMDataManager;
 import com.phasetranscrystal.fpsmatch.core.data.save.SaveHolder;
 import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMSaveDataEvent;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.Level;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.server.ServerLifecycleHooks;
 import org.slf4j.Logger;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +33,7 @@ import java.util.Optional;
 @Mod.EventBusSubscriber(modid = "codpattern", bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class CodTdmMapData {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final ModeMapPersistenceProvider PERSISTENCE_PROVIDER = new FrontlinePersistenceProvider();
 
     /**
      * 地图数据记录
@@ -105,6 +102,7 @@ public class CodTdmMapData {
      */
     @SubscribeEvent
     public static void onRegisterSaveData(RegisterFPSMSaveDataEvent event) {
+        ModeMapPersistenceRegistry.register(PERSISTENCE_PROVIDER);
         SaveHolder<MapData> saveHolder = new SaveHolder.Builder<>(MapData.CODEC)
                 .withReadHandler(CodTdmMapData::loadMap)
                 .withWriteHandler(CodTdmMapData::saveAllMaps)
@@ -119,34 +117,16 @@ public class CodTdmMapData {
      */
     private static void loadMap(MapData data) {
         try {
-            if (ServerLifecycleHooks.getCurrentServer() == null) {
-                LOGGER.error("Failed to load TDM map {}: server not ready", data.mapName());
-                return;
-            }
-            ResourceLocation levelId = ResourceLocation.tryParse(data.levelName());
-            if (levelId == null) {
-                LOGGER.error("Failed to load TDM map {}: invalid levelName={}", data.mapName(), data.levelName());
-                return;
-            }
-            ResourceKey<Level> levelKey = ResourceKey.create(Registries.DIMENSION, levelId);
-            ServerLevel level = ServerLifecycleHooks.getCurrentServer().getLevel(levelKey);
-            if (level == null) {
-                LOGGER.error("Failed to load TDM map {}: dimension {} not found", data.mapName(), data.levelName());
+            CommonModeMapData commonData = toCommonData(data);
+            Optional<ServerLevel> level = CodTdmMapPersistenceSupport.resolveLevel(commonData, LOGGER, "TDM");
+            if (level.isEmpty()) {
                 return;
             }
 
-            // 创建地图
-            CodTdmMap map = CodTdmMapAccess.createMap(level, data.mapName(), data.areaData());
-
-            CodTdmActionPort actionPort = CodTdmMapAccess.actionPort(map);
-
-            // 添加队伍和复活点
-            for (Map.Entry<String, TeamData> entry : data.teams().entrySet()) {
-                TeamData teamData = entry.getValue();
-                actionPort.applyTeamSpawnProfile(teamData.name(), teamData.playerLimit(), teamData.toSpawnProfile());
-            }
-            data.matchEndTeleportPoint().ifPresent(actionPort::setMatchEndTeleportPoint);
-
+            CodTdmMap map = (CodTdmMap) PERSISTENCE_PROVIDER.createMap(
+                    level.get(),
+                    commonData,
+                    toPayload(data));
             CodTdmMapAccess.registerMap(map);
 
         } catch (Exception e) {
@@ -158,27 +138,85 @@ public class CodTdmMapData {
      * 保存所有地图
      */
     private static void saveAllMaps(FPSMDataManager manager) {
-        CodTdmMapAccess.listReadPorts().forEach(readPort -> {
-            MapData data = mapToData(readPort);
-            manager.saveData(data, readPort.mapName(), true);
-        });
+        FPSMCore.getInstance()
+                .getAllMaps()
+                .getOrDefault(TdmGameTypes.CDP_TDM, List.of())
+                .forEach(map -> PERSISTENCE_PROVIDER.save(map, manager));
     }
 
     /**
      * 将地图转换为数据对象
      */
     public static MapData mapToData(CodTdmReadPort readPort) {
-        Map<String, TeamData> teams = new HashMap<>();
-
-        for (CodTdmTeamPersistenceSnapshot team : readPort.teamPersistenceSnapshots()) {
-            teams.put(team.name(), TeamData.fromSpawnProfile(team.name(), team.playerLimit(), team.spawnProfile()));
-        }
-
+        CodTdmMapPersistenceSupport.TeamPayload payload = CodTdmMapPersistenceSupport.capturePayload(readPort);
         return new MapData(
                 readPort.mapName(),
                 readPort.dimensionId(),
                 readPort.mapArea(),
-                teams,
-                readPort.matchEndTeleportPoint());
+                payload.teams(),
+                payload.matchEndTeleportPoint());
+    }
+
+    private static CommonModeMapData toCommonData(MapData data) {
+        return new CommonModeMapData(
+                CodTdmMapPersistenceSupport.SCHEMA_VERSION,
+                TdmGameTypes.CDP_TDM,
+                data.mapName(),
+                data.levelName(),
+                data.areaData(),
+                data.matchEndTeleportPoint());
+    }
+
+    private static CodTdmMapPersistenceSupport.TeamPayload toPayload(MapData data) {
+        return new CodTdmMapPersistenceSupport.TeamPayload(data.teams(), data.matchEndTeleportPoint());
+    }
+
+    private static final class FrontlinePersistenceProvider implements ModeMapPersistenceProvider {
+        @Override
+        public String gameType() {
+            return TdmGameTypes.CDP_TDM;
+        }
+
+        @Override
+        public CodTdmMap createMap(ServerLevel level, CommonModeMapData commonData, Object payload) {
+            CodTdmMap map = CodTdmMapAccess.createMap(level, commonData.mapName(), commonData.areaData());
+            applyPayload(map, payload);
+            return map;
+        }
+
+        @Override
+        public Object capturePayload(com.phasetranscrystal.fpsmatch.core.map.BaseMap map) {
+            return CodTdmMapPersistenceSupport.capturePayload(readPort(map));
+        }
+
+        @Override
+        public void applyPayload(com.phasetranscrystal.fpsmatch.core.map.BaseMap map, Object payload) {
+            if (!(payload instanceof CodTdmMapPersistenceSupport.TeamPayload teamPayload)) {
+                throw new IllegalArgumentException("Unsupported TDM map payload: " + payload);
+            }
+            CodTdmMapPersistenceSupport.applyPayload(CodTdmMapAccess.actionPort(tdmMap(map)), teamPayload);
+        }
+
+        @Override
+        public void save(com.phasetranscrystal.fpsmatch.core.map.BaseMap map, FPSMDataManager manager) {
+            CodTdmReadPort readPort = readPort(map);
+            manager.saveData(mapToData(readPort), readPort.mapName(), true);
+        }
+
+        @Override
+        public FPSMDataManager.DeleteStatus delete(String mapName, FPSMDataManager manager) {
+            return manager.deleteData(MapData.class, mapName);
+        }
+
+        private CodTdmReadPort readPort(com.phasetranscrystal.fpsmatch.core.map.BaseMap map) {
+            return CodTdmMapAccess.readPort(tdmMap(map));
+        }
+
+        private CodTdmMap tdmMap(com.phasetranscrystal.fpsmatch.core.map.BaseMap map) {
+            if (map instanceof CodTdmMap tdmMap && TdmGameTypes.CDP_TDM.equals(tdmMap.getGameType())) {
+                return tdmMap;
+            }
+            throw new IllegalArgumentException("Unsupported TDM map type: " + map.getClass().getName());
+        }
     }
 }

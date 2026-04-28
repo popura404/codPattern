@@ -1,36 +1,35 @@
 package com.cdp.codpattern.compat.fpsmatch.data;
 
+import com.cdp.codpattern.app.match.persistence.CommonModeMapData;
+import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceProvider;
+import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceRegistry;
 import com.cdp.codpattern.app.tactical.port.CodTacticalTdmActionPort;
 import com.cdp.codpattern.app.tactical.port.CodTacticalTdmReadPort;
-import com.cdp.codpattern.app.tdm.model.CodTdmTeamPersistenceSnapshot;
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.cdp.codpattern.compat.fpsmatch.map.CodTacticalTdmMap;
 import com.cdp.codpattern.compat.fpsmatch.map.CodTacticalTdmMapAccess;
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.data.save.FPSMDataManager;
 import com.phasetranscrystal.fpsmatch.core.data.save.SaveHolder;
 import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMSaveDataEvent;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.Level;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.server.ServerLifecycleHooks;
 import org.slf4j.Logger;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 @Mod.EventBusSubscriber(modid = "codpattern", bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class CodTacticalTdmMapData {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final ModeMapPersistenceProvider PERSISTENCE_PROVIDER = new TacticalTdmPersistenceProvider();
 
     public record MapData(
             String mapName,
@@ -50,6 +49,7 @@ public class CodTacticalTdmMapData {
 
     @SubscribeEvent
     public static void onRegisterSaveData(RegisterFPSMSaveDataEvent event) {
+        ModeMapPersistenceRegistry.register(PERSISTENCE_PROVIDER);
         SaveHolder<MapData> saveHolder = new SaveHolder.Builder<>(MapData.CODEC)
                 .withReadHandler(CodTacticalTdmMapData::loadMap)
                 .withWriteHandler(CodTacticalTdmMapData::saveAllMaps)
@@ -61,30 +61,16 @@ public class CodTacticalTdmMapData {
 
     private static void loadMap(MapData data) {
         try {
-            if (ServerLifecycleHooks.getCurrentServer() == null) {
-                LOGGER.error("Failed to load tactical TDM map {}: server not ready", data.mapName());
-                return;
-            }
-            ResourceLocation levelId = ResourceLocation.tryParse(data.levelName());
-            if (levelId == null) {
-                LOGGER.error("Failed to load tactical TDM map {}: invalid levelName={}", data.mapName(), data.levelName());
-                return;
-            }
-            ResourceKey<Level> levelKey = ResourceKey.create(Registries.DIMENSION, levelId);
-            ServerLevel level = ServerLifecycleHooks.getCurrentServer().getLevel(levelKey);
-            if (level == null) {
-                LOGGER.error("Failed to load tactical TDM map {}: dimension {} not found", data.mapName(), data.levelName());
+            CommonModeMapData commonData = toCommonData(data);
+            Optional<ServerLevel> level = CodTdmMapPersistenceSupport.resolveLevel(commonData, LOGGER, "tactical TDM");
+            if (level.isEmpty()) {
                 return;
             }
 
-            CodTacticalTdmMap map = CodTacticalTdmMapAccess.createMap(level, data.mapName(), data.areaData());
-            CodTacticalTdmActionPort actionPort = CodTacticalTdmMapAccess.actionPort(map);
-
-            for (Map.Entry<String, CodTdmMapData.TeamData> entry : data.teams().entrySet()) {
-                CodTdmMapData.TeamData teamData = entry.getValue();
-                actionPort.applyTeamSpawnProfile(teamData.name(), teamData.playerLimit(), teamData.toSpawnProfile());
-            }
-            data.matchEndTeleportPoint().ifPresent(actionPort::setMatchEndTeleportPoint);
+            CodTacticalTdmMap map = (CodTacticalTdmMap) PERSISTENCE_PROVIDER.createMap(
+                    level.get(),
+                    commonData,
+                    toPayload(data));
             CodTacticalTdmMapAccess.registerMap(map);
         } catch (Exception e) {
             LOGGER.error("Failed to load tactical TDM map {}", data.mapName(), e);
@@ -92,23 +78,84 @@ public class CodTacticalTdmMapData {
     }
 
     private static void saveAllMaps(FPSMDataManager manager) {
-        CodTacticalTdmMapAccess.listReadPorts().forEach(readPort -> {
-            MapData data = mapToData(readPort);
-            manager.saveData(data, readPort.mapName(), true);
-        });
+        FPSMCore.getInstance()
+                .getAllMaps()
+                .getOrDefault(TdmGameTypes.CDP_TACTICAL_TDM, List.of())
+                .forEach(map -> PERSISTENCE_PROVIDER.save(map, manager));
     }
 
     public static MapData mapToData(CodTacticalTdmReadPort readPort) {
-        Map<String, CodTdmMapData.TeamData> teams = new HashMap<>();
-        for (CodTdmTeamPersistenceSnapshot team : readPort.teamPersistenceSnapshots()) {
-            teams.put(team.name(), CodTdmMapData.TeamData.fromSpawnProfile(team.name(), team.playerLimit(), team.spawnProfile()));
-        }
+        CodTdmMapPersistenceSupport.TeamPayload payload = CodTdmMapPersistenceSupport.capturePayload(readPort);
         return new MapData(
                 readPort.mapName(),
                 readPort.dimensionId(),
                 readPort.mapArea(),
-                teams,
-                readPort.matchEndTeleportPoint()
+                payload.teams(),
+                payload.matchEndTeleportPoint()
         );
+    }
+
+    private static CommonModeMapData toCommonData(MapData data) {
+        return new CommonModeMapData(
+                CodTdmMapPersistenceSupport.SCHEMA_VERSION,
+                TdmGameTypes.CDP_TACTICAL_TDM,
+                data.mapName(),
+                data.levelName(),
+                data.areaData(),
+                data.matchEndTeleportPoint());
+    }
+
+    private static CodTdmMapPersistenceSupport.TeamPayload toPayload(MapData data) {
+        return new CodTdmMapPersistenceSupport.TeamPayload(data.teams(), data.matchEndTeleportPoint());
+    }
+
+    private static final class TacticalTdmPersistenceProvider implements ModeMapPersistenceProvider {
+        @Override
+        public String gameType() {
+            return TdmGameTypes.CDP_TACTICAL_TDM;
+        }
+
+        @Override
+        public CodTacticalTdmMap createMap(ServerLevel level, CommonModeMapData commonData, Object payload) {
+            CodTacticalTdmMap map = CodTacticalTdmMapAccess.createMap(level, commonData.mapName(), commonData.areaData());
+            applyPayload(map, payload);
+            return map;
+        }
+
+        @Override
+        public Object capturePayload(com.phasetranscrystal.fpsmatch.core.map.BaseMap map) {
+            return CodTdmMapPersistenceSupport.capturePayload(readPort(map));
+        }
+
+        @Override
+        public void applyPayload(com.phasetranscrystal.fpsmatch.core.map.BaseMap map, Object payload) {
+            if (!(payload instanceof CodTdmMapPersistenceSupport.TeamPayload teamPayload)) {
+                throw new IllegalArgumentException("Unsupported tactical TDM map payload: " + payload);
+            }
+            CodTacticalTdmActionPort actionPort = CodTacticalTdmMapAccess.actionPort(tacticalMap(map));
+            CodTdmMapPersistenceSupport.applyPayload(actionPort, teamPayload);
+        }
+
+        @Override
+        public void save(com.phasetranscrystal.fpsmatch.core.map.BaseMap map, FPSMDataManager manager) {
+            CodTacticalTdmReadPort readPort = readPort(map);
+            manager.saveData(mapToData(readPort), readPort.mapName(), true);
+        }
+
+        @Override
+        public FPSMDataManager.DeleteStatus delete(String mapName, FPSMDataManager manager) {
+            return manager.deleteData(MapData.class, mapName);
+        }
+
+        private CodTacticalTdmReadPort readPort(com.phasetranscrystal.fpsmatch.core.map.BaseMap map) {
+            return CodTacticalTdmMapAccess.readPort(tacticalMap(map));
+        }
+
+        private CodTacticalTdmMap tacticalMap(com.phasetranscrystal.fpsmatch.core.map.BaseMap map) {
+            if (map instanceof CodTacticalTdmMap tacticalMap) {
+                return tacticalMap;
+            }
+            throw new IllegalArgumentException("Unsupported tactical TDM map type: " + map.getClass().getName());
+        }
     }
 }

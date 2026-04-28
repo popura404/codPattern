@@ -325,6 +325,7 @@
     "command.codpattern.map.endtp.cleared": "Cleared match end teleport point for %s",
     "command.codpattern.map.endtp.show": "Match end teleport point for %s: %s %s yaw=%s",
     "command.codpattern.map.endtp.none": "Map %s has no match end teleport point configured",
+    "command.codpattern.map.endtp.unsupported_mode": "Game mode %s does not support match end teleport points",
     "item.codpattern.map_creator_tool": "Map Creator Tool",
     "item.codpattern.spawn_point_tool": "Spawn Point Tool",
     "commands.fpsm.create.success": "Created map %s",

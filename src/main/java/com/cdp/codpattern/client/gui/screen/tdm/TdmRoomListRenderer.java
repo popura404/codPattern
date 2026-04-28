@@ -19,9 +19,6 @@ public final class TdmRoomListRenderer {
     private static final long NEW_ROOM_PULSE_MS = 550L;
     private static final float MAP_TITLE_SCALE = 1.28f;
     private static final float MODE_INFO_SCALE = 1.04f;
-    private static final int FRONTLINE_MODE_COLOR = 0xFF62F08A;
-    private static final int TACTICAL_MODE_COLOR = 0xFF5FC7C3;
-    private static final int UNKNOWN_MODE_COLOR = 0xFFB8C2CC;
 
     private static final int BASE_FRAME_INSET = 5;
     private static final int BASE_PANEL_PADDING = 8;
@@ -606,16 +603,9 @@ public final class TdmRoomListRenderer {
 
     private static int modeAccentColor(String gameType) {
         if (gameType == null || gameType.isBlank()) {
-            return UNKNOWN_MODE_COLOR;
+            return 0xFFB8C2CC;
         }
-        String normalized = gameType.toLowerCase();
-        if (normalized.contains("frontline")) {
-            return FRONTLINE_MODE_COLOR;
-        }
-        if (normalized.contains("teamdeathmatch") || normalized.contains("tactical")) {
-            return TACTICAL_MODE_COLOR;
-        }
-        return UNKNOWN_MODE_COLOR;
+        return TdmModePreviewPanel.accentColor(gameType);
     }
 
     private static float approach(float current, float target, float step) {

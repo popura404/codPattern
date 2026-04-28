@@ -1,6 +1,6 @@
 package com.phasetranscrystal.fpsmatch.common.client.screen;
 
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.tdm.model.TdmMapEditorSchemas;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenSpawnPointToolScreenS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.SpawnPointToolActionC2SPacket;
@@ -261,7 +261,7 @@ public class SpawnPointToolScreen extends Screen {
     }
 
     private boolean canMergeDynamicPoints() {
-        return TdmGameTypes.supportsDynamicRespawnPoints(selectedType)
+        return TdmMapEditorSchemas.supportsDynamicRespawnMerge(selectedType)
                 && SpawnPointKind.DYNAMIC_CANDIDATE.serializedName().equals(selectedKind)
                 && !selectedMap.isBlank()
                 && availableTeams.size() == 2;

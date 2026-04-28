@@ -1,11 +1,17 @@
 package com.cdp.codpattern.network.tdm;
 
+import com.cdp.codpattern.app.match.model.MetricDisplay;
 import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.model.RoomSummaryMetric;
+import com.cdp.codpattern.app.match.model.RoomSummarySnapshot;
+import com.cdp.codpattern.app.match.model.TeamSummarySnapshot;
 import com.cdp.codpattern.network.handler.ClientPacketBridge;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -63,16 +69,49 @@ public class RoomListSyncPacket {
         public Map<String, Integer> teamScores;
         public int remainingTimeTicks;
         public boolean hasMatchEndTeleportPoint;
+        public List<RoomSummaryMetric> metrics;
 
         public RoomInfo(String state, int playerCount, int maxPlayers, Map<String, Integer> teamPlayerCounts,
                 Map<String, Integer> teamScores, int remainingTimeTicks, boolean hasMatchEndTeleportPoint) {
+            this(state,
+                    playerCount,
+                    maxPlayers,
+                    teamPlayerCounts,
+                    teamScores,
+                    remainingTimeTicks,
+                    hasMatchEndTeleportPoint,
+                    List.of());
+        }
+
+        public RoomInfo(String state, int playerCount, int maxPlayers, Map<String, Integer> teamPlayerCounts,
+                Map<String, Integer> teamScores, int remainingTimeTicks, boolean hasMatchEndTeleportPoint,
+                List<RoomSummaryMetric> metrics) {
             this.state = state;
             this.playerCount = playerCount;
             this.maxPlayers = maxPlayers;
-            this.teamPlayerCounts = teamPlayerCounts;
-            this.teamScores = teamScores;
+            this.teamPlayerCounts = teamPlayerCounts == null ? Map.of() : teamPlayerCounts;
+            this.teamScores = teamScores == null ? Map.of() : teamScores;
             this.remainingTimeTicks = remainingTimeTicks;
             this.hasMatchEndTeleportPoint = hasMatchEndTeleportPoint;
+            this.metrics = metrics == null ? List.of() : List.copyOf(metrics);
+        }
+
+        public static RoomInfo fromSnapshot(RoomSummarySnapshot snapshot, boolean hasMatchEndTeleportPoint) {
+            Map<String, Integer> teamPlayerCounts = new HashMap<>();
+            Map<String, Integer> teamScores = new HashMap<>();
+            for (TeamSummarySnapshot team : snapshot.teams()) {
+                teamPlayerCounts.put(team.teamName(), team.playerCount());
+                teamScores.put(team.teamName(), team.score());
+            }
+            return new RoomInfo(
+                    snapshot.lifecycleStateKey(),
+                    snapshot.playerCount(),
+                    snapshot.maxPlayers(),
+                    teamPlayerCounts,
+                    teamScores,
+                    snapshot.remainingTimeTicks(),
+                    hasMatchEndTeleportPoint,
+                    snapshot.metrics());
         }
 
         public void write(FriendlyByteBuf buf) {
@@ -91,6 +130,13 @@ public class RoomListSyncPacket {
             }
             buf.writeInt(remainingTimeTicks);
             buf.writeBoolean(hasMatchEndTeleportPoint);
+            buf.writeInt(metrics.size());
+            for (RoomSummaryMetric metric : metrics) {
+                buf.writeUtf(metric.key());
+                buf.writeUtf(metric.translationKey());
+                buf.writeInt(metric.value());
+                buf.writeUtf(metric.display().name());
+            }
         }
 
         public static RoomInfo read(FriendlyByteBuf buf) {
@@ -109,8 +155,26 @@ public class RoomListSyncPacket {
             }
             int remainingTimeTicks = buf.readInt();
             boolean hasMatchEndTeleportPoint = buf.readBoolean();
+            int metricCount = buf.readInt();
+            List<RoomSummaryMetric> metrics = new ArrayList<>();
+            for (int i = 0; i < metricCount; i++) {
+                metrics.add(new RoomSummaryMetric(
+                        buf.readUtf(),
+                        buf.readUtf(),
+                        buf.readInt(),
+                        readMetricDisplay(buf)));
+            }
             return new RoomInfo(state, playerCount, maxPlayers, teamPlayerCounts, teamScores, remainingTimeTicks,
-                    hasMatchEndTeleportPoint);
+                    hasMatchEndTeleportPoint, metrics);
+        }
+
+        private static MetricDisplay readMetricDisplay(FriendlyByteBuf buf) {
+            String rawDisplay = buf.readUtf();
+            try {
+                return MetricDisplay.valueOf(rawDisplay);
+            } catch (IllegalArgumentException ignored) {
+                return MetricDisplay.NUMBER;
+            }
         }
     }
 }

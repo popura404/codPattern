@@ -1,6 +1,7 @@
 package com.phasetranscrystal.fpsmatch.common.packet;
 
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.tdm.model.TdmMapEditorSchemas;
 import com.cdp.codpattern.app.tdm.service.DynamicSpawnMergeService;
 import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
@@ -250,7 +251,7 @@ public class SpawnPointToolActionC2SPacket {
         }
 
         BaseMap map = snapshot.map().get();
-        if (!TdmGameTypes.supportsDynamicRespawnPoints(map.getGameType())) {
+        if (!TdmMapEditorSchemas.supportsDynamicRespawnMerge(map.getGameType())) {
             player.displayClientMessage(Component.translatable(
                     "command.codpattern.map.spawn.merge.unsupported_mode",
                     map.getGameType()), false);

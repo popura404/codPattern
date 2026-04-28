@@ -1,5 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.match.ModeRoomHandle;
 import com.cdp.codpattern.app.tactical.port.CodTacticalTdmActionPort;
 import com.cdp.codpattern.app.tactical.port.CodTacticalTdmReadPort;
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
@@ -31,6 +32,11 @@ public class CodTacticalTdmMap extends CodTdmMap {
         }
         return super.teleportPlayerToSpawnPoint(player, SpawnPointKind.DYNAMIC_CANDIDATE)
                 || super.teleportPlayerToSpawnPoint(player, SpawnPointKind.INITIAL);
+    }
+
+    @Override
+    public ModeRoomHandle roomHandle() {
+        return createRoomHandle(tacticalReadPort, tacticalActionPort);
     }
 
     CodTacticalTdmActionPort tacticalActionPort() {

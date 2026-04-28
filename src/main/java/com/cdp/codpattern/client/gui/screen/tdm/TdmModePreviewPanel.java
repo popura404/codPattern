@@ -1,8 +1,11 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
 import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.model.ClientModePresentation;
+import com.cdp.codpattern.app.match.model.ClientModePresentationRegistry;
 import com.cdp.codpattern.app.match.model.ModeDescriptor;
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.tdm.model.TdmClientModePresentations;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -15,14 +18,6 @@ public final class TdmModePreviewPanel {
             ResourceLocation.fromNamespaceAndPath(CodPattern.MODID, "textures/gui/modes/shared_preview.png"),
             3840,
             2160);
-    private static final PreviewTexture FRONTLINE_PREVIEW = new PreviewTexture(
-            ResourceLocation.fromNamespaceAndPath(CodPattern.MODID, "textures/gui/modes/frontline_preview.png"),
-            16001,
-            9001);
-    private static final PreviewTexture TEAM_DEATHMATCH_PREVIEW = new PreviewTexture(
-            ResourceLocation.fromNamespaceAndPath(CodPattern.MODID, "textures/gui/modes/team_death_match_preview.png"),
-            16047,
-            9001);
     private static final float MODE_OVERLAY_ALPHA_FACTOR = 0.40f;
     private static final int[] FALLBACK_ACCENTS = {
             0xFF88D6FF,
@@ -107,25 +102,11 @@ public final class TdmModePreviewPanel {
     }
 
     public static int accentColor(String gameType) {
-        String canonical = TdmGameTypes.canonicalize(gameType);
-        if (TdmGameTypes.FRONTLINE.equals(canonical)) {
-            return 0xFF62F08A;
-        }
-        if (TdmGameTypes.TEAM_DEATHMATCH.equals(canonical)) {
-            return 0xFF5FC7C3;
-        }
-        return FALLBACK_ACCENTS[Math.abs(canonical.hashCode()) % FALLBACK_ACCENTS.length];
+        return resolvePresentation(gameType).accentColor();
     }
 
     public static Component resolveModeDescription(String gameType) {
-        String canonical = TdmGameTypes.canonicalize(gameType);
-        if (TdmGameTypes.FRONTLINE.equals(canonical)) {
-            return Component.translatable("screen.codpattern.mode_select.hover_frontline");
-        }
-        if (TdmGameTypes.TEAM_DEATHMATCH.equals(canonical)) {
-            return Component.translatable("screen.codpattern.mode_select.hover_teamdeathmatch");
-        }
-        return Component.translatable("screen.codpattern.mode_select.preview_hint");
+        return Component.translatable(resolvePresentation(gameType).descriptionKey());
     }
 
     private static void renderVariantOverlay(
@@ -135,12 +116,12 @@ public final class TdmModePreviewPanel {
             int screenWidth,
             int screenHeight,
             float alphaFactor) {
-        String canonical = TdmGameTypes.canonicalize(gameType);
-        if (TdmGameTypes.FRONTLINE.equals(canonical)) {
+        String overlayStyle = resolvePresentation(gameType).overlayStyle();
+        if ("frontline".equals(overlayStyle)) {
             renderFrontlineOverlay(graphics, accentColor, screenWidth, screenHeight, alphaFactor);
             return;
         }
-        if (TdmGameTypes.TEAM_DEATHMATCH.equals(canonical)) {
+        if ("teamdeathmatch".equals(overlayStyle)) {
             renderTeamDeathmatchOverlay(graphics, accentColor, screenWidth, screenHeight, alphaFactor);
             return;
         }
@@ -240,14 +221,31 @@ public final class TdmModePreviewPanel {
     }
 
     private static PreviewTexture resolvePreviewTexture(String gameType) {
-        String canonical = TdmGameTypes.canonicalize(gameType);
-        if (TdmGameTypes.FRONTLINE.equals(canonical)) {
-            return FRONTLINE_PREVIEW;
+        ClientModePresentation presentation = resolvePresentation(gameType);
+        if (presentation.previewTexturePath().isBlank()) {
+            return SHARED_PREVIEW;
         }
-        if (TdmGameTypes.TEAM_DEATHMATCH.equals(canonical)) {
-            return TEAM_DEATHMATCH_PREVIEW;
-        }
-        return SHARED_PREVIEW;
+        return new PreviewTexture(
+                ResourceLocation.fromNamespaceAndPath(CodPattern.MODID, presentation.previewTexturePath()),
+                presentation.textureWidth(),
+                presentation.textureHeight());
+    }
+
+    private static ClientModePresentation resolvePresentation(String gameType) {
+        TdmClientModePresentations.registerDefaults();
+        return ClientModePresentationRegistry.find(gameType).orElseGet(() -> fallbackPresentation(gameType));
+    }
+
+    private static ClientModePresentation fallbackPresentation(String gameType) {
+        String canonical = GameModeRegistry.canonicalize(gameType);
+        int accent = FALLBACK_ACCENTS[Math.floorMod(canonical.hashCode(), FALLBACK_ACCENTS.length)];
+        return new ClientModePresentation(
+                "",
+                SHARED_PREVIEW.width(),
+                SHARED_PREVIEW.height(),
+                accent,
+                "screen.codpattern.mode_select.preview_hint",
+                "fallback");
     }
 
     private static void renderFullscreenTexture(

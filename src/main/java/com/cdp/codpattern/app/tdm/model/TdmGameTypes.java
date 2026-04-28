@@ -1,6 +1,7 @@
 package com.cdp.codpattern.app.tdm.model;
 
-import java.util.Locale;
+import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.model.ModeCapability;
 
 public final class TdmGameTypes {
     private TdmGameTypes() {
@@ -15,14 +16,7 @@ public final class TdmGameTypes {
     public static final String CDP_TACTICAL_TDM = TEAM_DEATHMATCH;
 
     public static String canonicalize(String gameType) {
-        String normalized = normalize(gameType);
-        if (LEGACY_CDP_TDM.equals(normalized)) {
-            return FRONTLINE;
-        }
-        if (LEGACY_CDP_TACTICAL_TDM.equals(normalized)) {
-            return TEAM_DEATHMATCH;
-        }
-        return normalized;
+        return GameModeRegistry.canonicalize(gameType);
     }
 
     public static boolean isFrontline(String gameType) {
@@ -34,10 +28,6 @@ public final class TdmGameTypes {
     }
 
     public static boolean supportsDynamicRespawnPoints(String gameType) {
-        return isTeamDeathMatch(gameType);
-    }
-
-    private static String normalize(String gameType) {
-        return gameType == null ? "" : gameType.trim().toLowerCase(Locale.ROOT);
+        return GameModeRegistry.hasCapability(gameType, ModeCapability.DYNAMIC_RESPAWN_POINTS);
     }
 }

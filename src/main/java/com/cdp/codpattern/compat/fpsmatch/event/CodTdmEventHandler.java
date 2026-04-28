@@ -1,10 +1,14 @@
 package com.cdp.codpattern.compat.fpsmatch.event;
 
+import com.cdp.codpattern.app.match.model.DamageContext;
+import com.cdp.codpattern.app.match.model.DamageDecision;
+import com.cdp.codpattern.app.match.model.DeathContext;
+import com.cdp.codpattern.app.match.model.DeathDecision;
+import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
+import com.cdp.codpattern.app.tdm.model.TdmMapEditorSchemas;
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
-import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMap;
-import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
 import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMapEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -29,6 +33,7 @@ public class CodTdmEventHandler {
      */
     @SubscribeEvent
     public static void onRegisterFPSMap(RegisterFPSMapEvent event) {
+        TdmMapEditorSchemas.registerDefaults();
         event.registerGameType(TdmGameTypes.CDP_TDM, CodTdmMap::new);
     }
 
@@ -42,46 +47,24 @@ public class CodTdmEventHandler {
             return;
         }
 
-        // 获取玩家所在的地图
-        Optional<CodTdmReadPort> readPortOptional = FpsMatchGatewayProvider.gateway().findPlayerTdmReadPort(player);
-        if (readPortOptional.isEmpty()) {
+        Optional<ModeCombatEventPort> combatPortOptional = FpsMatchGatewayProvider.gateway()
+                .findPlayerCombatEventPort(player);
+        if (combatPortOptional.isEmpty()) {
             return;
         }
-        CodTdmReadPort readPort = readPortOptional.get();
 
-        // 游戏未开始时不受伤害
-        if (!readPort.isStarted()) {
+        DamageDecision decision = combatPortOptional.get().onPlayerHurt(player, new DamageContext(
+                event.getSource(),
+                event.getSource().getDirectEntity(),
+                Optional.ofNullable(resolveAttacker(event)),
+                event.getAmount()));
+        if (decision == null) {
+            return;
+        }
+        if (decision.cancelEvent()) {
             event.setCanceled(true);
-            return;
         }
-
-        // 无敌期间取消所有伤害
-        if (readPort.isPlayerInvincible(player.getUUID())) {
-            event.setCanceled(true);
-            return;
-        }
-
-        ServerPlayer attacker = resolveAttacker(event);
-        if (isTeammate(readPort, attacker, player)) {
-            event.setCanceled(true);
-            return;
-        }
-
-        // 热身期间：伤害归零但保留事件（保留击退效果）
-        if (!readPort.canDealDamage()) {
-            event.setAmount(0);
-            // 不取消事件，击退效果由 Minecraft 原生处理
-            return;
-        }
-
-        if (event.getAmount() <= 0) {
-            return;
-        }
-
-        Optional<CodTdmActionPort> actionPortOptional = FpsMatchGatewayProvider.gateway().findPlayerTdmActionPort(player);
-        if (actionPortOptional.isPresent()) {
-            actionPortOptional.get().onPlayerDamaged(player);
-        }
+        decision.replacementAmount().ifPresent(event::setAmount);
     }
 
     /**
@@ -95,35 +78,25 @@ public class CodTdmEventHandler {
         }
 
         ServerPlayer killer = resolveKiller(event);
-        var gateway = FpsMatchGatewayProvider.gateway();
-        Optional<CodTdmReadPort> readPortOptional = gateway.findPlayerTdmReadPort(player);
-        Optional<CodTdmActionPort> actionPortOptional = gateway.findPlayerTdmActionPort(player);
-        if (readPortOptional.isEmpty() || actionPortOptional.isEmpty()) {
-            return;
-        }
-        CodTdmReadPort readPort = readPortOptional.get();
-        CodTdmActionPort actionPort = actionPortOptional.get();
-
-        // 只有游戏开始后才处理死亡
-        if (!readPort.isStarted()) {
+        Optional<ModeCombatEventPort> combatPortOptional = FpsMatchGatewayProvider.gateway()
+                .findPlayerCombatEventPort(player);
+        if (combatPortOptional.isEmpty()) {
             return;
         }
 
-        // 取消死亡事件，防止玩家真正死亡
-        event.setCanceled(true);
-
-        // 击杀计分统一在死亡事件处理，兼容子弹/投射物 owner。
-        if (killer != null
-                && !killer.getUUID().equals(player.getUUID())
-                && !isTeammate(readPort, killer, player)) {
-            actionPort.onPlayerKill(killer, player);
+        DeathDecision decision = combatPortOptional.get().onPlayerDeath(player, new DeathContext(
+                event.getSource(),
+                event.getSource().getDirectEntity(),
+                Optional.ofNullable(killer)));
+        if (decision == null) {
+            return;
         }
-
-        // 调用地图的死亡处理逻辑
-        actionPort.onPlayerDead(player, killer);
-
-        // 恢复玩家到满血状态（取消死亡）
-        player.setHealth(player.getMaxHealth());
+        if (decision.cancelEvent()) {
+            event.setCanceled(true);
+        }
+        if (decision.restoreFullHealth()) {
+            player.setHealth(player.getMaxHealth());
+        }
     }
 
     private static ServerPlayer resolveKiller(LivingDeathEvent event) {
@@ -188,18 +161,6 @@ public class CodTdmEventHandler {
             return attacker;
         }
         return resolveProjectileOwner(directEntity);
-    }
-
-    private static boolean isTeammate(CodTdmReadPort readPort, ServerPlayer attacker, ServerPlayer victim) {
-        if (readPort == null || attacker == null || victim == null) {
-            return false;
-        }
-        if (attacker.getUUID().equals(victim.getUUID())) {
-            return false;
-        }
-        Optional<String> attackerTeam = readPort.findTeamNameByPlayer(attacker);
-        Optional<String> victimTeam = readPort.findTeamNameByPlayer(victim);
-        return attackerTeam.isPresent() && attackerTeam.equals(victimTeam);
     }
 
     private static ServerPlayer asServerPlayer(Entity entity) {

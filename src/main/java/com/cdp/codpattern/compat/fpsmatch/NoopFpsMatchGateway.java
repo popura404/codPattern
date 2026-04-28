@@ -2,7 +2,9 @@ package com.cdp.codpattern.compat.fpsmatch;
 
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
+import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
 import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
+import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
 import net.minecraft.core.BlockPos;
@@ -37,6 +39,16 @@ public final class NoopFpsMatchGateway implements FpsMatchGateway {
     @Override
     public Optional<ModeRoomReadPort> findPlayerRoomReadPort(ServerPlayer player) {
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<ModeCombatEventPort> findPlayerCombatEventPort(ServerPlayer player) {
+        return Optional.empty();
+    }
+
+    @Override
+    public List<ModeRoomSummaryPort> listRoomSummaryPorts() {
+        return List.of();
     }
 
     @Override

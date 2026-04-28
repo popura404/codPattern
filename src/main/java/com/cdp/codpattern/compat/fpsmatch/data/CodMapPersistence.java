@@ -1,9 +1,7 @@
 package com.cdp.codpattern.compat.fpsmatch.data;
 
-import com.cdp.codpattern.compat.fpsmatch.map.CodTacticalTdmMap;
-import com.cdp.codpattern.compat.fpsmatch.map.CodTacticalTdmMapAccess;
-import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMap;
-import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMapAccess;
+import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceProvider;
+import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceRegistry;
 import com.mojang.logging.LogUtils;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
@@ -19,28 +17,20 @@ public final class CodMapPersistence {
     }
 
     public static void saveMap(BaseMap map) {
+        if (map == null) {
+            throw new IllegalArgumentException("Cannot persist null map");
+        }
         FPSMCore core = FPSMCore.getInstance();
         try {
-            if (map instanceof CodTacticalTdmMap tacticalMap) {
-                core.getFPSMDataManager().saveData(
-                        CodTacticalTdmMapData.mapToData(CodTacticalTdmMapAccess.readPort(tacticalMap)),
-                        tacticalMap.getMapName(),
-                        true);
-                return;
-            }
-            if (map instanceof CodTdmMap tdmMap) {
-                core.getFPSMDataManager().saveData(
-                        CodTdmMapData.mapToData(CodTdmMapAccess.readPort(tdmMap)),
-                        tdmMap.getMapName(),
-                        true);
-                return;
-            }
+            ModeMapPersistenceProvider provider = ModeMapPersistenceRegistry.find(map.getGameType())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Unsupported map type: " + map.getClass().getName()));
+            provider.save(map, core.getFPSMDataManager());
+            return;
         } catch (RuntimeException e) {
             LOGGER.error("Failed to persist map {}/{}", map.getGameType(), map.getMapName(), e);
             throw e;
         }
-
-        throw new IllegalArgumentException("Unsupported map type: " + map.getClass().getName());
     }
 
     public static void saveMapOrRollback(BaseMap map, Runnable rollback) {

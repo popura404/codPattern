@@ -1,6 +1,7 @@
 package com.phasetranscrystal.fpsmatch.common.item;
 
 import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.tdm.model.TdmMapEditorSchemas;
 import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.tool.CreatorToolItem;
@@ -257,12 +258,7 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
     }
 
     public static List<String> availableKindsForType(String gameType) {
-        if (TdmGameTypes.supportsDynamicRespawnPoints(gameType)) {
-            return List.of(
-                    SpawnPointKind.INITIAL.serializedName(),
-                    SpawnPointKind.DYNAMIC_CANDIDATE.serializedName());
-        }
-        return List.of(SpawnPointKind.INITIAL.serializedName());
+        return TdmMapEditorSchemas.spawnPointLayerKeys(gameType);
     }
 
     public static String normalizeSelectedKind(String gameType, String selectedKind) {

@@ -1,7 +1,10 @@
 package com.cdp.codpattern.fpsmatch.room;
 
 import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.app.match.model.RoomSummarySnapshot;
+import com.cdp.codpattern.app.match.model.RoomSummarySnapshots;
 import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
+import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
@@ -74,24 +77,21 @@ public class CodTdmRoomManager {
     private Map<RoomId, RoomListSyncPacket.RoomInfo> buildRoomInfos() {
         Map<RoomId, RoomListSyncPacket.RoomInfo> roomInfos = new HashMap<>();
 
-        for (ModeRoomReadPort readPort : FpsMatchGatewayProvider.gateway().listRoomReadPorts()) {
-            Map<String, Integer> teamPlayerCounts = readPort.getTeamPlayerCountsSnapshot();
-            int playerCount = teamPlayerCounts.values().stream().mapToInt(Integer::intValue).sum();
-            int maxPlayers = readPort.getMaxPlayerCapacity();
-            Map<String, Integer> teamScores = readPort.getTeamScoresSnapshot();
-            int remainingTimeTicks = readPort.getRemainingTimeTicks();
-
-            RoomListSyncPacket.RoomInfo info = new RoomListSyncPacket.RoomInfo(
-                    readPort.phaseName(),
-                    playerCount,
-                    maxPlayers,
-                    teamPlayerCounts,
-                    teamScores,
-                    remainingTimeTicks,
-                    readPort.hasMatchEndTeleportPoint());
-            roomInfos.put(readPort.roomId(), info);
+        for (ModeRoomSummaryPort summaryPort : FpsMatchGatewayProvider.gateway().listRoomSummaryPorts()) {
+            RoomSummarySnapshot snapshot = RoomSummarySnapshots.fromSummaryPort(summaryPort);
+            RoomListSyncPacket.RoomInfo info = RoomListSyncPacket.RoomInfo.fromSnapshot(
+                    snapshot,
+                    hasMatchEndTeleportPoint(summaryPort));
+            roomInfos.put(snapshot.roomId(), info);
         }
         return roomInfos;
+    }
+
+    private boolean hasMatchEndTeleportPoint(ModeRoomSummaryPort summaryPort) {
+        if (summaryPort instanceof ModeRoomReadPort readPort) {
+            return readPort.hasMatchEndTeleportPoint();
+        }
+        return true;
     }
 
     /**
