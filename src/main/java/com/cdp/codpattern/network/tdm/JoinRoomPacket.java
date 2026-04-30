@@ -1,57 +1,21 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.app.match.service.ModeRoomInteractionService;
-import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
-
-import java.util.function.Supplier;
 
 /**
- * C→S: 加入房间数据包
+ * @deprecated Use {@link com.cdp.codpattern.network.match.JoinRoomPacket}.
  */
-public class JoinRoomPacket {
-    private final String roomKey;
-    private final String teamName; // 可选，null表示自动分配
-
+@Deprecated(forRemoval = false)
+public class JoinRoomPacket extends com.cdp.codpattern.network.match.JoinRoomPacket {
     public JoinRoomPacket(String roomKey, String teamName) {
-        this.roomKey = roomKey;
-        this.teamName = teamName;
+        super(roomKey, teamName);
     }
 
     public JoinRoomPacket(FriendlyByteBuf buf) {
-        this.roomKey = buf.readUtf();
-        this.teamName = buf.readBoolean() ? buf.readUtf() : null;
-    }
-
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeUtf(roomKey);
-        buf.writeBoolean(teamName != null);
-        if (teamName != null) {
-            buf.writeUtf(teamName);
-        }
+        super(buf);
     }
 
     public static JoinRoomPacket decode(FriendlyByteBuf buf) {
         return new JoinRoomPacket(buf);
-    }
-
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            ServerPlayer player = ctx.get().getSender();
-            if (player == null) {
-                return;
-            }
-            ModeRoomInteractionService.JoinResult result = ModeRoomInteractionService.joinRoom(player, roomKey, teamName);
-            sendResult(player, result.success(), result.roomKey(), result.code(), result.message());
-        });
-        ctx.get().setPacketHandled(true);
-    }
-
-    private static void sendResult(ServerPlayer player, boolean success, String roomKey, String code, String message) {
-        CodTdmRoomManager.getInstance().markRoomListDirty();
-        JoinRoomResultPacket packet = new JoinRoomResultPacket(success, roomKey, code, message);
-        com.cdp.codpattern.adapter.forge.network.ModNetworkChannel.sendToPlayer(packet, player);
     }
 }

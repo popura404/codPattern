@@ -16,6 +16,11 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.UUID;
 
+/**
+ * Legacy TDM map access facade retained for older integrations. New code should discover rooms through
+ * {@link FpsMatchMapRegistry} and mode runtime ports.
+ */
+@Deprecated(forRemoval = false)
 public final class CodTdmMapAccess {
     private CodTdmMapAccess() {
     }

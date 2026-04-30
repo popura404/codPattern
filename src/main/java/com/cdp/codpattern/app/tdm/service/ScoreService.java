@@ -3,7 +3,7 @@ package com.cdp.codpattern.app.tdm.service;
 import com.cdp.codpattern.app.tdm.model.TdmGamePhase;
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.config.tdm.CodTdmConfig;
-import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
+import com.cdp.codpattern.network.match.ScoreUpdatePacket;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Map;

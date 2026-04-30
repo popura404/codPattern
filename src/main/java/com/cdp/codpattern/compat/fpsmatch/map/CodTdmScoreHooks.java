@@ -2,7 +2,7 @@ package com.cdp.codpattern.compat.fpsmatch.map;
 
 import com.cdp.codpattern.app.tdm.service.ScoreService;
 import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
-import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
+import com.cdp.codpattern.network.match.ScoreUpdatePacket;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Optional;

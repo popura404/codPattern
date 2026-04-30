@@ -6,8 +6,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * Legacy TDM facade retained for older call sites.
+ * @deprecated Legacy TDM interaction facade retained for older call sites. New code should use
+ * {@link ModeRoomInteractionService}.
  */
+@Deprecated(forRemoval = false)
 public final class TdmRoomInteractionService {
     private TdmRoomInteractionService() {
     }

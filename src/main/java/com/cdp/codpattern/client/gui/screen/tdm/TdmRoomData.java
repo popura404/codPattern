@@ -11,6 +11,7 @@ import java.util.Set;
 /**
  * Legacy DTO name retained for older callers. New code should use {@link ModeRoomData}.
  */
+@Deprecated(forRemoval = false)
 public class TdmRoomData extends ModeRoomData {
     public TdmRoomData(String gameType,
             String mapName,

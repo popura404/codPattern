@@ -28,7 +28,10 @@ public final class ModNetworkChannel {
         BackpackPacketRegistrar.register();
         ThrowablePacketRegistrar.register();
         RefitPacketRegistrar.register();
-        TdmPacketRegistrar.register();
+        ModeRoomPacketRegistrar.registerInitialRoomPackets();
+        ModeRoomPacketRegistrar.registerRoomFeedbackPackets();
+        ModeRuntimePacketRegistrar.register();
+        ModeRoomPacketRegistrar.registerLateRoomPackets();
         FpsmPacketRegistrar.register();
     }
 

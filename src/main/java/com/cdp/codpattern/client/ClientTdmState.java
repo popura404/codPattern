@@ -11,6 +11,7 @@ import java.util.Map;
 /**
  * Legacy TDM state facade retained for older call sites. New code should use {@link ClientMatchState}.
  */
+@Deprecated(forRemoval = false)
 public final class ClientTdmState {
     public enum RosterDeltaApplyResult {
         APPLIED,

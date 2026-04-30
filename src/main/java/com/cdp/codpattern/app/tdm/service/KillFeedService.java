@@ -1,7 +1,7 @@
 package com.cdp.codpattern.app.tdm.service;
 
 import com.cdp.codpattern.app.tdm.model.TdmGamePhase;
-import com.cdp.codpattern.network.tdm.KillFeedPacket;
+import com.cdp.codpattern.network.match.KillFeedPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 

@@ -7,6 +7,7 @@ import net.minecraft.client.gui.GuiGraphics;
 /**
  * Legacy renderer name retained for older callers. New code should use {@link ModeRoomInfoPanelRenderer}.
  */
+@Deprecated(forRemoval = false)
 public final class TdmRoomInfoPanelRenderer {
     private TdmRoomInfoPanelRenderer() {
     }

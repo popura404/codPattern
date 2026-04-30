@@ -1,62 +1,22 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.network.handler.ClientPacketBridge;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
-
-import java.util.function.Supplier;
 
 /**
- * S→C: 投票弹窗请求数据包
+ * @deprecated Use {@link com.cdp.codpattern.network.match.VoteDialogPacket}.
  */
-public class VoteDialogPacket {
-    private final String roomName;
-    private final long voteId;
-    private final String voteType;
-    private final String initiatorName;
-    private final int requiredVotes;
-    private final int totalVoters;
-
+@Deprecated(forRemoval = false)
+public class VoteDialogPacket extends com.cdp.codpattern.network.match.VoteDialogPacket {
     public VoteDialogPacket(String roomName, long voteId, String voteType, String initiatorName, int requiredVotes,
             int totalVoters) {
-        this.roomName = roomName;
-        this.voteId = voteId;
-        this.voteType = voteType;
-        this.initiatorName = initiatorName;
-        this.requiredVotes = requiredVotes;
-        this.totalVoters = totalVoters;
+        super(roomName, voteId, voteType, initiatorName, requiredVotes, totalVoters);
     }
 
     public VoteDialogPacket(FriendlyByteBuf buf) {
-        this.roomName = buf.readUtf();
-        this.voteId = buf.readLong();
-        this.voteType = buf.readUtf();
-        this.initiatorName = buf.readUtf();
-        this.requiredVotes = buf.readInt();
-        this.totalVoters = buf.readInt();
-    }
-
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeUtf(roomName);
-        buf.writeLong(voteId);
-        buf.writeUtf(voteType);
-        buf.writeUtf(initiatorName);
-        buf.writeInt(requiredVotes);
-        buf.writeInt(totalVoters);
+        super(buf);
     }
 
     public static VoteDialogPacket decode(FriendlyByteBuf buf) {
         return new VoteDialogPacket(buf);
-    }
-
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> ClientPacketBridge.voteDialog(
-                roomName,
-                voteId,
-                voteType,
-                initiatorName,
-                requiredVotes,
-                totalVoters));
-        ctx.get().setPacketHandled(true);
     }
 }

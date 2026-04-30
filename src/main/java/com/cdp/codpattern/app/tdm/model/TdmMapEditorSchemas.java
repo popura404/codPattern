@@ -10,6 +10,10 @@ import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * @deprecated Legacy TDM editor schema facade. New code should use {@link ModeMapEditorSchemas}.
+ */
+@Deprecated(forRemoval = false)
 public final class TdmMapEditorSchemas {
     public static final String MATCH_END_TELEPORT = ModeMapEditorSchemas.MATCH_END_TELEPORT;
 

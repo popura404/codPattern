@@ -6,6 +6,7 @@ import net.minecraft.client.gui.components.Button;
 /**
  * Legacy helper name retained for older callers. New code should use {@link ModeRoomButtonStateBinder}.
  */
+@Deprecated(forRemoval = false)
 public final class TdmRoomButtonStateBinder {
     private TdmRoomButtonStateBinder() {
     }

@@ -3,9 +3,9 @@ package com.cdp.codpattern.compat.fpsmatch.map;
 import com.cdp.codpattern.app.tdm.model.TdmGamePhase;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
-import com.cdp.codpattern.network.tdm.DeathCamPacket;
-import com.cdp.codpattern.network.tdm.GamePhasePacket;
-import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
+import com.cdp.codpattern.network.match.DeathCamPacket;
+import com.cdp.codpattern.network.match.GamePhasePacket;
+import com.cdp.codpattern.network.match.ScoreUpdatePacket;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;

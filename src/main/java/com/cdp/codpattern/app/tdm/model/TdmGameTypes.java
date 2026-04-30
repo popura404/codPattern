@@ -3,6 +3,10 @@ package com.cdp.codpattern.app.tdm.model;
 import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 
+/**
+ * @deprecated Legacy game type facade. New code should use {@link BuiltInGameModes}.
+ */
+@Deprecated(forRemoval = false)
 public final class TdmGameTypes {
     private TdmGameTypes() {
     }

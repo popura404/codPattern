@@ -1,41 +1,21 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.network.handler.ClientPacketBridge;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraftforge.network.NetworkEvent;
-
-import java.util.function.Supplier;
 
 /**
- * S→C: 游戏阶段同步数据包
+ * @deprecated Use {@link com.cdp.codpattern.network.match.GamePhasePacket}.
  */
-public class GamePhasePacket {
-    private final String phase;
-    private final int remainingTicks;
-
+@Deprecated(forRemoval = false)
+public class GamePhasePacket extends com.cdp.codpattern.network.match.GamePhasePacket {
     public GamePhasePacket(String phase, int remainingTicks) {
-        this.phase = phase;
-        this.remainingTicks = remainingTicks;
+        super(phase, remainingTicks);
     }
 
     public GamePhasePacket(FriendlyByteBuf buf) {
-        this.phase = buf.readUtf();
-        this.remainingTicks = buf.readInt();
-    }
-
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeUtf(phase);
-        buf.writeInt(remainingTicks);
+        super(buf);
     }
 
     public static GamePhasePacket decode(FriendlyByteBuf buf) {
         return new GamePhasePacket(buf);
-    }
-
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            ClientPacketBridge.gamePhase(phase, remainingTicks);
-        });
-        ctx.get().setPacketHandled(true);
     }
 }

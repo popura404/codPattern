@@ -1,45 +1,21 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.app.match.service.ModeRoomInteractionService;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
-
-import java.util.function.Supplier;
 
 /**
- * C→S: 选择队伍数据包
+ * @deprecated Use {@link com.cdp.codpattern.network.match.SelectTeamPacket}.
  */
-public class SelectTeamPacket {
-    private final String roomKey;
-    private final String teamName;
-
+@Deprecated(forRemoval = false)
+public class SelectTeamPacket extends com.cdp.codpattern.network.match.SelectTeamPacket {
     public SelectTeamPacket(String roomKey, String teamName) {
-        this.roomKey = roomKey;
-        this.teamName = teamName;
+        super(roomKey, teamName);
     }
 
     public SelectTeamPacket(FriendlyByteBuf buf) {
-        this.roomKey = buf.readUtf();
-        this.teamName = buf.readUtf();
-    }
-
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeUtf(roomKey);
-        buf.writeUtf(teamName);
+        super(buf);
     }
 
     public static SelectTeamPacket decode(FriendlyByteBuf buf) {
         return new SelectTeamPacket(buf);
-    }
-
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            ServerPlayer player = ctx.get().getSender();
-            if (player != null) {
-                ModeRoomInteractionService.selectTeamInRoom(player, roomKey, teamName);
-            }
-        });
-        ctx.get().setPacketHandled(true);
     }
 }

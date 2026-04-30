@@ -1,8 +1,8 @@
 package com.cdp.codpattern.app.tdm.service;
 
 import com.cdp.codpattern.config.tdm.CodTdmConfig;
-import com.cdp.codpattern.network.tdm.DeathCamPacket;
-import com.cdp.codpattern.network.tdm.PhysicsMobRetainPacket;
+import com.cdp.codpattern.network.match.DeathCamPacket;
+import com.cdp.codpattern.network.match.PhysicsMobRetainPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;

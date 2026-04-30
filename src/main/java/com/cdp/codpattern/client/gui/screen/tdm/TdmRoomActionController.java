@@ -7,6 +7,7 @@ import com.cdp.codpattern.client.gui.screen.match.ModeRoomUiState;
 /**
  * Legacy controller name retained for older callers. New code should use {@link ModeRoomActionController}.
  */
+@Deprecated(forRemoval = false)
 public class TdmRoomActionController extends ModeRoomActionController {
     public TdmRoomActionController(
             ModeRoomSessionState roomState,

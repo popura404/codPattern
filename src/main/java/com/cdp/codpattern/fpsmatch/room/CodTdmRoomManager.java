@@ -8,7 +8,8 @@ import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
-import com.cdp.codpattern.network.tdm.RoomListSyncPacket;
+import com.cdp.codpattern.network.match.RoomSyncInfo;
+import com.cdp.codpattern.network.match.RoomListSyncPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -74,12 +75,12 @@ public class CodTdmRoomManager {
         ModNetworkChannel.sendToPlayer(new RoomListSyncPacket(snapshotVersion, buildRoomInfos()), player);
     }
 
-    private Map<RoomId, RoomListSyncPacket.RoomInfo> buildRoomInfos() {
-        Map<RoomId, RoomListSyncPacket.RoomInfo> roomInfos = new HashMap<>();
+    private Map<RoomId, RoomSyncInfo> buildRoomInfos() {
+        Map<RoomId, RoomSyncInfo> roomInfos = new HashMap<>();
 
         for (ModeRoomSummaryPort summaryPort : FpsMatchGatewayProvider.gateway().listRoomSummaryPorts()) {
             RoomSummarySnapshot snapshot = RoomSummarySnapshots.fromSummaryPort(summaryPort);
-            RoomListSyncPacket.RoomInfo info = RoomListSyncPacket.RoomInfo.fromSnapshot(
+            RoomSyncInfo info = RoomSyncInfo.fromSnapshot(
                     snapshot,
                     hasMatchEndTeleportPoint(summaryPort));
             roomInfos.put(snapshot.roomId(), info);

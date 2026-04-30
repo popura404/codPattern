@@ -10,6 +10,7 @@ import java.util.UUID;
 /**
  * Legacy utility name retained for older callers. New code should use {@link ModeRoomTextFormatter}.
  */
+@Deprecated(forRemoval = false)
 public final class TdmRoomTextFormatter {
     private TdmRoomTextFormatter() {
     }

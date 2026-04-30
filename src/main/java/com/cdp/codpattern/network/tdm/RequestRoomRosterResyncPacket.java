@@ -1,38 +1,21 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
-
-import java.util.function.Supplier;
 
 /**
- * C→S: 请求当前房间名单全量回正。
+ * @deprecated Use {@link com.cdp.codpattern.network.match.RequestRoomRosterResyncPacket}.
  */
-public class RequestRoomRosterResyncPacket {
+@Deprecated(forRemoval = false)
+public class RequestRoomRosterResyncPacket extends com.cdp.codpattern.network.match.RequestRoomRosterResyncPacket {
     public RequestRoomRosterResyncPacket() {
+        super();
     }
 
     public RequestRoomRosterResyncPacket(FriendlyByteBuf buf) {
-    }
-
-    public void encode(FriendlyByteBuf buf) {
+        super(buf);
     }
 
     public static RequestRoomRosterResyncPacket decode(FriendlyByteBuf buf) {
         return new RequestRoomRosterResyncPacket(buf);
-    }
-
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            ServerPlayer player = ctx.get().getSender();
-            if (player != null) {
-                FpsMatchGatewayProvider.gateway()
-                        .findPlayerRosterPort(player)
-                        .ifPresent(port -> port.requestRosterResync(player));
-            }
-        });
-        ctx.get().setPacketHandled(true);
     }
 }

@@ -8,6 +8,7 @@ import net.minecraft.network.chat.Component;
 /**
  * Legacy preview helper name retained for older callers. New code should use {@link ModePreviewPanel}.
  */
+@Deprecated(forRemoval = false)
 public final class TdmModePreviewPanel {
     private TdmModePreviewPanel() {
     }

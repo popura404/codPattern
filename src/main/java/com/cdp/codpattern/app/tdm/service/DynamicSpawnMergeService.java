@@ -7,6 +7,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * @deprecated Legacy TDM dynamic spawn merge facade. New code should use
+ * {@link com.cdp.codpattern.app.match.service.DynamicSpawnMergeService}.
+ */
+@Deprecated(forRemoval = false)
 public final class DynamicSpawnMergeService {
     private DynamicSpawnMergeService() {
     }

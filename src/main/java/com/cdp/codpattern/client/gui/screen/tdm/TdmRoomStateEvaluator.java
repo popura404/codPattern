@@ -11,6 +11,7 @@ import java.util.UUID;
 /**
  * Legacy helper name retained for older callers. New code should use {@link ModeRoomStateEvaluator}.
  */
+@Deprecated(forRemoval = false)
 public final class TdmRoomStateEvaluator {
     private TdmRoomStateEvaluator() {
     }

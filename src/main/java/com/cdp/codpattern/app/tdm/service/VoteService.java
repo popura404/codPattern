@@ -1,6 +1,6 @@
 package com.cdp.codpattern.app.tdm.service;
 
-import com.cdp.codpattern.network.tdm.VoteDialogPacket;
+import com.cdp.codpattern.network.match.VoteDialogPacket;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;

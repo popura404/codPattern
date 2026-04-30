@@ -1,40 +1,21 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
-import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
-
-import java.util.function.Supplier;
 
 /**
- * C→S: 请求房间列表数据包
+ * @deprecated Use {@link com.cdp.codpattern.network.match.RequestRoomListPacket}.
  */
-public class RequestRoomListPacket {
-
+@Deprecated(forRemoval = false)
+public class RequestRoomListPacket extends com.cdp.codpattern.network.match.RequestRoomListPacket {
     public RequestRoomListPacket() {
+        super();
     }
 
     public RequestRoomListPacket(FriendlyByteBuf buf) {
-        // 无数据需要读取
-    }
-
-    public void encode(FriendlyByteBuf buf) {
-        // 无数据需要写入
+        super(buf);
     }
 
     public static RequestRoomListPacket decode(FriendlyByteBuf buf) {
         return new RequestRoomListPacket(buf);
-    }
-
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            ServerPlayer player = ctx.get().getSender();
-            if (player != null) {
-                CodTdmRoomManager.getInstance().syncRoomListToClient(player);
-            }
-        });
-        ctx.get().setPacketHandled(true);
     }
 }

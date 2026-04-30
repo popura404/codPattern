@@ -1,63 +1,53 @@
 package com.cdp.codpattern.client.network;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
-import com.cdp.codpattern.network.tdm.JoinRoomPacket;
-import com.cdp.codpattern.network.tdm.LeaveRoomPacket;
-import com.cdp.codpattern.network.tdm.RequestRoomPreviewRosterPacket;
-import com.cdp.codpattern.network.tdm.RequestRoomRosterResyncPacket;
-import com.cdp.codpattern.network.tdm.SelectTeamPacket;
-import com.cdp.codpattern.network.tdm.SetReadyStatePacket;
-import com.cdp.codpattern.network.tdm.SubscribeRoomListPacket;
-import com.cdp.codpattern.network.tdm.UnsubscribeRoomListPacket;
-import com.cdp.codpattern.network.tdm.VoteEndPacket;
-import com.cdp.codpattern.network.tdm.VoteResponsePacket;
-import com.cdp.codpattern.network.tdm.VoteStartPacket;
+import com.cdp.codpattern.network.match.ModeRoomPacketFactory;
 
 public final class ModeRoomClientPackets {
     private ModeRoomClientPackets() {
     }
 
     public static void subscribeRoomList() {
-        ModNetworkChannel.sendToServer(new SubscribeRoomListPacket());
+        ModNetworkChannel.sendToServer(ModeRoomPacketFactory.subscribeRoomList());
     }
 
     public static void unsubscribeRoomList() {
-        ModNetworkChannel.sendToServer(new UnsubscribeRoomListPacket());
+        ModNetworkChannel.sendToServer(ModeRoomPacketFactory.unsubscribeRoomList());
     }
 
     public static void joinRoom(String roomKey) {
-        ModNetworkChannel.sendToServer(new JoinRoomPacket(roomKey, null));
+        ModNetworkChannel.sendToServer(ModeRoomPacketFactory.joinRoom(roomKey));
     }
 
     public static void leaveRoom() {
-        ModNetworkChannel.sendToServer(new LeaveRoomPacket());
+        ModNetworkChannel.sendToServer(ModeRoomPacketFactory.leaveRoom());
     }
 
     public static void selectTeam(String roomKey, String teamName) {
-        ModNetworkChannel.sendToServer(new SelectTeamPacket(roomKey, teamName));
+        ModNetworkChannel.sendToServer(ModeRoomPacketFactory.selectTeam(roomKey, teamName));
     }
 
     public static void setReadyState(boolean ready) {
-        ModNetworkChannel.sendToServer(new SetReadyStatePacket(ready));
+        ModNetworkChannel.sendToServer(ModeRoomPacketFactory.setReadyState(ready));
     }
 
     public static void voteStart() {
-        ModNetworkChannel.sendToServer(new VoteStartPacket());
+        ModNetworkChannel.sendToServer(ModeRoomPacketFactory.voteStart());
     }
 
     public static void voteEnd() {
-        ModNetworkChannel.sendToServer(new VoteEndPacket());
+        ModNetworkChannel.sendToServer(ModeRoomPacketFactory.voteEnd());
     }
 
     public static void respondToVote(long voteId, boolean accepted) {
-        ModNetworkChannel.sendToServer(new VoteResponsePacket(voteId, accepted));
+        ModNetworkChannel.sendToServer(ModeRoomPacketFactory.voteResponse(voteId, accepted));
     }
 
     public static void requestRoomPreviewRoster(String roomKey) {
-        ModNetworkChannel.sendToServer(new RequestRoomPreviewRosterPacket(roomKey));
+        ModNetworkChannel.sendToServer(ModeRoomPacketFactory.requestRoomPreviewRoster(roomKey));
     }
 
     public static void requestRoomRosterResync() {
-        ModNetworkChannel.sendToServer(new RequestRoomRosterResyncPacket());
+        ModNetworkChannel.sendToServer(ModeRoomPacketFactory.requestRoomRosterResync());
     }
 }

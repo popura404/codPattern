@@ -1,43 +1,21 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.app.match.service.ModeRoomInteractionService;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
-
-import java.util.function.Supplier;
 
 /**
- * C→S: 设置 READY 状态
+ * @deprecated Use {@link com.cdp.codpattern.network.match.SetReadyStatePacket}.
  */
-public class SetReadyStatePacket {
-    private final boolean ready;
-
+@Deprecated(forRemoval = false)
+public class SetReadyStatePacket extends com.cdp.codpattern.network.match.SetReadyStatePacket {
     public SetReadyStatePacket(boolean ready) {
-        this.ready = ready;
+        super(ready);
     }
 
     public SetReadyStatePacket(FriendlyByteBuf buf) {
-        this.ready = buf.readBoolean();
-    }
-
-    public void encode(FriendlyByteBuf buf) {
-        buf.writeBoolean(ready);
+        super(buf);
     }
 
     public static SetReadyStatePacket decode(FriendlyByteBuf buf) {
         return new SetReadyStatePacket(buf);
-    }
-
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            ServerPlayer player = ctx.get().getSender();
-            if (player == null) {
-                return;
-            }
-            player.sendSystemMessage(ModeRoomInteractionService.setReadyState(player, ready));
-        });
-        ctx.get().setPacketHandled(true);
     }
 }

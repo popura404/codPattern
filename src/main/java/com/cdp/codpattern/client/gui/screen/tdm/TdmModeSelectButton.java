@@ -6,6 +6,7 @@ import com.cdp.codpattern.client.gui.screen.match.ModeSelectButton;
 /**
  * Legacy button name retained for older callers. New code should use {@link ModeSelectButton}.
  */
+@Deprecated(forRemoval = false)
 public class TdmModeSelectButton extends ModeSelectButton {
     public TdmModeSelectButton(
             int x,

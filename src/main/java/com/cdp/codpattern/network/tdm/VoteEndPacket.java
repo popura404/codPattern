@@ -1,39 +1,21 @@
 package com.cdp.codpattern.network.tdm;
 
-import com.cdp.codpattern.app.match.service.ModeRoomInteractionService;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkEvent;
-
-import java.util.function.Supplier;
 
 /**
- * C→S: 投票结束游戏数据包
+ * @deprecated Use {@link com.cdp.codpattern.network.match.VoteEndPacket}.
  */
-public class VoteEndPacket {
-
+@Deprecated(forRemoval = false)
+public class VoteEndPacket extends com.cdp.codpattern.network.match.VoteEndPacket {
     public VoteEndPacket() {
+        super();
     }
 
     public VoteEndPacket(FriendlyByteBuf buf) {
-        // 无数据需要读取
-    }
-
-    public void encode(FriendlyByteBuf buf) {
-        // 无数据需要写入
+        super(buf);
     }
 
     public static VoteEndPacket decode(FriendlyByteBuf buf) {
         return new VoteEndPacket(buf);
-    }
-
-    public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            ServerPlayer player = ctx.get().getSender();
-            if (player != null) {
-                ModeRoomInteractionService.initiateEndVote(player);
-            }
-        });
-        ctx.get().setPacketHandled(true);
     }
 }

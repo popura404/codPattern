@@ -5,6 +5,7 @@ import net.minecraft.client.gui.screens.Screen;
 /**
  * Legacy screen name retained for older callers. New code should use {@link ModeSelectScreen}.
  */
+@Deprecated(forRemoval = false)
 public class TdmModeSelectScreen extends ModeSelectScreen {
     public TdmModeSelectScreen(Screen previousScreen) {
         super(previousScreen);

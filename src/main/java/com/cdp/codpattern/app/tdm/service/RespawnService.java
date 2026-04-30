@@ -1,7 +1,7 @@
 package com.cdp.codpattern.app.tdm.service;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
-import com.cdp.codpattern.network.tdm.DeathCamPacket;
+import com.cdp.codpattern.network.match.DeathCamPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;

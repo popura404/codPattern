@@ -11,6 +11,7 @@ import java.util.Map;
 /**
  * Legacy renderer name retained for older callers. New code should use {@link ModeRoomListRenderer}.
  */
+@Deprecated(forRemoval = false)
 public final class TdmRoomListRenderer {
     private TdmRoomListRenderer() {
     }

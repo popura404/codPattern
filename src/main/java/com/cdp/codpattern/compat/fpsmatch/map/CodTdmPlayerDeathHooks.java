@@ -3,8 +3,8 @@ package com.cdp.codpattern.compat.fpsmatch.map;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.tdm.service.DeathCamService;
 import com.cdp.codpattern.app.tdm.service.PlayerDeathService;
-import com.cdp.codpattern.network.tdm.DeathCamPacket;
-import com.cdp.codpattern.network.tdm.PhysicsMobRetainPacket;
+import com.cdp.codpattern.network.match.DeathCamPacket;
+import com.cdp.codpattern.network.match.PhysicsMobRetainPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
 

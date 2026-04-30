@@ -6,12 +6,12 @@ import com.cdp.codpattern.config.tdm.CodTdmConfig;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
-import com.cdp.codpattern.network.tdm.CombatMarkerConfigPacket;
-import com.cdp.codpattern.network.tdm.GamePhasePacket;
-import com.cdp.codpattern.network.tdm.RoomPreviewRosterPacket;
-import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
-import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
-import com.cdp.codpattern.network.tdm.TeamPlayerListPacket;
+import com.cdp.codpattern.network.match.CombatMarkerConfigPacket;
+import com.cdp.codpattern.network.match.GamePhasePacket;
+import com.cdp.codpattern.network.match.RoomPreviewRosterPacket;
+import com.cdp.codpattern.network.match.RoomPlayerDeltaPacket;
+import com.cdp.codpattern.network.match.ScoreUpdatePacket;
+import com.cdp.codpattern.network.match.TeamPlayerListPacket;
 import com.cdp.codpattern.network.match.RoomRosterDelta;
 import net.minecraft.server.level.ServerPlayer;
 
