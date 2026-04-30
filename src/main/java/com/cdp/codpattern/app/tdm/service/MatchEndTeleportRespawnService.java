@@ -1,9 +1,7 @@
 package com.cdp.codpattern.app.tdm.service;
 
-import com.cdp.codpattern.compat.fpsmatch.map.CodTacticalTdmMap;
-import com.cdp.codpattern.compat.fpsmatch.map.CodTacticalTdmMapAccess;
-import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMap;
-import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMapAccess;
+import com.cdp.codpattern.app.match.ModeRoomBackedMap;
+import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
@@ -48,11 +46,9 @@ public final class MatchEndTeleportRespawnService {
     }
 
     private static Optional<SpawnPointData> readMatchEndTeleportPoint(BaseMap map) {
-        if (map instanceof CodTacticalTdmMap tacticalMap) {
-            return CodTacticalTdmMapAccess.readPort(tacticalMap).matchEndTeleportPoint();
-        }
-        if (map instanceof CodTdmMap tdmMap) {
-            return CodTdmMapAccess.readPort(tdmMap).matchEndTeleportPoint();
+        if (map instanceof ModeRoomBackedMap backedMap
+                && backedMap.roomHandle().summaryPort() instanceof ModeRoomReadPort readPort) {
+            return readPort.matchEndTeleportPoint();
         }
         return Optional.empty();
     }

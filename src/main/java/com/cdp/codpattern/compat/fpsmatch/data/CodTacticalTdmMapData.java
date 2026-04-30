@@ -1,17 +1,16 @@
 package com.cdp.codpattern.compat.fpsmatch.data;
 
+import com.cdp.codpattern.app.match.BuiltInGameModes;
+import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.persistence.CommonModeMapData;
 import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceProvider;
-import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceRegistry;
 import com.cdp.codpattern.app.tactical.port.CodTacticalTdmActionPort;
 import com.cdp.codpattern.app.tactical.port.CodTacticalTdmReadPort;
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.cdp.codpattern.compat.fpsmatch.map.CodTacticalTdmMap;
-import com.cdp.codpattern.compat.fpsmatch.map.CodTacticalTdmMapAccess;
+import com.cdp.codpattern.compat.fpsmatch.map.FpsMatchMapRegistry;
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.data.save.FPSMDataManager;
@@ -22,7 +21,6 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,6 +28,10 @@ import java.util.Optional;
 public class CodTacticalTdmMapData {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final ModeMapPersistenceProvider PERSISTENCE_PROVIDER = new TacticalTdmPersistenceProvider();
+
+    public static ModeMapPersistenceProvider persistenceProvider() {
+        return PERSISTENCE_PROVIDER;
+    }
 
     public record MapData(
             String mapName,
@@ -49,14 +51,14 @@ public class CodTacticalTdmMapData {
 
     @SubscribeEvent
     public static void onRegisterSaveData(RegisterFPSMSaveDataEvent event) {
-        ModeMapPersistenceRegistry.register(PERSISTENCE_PROVIDER);
+        GameModeBootstrap.registerPersistenceProviders();
         SaveHolder<MapData> saveHolder = new SaveHolder.Builder<>(MapData.CODEC)
                 .withReadHandler(CodTacticalTdmMapData::loadMap)
                 .withWriteHandler(CodTacticalTdmMapData::saveAllMaps)
                 .isGlobal(false)
                 .build();
 
-        event.registerData(MapData.class, TdmGameTypes.CDP_TACTICAL_TDM, saveHolder);
+        event.registerData(MapData.class, BuiltInGameModes.TEAM_DEATHMATCH, saveHolder);
     }
 
     private static void loadMap(MapData data) {
@@ -71,16 +73,14 @@ public class CodTacticalTdmMapData {
                     level.get(),
                     commonData,
                     toPayload(data));
-            CodTacticalTdmMapAccess.registerMap(map);
+            FpsMatchMapRegistry.register(BuiltInGameModes.TEAM_DEATHMATCH, map);
         } catch (Exception e) {
             LOGGER.error("Failed to load tactical TDM map {}", data.mapName(), e);
         }
     }
 
     private static void saveAllMaps(FPSMDataManager manager) {
-        FPSMCore.getInstance()
-                .getAllMaps()
-                .getOrDefault(TdmGameTypes.CDP_TACTICAL_TDM, List.of())
+        FpsMatchMapRegistry.listMaps(BuiltInGameModes.TEAM_DEATHMATCH)
                 .forEach(map -> PERSISTENCE_PROVIDER.save(map, manager));
     }
 
@@ -98,7 +98,7 @@ public class CodTacticalTdmMapData {
     private static CommonModeMapData toCommonData(MapData data) {
         return new CommonModeMapData(
                 CodTdmMapPersistenceSupport.SCHEMA_VERSION,
-                TdmGameTypes.CDP_TACTICAL_TDM,
+                BuiltInGameModes.TEAM_DEATHMATCH,
                 data.mapName(),
                 data.levelName(),
                 data.areaData(),
@@ -112,12 +112,12 @@ public class CodTacticalTdmMapData {
     private static final class TacticalTdmPersistenceProvider implements ModeMapPersistenceProvider {
         @Override
         public String gameType() {
-            return TdmGameTypes.CDP_TACTICAL_TDM;
+            return BuiltInGameModes.TEAM_DEATHMATCH;
         }
 
         @Override
         public CodTacticalTdmMap createMap(ServerLevel level, CommonModeMapData commonData, Object payload) {
-            CodTacticalTdmMap map = CodTacticalTdmMapAccess.createMap(level, commonData.mapName(), commonData.areaData());
+            CodTacticalTdmMap map = new CodTacticalTdmMap(level, commonData.mapName(), commonData.areaData());
             applyPayload(map, payload);
             return map;
         }
@@ -132,7 +132,7 @@ public class CodTacticalTdmMapData {
             if (!(payload instanceof CodTdmMapPersistenceSupport.TeamPayload teamPayload)) {
                 throw new IllegalArgumentException("Unsupported tactical TDM map payload: " + payload);
             }
-            CodTacticalTdmActionPort actionPort = CodTacticalTdmMapAccess.actionPort(tacticalMap(map));
+            CodTacticalTdmActionPort actionPort = tacticalMap(map).tacticalActionPort();
             CodTdmMapPersistenceSupport.applyPayload(actionPort, teamPayload);
         }
 
@@ -148,7 +148,7 @@ public class CodTacticalTdmMapData {
         }
 
         private CodTacticalTdmReadPort readPort(com.phasetranscrystal.fpsmatch.core.map.BaseMap map) {
-            return CodTacticalTdmMapAccess.readPort(tacticalMap(map));
+            return tacticalMap(map).tacticalReadPort();
         }
 
         private CodTacticalTdmMap tacticalMap(com.phasetranscrystal.fpsmatch.core.map.BaseMap map) {

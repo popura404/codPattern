@@ -1,7 +1,7 @@
 package com.cdp.codpattern.event.client;
 
 import com.cdp.codpattern.client.gui.refit.BackpackButton;
-import com.cdp.codpattern.client.gui.refit.TdmRoomButton;
+import com.cdp.codpattern.client.gui.refit.ModeRoomButton;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ScreenEvent;
@@ -20,7 +20,7 @@ public class CreateMenuButtonsHandler {
         // 添加背包按键
         event.addListener(BackpackButton.create(screen.width / 2 - 102, screen.height - 24, 204, 16));
 
-        // 添加团队竞技按键
-        event.addListener(TdmRoomButton.create(screen.width / 2 - 102, screen.height - 48, 204, 16));
+        // 添加模式房间按键
+        event.addListener(ModeRoomButton.create(screen.width / 2 - 102, screen.height - 48, 204, 16));
     }
 }

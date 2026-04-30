@@ -1,16 +1,13 @@
 package com.cdp.codpattern.app.match;
 
 import com.cdp.codpattern.app.match.model.GameModeDefinition;
-import com.cdp.codpattern.app.match.model.JoinPolicy;
-import com.cdp.codpattern.app.match.model.LifecycleKind;
 import com.cdp.codpattern.app.match.model.ModeCapability;
 import com.cdp.codpattern.app.match.model.ModeDescriptor;
 import com.cdp.codpattern.app.match.model.ModeFamily;
 import com.cdp.codpattern.app.match.model.ScoreboardKind;
-import com.cdp.codpattern.app.match.model.TeamDescriptor;
+import com.cdp.codpattern.app.match.model.JoinPolicy;
+import com.cdp.codpattern.app.match.model.LifecycleKind;
 import com.cdp.codpattern.app.match.model.TeamPolicy;
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
-import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,78 +19,6 @@ import java.util.Locale;
 public final class GameModeRegistry {
     private static final Map<String, GameModeDefinition> DEFINITIONS = new LinkedHashMap<>();
     private static final Map<String, String> ALIASES = new LinkedHashMap<>();
-
-    static {
-        registerDefinition(new GameModeDefinition(
-                TdmGameTypes.FRONTLINE,
-                List.of(TdmGameTypes.LEGACY_CDP_TDM),
-                "mode.codpattern.frontline",
-                "screen.codpattern.tdm_room.header",
-                "/cdp map create frontline <名称> <起点> <终点>",
-                List.of(
-                        new TeamDescriptor(TdmTeamNames.KORTAC,
-                                "screen.codpattern.tdm_room.team.kortac",
-                                "hud.codpattern.tdm.team.kortac_short",
-                                0xFFE35A5A),
-                        new TeamDescriptor(TdmTeamNames.SPECGRU,
-                                "screen.codpattern.tdm_room.team.specgru",
-                                "hud.codpattern.tdm.team.specgru_short",
-                                0xFF66A6FF)
-                ),
-                ModeFamily.PVP_TEAM,
-                TeamPolicy.FIXED_TEAMS,
-                JoinPolicy.MODE_DEFINED,
-                LifecycleKind.WAITING_START_PLAYING_ENDED,
-                ScoreboardKind.TEAM_SCORE,
-                Set.of(
-                        ModeCapability.TEAM_SELECTION,
-                        ModeCapability.TEAM_BALANCE,
-                        ModeCapability.READY_STATE,
-                        ModeCapability.START_VOTE,
-                        ModeCapability.END_VOTE,
-                        ModeCapability.MATCH_END_TELEPORT,
-                        ModeCapability.ROUND_START_SPAWNS,
-                        ModeCapability.KILL_FEED,
-                        ModeCapability.MATCH_RECORD_EXPORT,
-                        ModeCapability.MODE_SPECIFIC_MAP_FEATURES
-                )
-        ));
-        registerDefinition(new GameModeDefinition(
-                TdmGameTypes.TEAM_DEATHMATCH,
-                List.of(TdmGameTypes.LEGACY_CDP_TACTICAL_TDM),
-                "mode.codpattern.teamdeathmatch",
-                "screen.codpattern.tactical_room.header",
-                "/cdp map create teamdeathmatch <名称> <起点> <终点>",
-                List.of(
-                        new TeamDescriptor(TdmTeamNames.KORTAC,
-                                "screen.codpattern.tdm_room.team.kortac",
-                                "hud.codpattern.tdm.team.kortac_short",
-                                0xFFE35A5A),
-                        new TeamDescriptor(TdmTeamNames.SPECGRU,
-                                "screen.codpattern.tdm_room.team.specgru",
-                                "hud.codpattern.tdm.team.specgru_short",
-                                0xFF66A6FF)
-                ),
-                ModeFamily.PVP_TEAM,
-                TeamPolicy.FIXED_TEAMS,
-                JoinPolicy.MODE_DEFINED,
-                LifecycleKind.WAITING_START_PLAYING_ENDED,
-                ScoreboardKind.TEAM_SCORE,
-                Set.of(
-                        ModeCapability.TEAM_SELECTION,
-                        ModeCapability.TEAM_BALANCE,
-                        ModeCapability.READY_STATE,
-                        ModeCapability.START_VOTE,
-                        ModeCapability.END_VOTE,
-                        ModeCapability.MATCH_END_TELEPORT,
-                        ModeCapability.ROUND_START_SPAWNS,
-                        ModeCapability.DYNAMIC_RESPAWN_POINTS,
-                        ModeCapability.KILL_FEED,
-                        ModeCapability.MATCH_RECORD_EXPORT,
-                        ModeCapability.MODE_SPECIFIC_MAP_FEATURES
-                )
-        ));
-    }
 
     private GameModeRegistry() {
     }
@@ -135,7 +60,11 @@ public final class GameModeRegistry {
                 definition.joinPolicy(),
                 definition.lifecycleKind(),
                 definition.scoreboardKind(),
-                definition.capabilities()
+                definition.capabilities(),
+                definition.runtimeProvider(),
+                definition.persistenceProvider(),
+                definition.editorSchema(),
+                definition.clientPresentation()
         );
         DEFINITIONS.put(canonical, normalizedDefinition);
         ALIASES.put(canonical, canonical);
@@ -173,6 +102,10 @@ public final class GameModeRegistry {
         return DEFINITIONS.values().stream()
                 .map(GameModeDefinition::descriptor)
                 .toList();
+    }
+
+    public static List<GameModeDefinition> orderedDefinitions() {
+        return List.copyOf(DEFINITIONS.values());
     }
 
     public static String canonicalize(String gameType) {

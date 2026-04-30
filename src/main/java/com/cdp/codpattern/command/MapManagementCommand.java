@@ -1,12 +1,14 @@
 package com.cdp.codpattern.command;
 
+import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.ModeRoomBackedMap;
 import com.cdp.codpattern.app.match.ModeRoomHandle;
-import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
+import com.cdp.codpattern.app.match.editor.ModeMapEditorSchemas;
+import com.cdp.codpattern.app.match.editor.ModeObjectData;
+import com.cdp.codpattern.app.match.editor.ModePointData;
+import com.cdp.codpattern.app.match.port.ModeMapEditPort;
 import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceRegistry;
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
-import com.cdp.codpattern.app.tdm.model.TdmMapEditorSchemas;
-import com.cdp.codpattern.app.tdm.service.DynamicSpawnMergeService;
+import com.cdp.codpattern.app.match.service.DynamicSpawnMergeService;
 import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
@@ -294,33 +296,37 @@ public final class MapManagementCommand {
         if (team == null) {
             return 0;
         }
-        SpawnPointKind kind = resolveSpawnKind(source, map, rawKind);
-        if (kind == null) {
+        String layerKey = resolvePointLayer(source, map, rawKind);
+        if (layerKey == null) {
             return 0;
         }
-        List<SpawnPointData> spawnPoints = team.getSpawnPointsData(kind);
+        ModeMapEditPort editPort = requireMapEditPort(source, map, layerKey);
+        if (editPort == null) {
+            return 0;
+        }
+        List<ModePointData> spawnPoints = editPort.pointLayerPoints(team.name, layerKey);
         source.sendSuccess(() -> Component.translatable(
                 "command.codpattern.map.spawn.list.header",
                 map.getGameType(),
                 map.getMapName(),
                 team.name,
-                kind.serializedName(),
+                layerKey,
                 spawnPoints.size()), false);
         if (spawnPoints.isEmpty()) {
             source.sendSuccess(() -> Component.translatable("command.codpattern.map.spawn.list.none"), false);
             return 0;
         }
         for (int i = 0; i < spawnPoints.size(); i++) {
-            SpawnPointData point = spawnPoints.get(i);
+            ModePointData point = spawnPoints.get(i);
             int index = i + 1;
             source.sendSuccess(() -> Component.translatable(
                     "command.codpattern.map.spawn.list.entry",
                     index,
-                    point.getDimension().location(),
-                    point.getX(),
-                    point.getY(),
-                    point.getZ(),
-                    formatAngle(point.getYaw())), false);
+                    point.dimension().location(),
+                    point.position().getX(),
+                    point.position().getY(),
+                    point.position().getZ(),
+                    formatAngle(point.yaw())), false);
         }
         return spawnPoints.size();
     }
@@ -338,27 +344,30 @@ public final class MapManagementCommand {
         if (team == null) {
             return 0;
         }
-        SpawnPointKind kind = resolveSpawnKind(source, map, rawKind);
-        if (kind == null) {
+        String layerKey = resolvePointLayer(source, map, rawKind);
+        if (layerKey == null) {
             return 0;
         }
-        TeamSpawnProfile previousSpawnProfile = team.getSpawnProfile();
+        ModeMapEditPort editPort = requireMapEditPort(source, map, layerKey);
+        if (editPort == null) {
+            return 0;
+        }
+        List<ModePointData> previousPoints = editPort.pointLayerPoints(team.name, layerKey);
 
-        SpawnPointData spawnPoint = new SpawnPointData(
+        ModePointData spawnPoint = new ModePointData(
+                layerKey,
                 source.getLevel().dimension(),
                 pos,
                 currentYaw(source),
-                0.0F,
-                kind);
-        if (!team.addSpawnPointDataIfAbsent(spawnPoint)) {
+                0.0F);
+        if (!editPort.addPointLayerPoint(team.name, spawnPoint)) {
             source.sendFailure(Component.translatable("message.fpsm.spawn_point_tool.duplicate"));
             return 0;
         }
-        if (map.isStart && kind == SpawnPointKind.INITIAL) {
-            team.assignNextSpawnPoints(SpawnPointKind.INITIAL);
-        }
         try {
-            CodMapPersistence.saveMapOrRollback(map, () -> CodMapPersistence.restoreSpawnProfile(map, team, previousSpawnProfile));
+            CodMapPersistence.saveMapOrRollback(
+                    map,
+                    () -> editPort.replacePointLayerPoints(team.name, layerKey, previousPoints));
         } catch (RuntimeException e) {
             source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
             return 0;
@@ -380,35 +389,37 @@ public final class MapManagementCommand {
         if (team == null) {
             return 0;
         }
-        SpawnPointKind kind = resolveSpawnKind(source, map, rawKind);
-        if (kind == null) {
+        String layerKey = resolvePointLayer(source, map, rawKind);
+        if (layerKey == null) {
             return 0;
         }
-        TeamSpawnProfile previousSpawnProfile = team.getSpawnProfile();
+        ModeMapEditPort editPort = requireMapEditPort(source, map, layerKey);
+        if (editPort == null) {
+            return 0;
+        }
+        List<ModePointData> previousPoints = editPort.pointLayerPoints(team.name, layerKey);
 
         int zeroBasedIndex = oneBasedIndex - 1;
-        Optional<SpawnPointData> removed = team.removeSpawnPointData(kind, zeroBasedIndex);
+        Optional<ModePointData> removed = editPort.removePointLayerPoint(team.name, layerKey, zeroBasedIndex);
         if (removed.isEmpty()) {
             source.sendFailure(Component.translatable("command.codpattern.map.spawn.invalid_index", oneBasedIndex));
             return 0;
         }
-        team.clearPlayerSpawnPointAssignments();
-        if (kind == SpawnPointKind.INITIAL && !team.getSpawnPointsData(kind).isEmpty()) {
-            team.assignNextSpawnPoints(SpawnPointKind.INITIAL);
-        }
         try {
-            CodMapPersistence.saveMapOrRollback(map, () -> CodMapPersistence.restoreSpawnProfile(map, team, previousSpawnProfile));
+            CodMapPersistence.saveMapOrRollback(
+                    map,
+                    () -> editPort.replacePointLayerPoints(team.name, layerKey, previousPoints));
         } catch (RuntimeException e) {
             source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
             return 0;
         }
         map.syncToClient();
-        SpawnPointData point = removed.get();
+        ModePointData point = removed.get();
         source.sendSuccess(() -> Component.translatable(
                 "command.codpattern.map.spawn.removed",
-                kind.serializedName(),
+                layerKey,
                 oneBasedIndex,
-                MapCreatorTool.formatPos(point.getPosition())), true);
+                MapCreatorTool.formatPos(point.position())), true);
         return 1;
     }
 
@@ -422,17 +433,21 @@ public final class MapManagementCommand {
         if (team == null) {
             return 0;
         }
-        SpawnPointKind kind = resolveSpawnKind(source, map, rawKind);
-        if (kind == null) {
+        String layerKey = resolvePointLayer(source, map, rawKind);
+        if (layerKey == null) {
             return 0;
         }
-        TeamSpawnProfile previousSpawnProfile = team.getSpawnProfile();
+        ModeMapEditPort editPort = requireMapEditPort(source, map, layerKey);
+        if (editPort == null) {
+            return 0;
+        }
+        List<ModePointData> previousPoints = editPort.pointLayerPoints(team.name, layerKey);
 
-        int removedCount = team.getSpawnPointsData(kind).size();
-        team.resetSpawnPointData(kind);
-        team.clearPlayerSpawnPointAssignments();
+        int removedCount = editPort.clearPointLayerPoints(team.name, layerKey);
         try {
-            CodMapPersistence.saveMapOrRollback(map, () -> CodMapPersistence.restoreSpawnProfile(map, team, previousSpawnProfile));
+            CodMapPersistence.saveMapOrRollback(
+                    map,
+                    () -> editPort.replacePointLayerPoints(team.name, layerKey, previousPoints));
         } catch (RuntimeException e) {
             source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
             return 0;
@@ -441,7 +456,7 @@ public final class MapManagementCommand {
         source.sendSuccess(() -> Component.translatable(
                 "command.codpattern.map.spawn.cleared",
                 team.name,
-                kind.serializedName(),
+                layerKey,
                 removedCount), true);
         return removedCount;
     }
@@ -451,7 +466,7 @@ public final class MapManagementCommand {
         if (map == null) {
             return 0;
         }
-        if (!TdmMapEditorSchemas.supportsDynamicRespawnMerge(map.getGameType())) {
+        if (!ModeMapEditorSchemas.supportsDynamicRespawnMerge(map.getGameType())) {
             source.sendFailure(Component.translatable(
                     "command.codpattern.map.spawn.merge.unsupported_mode",
                     map.getGameType()));
@@ -515,13 +530,13 @@ public final class MapManagementCommand {
         if (map == null) {
             return 0;
         }
-        if (!TdmMapEditorSchemas.supportsMatchEndTeleport(map.getGameType())) {
+        if (!ModeMapEditorSchemas.supportsMatchEndTeleport(map.getGameType())) {
             source.sendFailure(Component.translatable(
                     "command.codpattern.map.endtp.unsupported_mode",
                     map.getGameType()));
             return 0;
         }
-        Optional<SpawnPointData> point = readMatchEndTeleportPoint(map);
+        Optional<SpawnPointData> point = readObjectFeaturePoint(map, ModeMapEditorSchemas.MATCH_END_TELEPORT);
         if (point.isEmpty()) {
             source.sendSuccess(() -> Component.translatable("command.codpattern.map.endtp.none", map.getMapName()), false);
             return 0;
@@ -539,7 +554,7 @@ public final class MapManagementCommand {
     private static int setMatchEndTeleportForAllMaps(CommandSourceStack source) {
         List<BaseMap> maps = FPSMCore.getInstance().getAllMaps().values().stream()
                 .flatMap(List::stream)
-                .filter(map -> TdmMapEditorSchemas.supportsMatchEndTeleport(map.getGameType()))
+                .filter(map -> ModeMapEditorSchemas.supportsMatchEndTeleport(map.getGameType()))
                 .distinct()
                 .toList();
         if (maps.isEmpty()) {
@@ -557,8 +572,8 @@ public final class MapManagementCommand {
         Map<BaseMap, SpawnPointData> previousPoints = new LinkedHashMap<>();
         List<BaseMap> savedMaps = new ArrayList<>();
         for (BaseMap map : maps) {
-            previousPoints.put(map, readMatchEndTeleportPoint(map).orElse(null));
-            writeMatchEndTeleportPoint(map, point);
+            previousPoints.put(map, readObjectFeaturePoint(map, ModeMapEditorSchemas.MATCH_END_TELEPORT).orElse(null));
+            writeObjectFeaturePoint(map, ModeMapEditorSchemas.MATCH_END_TELEPORT, point);
         }
 
         try {
@@ -567,7 +582,8 @@ public final class MapManagementCommand {
                 savedMaps.add(map);
             }
         } catch (RuntimeException e) {
-            previousPoints.forEach(MapManagementCommand::writeMatchEndTeleportPoint);
+            previousPoints.forEach((map, previousPoint) ->
+                    writeObjectFeaturePoint(map, ModeMapEditorSchemas.MATCH_END_TELEPORT, previousPoint));
             for (BaseMap savedMap : savedMaps) {
                 try {
                     CodMapPersistence.saveMap(savedMap);
@@ -588,7 +604,7 @@ public final class MapManagementCommand {
     }
 
     private static String resolveGameType(CommandSourceStack source, String rawType) {
-        String type = TdmGameTypes.canonicalize(rawType);
+        String type = GameModeRegistry.canonicalize(rawType);
         if (!FPSMCore.getInstance().checkGameType(type)) {
             source.sendFailure(Component.translatable("message.fpsm.map_creator_tool.invalid_type"));
             return null;
@@ -637,32 +653,28 @@ public final class MapManagementCommand {
         return team.get();
     }
 
-    private static SpawnPointKind resolveSpawnKind(CommandSourceStack source, BaseMap map, String rawKind) {
-        if (rawKind == null || rawKind.isBlank()) {
-            return supportedSpawnKindOrFail(source, map, SpawnPointKind.INITIAL, rawKind);
-        }
-        String normalized = rawKind.trim().toUpperCase(Locale.ROOT);
-        for (SpawnPointKind kind : SpawnPointKind.values()) {
-            if (kind.serializedName().equalsIgnoreCase(normalized)) {
-                return supportedSpawnKindOrFail(source, map, kind, rawKind);
-            }
-        }
-        source.sendFailure(Component.translatable("command.codpattern.map.invalid_kind", rawKind));
-        return null;
-    }
-
-    private static SpawnPointKind supportedSpawnKindOrFail(
-            CommandSourceStack source,
-            BaseMap map,
-            SpawnPointKind kind,
-            String rawKind
-    ) {
-        if (map == null || TdmMapEditorSchemas.supportsSpawnPointLayer(map.getGameType(), kind)) {
-            return kind;
+    private static String resolvePointLayer(CommandSourceStack source, BaseMap map, String rawLayerKey) {
+        Optional<String> layerKey = ModeMapEditorSchemas.resolvePointLayerKey(
+                map == null ? defaultGameType() : map.getGameType(),
+                rawLayerKey);
+        if (layerKey.isPresent()) {
+            return layerKey.get();
         }
         source.sendFailure(Component.translatable(
                 "command.codpattern.map.invalid_kind",
-                rawKind == null || rawKind.isBlank() ? kind.serializedName() : rawKind));
+                rawLayerKey == null || rawLayerKey.isBlank()
+                        ? SpawnPointKind.INITIAL.serializedName()
+                        : rawLayerKey));
+        return null;
+    }
+
+    private static ModeMapEditPort requireMapEditPort(CommandSourceStack source, BaseMap map, String layerKey) {
+        Optional<ModeMapEditPort> editPort = mapEditPort(map)
+                .filter(port -> port.supportsPointLayer(layerKey));
+        if (editPort.isPresent()) {
+            return editPort.get();
+        }
+        source.sendFailure(Component.translatable("command.codpattern.map.invalid_kind", layerKey));
         return null;
     }
 
@@ -699,21 +711,27 @@ public final class MapManagementCommand {
         return removedCount;
     }
 
-    private static Optional<SpawnPointData> readMatchEndTeleportPoint(BaseMap map) {
+    private static Optional<ModeMapEditPort> mapEditPort(BaseMap map) {
         if (map instanceof ModeRoomBackedMap backedMap) {
             ModeRoomHandle handle = backedMap.roomHandle();
-            if (handle.summaryPort() instanceof ModeRoomReadPort readPort) {
-                return readPort.matchEndTeleportPoint();
-            }
+            return handle == null ? Optional.empty() : handle.mapEditPort();
         }
         return Optional.empty();
     }
 
-    private static void writeMatchEndTeleportPoint(BaseMap map, SpawnPointData point) {
-        if (map instanceof ModeRoomBackedMap backedMap) {
-            backedMap.roomHandle().actionPort()
-                    .ifPresent(actionPort -> actionPort.setMatchEndTeleportPoint(point));
-        }
+    private static Optional<SpawnPointData> readObjectFeaturePoint(BaseMap map, String featureKey) {
+        return mapEditPort(map)
+                .filter(port -> port.supportsObjectFeature(featureKey))
+                .flatMap(port -> port.objectFeature(featureKey))
+                .map(ModeObjectData::toSpawnPointData);
+    }
+
+    private static void writeObjectFeaturePoint(BaseMap map, String featureKey, SpawnPointData point) {
+        mapEditPort(map)
+                .filter(port -> port.supportsObjectFeature(featureKey))
+                .ifPresent(port -> port.setObjectFeature(
+                        featureKey,
+                        point == null ? null : ModeObjectData.fromSpawnPointData(featureKey, point)));
     }
 
     private static float currentYaw(CommandSourceStack source) {
@@ -727,7 +745,7 @@ public final class MapManagementCommand {
 
     private static List<String> registeredGameTypes() {
         return FPSMCore.getInstance().getGameTypes().stream()
-                .map(TdmGameTypes::canonicalize)
+                .map(GameModeRegistry::canonicalize)
                 .distinct()
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList();
@@ -736,7 +754,7 @@ public final class MapManagementCommand {
     private static List<String> mapNamesForContextType(CommandContext<CommandSourceStack> context) {
         try {
             String rawType = StringArgumentType.getString(context, "type");
-            String type = TdmGameTypes.canonicalize(rawType);
+            String type = GameModeRegistry.canonicalize(rawType);
             if (!FPSMCore.getInstance().checkGameType(type)) {
                 return List.of();
             }
@@ -751,14 +769,22 @@ public final class MapManagementCommand {
     private static List<String> spawnKindsForContextType(CommandContext<CommandSourceStack> context) {
         try {
             String rawType = StringArgumentType.getString(context, "type");
-            String type = TdmGameTypes.canonicalize(rawType);
+            String type = GameModeRegistry.canonicalize(rawType);
             if (!FPSMCore.getInstance().checkGameType(type)) {
                 return List.of();
             }
-            return TdmMapEditorSchemas.spawnPointLayerKeys(type);
+            return ModeMapEditorSchemas.spawnPointLayerKeys(type);
         } catch (IllegalArgumentException ignored) {
-            return TdmMapEditorSchemas.spawnPointLayerKeys(TdmGameTypes.CDP_TDM);
+            return ModeMapEditorSchemas.spawnPointLayerKeys(defaultGameType());
         }
+    }
+
+    private static String defaultGameType() {
+        return FPSMCore.getInstance().getGameTypes().stream()
+                .map(GameModeRegistry::canonicalize)
+                .filter(type -> !type.isBlank())
+                .findFirst()
+                .orElse("");
     }
 
     private static List<String> allMapNames() {
@@ -771,7 +797,7 @@ public final class MapManagementCommand {
         try {
             String rawType = StringArgumentType.getString(context, "type");
             String mapName = StringArgumentType.getString(context, "map");
-            String type = TdmGameTypes.canonicalize(rawType);
+            String type = GameModeRegistry.canonicalize(rawType);
             if (!FPSMCore.getInstance().checkGameType(type)) {
                 return null;
             }

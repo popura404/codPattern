@@ -1,7 +1,7 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
 import com.cdp.codpattern.app.match.GameModeRegistry;
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 import com.cdp.codpattern.config.tdm.CodTdmConfig;
 import com.cdp.codpattern.network.tdm.CountdownPacket;
@@ -153,7 +153,7 @@ final class CodTdmPhaseStateHooks implements PhaseStateMachine.Hooks {
     }
 
     private String resolveObjectiveKey(String gameType) {
-        if (TdmGameTypes.isTeamDeathMatch(gameType)) {
+        if (BuiltInGameModes.isTeamDeathMatch(gameType)) {
             return "hud.codpattern.tdm.intro.teamdeathmatch.objective";
         }
         return "hud.codpattern.tdm.intro.frontline.objective";

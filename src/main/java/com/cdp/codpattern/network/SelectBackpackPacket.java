@@ -1,5 +1,6 @@
 package com.cdp.codpattern.network;
 
+import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackNameHelper;
@@ -58,6 +59,9 @@ public class SelectBackpackPacket {
                                             .withColor(0xDDDDDD)
                                             .withBold(true)
                                             .withItalic(false))));
+                    FpsMatchGatewayProvider.gateway()
+                            .findPlayerKitDistributionPort(player)
+                            .ifPresent(port -> port.onBackpackSelected(player, backpackId));
                 } else {
                     // 背包ID无效，发送错误提示
                     player.connection.send(new ClientboundSetActionBarTextPacket(

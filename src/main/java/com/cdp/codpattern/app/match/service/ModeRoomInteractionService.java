@@ -4,13 +4,10 @@ import com.cdp.codpattern.app.match.model.JoinRoomRequest;
 import com.cdp.codpattern.app.match.model.JoinRoomResult;
 import com.cdp.codpattern.app.match.model.LeaveRoomResult;
 import com.cdp.codpattern.app.match.model.RoomId;
-import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
 import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
 import com.cdp.codpattern.app.match.port.ReadyStatePort;
 import com.cdp.codpattern.app.match.port.TeamRoomPort;
 import com.cdp.codpattern.app.match.port.VoteControlPort;
-import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
-import com.cdp.codpattern.app.tdm.service.TdmRoomInteractionService;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGateway;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import net.minecraft.network.chat.Component;
@@ -38,10 +35,6 @@ public final class ModeRoomInteractionService {
         }
 
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
-        if (isLegacyTdmAction(gateway.findRoomActionPort(roomId))) {
-            return fromTdm(TdmRoomInteractionService.joinRoom(player, roomKey, teamName));
-        }
-
         Optional<ModeRoomLifecyclePort> lifecyclePort = gateway.findRoomLifecyclePort(roomId);
         if (lifecyclePort.isEmpty()) {
             return new JoinResult(false, roomId.encode(), CODE_MAP_NOT_FOUND, "");
@@ -51,10 +44,6 @@ public final class ModeRoomInteractionService {
 
     public static LeaveResult leaveRoom(ServerPlayer player) {
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
-        if (isLegacyTdmAction(gateway.findPlayerRoomActionPort(player))) {
-            return fromTdm(TdmRoomInteractionService.leaveRoom(player));
-        }
-
         Optional<ModeRoomLifecyclePort> lifecyclePort = gateway.findPlayerRoomLifecyclePort(player);
         if (lifecyclePort.isEmpty()) {
             return new LeaveResult(false, "", CODE_NOT_IN_ROOM, "");
@@ -64,16 +53,11 @@ public final class ModeRoomInteractionService {
 
     public static void selectTeamInRoom(ServerPlayer player, String roomKey, String teamName) {
         RoomId roomId = decodeRoomId(roomKey);
-        if (roomId == null || teamName == null || teamName.isBlank()) {
+        if (player == null || roomId == null || teamName == null || teamName.isBlank()) {
             return;
         }
 
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
-        if (isLegacyTdmAction(gateway.findRoomActionPort(roomId))) {
-            TdmRoomInteractionService.selectTeamInRoom(player, roomKey, teamName);
-            return;
-        }
-
         Optional<TeamRoomPort> teamPort = gateway.findRoomTeamPort(roomId);
         if (teamPort.isEmpty()) {
             return;
@@ -87,10 +71,6 @@ public final class ModeRoomInteractionService {
 
     public static Component setReadyState(ServerPlayer player, boolean ready) {
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
-        if (isLegacyTdmAction(gateway.findPlayerRoomActionPort(player))) {
-            return TdmRoomInteractionService.setReadyState(player, ready);
-        }
-
         Optional<ReadyStatePort> readyPort = gateway.findPlayerReadyStatePort(player);
         if (readyPort.isEmpty()) {
             return Component.translatable("message.codpattern.room.not_joined_tdm");
@@ -104,36 +84,20 @@ public final class ModeRoomInteractionService {
 
     public static void initiateStartVote(ServerPlayer player) {
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
-        if (isLegacyTdmAction(gateway.findPlayerRoomActionPort(player))) {
-            TdmRoomInteractionService.initiateStartVote(player);
-            return;
-        }
         gateway.findPlayerVoteControlPort(player)
                 .ifPresent(port -> port.initiateStartVote(player.getUUID()));
     }
 
     public static void initiateEndVote(ServerPlayer player) {
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
-        if (isLegacyTdmAction(gateway.findPlayerRoomActionPort(player))) {
-            TdmRoomInteractionService.initiateEndVote(player);
-            return;
-        }
         gateway.findPlayerVoteControlPort(player)
                 .ifPresent(port -> port.initiateEndVote(player.getUUID()));
     }
 
     public static void submitVoteResponse(ServerPlayer player, long voteId, boolean accepted) {
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
-        if (isLegacyTdmAction(gateway.findPlayerRoomActionPort(player))) {
-            TdmRoomInteractionService.submitVoteResponse(player, voteId, accepted);
-            return;
-        }
         gateway.findPlayerVoteControlPort(player)
                 .ifPresent(port -> port.submitVoteResponse(player.getUUID(), voteId, accepted));
-    }
-
-    private static boolean isLegacyTdmAction(Optional<ModeRoomActionPort> actionPort) {
-        return actionPort.filter(CodTdmActionPort.class::isInstance).isPresent();
     }
 
     private static JoinRoomRequest joinRequest(String teamName) {
@@ -159,14 +123,6 @@ public final class ModeRoomInteractionService {
                 roomId == null ? "" : roomId.encode(),
                 result == null ? CODE_NOT_IN_ROOM : result.code(),
                 result == null ? "" : result.message());
-    }
-
-    private static JoinResult fromTdm(TdmRoomInteractionService.JoinResult result) {
-        return new JoinResult(result.success(), result.roomKey(), result.code(), result.message());
-    }
-
-    private static LeaveResult fromTdm(TdmRoomInteractionService.LeaveResult result) {
-        return new LeaveResult(result.success(), result.roomKey(), result.code(), result.message());
     }
 
     private static RoomId decodeRoomId(String roomKey) {

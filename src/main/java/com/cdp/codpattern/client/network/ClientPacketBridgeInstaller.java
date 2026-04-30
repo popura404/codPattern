@@ -5,8 +5,8 @@ import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.network.handler.ClientPacketBridge;
 import com.cdp.codpattern.network.handler.ClientPacketHandler;
-import com.cdp.codpattern.network.tdm.RoomListSyncPacket.RoomInfo;
-import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
+import com.cdp.codpattern.network.match.RoomRosterDelta;
+import com.cdp.codpattern.network.match.RoomSyncInfo;
 import com.phasetranscrystal.fpsmatch.common.client.FpsmClientPacketHandler;
 import com.phasetranscrystal.fpsmatch.common.packet.FpsmClientPacketBridge;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenMapCreatorToolScreenS2CPacket;
@@ -70,7 +70,7 @@ public final class ClientPacketBridgeInstaller {
             }
 
             @Override
-            public void roomListSync(long snapshotVersion, Map<RoomId, RoomInfo> rooms) {
+            public void roomListSync(long snapshotVersion, Map<RoomId, ? extends RoomSyncInfo> rooms) {
                 ClientPacketHandler.handleRoomListSync(snapshotVersion, rooms);
             }
 
@@ -87,7 +87,7 @@ public final class ClientPacketBridgeInstaller {
 
             @Override
             public void roomPlayerDelta(String roomKey, int rosterVersion,
-                    List<RoomPlayerDeltaPacket.PlayerDelta> updates) {
+                    List<RoomRosterDelta> updates) {
                 ClientPacketHandler.handleRoomPlayerDelta(roomKey, rosterVersion, updates);
             }
 

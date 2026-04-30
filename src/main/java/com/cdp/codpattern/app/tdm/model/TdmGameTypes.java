@@ -1,16 +1,16 @@
 package com.cdp.codpattern.app.tdm.model;
 
+import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.match.GameModeRegistry;
-import com.cdp.codpattern.app.match.model.ModeCapability;
 
 public final class TdmGameTypes {
     private TdmGameTypes() {
     }
 
-    public static final String FRONTLINE = "frontline";
-    public static final String TEAM_DEATHMATCH = "teamdeathmatch";
-    public static final String LEGACY_CDP_TDM = "cdptdm";
-    public static final String LEGACY_CDP_TACTICAL_TDM = "cdptacticaltdm";
+    public static final String FRONTLINE = BuiltInGameModes.FRONTLINE;
+    public static final String TEAM_DEATHMATCH = BuiltInGameModes.TEAM_DEATHMATCH;
+    public static final String LEGACY_CDP_TDM = BuiltInGameModes.LEGACY_CDP_TDM;
+    public static final String LEGACY_CDP_TACTICAL_TDM = BuiltInGameModes.LEGACY_CDP_TACTICAL_TDM;
 
     public static final String CDP_TDM = FRONTLINE;
     public static final String CDP_TACTICAL_TDM = TEAM_DEATHMATCH;
@@ -20,14 +20,14 @@ public final class TdmGameTypes {
     }
 
     public static boolean isFrontline(String gameType) {
-        return FRONTLINE.equals(canonicalize(gameType));
+        return BuiltInGameModes.isFrontline(gameType);
     }
 
     public static boolean isTeamDeathMatch(String gameType) {
-        return TEAM_DEATHMATCH.equals(canonicalize(gameType));
+        return BuiltInGameModes.isTeamDeathMatch(gameType);
     }
 
     public static boolean supportsDynamicRespawnPoints(String gameType) {
-        return GameModeRegistry.hasCapability(gameType, ModeCapability.DYNAMIC_RESPAWN_POINTS);
+        return BuiltInGameModes.supportsDynamicRespawnPoints(gameType);
     }
 }

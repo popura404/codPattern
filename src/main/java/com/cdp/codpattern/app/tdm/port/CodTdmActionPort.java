@@ -2,7 +2,7 @@ package com.cdp.codpattern.app.tdm.port;
 
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
 import net.minecraft.server.level.ServerPlayer;
@@ -18,7 +18,7 @@ public interface CodTdmActionPort extends ModeRoomActionPort {
 
     @Override
     default String gameType() {
-        return TdmGameTypes.CDP_TDM;
+        return BuiltInGameModes.FRONTLINE;
     }
 
     String mapName();
@@ -60,4 +60,6 @@ public interface CodTdmActionPort extends ModeRoomActionPort {
     Optional<String> consumeSpectatorPreferredTeam(ServerPlayer player);
 
     void requestRosterResync(ServerPlayer player);
+
+    void requestRosterPreview(ServerPlayer player);
 }

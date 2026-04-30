@@ -1,8 +1,11 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
+import com.cdp.codpattern.client.gui.screen.match.ModeRoomButtonStateBinder;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.network.chat.Component;
 
+/**
+ * Legacy helper name retained for older callers. New code should use {@link ModeRoomButtonStateBinder}.
+ */
 public final class TdmRoomButtonStateBinder {
     private TdmRoomButtonStateBinder() {
     }
@@ -22,30 +25,19 @@ public final class TdmRoomButtonStateBinder {
             boolean hasStartVote,
             boolean hasEndVote
     ) {
-        boolean canSwitchTeam = TdmRoomStateEvaluator.isTeamSwitchAllowed(currentRoomState);
-        boolean canStartVote = TdmRoomStateEvaluator.canStartVote(currentRoomState);
-        boolean canEndVote = TdmRoomStateEvaluator.canEndVote(currentRoomState);
-
-        if (readyButton != null) {
-            readyButton.active = hasReadyState && hasJoinedRoom && "WAITING".equals(currentRoomState) && !hasPendingAction;
-            readyButton.setMessage(Component.translatable(
-                    localPlayerReady ? "screen.codpattern.tdm.ready_cancel" : "screen.codpattern.tdm.ready"));
-        }
-
-        if (voteStartButton != null) {
-            voteStartButton.active = hasStartVote && hasJoinedRoom && canStartVote && !hasPendingAction;
-        }
-
-        if (voteEndButton != null) {
-            voteEndButton.active = hasEndVote && hasJoinedRoom && canEndVote && !hasPendingAction;
-        }
-
-        if (kortacButton != null) {
-            kortacButton.active = hasTeamSelection && hasJoinedRoom && canSwitchTeam && !hasPendingAction;
-        }
-
-        if (specgruButton != null) {
-            specgruButton.active = hasTeamSelection && hasJoinedRoom && canSwitchTeam && !hasPendingAction;
-        }
+        ModeRoomButtonStateBinder.refresh(
+                readyButton,
+                voteStartButton,
+                voteEndButton,
+                kortacButton,
+                specgruButton,
+                hasJoinedRoom,
+                hasPendingAction,
+                currentRoomState,
+                localPlayerReady,
+                hasTeamSelection,
+                hasReadyState,
+                hasStartVote,
+                hasEndVote);
     }
 }

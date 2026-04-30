@@ -1,8 +1,12 @@
 package com.phasetranscrystal.fpsmatch.common.packet;
 
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
-import com.cdp.codpattern.app.tdm.model.TdmMapEditorSchemas;
-import com.cdp.codpattern.app.tdm.service.DynamicSpawnMergeService;
+import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.ModeRoomBackedMap;
+import com.cdp.codpattern.app.match.ModeRoomHandle;
+import com.cdp.codpattern.app.match.editor.ModeMapEditorSchemas;
+import com.cdp.codpattern.app.match.editor.ModePointData;
+import com.cdp.codpattern.app.match.port.ModeMapEditPort;
+import com.cdp.codpattern.app.match.service.DynamicSpawnMergeService;
 import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.SpawnPointTool;
@@ -146,18 +150,34 @@ public class SpawnPointToolActionC2SPacket {
             );
             return;
         }
+        if (snapshot.mapEditPort().isEmpty()) {
+            player.displayClientMessage(Component.translatable("command.codpattern.map.invalid_kind", snapshot.selectedKind()), false);
+            return;
+        }
 
         BaseTeam team = snapshot.team().get();
-        TeamSpawnProfile previousSpawnProfile = team.getSpawnProfile();
-        team.removeSpawnPointData(snapshot.spawnPointKind(), snapshot.selectedIndex());
-        team.clearPlayerSpawnPointAssignments();
-        if (snapshot.spawnPointKind() == SpawnPointKind.INITIAL && !team.getSpawnPointsData().isEmpty()) {
-            team.assignNextSpawnPoints(SpawnPointKind.INITIAL);
+        ModeMapEditPort editPort = snapshot.mapEditPort().get();
+        List<ModePointData> previousPoints = snapshot.pointLayerPoints();
+        Optional<ModePointData> removed = editPort.removePointLayerPoint(
+                team.name,
+                snapshot.selectedKind(),
+                snapshot.selectedIndex());
+        if (removed.isEmpty()) {
+            sendScreen(
+                    player,
+                    stack,
+                    snapshot.selectedType(),
+                    snapshot.selectedMap(),
+                    snapshot.selectedTeam(),
+                    snapshot.selectedKind(),
+                    -1
+            );
+            return;
         }
         try {
             CodMapPersistence.saveMapOrRollback(
                     snapshot.map().orElseThrow(),
-                    () -> CodMapPersistence.restoreSpawnProfile(snapshot.map().orElse(null), team, previousSpawnProfile));
+                    () -> editPort.replacePointLayerPoints(team.name, snapshot.selectedKind(), previousPoints));
         } catch (RuntimeException e) {
             player.displayClientMessage(Component.translatable(
                     "message.codpattern.map.save_failed",
@@ -199,15 +219,19 @@ public class SpawnPointToolActionC2SPacket {
             player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.team_not_found", snapshot.selectedTeam()), false);
             return;
         }
+        if (snapshot.mapEditPort().isEmpty()) {
+            player.displayClientMessage(Component.translatable("command.codpattern.map.invalid_kind", snapshot.selectedKind()), false);
+            return;
+        }
 
         BaseTeam team = snapshot.team().get();
-        TeamSpawnProfile previousSpawnProfile = team.getSpawnProfile();
-        team.resetSpawnPointData(snapshot.spawnPointKind());
-        team.clearPlayerSpawnPointAssignments();
+        ModeMapEditPort editPort = snapshot.mapEditPort().get();
+        List<ModePointData> previousPoints = snapshot.pointLayerPoints();
+        editPort.clearPointLayerPoints(team.name, snapshot.selectedKind());
         try {
             CodMapPersistence.saveMapOrRollback(
                     snapshot.map().orElseThrow(),
-                    () -> CodMapPersistence.restoreSpawnProfile(snapshot.map().orElse(null), team, previousSpawnProfile));
+                    () -> editPort.replacePointLayerPoints(team.name, snapshot.selectedKind(), previousPoints));
         } catch (RuntimeException e) {
             player.displayClientMessage(Component.translatable(
                     "message.codpattern.map.save_failed",
@@ -251,7 +275,7 @@ public class SpawnPointToolActionC2SPacket {
         }
 
         BaseMap map = snapshot.map().get();
-        if (!TdmMapEditorSchemas.supportsDynamicRespawnMerge(map.getGameType())) {
+        if (!ModeMapEditorSchemas.supportsDynamicRespawnMerge(map.getGameType())) {
             player.displayClientMessage(Component.translatable(
                     "command.codpattern.map.spawn.merge.unsupported_mode",
                     map.getGameType()), false);
@@ -334,7 +358,7 @@ public class SpawnPointToolActionC2SPacket {
             String requestedTeam, String requestedKind, int requestedIndex) {
         FPSMCore core = FPSMCore.getInstance();
         List<String> availableTypes = core.getGameTypes();
-        String canonicalRequestedType = TdmGameTypes.canonicalize(requestedType);
+        String canonicalRequestedType = GameModeRegistry.canonicalize(requestedType);
         String selectedType = availableTypes.contains(canonicalRequestedType) ? canonicalRequestedType : firstOrBlank(availableTypes);
         List<String> availableMaps = selectedType.isBlank() ? List.of() : core.getMapNamesWithType(selectedType);
         String selectedMap = availableMaps.contains(requestedMap) ? requestedMap : firstOrBlank(availableMaps);
@@ -348,10 +372,15 @@ public class SpawnPointToolActionC2SPacket {
         Optional<BaseTeam> team = map.flatMap(baseMap -> baseMap.getMapTeams().getTeamByName(selectedTeam));
         List<String> availableKinds = SpawnPointTool.availableKindsForType(selectedType);
         String selectedKind = SpawnPointTool.normalizeSelectedKind(selectedType, requestedKind);
-        SpawnPointKind spawnPointKind = SpawnPointKind.fromSerializedName(selectedKind);
-        List<SpawnPointData> spawnPoints = team.map(baseTeam -> baseTeam.getSpawnPointsData(spawnPointKind))
+        Optional<ModeMapEditPort> editPort = map.flatMap(SpawnPointToolActionC2SPacket::mapEditPort)
+                .filter(port -> port.supportsPointLayer(selectedKind));
+        List<ModePointData> pointLayerPoints = team
+                .flatMap(baseTeam -> editPort.map(port -> port.pointLayerPoints(baseTeam.name, selectedKind)))
                 .map(List::copyOf)
                 .orElse(List.of());
+        List<SpawnPointData> spawnPoints = pointLayerPoints.stream()
+                .map(point -> toDisplaySpawnPointData(selectedKind, point))
+                .toList();
 
         SpawnPointTool.setSelectedType(stack, selectedType);
         SpawnPointTool.setSelectedMap(stack, selectedMap);
@@ -373,10 +402,25 @@ public class SpawnPointToolActionC2SPacket {
                 selectedKind,
                 normalizedIndex,
                 spawnPoints,
-                spawnPointKind,
+                pointLayerPoints,
+                editPort,
                 map,
                 team
         );
+    }
+
+    private static Optional<ModeMapEditPort> mapEditPort(BaseMap map) {
+        if (map instanceof ModeRoomBackedMap backedMap) {
+            ModeRoomHandle handle = backedMap.roomHandle();
+            return handle == null ? Optional.empty() : handle.mapEditPort();
+        }
+        return Optional.empty();
+    }
+
+    private static SpawnPointData toDisplaySpawnPointData(String layerKey, ModePointData point) {
+        SpawnPointKind kind = ModeMapEditorSchemas.legacySpawnPointKind(layerKey)
+                .orElse(SpawnPointKind.INITIAL);
+        return point.toSpawnPointData(kind);
     }
 
     private static String firstOrBlank(List<String> values) {
@@ -417,7 +461,8 @@ public class SpawnPointToolActionC2SPacket {
             String selectedKind,
             int selectedIndex,
             List<SpawnPointData> spawnPoints,
-            SpawnPointKind spawnPointKind,
+            List<ModePointData> pointLayerPoints,
+            Optional<ModeMapEditPort> mapEditPort,
             Optional<BaseMap> map,
             Optional<BaseTeam> team
     ) {

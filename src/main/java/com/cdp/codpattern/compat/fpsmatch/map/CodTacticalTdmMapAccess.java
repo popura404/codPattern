@@ -2,7 +2,7 @@ package com.cdp.codpattern.compat.fpsmatch.map;
 
 import com.cdp.codpattern.app.tactical.port.CodTacticalTdmActionPort;
 import com.cdp.codpattern.app.tactical.port.CodTacticalTdmReadPort;
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
@@ -68,12 +68,11 @@ public final class CodTacticalTdmMapAccess {
     }
 
     public static void registerMap(CodTacticalTdmMap map) {
-        FPSMCore.getInstance().registerMap(TdmGameTypes.CDP_TACTICAL_TDM, map);
+        FpsMatchMapRegistry.register(BuiltInGameModes.TEAM_DEATHMATCH, map);
     }
 
     private static Optional<CodTacticalTdmMap> findByName(String mapName) {
-        return FPSMCore.getInstance()
-                .getMapByTypeWithName(TdmGameTypes.CDP_TACTICAL_TDM, mapName)
+        return FpsMatchMapRegistry.findByName(BuiltInGameModes.TEAM_DEATHMATCH, mapName)
                 .filter(map -> map instanceof CodTacticalTdmMap)
                 .map(map -> (CodTacticalTdmMap) map);
     }
@@ -86,9 +85,7 @@ public final class CodTacticalTdmMapAccess {
     }
 
     private static List<CodTacticalTdmMap> listMaps() {
-        List<BaseMap> maps = FPSMCore.getInstance()
-                .getAllMaps()
-                .getOrDefault(TdmGameTypes.CDP_TACTICAL_TDM, List.of());
+        List<BaseMap> maps = FpsMatchMapRegistry.listMaps(BuiltInGameModes.TEAM_DEATHMATCH);
         return maps.stream()
                 .filter(map -> map instanceof CodTacticalTdmMap)
                 .map(map -> (CodTacticalTdmMap) map)

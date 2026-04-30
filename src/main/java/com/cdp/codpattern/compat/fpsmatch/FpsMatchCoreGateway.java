@@ -1,26 +1,22 @@
 package com.cdp.codpattern.compat.fpsmatch;
 
 import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.GameModeRuntimeRegistry;
 import com.cdp.codpattern.app.match.ModeRoomBackedMap;
 import com.cdp.codpattern.app.match.ModeRoomHandle;
 import com.cdp.codpattern.app.match.model.ModeDescriptor;
 import com.cdp.codpattern.app.match.model.RoomId;
-import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
 import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
+import com.cdp.codpattern.app.match.port.ModeKitDistributionPort;
 import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
 import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
+import com.cdp.codpattern.app.match.port.ModeRosterPort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
 import com.cdp.codpattern.app.match.port.ReadyStatePort;
 import com.cdp.codpattern.app.match.port.TeamRoomPort;
 import com.cdp.codpattern.app.match.port.VoteControlPort;
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
-import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
-import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
-import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
-import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.ArrayList;
@@ -35,16 +31,6 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
     @Override
     public boolean isInMatch(UUID playerId) {
         return findRoomHandleByPlayerId(playerId).isPresent();
-    }
-
-    @Override
-    public Optional<ModeRoomActionPort> findRoomActionPort(RoomId roomId) {
-        return findRoomHandle(roomId).flatMap(ModeRoomHandle::actionPort);
-    }
-
-    @Override
-    public Optional<ModeRoomActionPort> findPlayerRoomActionPort(ServerPlayer player) {
-        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::actionPort);
     }
 
     @Override
@@ -93,6 +79,21 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
     }
 
     @Override
+    public Optional<ModeRosterPort> findRoomRosterPort(RoomId roomId) {
+        return findRoomHandle(roomId).flatMap(ModeRoomHandle::rosterPort);
+    }
+
+    @Override
+    public Optional<ModeRosterPort> findPlayerRosterPort(ServerPlayer player) {
+        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::rosterPort);
+    }
+
+    @Override
+    public Optional<ModeKitDistributionPort> findPlayerKitDistributionPort(ServerPlayer player) {
+        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::kitDistributionPort);
+    }
+
+    @Override
     public List<ModeRoomSummaryPort> listRoomSummaryPorts() {
         List<ModeRoomSummaryPort> ports = new ArrayList<>();
         for (ModeRoomHandle handle : listRoomHandles()) {
@@ -111,28 +112,6 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
     }
 
     @Override
-    public Optional<CodTdmActionPort> findMapActionPortByName(String mapName) {
-        return findRoomHandle(RoomId.of(TdmGameTypes.CDP_TDM, mapName))
-                .flatMap(FpsMatchCoreGateway::legacyTdmActionPort);
-    }
-
-    @Override
-    public Optional<CodTdmActionPort> findPlayerTdmActionPort(ServerPlayer player) {
-        return findPlayerRoomHandle(player).flatMap(FpsMatchCoreGateway::legacyTdmActionPort);
-    }
-
-    @Override
-    public Optional<CodTdmReadPort> findMapReadPortByName(String mapName) {
-        return findRoomHandle(RoomId.of(TdmGameTypes.CDP_TDM, mapName))
-                .flatMap(FpsMatchCoreGateway::legacyTdmReadPort);
-    }
-
-    @Override
-    public Optional<CodTdmReadPort> findPlayerTdmReadPort(ServerPlayer player) {
-        return findPlayerRoomHandle(player).flatMap(FpsMatchCoreGateway::legacyTdmReadPort);
-    }
-
-    @Override
     public void leaveCurrentMapIfDifferent(ServerPlayer player, String targetMapName) {
         findPlayerRoomHandle(player).ifPresent(handle -> {
             if (!handle.roomId().mapName().equals(targetMapName)) {
@@ -146,27 +125,6 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
         Optional<ModeRoomHandle> handleOptional = findPlayerRoomHandle(player);
         handleOptional.ifPresent(handle -> handle.lifecyclePort().leave(player));
         return handleOptional.map(handle -> handle.roomId().mapName());
-    }
-
-    @Override
-    public void createAndRegisterMap(ServerLevel level, String mapName, BlockPos from, BlockPos to) {
-        FPSMCore core = FPSMCore.getInstance();
-        var factory = core.getPreBuildGame(TdmGameTypes.CDP_TDM);
-        if (factory == null) {
-            return;
-        }
-        core.registerMap(TdmGameTypes.CDP_TDM, factory.apply(level, mapName, new AreaData(from, to)));
-    }
-
-    @Override
-    public List<CodTdmReadPort> listTdmReadPorts() {
-        List<CodTdmReadPort> ports = new ArrayList<>();
-        for (ModeRoomHandle handle : listRoomHandles()) {
-            if (TdmGameTypes.CDP_TDM.equals(GameModeRegistry.canonicalize(handle.roomId().gameType()))) {
-                legacyTdmReadPort(handle).ifPresent(ports::add);
-            }
-        }
-        return List.copyOf(ports);
     }
 
     private static Optional<ModeRoomHandle> findRoomHandle(RoomId roomId) {
@@ -230,6 +188,13 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
     }
 
     private static Optional<ModeRoomHandle> roomHandle(BaseMap map) {
+        if (map != null) {
+            Optional<ModeRoomHandle> providerHandle = GameModeRuntimeRegistry.find(map.getGameType())
+                    .flatMap(provider -> provider.roomHandle(map));
+            if (providerHandle.isPresent()) {
+                return providerHandle;
+            }
+        }
         if (map instanceof ModeRoomBackedMap backedMap) {
             return Optional.ofNullable(backedMap.roomHandle());
         }
@@ -243,19 +208,4 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
         return Optional.empty();
     }
 
-    private static Optional<CodTdmReadPort> legacyTdmReadPort(ModeRoomHandle handle) {
-        if (handle != null && handle.summaryPort() instanceof CodTdmReadPort readPort) {
-            return Optional.of(readPort);
-        }
-        return Optional.empty();
-    }
-
-    private static Optional<CodTdmActionPort> legacyTdmActionPort(ModeRoomHandle handle) {
-        if (handle == null) {
-            return Optional.empty();
-        }
-        return handle.actionPort()
-                .filter(CodTdmActionPort.class::isInstance)
-                .map(CodTdmActionPort.class::cast);
-    }
 }

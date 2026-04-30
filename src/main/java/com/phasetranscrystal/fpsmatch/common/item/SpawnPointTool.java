@@ -1,7 +1,11 @@
 package com.phasetranscrystal.fpsmatch.common.item;
 
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
-import com.cdp.codpattern.app.tdm.model.TdmMapEditorSchemas;
+import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.ModeRoomBackedMap;
+import com.cdp.codpattern.app.match.ModeRoomHandle;
+import com.cdp.codpattern.app.match.editor.ModeMapEditorSchemas;
+import com.cdp.codpattern.app.match.editor.ModePointData;
+import com.cdp.codpattern.app.match.port.ModeMapEditPort;
 import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.tool.CreatorToolItem;
@@ -12,9 +16,7 @@ import com.phasetranscrystal.fpsmatch.common.packet.AddPointDataS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.RemoveDebugDataByPrefixS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.SpawnPointToolActionC2SPacket;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
-import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
-import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import com.phasetranscrystal.fpsmatch.util.PreviewColorUtil;
@@ -65,7 +67,7 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
     public void syncHeldPreview(ServerPlayer player, ItemStack stack) {
         String selectedType = getSelectedType(stack).trim();
         String selectedMap = getSelectedMap(stack).trim();
-        SpawnPointKind selectedKind = SpawnPointKind.fromSerializedName(getSelectedKind(stack));
+        String selectedLayerKey = getSelectedKind(stack);
         if (selectedType.isBlank() || selectedMap.isBlank()) {
             clearHeldPreview(player);
             return;
@@ -79,10 +81,17 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
         }
 
         BaseMap map = mapOptional.get();
+        Optional<ModeMapEditPort> editPort = mapEditPort(map)
+                .filter(port -> port.supportsPointLayer(selectedLayerKey));
+        if (editPort.isEmpty()) {
+            clearHeldPreview(player);
+            return;
+        }
         String signatureWithPoints = buildHeldPreviewSignature(
-                selectedType + "|" + selectedMap + "|" + selectedKind.serializedName(),
+                selectedType + "|" + selectedMap + "|" + selectedLayerKey,
                 map,
-                selectedKind
+                selectedLayerKey,
+                editPort.get()
         );
         String previousSignature = player.getPersistentData().getString(HELD_PREVIEW_STATE_TAG);
         if (signatureWithPoints.equals(previousSignature) && player.tickCount % HELD_PREVIEW_REFRESH_INTERVAL != 0) {
@@ -101,15 +110,15 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
         for (int teamIndex = 0; teamIndex < orderedTeams.size(); teamIndex++) {
             BaseTeam team = orderedTeams.get(teamIndex);
             int pointColor = PreviewColorUtil.getPointPreviewColor(selectedType, teamIndex);
-            List<SpawnPointData> spawnPoints = team.getSpawnPointsData(selectedKind);
+            List<ModePointData> spawnPoints = editPort.get().pointLayerPoints(team.name, selectedLayerKey);
             for (int i = 0; i < spawnPoints.size(); i++) {
-                SpawnPointData data = spawnPoints.get(i);
+                ModePointData data = spawnPoints.get(i);
                 FPSMatch.sendToPlayer(player, new AddPointDataS2CPacket(
                         getHeldPreviewPointKey(player, team.name, i),
                         Component.literal(team.name + " #" + (i + 1)),
                         pointColor,
-                        Vec3.atCenterOf(data.getPosition()),
-                        data.getYaw()
+                        Vec3.atCenterOf(data.position()),
+                        data.yaw()
                 ));
             }
         }
@@ -138,18 +147,23 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
         return getHeldPreviewPrefix(player) + teamName + ":" + index;
     }
 
-    private static String buildHeldPreviewSignature(String baseSignature, BaseMap map, SpawnPointKind selectedKind) {
+    private static String buildHeldPreviewSignature(
+            String baseSignature,
+            BaseMap map,
+            String selectedLayerKey,
+            ModeMapEditPort editPort
+    ) {
         StringBuilder builder = new StringBuilder(baseSignature);
         for (BaseTeam team : getOrderedNormalTeams(map)) {
             builder.append('|').append(team.name);
-            for (SpawnPointData point : team.getSpawnPointsData(selectedKind)) {
+            for (ModePointData point : editPort.pointLayerPoints(team.name, selectedLayerKey)) {
                 builder.append('|')
-                        .append(point.getDimension().location())
+                        .append(point.dimension().location())
                         .append('@')
-                        .append(point.getX()).append(',')
-                        .append(point.getY()).append(',')
-                        .append(point.getZ()).append(',')
-                        .append(point.getYaw());
+                        .append(point.position().getX()).append(',')
+                        .append(point.position().getY()).append(',')
+                        .append(point.position().getZ()).append(',')
+                        .append(point.yaw());
             }
         }
         return builder.toString();
@@ -161,11 +175,19 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
                 .toList();
     }
 
+    private static Optional<ModeMapEditPort> mapEditPort(BaseMap map) {
+        if (map instanceof ModeRoomBackedMap backedMap) {
+            ModeRoomHandle handle = backedMap.roomHandle();
+            return handle == null ? Optional.empty() : handle.mapEditPort();
+        }
+        return Optional.empty();
+    }
+
     private void addSpawnPoint(ServerPlayer player, ItemStack stack, BlockPos clickedPos) {
         String selectedType = getSelectedType(stack);
         String selectedMap = getSelectedMap(stack);
         String selectedTeam = getSelectedTeam(stack);
-        SpawnPointKind selectedKind = SpawnPointKind.fromSerializedName(getSelectedKind(stack));
+        String selectedLayerKey = getSelectedKind(stack);
         if (selectedType.isBlank() || selectedMap.isBlank() || selectedTeam.isBlank()) {
             player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.missing_selection"), false);
             return;
@@ -194,23 +216,28 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
         }
 
         BaseTeam team = teamOptional.get();
-        TeamSpawnProfile previousSpawnProfile = team.getSpawnProfile();
-        SpawnPointData spawnPointData = new SpawnPointData(
+        Optional<ModeMapEditPort> editPort = mapEditPort(map)
+                .filter(port -> port.supportsPointLayer(selectedLayerKey));
+        if (editPort.isEmpty()) {
+            player.displayClientMessage(Component.translatable("command.codpattern.map.invalid_kind", selectedLayerKey), false);
+            return;
+        }
+        List<ModePointData> previousPoints = editPort.get().pointLayerPoints(team.name, selectedLayerKey);
+        ModePointData spawnPointData = new ModePointData(
+                selectedLayerKey,
                 player.serverLevel().dimension(),
                 clickedPos.above(),
                 player.getYRot(),
-                0.0F,
-                selectedKind
+                0.0F
         );
-        if (!team.addSpawnPointDataIfAbsent(spawnPointData)) {
+        if (!editPort.get().addPointLayerPoint(team.name, spawnPointData)) {
             player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.duplicate"), false);
             return;
         }
-        if (map.isStart && selectedKind == SpawnPointKind.INITIAL) {
-            team.assignNextSpawnPoints(SpawnPointKind.INITIAL);
-        }
         try {
-            CodMapPersistence.saveMapOrRollback(map, () -> CodMapPersistence.restoreSpawnProfile(map, team, previousSpawnProfile));
+            CodMapPersistence.saveMapOrRollback(
+                    map,
+                    () -> editPort.get().replacePointLayerPoints(team.name, selectedLayerKey, previousPoints));
         } catch (RuntimeException e) {
             player.displayClientMessage(Component.translatable(
                     "message.codpattern.map.save_failed",
@@ -225,11 +252,11 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
     }
 
     public static void setSelectedType(ItemStack stack, String selectedType) {
-        setStringTag(stack, TYPE_TAG, TdmGameTypes.canonicalize(selectedType));
+        setStringTag(stack, TYPE_TAG, GameModeRegistry.canonicalize(selectedType));
     }
 
     public static String getSelectedType(ItemStack stack) {
-        return TdmGameTypes.canonicalize(getStringTag(stack, TYPE_TAG));
+        return GameModeRegistry.canonicalize(getStringTag(stack, TYPE_TAG));
     }
 
     public static void setSelectedMap(ItemStack stack, String selectedMap) {
@@ -258,7 +285,7 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
     }
 
     public static List<String> availableKindsForType(String gameType) {
-        return TdmMapEditorSchemas.spawnPointLayerKeys(gameType);
+        return ModeMapEditorSchemas.spawnPointLayerKeys(gameType);
     }
 
     public static String normalizeSelectedKind(String gameType, String selectedKind) {

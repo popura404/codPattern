@@ -1,11 +1,11 @@
 package com.cdp.codpattern.compat.fpsmatch.data;
 
+import com.cdp.codpattern.app.match.BuiltInGameModes;
+import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.persistence.CommonModeMapData;
 import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceProvider;
-import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceRegistry;
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMap;
-import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMapAccess;
+import com.cdp.codpattern.compat.fpsmatch.map.FpsMatchMapRegistry;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Codec;
@@ -13,7 +13,6 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
-import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.save.FPSMDataManager;
 import com.phasetranscrystal.fpsmatch.core.data.save.SaveHolder;
 import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMSaveDataEvent;
@@ -34,6 +33,10 @@ import java.util.Optional;
 public class CodTdmMapData {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final ModeMapPersistenceProvider PERSISTENCE_PROVIDER = new FrontlinePersistenceProvider();
+
+    public static ModeMapPersistenceProvider persistenceProvider() {
+        return PERSISTENCE_PROVIDER;
+    }
 
     /**
      * 地图数据记录
@@ -102,14 +105,14 @@ public class CodTdmMapData {
      */
     @SubscribeEvent
     public static void onRegisterSaveData(RegisterFPSMSaveDataEvent event) {
-        ModeMapPersistenceRegistry.register(PERSISTENCE_PROVIDER);
+        GameModeBootstrap.registerPersistenceProviders();
         SaveHolder<MapData> saveHolder = new SaveHolder.Builder<>(MapData.CODEC)
                 .withReadHandler(CodTdmMapData::loadMap)
                 .withWriteHandler(CodTdmMapData::saveAllMaps)
                 .isGlobal(false) // 保存到世界文件夹
                 .build();
 
-        event.registerData(MapData.class, TdmGameTypes.CDP_TDM, saveHolder);
+        event.registerData(MapData.class, BuiltInGameModes.FRONTLINE, saveHolder);
     }
 
     /**
@@ -127,7 +130,7 @@ public class CodTdmMapData {
                     level.get(),
                     commonData,
                     toPayload(data));
-            CodTdmMapAccess.registerMap(map);
+            FpsMatchMapRegistry.register(BuiltInGameModes.FRONTLINE, map);
 
         } catch (Exception e) {
             LOGGER.error("Failed to load TDM map {}", data.mapName(), e);
@@ -138,9 +141,7 @@ public class CodTdmMapData {
      * 保存所有地图
      */
     private static void saveAllMaps(FPSMDataManager manager) {
-        FPSMCore.getInstance()
-                .getAllMaps()
-                .getOrDefault(TdmGameTypes.CDP_TDM, List.of())
+        FpsMatchMapRegistry.listMaps(BuiltInGameModes.FRONTLINE)
                 .forEach(map -> PERSISTENCE_PROVIDER.save(map, manager));
     }
 
@@ -160,7 +161,7 @@ public class CodTdmMapData {
     private static CommonModeMapData toCommonData(MapData data) {
         return new CommonModeMapData(
                 CodTdmMapPersistenceSupport.SCHEMA_VERSION,
-                TdmGameTypes.CDP_TDM,
+                BuiltInGameModes.FRONTLINE,
                 data.mapName(),
                 data.levelName(),
                 data.areaData(),
@@ -174,12 +175,12 @@ public class CodTdmMapData {
     private static final class FrontlinePersistenceProvider implements ModeMapPersistenceProvider {
         @Override
         public String gameType() {
-            return TdmGameTypes.CDP_TDM;
+            return BuiltInGameModes.FRONTLINE;
         }
 
         @Override
         public CodTdmMap createMap(ServerLevel level, CommonModeMapData commonData, Object payload) {
-            CodTdmMap map = CodTdmMapAccess.createMap(level, commonData.mapName(), commonData.areaData());
+            CodTdmMap map = new CodTdmMap(level, commonData.mapName(), commonData.areaData());
             applyPayload(map, payload);
             return map;
         }
@@ -194,7 +195,7 @@ public class CodTdmMapData {
             if (!(payload instanceof CodTdmMapPersistenceSupport.TeamPayload teamPayload)) {
                 throw new IllegalArgumentException("Unsupported TDM map payload: " + payload);
             }
-            CodTdmMapPersistenceSupport.applyPayload(CodTdmMapAccess.actionPort(tdmMap(map)), teamPayload);
+            CodTdmMapPersistenceSupport.applyPayload(tdmMap(map).actionPort(), teamPayload);
         }
 
         @Override
@@ -209,11 +210,11 @@ public class CodTdmMapData {
         }
 
         private CodTdmReadPort readPort(com.phasetranscrystal.fpsmatch.core.map.BaseMap map) {
-            return CodTdmMapAccess.readPort(tdmMap(map));
+            return tdmMap(map).readPort();
         }
 
         private CodTdmMap tdmMap(com.phasetranscrystal.fpsmatch.core.map.BaseMap map) {
-            if (map instanceof CodTdmMap tdmMap && TdmGameTypes.CDP_TDM.equals(tdmMap.getGameType())) {
+            if (map instanceof CodTdmMap tdmMap && BuiltInGameModes.FRONTLINE.equals(tdmMap.getGameType())) {
                 return tdmMap;
             }
             throw new IllegalArgumentException("Unsupported TDM map type: " + map.getClass().getName());

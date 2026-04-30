@@ -2,8 +2,8 @@ package com.cdp.codpattern.network.handler;
 
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
-import com.cdp.codpattern.network.tdm.RoomListSyncPacket.RoomInfo;
-import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
+import com.cdp.codpattern.network.match.RoomRosterDelta;
+import com.cdp.codpattern.network.match.RoomSyncInfo;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 
@@ -52,7 +52,7 @@ public final class ClientPacketBridge {
         handler.voteDialog(roomName, voteId, voteType, initiatorName, requiredVotes, totalVoters);
     }
 
-    public static void roomListSync(long snapshotVersion, Map<RoomId, RoomInfo> rooms) {
+    public static void roomListSync(long snapshotVersion, Map<RoomId, ? extends RoomSyncInfo> rooms) {
         handler.roomListSync(snapshotVersion, rooms);
     }
 
@@ -67,7 +67,7 @@ public final class ClientPacketBridge {
     public static void roomPlayerDelta(
             String roomKey,
             int rosterVersion,
-            List<RoomPlayerDeltaPacket.PlayerDelta> updates
+            List<RoomRosterDelta> updates
     ) {
         handler.roomPlayerDelta(roomKey, rosterVersion, updates);
     }
@@ -138,7 +138,7 @@ public final class ClientPacketBridge {
                 int requiredVotes, int totalVoters) {
         }
 
-        default void roomListSync(long snapshotVersion, Map<RoomId, RoomInfo> rooms) {
+        default void roomListSync(long snapshotVersion, Map<RoomId, ? extends RoomSyncInfo> rooms) {
         }
 
         default void teamPlayerList(String roomKey, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
@@ -148,7 +148,7 @@ public final class ClientPacketBridge {
         }
 
         default void roomPlayerDelta(String roomKey, int rosterVersion,
-                List<RoomPlayerDeltaPacket.PlayerDelta> updates) {
+                List<RoomRosterDelta> updates) {
         }
 
         default void popupNotice(Component title, Component message) {

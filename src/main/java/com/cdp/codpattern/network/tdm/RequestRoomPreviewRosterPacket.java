@@ -43,7 +43,7 @@ public class RequestRoomPreviewRosterPacket {
                 return;
             }
             FpsMatchGatewayProvider.gateway()
-                    .findRoomActionPort(roomId)
+                    .findRoomRosterPort(roomId)
                     .ifPresent(port -> port.requestRosterPreview(player));
         });
         ctx.get().setPacketHandled(true);

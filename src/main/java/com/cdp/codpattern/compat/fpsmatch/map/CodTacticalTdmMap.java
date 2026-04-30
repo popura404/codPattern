@@ -3,7 +3,7 @@ package com.cdp.codpattern.compat.fpsmatch.map;
 import com.cdp.codpattern.app.match.ModeRoomHandle;
 import com.cdp.codpattern.app.tactical.port.CodTacticalTdmActionPort;
 import com.cdp.codpattern.app.tactical.port.CodTacticalTdmReadPort;
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnSelectionReason;
@@ -22,7 +22,7 @@ public class CodTacticalTdmMap extends CodTdmMap {
 
     @Override
     public String getGameType() {
-        return TdmGameTypes.CDP_TACTICAL_TDM;
+        return BuiltInGameModes.TEAM_DEATHMATCH;
     }
 
     @Override
@@ -39,11 +39,11 @@ public class CodTacticalTdmMap extends CodTdmMap {
         return createRoomHandle(tacticalReadPort, tacticalActionPort);
     }
 
-    CodTacticalTdmActionPort tacticalActionPort() {
+    public CodTacticalTdmActionPort tacticalActionPort() {
         return tacticalActionPort;
     }
 
-    CodTacticalTdmReadPort tacticalReadPort() {
+    public CodTacticalTdmReadPort tacticalReadPort() {
         return tacticalReadPort;
     }
 }

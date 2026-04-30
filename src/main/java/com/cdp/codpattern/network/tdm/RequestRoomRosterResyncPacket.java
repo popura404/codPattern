@@ -29,7 +29,7 @@ public class RequestRoomRosterResyncPacket {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
                 FpsMatchGatewayProvider.gateway()
-                        .findPlayerRoomActionPort(player)
+                        .findPlayerRosterPort(player)
                         .ifPresent(port -> port.requestRosterResync(player));
             }
         });

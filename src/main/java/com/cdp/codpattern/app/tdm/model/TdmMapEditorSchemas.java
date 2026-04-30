@@ -2,15 +2,16 @@ package com.cdp.codpattern.app.tdm.model;
 
 import com.cdp.codpattern.app.match.editor.AreaLayerDefinition;
 import com.cdp.codpattern.app.match.editor.ModeMapEditorSchema;
-import com.cdp.codpattern.app.match.editor.ModeMapEditorSchemaRegistry;
+import com.cdp.codpattern.app.match.editor.ModeMapEditorSchemas;
 import com.cdp.codpattern.app.match.editor.ObjectFeatureDefinition;
 import com.cdp.codpattern.app.match.editor.PointLayerDefinition;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
 
 import java.util.List;
+import java.util.Optional;
 
 public final class TdmMapEditorSchemas {
-    public static final String MATCH_END_TELEPORT = "match_end_teleport";
+    public static final String MATCH_END_TELEPORT = ModeMapEditorSchemas.MATCH_END_TELEPORT;
 
     private static final ModeMapEditorSchema FRONTLINE_SCHEMA = schema(List.of(initialSpawnLayer()));
     private static final ModeMapEditorSchema TEAM_DEATHMATCH_SCHEMA = schema(List.of(
@@ -22,30 +23,43 @@ public final class TdmMapEditorSchemas {
     }
 
     public static void registerDefaults() {
-        ModeMapEditorSchemaRegistry.register(TdmGameTypes.CDP_TDM, FRONTLINE_SCHEMA);
-        ModeMapEditorSchemaRegistry.register(TdmGameTypes.CDP_TACTICAL_TDM, TEAM_DEATHMATCH_SCHEMA);
+        ModeMapEditorSchemas.registerDefaults();
+    }
+
+    public static ModeMapEditorSchema frontlineSchema() {
+        return FRONTLINE_SCHEMA;
+    }
+
+    public static ModeMapEditorSchema teamDeathmatchSchema() {
+        return TEAM_DEATHMATCH_SCHEMA;
     }
 
     public static List<String> spawnPointLayerKeys(String gameType) {
-        registerDefaults();
-        List<String> keys = ModeMapEditorSchemaRegistry.pointLayerKeys(gameType);
-        return keys.isEmpty() ? List.of(SpawnPointKind.INITIAL.serializedName()) : keys;
+        return ModeMapEditorSchemas.spawnPointLayerKeys(gameType);
     }
 
     public static boolean supportsSpawnPointLayer(String gameType, SpawnPointKind kind) {
-        registerDefaults();
-        SpawnPointKind resolvedKind = kind == null ? SpawnPointKind.INITIAL : kind;
-        return ModeMapEditorSchemaRegistry.supportsPointLayer(gameType, resolvedKind.serializedName());
+        return ModeMapEditorSchemas.supportsSpawnPointLayer(gameType, kind);
+    }
+
+    public static Optional<String> resolvePointLayerKey(String gameType, String rawLayerKey) {
+        return ModeMapEditorSchemas.resolvePointLayerKey(gameType, rawLayerKey);
+    }
+
+    public static boolean supportsPointLayer(String gameType, String layerKey) {
+        return ModeMapEditorSchemas.supportsPointLayer(gameType, layerKey);
+    }
+
+    public static Optional<SpawnPointKind> legacySpawnPointKind(String layerKey) {
+        return ModeMapEditorSchemas.legacySpawnPointKind(layerKey);
     }
 
     public static boolean supportsDynamicRespawnMerge(String gameType) {
-        return supportsSpawnPointLayer(gameType, SpawnPointKind.DYNAMIC_CANDIDATE)
-                && TdmGameTypes.supportsDynamicRespawnPoints(gameType);
+        return ModeMapEditorSchemas.supportsDynamicRespawnMerge(gameType);
     }
 
     public static boolean supportsMatchEndTeleport(String gameType) {
-        registerDefaults();
-        return ModeMapEditorSchemaRegistry.supportsObjectFeature(gameType, MATCH_END_TELEPORT);
+        return ModeMapEditorSchemas.supportsMatchEndTeleport(gameType);
     }
 
     private static ModeMapEditorSchema schema(List<PointLayerDefinition> pointLayers) {

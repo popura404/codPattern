@@ -90,10 +90,4 @@ public interface ModeRoomActionPort extends ModeRoomLifecyclePort, ReadyStatePor
     void setSpectatorPreferredTeam(ServerPlayer player, String teamName);
 
     Optional<String> consumeSpectatorPreferredTeam(ServerPlayer player);
-
-    default void requestRosterResync(ServerPlayer player) {
-    }
-
-    default void requestRosterPreview(ServerPlayer player) {
-    }
 }

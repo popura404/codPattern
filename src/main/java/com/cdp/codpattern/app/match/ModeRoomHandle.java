@@ -2,8 +2,11 @@ package com.cdp.codpattern.app.match;
 
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
+import com.cdp.codpattern.app.match.port.ModeKitDistributionPort;
+import com.cdp.codpattern.app.match.port.ModeMapEditPort;
 import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
 import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
+import com.cdp.codpattern.app.match.port.ModeRosterPort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
 import com.cdp.codpattern.app.match.port.ReadyStatePort;
 import com.cdp.codpattern.app.match.port.TeamRoomPort;
@@ -20,7 +23,10 @@ public record ModeRoomHandle(
         Optional<TeamRoomPort> teamPort,
         Optional<ReadyStatePort> readyPort,
         Optional<VoteControlPort> votePort,
-        Optional<ModeCombatEventPort> combatEventPort
+        Optional<ModeCombatEventPort> combatEventPort,
+        Optional<ModeRosterPort> rosterPort,
+        Optional<ModeMapEditPort> mapEditPort,
+        Optional<ModeKitDistributionPort> kitDistributionPort
 ) {
     public ModeRoomHandle {
         Objects.requireNonNull(roomId, "roomId");
@@ -31,6 +37,9 @@ public record ModeRoomHandle(
         readyPort = readyPort == null ? Optional.empty() : readyPort;
         votePort = votePort == null ? Optional.empty() : votePort;
         combatEventPort = combatEventPort == null ? Optional.empty() : combatEventPort;
+        rosterPort = rosterPort == null ? Optional.empty() : rosterPort;
+        mapEditPort = mapEditPort == null ? Optional.empty() : mapEditPort;
+        kitDistributionPort = kitDistributionPort == null ? Optional.empty() : kitDistributionPort;
     }
 
     public ModeRoomHandle(
@@ -50,6 +59,58 @@ public record ModeRoomHandle(
                 teamPort,
                 readyPort,
                 votePort,
-                combatEventPort);
+                combatEventPort,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty());
+    }
+
+    public ModeRoomHandle(
+            RoomId roomId,
+            ModeRoomSummaryPort summaryPort,
+            ModeRoomActionPort actionPort,
+            Optional<TeamRoomPort> teamPort,
+            Optional<ReadyStatePort> readyPort,
+            Optional<VoteControlPort> votePort,
+            Optional<ModeCombatEventPort> combatEventPort,
+            Optional<ModeMapEditPort> mapEditPort
+    ) {
+        this(
+                roomId,
+                summaryPort,
+                actionPort,
+                Optional.ofNullable(actionPort),
+                teamPort,
+                readyPort,
+                votePort,
+                combatEventPort,
+                Optional.empty(),
+                mapEditPort,
+                Optional.empty());
+    }
+
+    public ModeRoomHandle(
+            RoomId roomId,
+            ModeRoomSummaryPort summaryPort,
+            ModeRoomActionPort actionPort,
+            Optional<TeamRoomPort> teamPort,
+            Optional<ReadyStatePort> readyPort,
+            Optional<VoteControlPort> votePort,
+            Optional<ModeCombatEventPort> combatEventPort,
+            Optional<ModeMapEditPort> mapEditPort,
+            Optional<ModeKitDistributionPort> kitDistributionPort
+    ) {
+        this(
+                roomId,
+                summaryPort,
+                actionPort,
+                Optional.ofNullable(actionPort),
+                teamPort,
+                readyPort,
+                votePort,
+                combatEventPort,
+                Optional.empty(),
+                mapEditPort,
+                kitDistributionPort);
     }
 }

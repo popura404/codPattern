@@ -1,6 +1,6 @@
 package com.phasetranscrystal.fpsmatch.common.item;
 
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.tool.CreatorToolItem;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionAction;
@@ -106,11 +106,11 @@ public class MapCreatorTool extends CreatorToolItem implements WorldToolItem {
     }
 
     public static void setSelectedType(ItemStack stack, String selectedType) {
-        setStringTag(stack, TYPE_TAG, TdmGameTypes.canonicalize(selectedType));
+        setStringTag(stack, TYPE_TAG, GameModeRegistry.canonicalize(selectedType));
     }
 
     public static String getSelectedType(ItemStack stack) {
-        return TdmGameTypes.canonicalize(getStringTag(stack, TYPE_TAG));
+        return GameModeRegistry.canonicalize(getStringTag(stack, TYPE_TAG));
     }
 
     public static void setDraftMapName(ItemStack stack, String draftMapName) {

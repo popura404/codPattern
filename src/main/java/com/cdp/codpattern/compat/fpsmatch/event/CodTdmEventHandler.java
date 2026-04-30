@@ -1,14 +1,12 @@
 package com.cdp.codpattern.compat.fpsmatch.event;
 
+import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.model.DamageContext;
 import com.cdp.codpattern.app.match.model.DamageDecision;
 import com.cdp.codpattern.app.match.model.DeathContext;
 import com.cdp.codpattern.app.match.model.DeathDecision;
 import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
-import com.cdp.codpattern.app.tdm.model.TdmMapEditorSchemas;
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
-import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMap;
 import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMapEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -33,8 +31,7 @@ public class CodTdmEventHandler {
      */
     @SubscribeEvent
     public static void onRegisterFPSMap(RegisterFPSMapEvent event) {
-        TdmMapEditorSchemas.registerDefaults();
-        event.registerGameType(TdmGameTypes.CDP_TDM, CodTdmMap::new);
+        GameModeBootstrap.registerCommonProviders(event);
     }
 
     /**

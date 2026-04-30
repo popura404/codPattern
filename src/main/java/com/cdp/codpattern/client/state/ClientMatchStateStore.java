@@ -1,10 +1,10 @@
 package com.cdp.codpattern.client.state;
 
 import com.cdp.codpattern.CodPattern;
-import com.cdp.codpattern.client.ClientTdmState;
+import com.cdp.codpattern.client.ClientMatchState;
 import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
-import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
+import com.cdp.codpattern.network.match.RoomRosterDelta;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
@@ -38,7 +38,7 @@ public final class ClientMatchStateStore {
     private int gameTimeTicks = 0;
     private int countdown = 0;
     private boolean blackout = false;
-    private ClientTdmState.BlackoutPhase blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
+    private ClientMatchState.BlackoutPhase blackoutPhase = ClientMatchState.BlackoutPhase.NONE;
     private int blackoutTicksRemaining = 0;
     private int blackoutTotalTicks = 0;
     private int blackoutFadeTicks = 0;
@@ -98,7 +98,7 @@ public final class ClientMatchStateStore {
         return blackout;
     }
 
-    public ClientTdmState.BlackoutPhase blackoutPhase() {
+    public ClientMatchState.BlackoutPhase blackoutPhase() {
         return blackoutPhase;
     }
 
@@ -227,26 +227,26 @@ public final class ClientMatchStateStore {
         }
     }
 
-    public ClientTdmState.RosterDeltaApplyResult applyTeamPlayerDelta(
+    public ClientMatchState.RosterDeltaApplyResult applyTeamPlayerDelta(
             String roomKey,
             int nextRosterVersion,
-            List<RoomPlayerDeltaPacket.PlayerDelta> updates
+            List<? extends RoomRosterDelta> updates
     ) {
         if (roomKey == null || roomKey.isBlank()) {
-            return ClientTdmState.RosterDeltaApplyResult.ROOM_MISMATCH;
+            return ClientMatchState.RosterDeltaApplyResult.ROOM_MISMATCH;
         }
         if (!syncedMapName.isBlank() && !syncedMapName.equals(roomKey)
                 && !roomContextName.isBlank() && !roomContextName.equals(roomKey)) {
-            return ClientTdmState.RosterDeltaApplyResult.ROOM_MISMATCH;
+            return ClientMatchState.RosterDeltaApplyResult.ROOM_MISMATCH;
         }
         if (rosterVersion <= 0 || nextRosterVersion != rosterVersion + 1) {
-            return ClientTdmState.RosterDeltaApplyResult.VERSION_GAP;
+            return ClientMatchState.RosterDeltaApplyResult.VERSION_GAP;
         }
 
         Map<String, List<PlayerInfo>> snapshot = teamPlayersSnapshot();
-        for (RoomPlayerDeltaPacket.PlayerDelta update : updates) {
+        for (RoomRosterDelta update : updates) {
             if (!applyPlayerDelta(snapshot, update)) {
-                return ClientTdmState.RosterDeltaApplyResult.PLAYER_MISSING;
+                return ClientMatchState.RosterDeltaApplyResult.PLAYER_MISSING;
             }
         }
         for (List<PlayerInfo> players : snapshot.values()) {
@@ -259,7 +259,7 @@ public final class ClientMatchStateStore {
         lastRosterSyncAtMs = System.currentTimeMillis();
         teamPlayers.clear();
         teamPlayers.putAll(snapshot);
-        return ClientTdmState.RosterDeltaApplyResult.APPLIED;
+        return ClientMatchState.RosterDeltaApplyResult.APPLIED;
     }
 
     public void updatePhase(String phase, int time) {
@@ -355,7 +355,7 @@ public final class ClientMatchStateStore {
         gameTimeTicks = 0;
         countdown = 0;
         blackout = false;
-        blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
+        blackoutPhase = ClientMatchState.BlackoutPhase.NONE;
         blackoutTicksRemaining = 0;
         blackoutTotalTicks = 0;
         blackoutFadeTicks = 0;
@@ -385,7 +385,7 @@ public final class ClientMatchStateStore {
 
     private boolean applyPlayerDelta(
             Map<String, List<PlayerInfo>> snapshot,
-            RoomPlayerDeltaPacket.PlayerDelta update
+            RoomRosterDelta update
     ) {
         if (update == null || update.snapshot() == null) {
             return false;
@@ -405,7 +405,7 @@ public final class ClientMatchStateStore {
         return false;
     }
 
-    private boolean replacePlayer(List<PlayerInfo> players, RoomPlayerDeltaPacket.PlayerDelta update) {
+    private boolean replacePlayer(List<PlayerInfo> players, RoomRosterDelta update) {
         if (players == null) {
             return false;
         }
@@ -497,7 +497,7 @@ public final class ClientMatchStateStore {
     }
 
     public boolean isBlackoutActive() {
-        return blackoutPhase != ClientTdmState.BlackoutPhase.NONE;
+        return blackoutPhase != ClientMatchState.BlackoutPhase.NONE;
     }
 
     public float getAnnouncementAlpha() {
@@ -559,17 +559,17 @@ public final class ClientMatchStateStore {
 
         switch (blackoutPhase) {
             case FADE_IN -> {
-                ClientTdmState.BlackoutPhase nextPhase = blackoutHoldTicks > 0
-                        ? ClientTdmState.BlackoutPhase.HOLD
-                        : ClientTdmState.BlackoutPhase.FADE_OUT;
+                ClientMatchState.BlackoutPhase nextPhase = blackoutHoldTicks > 0
+                        ? ClientMatchState.BlackoutPhase.HOLD
+                        : ClientMatchState.BlackoutPhase.FADE_OUT;
                 int nextDuration = blackoutHoldTicks > 0
                         ? blackoutHoldTicks
                         : PhaseStateMachine.PREPARE_BLACKOUT_FADE_OUT_TICKS;
                 tickBlackoutPhase(nextPhase, nextDuration);
             }
-            case HOLD -> tickBlackoutPhase(ClientTdmState.BlackoutPhase.FADE_OUT,
+            case HOLD -> tickBlackoutPhase(ClientMatchState.BlackoutPhase.FADE_OUT,
                     PhaseStateMachine.PREPARE_BLACKOUT_FADE_OUT_TICKS);
-            case FADE_OUT -> tickBlackoutPhase(ClientTdmState.BlackoutPhase.NONE, 0);
+            case FADE_OUT -> tickBlackoutPhase(ClientMatchState.BlackoutPhase.NONE, 0);
             default -> {
             }
         }
@@ -628,7 +628,7 @@ public final class ClientMatchStateStore {
     private void startBlackoutSequence(int totalTicks) {
         int sanitizedTotalTicks = Math.max(0, totalTicks);
         if (sanitizedTotalTicks <= 0) {
-            blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
+            blackoutPhase = ClientMatchState.BlackoutPhase.NONE;
             blackoutTotalTicks = 0;
             blackoutTicksRemaining = 0;
             blackoutFadeTicks = 0;
@@ -640,10 +640,10 @@ public final class ClientMatchStateStore {
         blackoutFadeTicks = Math.max(1, PhaseStateMachine.PREPARE_BLACKOUT_FADE_IN_TICKS);
         blackoutHoldTicks = Math.max(0,
                 sanitizedTotalTicks - blackoutFadeTicks - Math.max(1, PhaseStateMachine.PREPARE_BLACKOUT_FADE_OUT_TICKS));
-        setBlackoutPhase(ClientTdmState.BlackoutPhase.FADE_IN, blackoutFadeTicks);
+        setBlackoutPhase(ClientMatchState.BlackoutPhase.FADE_IN, blackoutFadeTicks);
     }
 
-    private void tickBlackoutPhase(ClientTdmState.BlackoutPhase nextPhase, int nextDurationTicks) {
+    private void tickBlackoutPhase(ClientMatchState.BlackoutPhase nextPhase, int nextDurationTicks) {
         if (blackoutTicksRemaining > 0) {
             blackoutTicksRemaining--;
         }
@@ -651,8 +651,8 @@ public final class ClientMatchStateStore {
             return;
         }
 
-        if (nextPhase == ClientTdmState.BlackoutPhase.NONE) {
-            blackoutPhase = ClientTdmState.BlackoutPhase.NONE;
+        if (nextPhase == ClientMatchState.BlackoutPhase.NONE) {
+            blackoutPhase = ClientMatchState.BlackoutPhase.NONE;
             blackoutTotalTicks = 0;
             blackoutTicksRemaining = 0;
             blackoutFadeTicks = 0;
@@ -664,7 +664,7 @@ public final class ClientMatchStateStore {
         setBlackoutPhase(nextPhase, nextDurationTicks);
     }
 
-    private void setBlackoutPhase(ClientTdmState.BlackoutPhase phase, int durationTicks) {
+    private void setBlackoutPhase(ClientMatchState.BlackoutPhase phase, int durationTicks) {
         blackoutPhase = phase;
         blackoutTotalTicks = Math.max(0, durationTicks);
         blackoutTicksRemaining = blackoutTotalTicks;

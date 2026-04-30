@@ -1,18 +1,15 @@
 package com.cdp.codpattern.compat.fpsmatch;
 
 import com.cdp.codpattern.app.match.model.RoomId;
-import com.cdp.codpattern.app.match.port.ModeRoomActionPort;
 import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
+import com.cdp.codpattern.app.match.port.ModeKitDistributionPort;
 import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
 import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
+import com.cdp.codpattern.app.match.port.ModeRosterPort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
 import com.cdp.codpattern.app.match.port.ReadyStatePort;
 import com.cdp.codpattern.app.match.port.TeamRoomPort;
 import com.cdp.codpattern.app.match.port.VoteControlPort;
-import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
-import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
-import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
@@ -23,16 +20,6 @@ public final class NoopFpsMatchGateway implements FpsMatchGateway {
     @Override
     public boolean isInMatch(UUID playerId) {
         return false;
-    }
-
-    @Override
-    public Optional<ModeRoomActionPort> findRoomActionPort(RoomId roomId) {
-        return Optional.empty();
-    }
-
-    @Override
-    public Optional<ModeRoomActionPort> findPlayerRoomActionPort(ServerPlayer player) {
-        return Optional.empty();
     }
 
     @Override
@@ -81,6 +68,21 @@ public final class NoopFpsMatchGateway implements FpsMatchGateway {
     }
 
     @Override
+    public Optional<ModeRosterPort> findRoomRosterPort(RoomId roomId) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<ModeRosterPort> findPlayerRosterPort(ServerPlayer player) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<ModeKitDistributionPort> findPlayerKitDistributionPort(ServerPlayer player) {
+        return Optional.empty();
+    }
+
+    @Override
     public List<ModeRoomSummaryPort> listRoomSummaryPorts() {
         return List.of();
     }
@@ -91,41 +93,11 @@ public final class NoopFpsMatchGateway implements FpsMatchGateway {
     }
 
     @Override
-    public Optional<CodTdmActionPort> findMapActionPortByName(String mapName) {
-        return Optional.empty();
-    }
-
-    @Override
-    public Optional<CodTdmActionPort> findPlayerTdmActionPort(ServerPlayer player) {
-        return Optional.empty();
-    }
-
-    @Override
-    public Optional<CodTdmReadPort> findMapReadPortByName(String mapName) {
-        return Optional.empty();
-    }
-
-    @Override
-    public Optional<CodTdmReadPort> findPlayerTdmReadPort(ServerPlayer player) {
-        return Optional.empty();
-    }
-
-    @Override
     public void leaveCurrentMapIfDifferent(ServerPlayer player, String targetMapName) {
     }
 
     @Override
     public Optional<String> leaveCurrentMapIncludingSpectator(ServerPlayer player) {
         return Optional.empty();
-    }
-
-    @Override
-    public void createAndRegisterMap(ServerLevel level, String mapName, BlockPos from, BlockPos to) {
-        throw new UnsupportedOperationException("FPSMatch gateway unavailable");
-    }
-
-    @Override
-    public List<CodTdmReadPort> listTdmReadPorts() {
-        return List.of();
     }
 }

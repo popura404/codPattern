@@ -1,6 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.config.path.ConfigPath;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.MinecraftServer;
@@ -68,7 +68,7 @@ final class CodTdmMapComponentsAssembler {
     }
 
     private static java.util.function.Function<MinecraftServer, Path> resolveMatchRecordDir(CodTdmMap map) {
-        return server -> TdmGameTypes.CDP_TACTICAL_TDM.equals(map.getGameType())
+        return server -> BuiltInGameModes.TEAM_DEATHMATCH.equals(map.getGameType())
                 ? ConfigPath.SERVER_TACTICAL_TDM_MATCH_RECORDS.getPath(server)
                 : ConfigPath.SERVER_TDM_MATCH_RECORDS.getPath(server);
     }

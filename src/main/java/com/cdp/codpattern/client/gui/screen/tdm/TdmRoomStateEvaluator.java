@@ -1,58 +1,42 @@
 package com.cdp.codpattern.client.gui.screen.tdm;
 
+import com.cdp.codpattern.client.gui.screen.match.ModeRoomData;
+import com.cdp.codpattern.client.gui.screen.match.ModeRoomStateEvaluator;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Legacy helper name retained for older callers. New code should use {@link ModeRoomStateEvaluator}.
+ */
 public final class TdmRoomStateEvaluator {
     private TdmRoomStateEvaluator() {
     }
 
     public static String currentRoomState(
             String joinedRoom,
-            Map<String, TdmRoomData> rooms,
+            Map<String, ModeRoomData> rooms,
             String livePhase,
             String fallbackPhase
     ) {
-        if (joinedRoom == null) {
-            return null;
-        }
-        if (livePhase != null && !livePhase.isBlank()) {
-            return livePhase;
-        }
-        TdmRoomData joined = rooms.get(joinedRoom);
-        if (joined != null) {
-            return joined.state;
-        }
-        return fallbackPhase;
+        return ModeRoomStateEvaluator.currentRoomState(joinedRoom, rooms, livePhase, fallbackPhase);
     }
 
     public static boolean isTeamSwitchAllowed(String currentRoomState) {
-        return "WAITING".equals(currentRoomState);
+        return ModeRoomStateEvaluator.isTeamSwitchAllowed(currentRoomState);
     }
 
     public static boolean canStartVote(String currentRoomState) {
-        return "WAITING".equals(currentRoomState);
+        return ModeRoomStateEvaluator.canStartVote(currentRoomState);
     }
 
     public static boolean canEndVote(String currentRoomState) {
-        return "WARMUP".equals(currentRoomState) || "PLAYING".equals(currentRoomState);
+        return ModeRoomStateEvaluator.canEndVote(currentRoomState);
     }
 
     public static boolean isLocalPlayerReady(UUID localPlayerId, Map<String, List<PlayerInfo>> teamPlayers) {
-        if (localPlayerId == null) {
-            return false;
-        }
-        for (List<PlayerInfo> players : teamPlayers.values()) {
-            for (PlayerInfo info : players) {
-                if (info.uuid().equals(localPlayerId)) {
-                    return info.isReady();
-                }
-            }
-        }
-        return false;
+        return ModeRoomStateEvaluator.isLocalPlayerReady(localPlayerId, teamPlayers);
     }
-
 }

@@ -5,7 +5,7 @@ import com.cdp.codpattern.app.match.model.ModeCapability;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.model.RoomSummaryMetric;
 import com.cdp.codpattern.app.match.model.RoomSummarySnapshot;
-import com.cdp.codpattern.app.match.model.TeamSummarySnapshot;
+import com.cdp.codpattern.network.match.RoomSyncInfo;
 import com.cdp.codpattern.network.handler.ClientPacketBridge;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
@@ -64,17 +64,7 @@ public class RoomListSyncPacket {
     /**
      * 房间信息
      */
-    public static class RoomInfo {
-        public String state;
-        public int playerCount;
-        public int maxPlayers;
-        public Map<String, Integer> teamPlayerCounts;
-        public Map<String, Integer> teamScores;
-        public int remainingTimeTicks;
-        public boolean hasMatchEndTeleportPoint;
-        public List<RoomSummaryMetric> metrics;
-        public Set<ModeCapability> capabilities;
-
+    public static class RoomInfo extends RoomSyncInfo {
         public RoomInfo(String state, int playerCount, int maxPlayers, Map<String, Integer> teamPlayerCounts,
                 Map<String, Integer> teamScores, int remainingTimeTicks, boolean hasMatchEndTeleportPoint) {
             this(state,
@@ -105,34 +95,29 @@ public class RoomListSyncPacket {
         public RoomInfo(String state, int playerCount, int maxPlayers, Map<String, Integer> teamPlayerCounts,
                 Map<String, Integer> teamScores, int remainingTimeTicks, boolean hasMatchEndTeleportPoint,
                 List<RoomSummaryMetric> metrics, Set<ModeCapability> capabilities) {
-            this.state = state;
-            this.playerCount = playerCount;
-            this.maxPlayers = maxPlayers;
-            this.teamPlayerCounts = teamPlayerCounts == null ? Map.of() : teamPlayerCounts;
-            this.teamScores = teamScores == null ? Map.of() : teamScores;
-            this.remainingTimeTicks = remainingTimeTicks;
-            this.hasMatchEndTeleportPoint = hasMatchEndTeleportPoint;
-            this.metrics = metrics == null ? List.of() : List.copyOf(metrics);
-            this.capabilities = capabilities == null ? Set.of() : Set.copyOf(capabilities);
+            super(state,
+                    playerCount,
+                    maxPlayers,
+                    teamPlayerCounts,
+                    teamScores,
+                    remainingTimeTicks,
+                    hasMatchEndTeleportPoint,
+                    metrics,
+                    capabilities);
         }
 
         public static RoomInfo fromSnapshot(RoomSummarySnapshot snapshot, boolean hasMatchEndTeleportPoint) {
-            Map<String, Integer> teamPlayerCounts = new HashMap<>();
-            Map<String, Integer> teamScores = new HashMap<>();
-            for (TeamSummarySnapshot team : snapshot.teams()) {
-                teamPlayerCounts.put(team.teamName(), team.playerCount());
-                teamScores.put(team.teamName(), team.score());
-            }
+            RoomSyncInfo info = RoomSyncInfo.fromSnapshot(snapshot, hasMatchEndTeleportPoint);
             return new RoomInfo(
-                    snapshot.lifecycleStateKey(),
-                    snapshot.playerCount(),
-                    snapshot.maxPlayers(),
-                    teamPlayerCounts,
-                    teamScores,
-                    snapshot.remainingTimeTicks(),
-                    hasMatchEndTeleportPoint,
-                    snapshot.metrics(),
-                    snapshot.capabilities());
+                    info.state,
+                    info.playerCount,
+                    info.maxPlayers,
+                    info.teamPlayerCounts,
+                    info.teamScores,
+                    info.remainingTimeTicks,
+                    info.hasMatchEndTeleportPoint,
+                    info.metrics,
+                    info.capabilities);
         }
 
         public void write(FriendlyByteBuf buf) {

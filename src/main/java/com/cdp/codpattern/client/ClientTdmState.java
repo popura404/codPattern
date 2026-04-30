@@ -1,17 +1,15 @@
 package com.cdp.codpattern.client;
 
-import com.cdp.codpattern.client.state.ClientMatchStateStore;
 import com.cdp.codpattern.client.state.KillFeedEntry;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
-import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
+import com.cdp.codpattern.network.match.RoomRosterDelta;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * 客户端 TDM 状态静态门面
- * 实际状态存储在实例化的 {@link ClientMatchStateStore}。
+ * Legacy TDM state facade retained for older call sites. New code should use {@link ClientMatchState}.
  */
 public final class ClientTdmState {
     public enum RosterDeltaApplyResult {
@@ -28,209 +26,214 @@ public final class ClientTdmState {
         FADE_OUT
     }
 
-    private static final ClientMatchStateStore STORE = new ClientMatchStateStore();
-
     private ClientTdmState() {
     }
 
     public static void updatePhase(String phase, int time) {
-        STORE.updatePhase(phase, time);
+        ClientMatchState.updatePhase(phase, time);
     }
 
     public static void updateScore(int t1, int t2, int time) {
-        STORE.updateScore(t1, t2, time);
+        ClientMatchState.updateScore(t1, t2, time);
     }
 
     public static void updateScore(Map<String, Integer> scores, int legacyTeam1, int legacyTeam2, int time) {
-        STORE.updateScore(scores, legacyTeam1, legacyTeam2, time);
+        ClientMatchState.updateScore(scores, legacyTeam1, legacyTeam2, time);
     }
 
     public static void updateTeamPlayers(String mapName, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
-        STORE.updateTeamPlayers(mapName, rosterVersion, teamPlayers);
+        ClientMatchState.updateTeamPlayers(mapName, rosterVersion, teamPlayers);
     }
 
     public static RosterDeltaApplyResult applyTeamPlayerDelta(
             String roomKey,
             int rosterVersion,
-            List<RoomPlayerDeltaPacket.PlayerDelta> updates
+            List<? extends RoomRosterDelta> updates
     ) {
-        return STORE.applyTeamPlayerDelta(roomKey, rosterVersion, updates);
+        return convert(ClientMatchState.applyTeamPlayerDelta(roomKey, rosterVersion, updates));
     }
 
     public static Map<String, List<PlayerInfo>> teamPlayersSnapshot() {
-        return STORE.teamPlayersSnapshot();
+        return ClientMatchState.teamPlayersSnapshot();
     }
 
     public static Map<String, Integer> teamScoresSnapshot() {
-        return STORE.teamScoresSnapshot();
+        return ClientMatchState.teamScoresSnapshot();
     }
 
     public static boolean hasRoomContext() {
-        return STORE.hasRoomContext();
+        return ClientMatchState.hasRoomContext();
     }
 
     public static int endSummaryPageIndex() {
-        return STORE.endSummaryPageIndex();
+        return ClientMatchState.endSummaryPageIndex();
     }
 
     public static int endSummaryPageTick() {
-        return STORE.endSummaryPageTick();
+        return ClientMatchState.endSummaryPageTick();
     }
 
     public static int endSummaryPageDurationTicks() {
-        return STORE.endSummaryPageDurationTicks();
+        return ClientMatchState.endSummaryPageDurationTicks();
     }
 
     public static int getTeamScore(String teamName, int fallback) {
-        return STORE.getTeamScore(teamName, fallback);
+        return ClientMatchState.getTeamScore(teamName, fallback);
     }
 
     public static void resetMatchState() {
-        STORE.resetMatchState();
-        TdmCombatMarkerTracker.INSTANCE.clear();
+        ClientMatchState.resetMatchState();
     }
 
     public static void updateCountdown(int count, boolean black) {
-        STORE.updateCountdown(count, black);
+        ClientMatchState.updateCountdown(count, black);
     }
 
     public static void setDeathCam(String killer, int duration, boolean updateViewLock, float lockedYaw, float lockedPitch) {
-        STORE.setDeathCam(killer, duration, updateViewLock, lockedYaw, lockedPitch);
+        ClientMatchState.setDeathCam(killer, duration, updateViewLock, lockedYaw, lockedPitch);
     }
 
     public static void clearDeathCam() {
-        STORE.clearDeathCam();
+        ClientMatchState.clearDeathCam();
     }
 
     public static void pushKillFeed(String killerName, String victimName, ItemStack weaponStack, boolean blunder) {
-        STORE.pushKillFeed(killerName, victimName, weaponStack, blunder);
+        ClientMatchState.pushKillFeed(killerName, victimName, weaponStack, blunder);
     }
 
     public static List<KillFeedEntry> killFeedSnapshot() {
-        return STORE.killFeedSnapshot();
+        return ClientMatchState.killFeedSnapshot();
     }
 
     public static void clearKillFeed() {
-        STORE.clearKillFeed();
+        ClientMatchState.clearKillFeed();
     }
 
     public static void setRoomContext(String roomName) {
-        STORE.setRoomContext(roomName);
+        ClientMatchState.setRoomContext(roomName);
     }
 
     public static void clearRoomContext() {
-        STORE.clearRoomContext();
+        ClientMatchState.clearRoomContext();
     }
 
     public static float getBlackoutAlpha() {
-        return STORE.getBlackoutAlpha();
+        return ClientMatchState.getBlackoutAlpha();
     }
 
     public static float getBlackoutInfoAlpha() {
-        return STORE.getBlackoutInfoAlpha();
+        return ClientMatchState.getBlackoutInfoAlpha();
     }
 
     public static boolean isBlackoutActive() {
-        return STORE.isBlackoutActive();
+        return ClientMatchState.isBlackoutActive();
     }
 
     public static void clientTick() {
-        STORE.clientTick();
+        ClientMatchState.clientTick();
     }
 
     public static float getAnnouncementAlpha() {
-        return STORE.getAnnouncementAlpha();
+        return ClientMatchState.getAnnouncementAlpha();
     }
 
     public static float getScorePulseStrength() {
-        return STORE.getScorePulseStrength();
+        return ClientMatchState.getScorePulseStrength();
     }
 
     public static float getPhaseFlashStrength() {
-        return STORE.getPhaseFlashStrength();
+        return ClientMatchState.getPhaseFlashStrength();
     }
 
     public static String currentPhase() {
-        return STORE.currentPhase();
+        return ClientMatchState.currentPhase();
     }
 
     public static String roomContextName() {
-        return STORE.roomContextName();
+        return ClientMatchState.roomContextName();
     }
 
     public static int rosterVersion() {
-        return STORE.rosterVersion();
+        return ClientMatchState.rosterVersion();
     }
 
     public static long lastPhaseSyncAtMs() {
-        return STORE.lastPhaseSyncAtMs();
+        return ClientMatchState.lastPhaseSyncAtMs();
     }
 
     public static long lastScoreSyncAtMs() {
-        return STORE.lastScoreSyncAtMs();
+        return ClientMatchState.lastScoreSyncAtMs();
     }
 
     public static long lastRosterSyncAtMs() {
-        return STORE.lastRosterSyncAtMs();
+        return ClientMatchState.lastRosterSyncAtMs();
     }
 
     public static int remainingTimeTicks() {
-        return STORE.remainingTimeTicks();
+        return ClientMatchState.remainingTimeTicks();
     }
 
     public static int team1Score() {
-        return STORE.team1Score();
+        return ClientMatchState.team1Score();
     }
 
     public static int team2Score() {
-        return STORE.team2Score();
+        return ClientMatchState.team2Score();
     }
 
     public static int gameTimeTicks() {
-        return STORE.gameTimeTicks();
+        return ClientMatchState.gameTimeTicks();
     }
 
     public static String announcementKey() {
-        return STORE.announcementKey();
+        return ClientMatchState.announcementKey();
     }
 
     public static int announcementTicks() {
-        return STORE.announcementTicks();
+        return ClientMatchState.announcementTicks();
     }
 
     public static boolean isDead() {
-        return STORE.isDead();
+        return ClientMatchState.isDead();
     }
 
     public static String killerName() {
-        return STORE.killerName();
+        return ClientMatchState.killerName();
     }
 
     public static int deathCamTicks() {
-        return STORE.deathCamTicks();
+        return ClientMatchState.deathCamTicks();
     }
 
     public static boolean isDeathCamViewLocked() {
-        return STORE.isDeathCamViewLocked();
+        return ClientMatchState.isDeathCamViewLocked();
     }
 
     public static float deathCamLockedYaw() {
-        return STORE.deathCamLockedYaw();
+        return ClientMatchState.deathCamLockedYaw();
     }
 
     public static float deathCamLockedPitch() {
-        return STORE.deathCamLockedPitch();
+        return ClientMatchState.deathCamLockedPitch();
     }
 
     public static void enforceDeathCamViewLock() {
-        STORE.enforceDeathCamViewLock();
+        ClientMatchState.enforceDeathCamViewLock();
     }
 
     public static BlackoutPhase blackoutPhase() {
-        return STORE.blackoutPhase();
+        return convert(ClientMatchState.blackoutPhase());
     }
 
     public static String syncedMapName() {
-        return STORE.syncedMapName();
+        return ClientMatchState.syncedMapName();
+    }
+
+    private static RosterDeltaApplyResult convert(ClientMatchState.RosterDeltaApplyResult result) {
+        return RosterDeltaApplyResult.valueOf(result.name());
+    }
+
+    private static BlackoutPhase convert(ClientMatchState.BlackoutPhase phase) {
+        return BlackoutPhase.valueOf(phase.name());
     }
 }

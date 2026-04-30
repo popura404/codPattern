@@ -1,6 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
@@ -61,11 +61,11 @@ public final class CodTdmMapAccess {
 
     public static void leaveMap(BaseMap map, ServerPlayer player) {
         if (map instanceof CodTacticalTdmMap tacticalMap) {
-            CodTacticalTdmMapAccess.actionPort(tacticalMap).leaveRoom(player);
+            tacticalMap.tacticalActionPort().leaveRoom(player);
             return;
         }
         if (map instanceof CodTdmMap tdmMap) {
-            actionPort(tdmMap).leaveRoom(player);
+            tdmMap.actionPort().leaveRoom(player);
             return;
         }
         map.leave(player);
@@ -99,25 +99,23 @@ public final class CodTdmMapAccess {
     }
 
     private static Optional<CodTdmMap> findByName(String mapName) {
-        return asTdmMap(core().getMapByTypeWithName(TdmGameTypes.CDP_TDM, mapName));
+        return asTdmMap(FpsMatchMapRegistry.findByName(BuiltInGameModes.FRONTLINE, mapName));
     }
 
     private static Optional<CodTdmMap> findByPlayer(ServerPlayer player) {
-        return asTdmMap(core().getMapByPlayer(player));
+        return asTdmMap(FPSMCore.getInstance().getMapByPlayer(player));
     }
 
     private static Optional<BaseMap> findAnyByPlayer(ServerPlayer player) {
-        return core().getMapByPlayer(player);
+        return FPSMCore.getInstance().getMapByPlayer(player);
     }
 
     private static Optional<BaseMap> findAnyByPlayerIncludingSpectator(ServerPlayer player) {
-        return core().getMapByPlayerWithSpec(player);
+        return FPSMCore.getInstance().getMapByPlayerWithSpec(player);
     }
 
     private static List<CodTdmMap> listMaps() {
-        List<BaseMap> maps = core()
-                .getAllMaps()
-                .getOrDefault(TdmGameTypes.CDP_TDM, List.of());
+        List<BaseMap> maps = FpsMatchMapRegistry.listMaps(BuiltInGameModes.FRONTLINE);
         return maps.stream()
                 .filter(map -> map instanceof CodTdmMap)
                 .map(map -> (CodTdmMap) map)
@@ -125,7 +123,7 @@ public final class CodTdmMapAccess {
     }
 
     private static void register(CodTdmMap map) {
-        core().registerMap(TdmGameTypes.CDP_TDM, map);
+        FpsMatchMapRegistry.register(BuiltInGameModes.FRONTLINE, map);
     }
 
     private static CodTdmMap create(ServerLevel level, String mapName, AreaData areaData) {
@@ -145,7 +143,4 @@ public final class CodTdmMapAccess {
         return map.mapName;
     }
 
-    private static FPSMCore core() {
-        return FPSMCore.getInstance();
-    }
 }

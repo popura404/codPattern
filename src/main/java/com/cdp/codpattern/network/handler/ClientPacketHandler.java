@@ -1,23 +1,21 @@
 package com.cdp.codpattern.network.handler;
 
-import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.match.model.RoomId;
-import com.cdp.codpattern.client.ClientTdmState;
+import com.cdp.codpattern.client.ClientMatchState;
 import com.cdp.codpattern.client.TdmCombatMarkerTracker;
 import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
+import com.cdp.codpattern.client.gui.screen.ModeRoomScreen;
 import com.cdp.codpattern.client.gui.screen.NoticePopupScreen;
 import com.cdp.codpattern.client.gui.screen.PopupNoticeHelper;
-import com.cdp.codpattern.client.gui.screen.TdmRoomScreen;
-import com.cdp.codpattern.client.gui.screen.tdm.TdmRoomData;
+import com.cdp.codpattern.client.gui.screen.match.ModeRoomData;
+import com.cdp.codpattern.client.network.ModeRoomClientPackets;
 import com.cdp.codpattern.client.refit.AttachmentRefitClientState;
 import com.cdp.codpattern.compat.physicsmod.PhysicsModClientBridge;
 import com.cdp.codpattern.config.backpack.BackpackClientCache;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
-import com.cdp.codpattern.network.tdm.VoteResponsePacket;
-import com.cdp.codpattern.network.tdm.RoomListSyncPacket.RoomInfo;
-import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
-import com.cdp.codpattern.network.tdm.RequestRoomRosterResyncPacket;
+import com.cdp.codpattern.network.match.RoomRosterDelta;
+import com.cdp.codpattern.network.match.RoomSyncInfo;
 import com.google.gson.Gson;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.client.Minecraft;
@@ -77,7 +75,7 @@ public class ClientPacketHandler {
         ConfirmScreen voteDialog = new ConfirmScreen(accepted -> {
             clearActiveVoteDialog(voteDialogHolder[0]);
             minecraft.setScreen(previous);
-            ModNetworkChannel.sendToServer(new VoteResponsePacket(voteId, accepted));
+            ModeRoomClientPackets.respondToVote(voteId, accepted);
         },
                 title,
                 message,
@@ -92,7 +90,7 @@ public class ClientPacketHandler {
     public static void handlePopupNotice(Component title, Component message) {
         Minecraft.getInstance().execute(() -> {
             Screen current = Minecraft.getInstance().screen;
-            if (current instanceof TdmRoomScreen || current instanceof NoticePopupScreen) {
+            if (current instanceof ModeRoomScreen || current instanceof NoticePopupScreen) {
                 PopupNoticeHelper.show(title, message);
                 return;
             }
@@ -128,15 +126,15 @@ public class ClientPacketHandler {
         Minecraft.getInstance().player.sendSystemMessage(resolveWeaponUpdateFailure(code, message));
     }
 
-    public static void handleRoomListSync(long snapshotVersion, Map<RoomId, RoomInfo> rooms) {
+    public static void handleRoomListSync(long snapshotVersion, Map<RoomId, ? extends RoomSyncInfo> rooms) {
         Minecraft.getInstance().execute(() -> {
             Screen screen = Minecraft.getInstance().screen;
-            if (screen instanceof TdmRoomScreen tdmScreen) {
-                Map<String, TdmRoomData> roomDataMap = new HashMap<>();
-                for (Map.Entry<RoomId, RoomInfo> entry : rooms.entrySet()) {
+            if (screen instanceof ModeRoomScreen modeRoomScreen) {
+                Map<String, ModeRoomData> roomDataMap = new HashMap<>();
+                for (Map.Entry<RoomId, ? extends RoomSyncInfo> entry : rooms.entrySet()) {
                     RoomId roomId = entry.getKey();
-                    RoomInfo info = entry.getValue();
-                    roomDataMap.put(roomId.encode(), new TdmRoomData(
+                    RoomSyncInfo info = entry.getValue();
+                    roomDataMap.put(roomId.encode(), new ModeRoomData(
                             roomId.gameType(),
                             roomId.mapName(),
                             info.state,
@@ -149,17 +147,17 @@ public class ClientPacketHandler {
                             info.metrics,
                             info.capabilities));
                 }
-                tdmScreen.updateRoomList(snapshotVersion, roomDataMap);
+                modeRoomScreen.updateRoomList(snapshotVersion, roomDataMap);
             }
         });
     }
 
     public static void handleTeamPlayerList(String roomKey, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
         Minecraft.getInstance().execute(() -> {
-            ClientTdmState.updateTeamPlayers(roomKey, rosterVersion, teamPlayers);
+            ClientMatchState.updateTeamPlayers(roomKey, rosterVersion, teamPlayers);
             Screen screen = Minecraft.getInstance().screen;
-            if (screen instanceof TdmRoomScreen tdmScreen) {
-                tdmScreen.updatePlayerList(roomKey, rosterVersion, teamPlayers);
+            if (screen instanceof ModeRoomScreen modeRoomScreen) {
+                modeRoomScreen.updatePlayerList(roomKey, rosterVersion, teamPlayers);
             }
         });
     }
@@ -167,8 +165,8 @@ public class ClientPacketHandler {
     public static void handleRoomPreviewRoster(String roomKey, int rosterVersion, Map<String, List<PlayerInfo>> teamPlayers) {
         Minecraft.getInstance().execute(() -> {
             Screen screen = Minecraft.getInstance().screen;
-            if (screen instanceof TdmRoomScreen tdmScreen) {
-                tdmScreen.updatePreviewPlayerList(roomKey, rosterVersion, teamPlayers);
+            if (screen instanceof ModeRoomScreen modeRoomScreen) {
+                modeRoomScreen.updatePreviewPlayerList(roomKey, rosterVersion, teamPlayers);
             }
         });
     }
@@ -176,19 +174,19 @@ public class ClientPacketHandler {
     public static void handleRoomPlayerDelta(
             String roomKey,
             int rosterVersion,
-            List<RoomPlayerDeltaPacket.PlayerDelta> updates
+            List<RoomRosterDelta> updates
     ) {
         Minecraft.getInstance().execute(() -> {
-            ClientTdmState.RosterDeltaApplyResult result = ClientTdmState.applyTeamPlayerDelta(
+            ClientMatchState.RosterDeltaApplyResult result = ClientMatchState.applyTeamPlayerDelta(
                     roomKey,
                     rosterVersion,
                     updates);
-            if (result != ClientTdmState.RosterDeltaApplyResult.APPLIED) {
-                ModNetworkChannel.sendToServer(new RequestRoomRosterResyncPacket());
+            if (result != ClientMatchState.RosterDeltaApplyResult.APPLIED) {
+                ModeRoomClientPackets.requestRoomRosterResync();
             }
             Screen screen = Minecraft.getInstance().screen;
-            if (screen instanceof TdmRoomScreen tdmScreen) {
-                tdmScreen.updatePlayerDelta(roomKey, rosterVersion);
+            if (screen instanceof ModeRoomScreen modeRoomScreen) {
+                modeRoomScreen.updatePlayerDelta(roomKey, rosterVersion);
             }
         });
     }
@@ -196,15 +194,15 @@ public class ClientPacketHandler {
     public static void handleDeathCam(String killerName, int deathCamTicks, int respawnDelayTicks, float lockedYaw, float lockedPitch) {
         Minecraft.getInstance().execute(() -> {
             if (respawnDelayTicks <= 0) {
-                ClientTdmState.clearDeathCam();
+                ClientMatchState.clearDeathCam();
                 return;
             }
-            ClientTdmState.setDeathCam(killerName, respawnDelayTicks, deathCamTicks > 0, lockedYaw, lockedPitch);
+            ClientMatchState.setDeathCam(killerName, respawnDelayTicks, deathCamTicks > 0, lockedYaw, lockedPitch);
         });
     }
 
     public static void handleKillFeed(String killerName, String victimName, ItemStack weaponStack, boolean blunder) {
-        Minecraft.getInstance().execute(() -> ClientTdmState.pushKillFeed(killerName, victimName, weaponStack, blunder));
+        Minecraft.getInstance().execute(() -> ClientMatchState.pushKillFeed(killerName, victimName, weaponStack, blunder));
     }
 
     public static void handleGamePhase(String phase, int remainingTicks) {
@@ -215,7 +213,7 @@ public class ClientPacketHandler {
             } else if ("ENDED".equals(phase)) {
                 closeActiveVoteDialog(minecraft);
             }
-            ClientTdmState.updatePhase(phase, remainingTicks);
+            ClientMatchState.updatePhase(phase, remainingTicks);
         });
     }
 
@@ -225,14 +223,14 @@ public class ClientPacketHandler {
             if (countdown > 0 || blackout) {
                 closeMatchStartScreens(minecraft);
             }
-            ClientTdmState.updateCountdown(countdown, blackout);
+            ClientMatchState.updateCountdown(countdown, blackout);
         });
     }
 
     public static void handleScoreUpdate(Map<String, Integer> teamScores, int team1Score, int team2Score,
             int gameTimeTicks) {
         Minecraft.getInstance().execute(
-                () -> ClientTdmState.updateScore(teamScores, team1Score, team2Score, gameTimeTicks));
+                () -> ClientMatchState.updateScore(teamScores, team1Score, team2Score, gameTimeTicks));
     }
 
     public static void handleCombatMarkerConfig(float focusHalfAngleDegrees,
@@ -249,11 +247,11 @@ public class ClientPacketHandler {
     public static void handleJoinRoomResult(boolean success, String roomKey, String reasonCode, String reasonMessage) {
         Minecraft.getInstance().execute(() -> {
             if (success) {
-                ClientTdmState.setRoomContext(roomKey);
+                ClientMatchState.setRoomContext(roomKey);
             }
             Screen screen = Minecraft.getInstance().screen;
-            if (screen instanceof TdmRoomScreen tdmRoomScreen) {
-                tdmRoomScreen.handleJoinResult(success, roomKey, reasonCode, reasonMessage);
+            if (screen instanceof ModeRoomScreen modeRoomScreen) {
+                modeRoomScreen.handleJoinResult(success, roomKey, reasonCode, reasonMessage);
             }
         });
     }
@@ -261,14 +259,14 @@ public class ClientPacketHandler {
     public static void handleLeaveRoomResult(boolean success, String roomKey, String reasonCode, String reasonMessage) {
         Minecraft.getInstance().execute(() -> {
             if (success) {
-                ClientTdmState.clearRoomContext();
+                ClientMatchState.clearRoomContext();
             }
             Screen screen = Minecraft.getInstance().screen;
-            if (screen instanceof TdmRoomScreen tdmRoomScreen) {
-                tdmRoomScreen.handleLeaveResult(success, roomKey, reasonCode, reasonMessage);
+            if (screen instanceof ModeRoomScreen modeRoomScreen) {
+                modeRoomScreen.handleLeaveResult(success, roomKey, reasonCode, reasonMessage);
             }
             if (!success
-                    && !(screen instanceof TdmRoomScreen)
+                    && !(screen instanceof ModeRoomScreen)
                     && Minecraft.getInstance().player != null) {
                 PopupNoticeHelper.show(Component.translatable(
                         "screen.codpattern.tdm_room.error.leave_failed",

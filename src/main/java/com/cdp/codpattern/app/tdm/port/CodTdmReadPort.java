@@ -5,7 +5,7 @@ import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.model.TeamDescriptor;
 import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
 import com.cdp.codpattern.app.tdm.model.CodTdmTeamPersistenceSnapshot;
-import com.cdp.codpattern.app.tdm.model.TdmGameTypes;
+import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import net.minecraft.server.level.ServerPlayer;
@@ -23,7 +23,7 @@ public interface CodTdmReadPort extends ModeRoomReadPort {
 
     @Override
     default String gameType() {
-        return TdmGameTypes.CDP_TDM;
+        return BuiltInGameModes.FRONTLINE;
     }
 
     @Override

@@ -2,6 +2,7 @@ package com.cdp.codpattern.network.tdm;
 
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.network.handler.ClientPacketBridge;
+import com.cdp.codpattern.network.match.RoomRosterDelta;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
 
@@ -14,30 +15,30 @@ import java.util.function.Supplier;
  * S→C: 当前房间玩家名单增量更新。
  */
 public class RoomPlayerDeltaPacket {
-    public static final int CHANGE_READY = 1;
-    public static final int CHANGE_STATS = 1 << 1;
-    public static final int CHANGE_LIFE = 1 << 2;
-    public static final int CHANGE_INVINCIBLE = 1 << 3;
-    public static final int CHANGE_PING_BUCKET = 1 << 4;
-    public static final int CHANGE_STREAK = 1 << 5;
+    public static final int CHANGE_READY = RoomRosterDelta.CHANGE_READY;
+    public static final int CHANGE_STATS = RoomRosterDelta.CHANGE_STATS;
+    public static final int CHANGE_LIFE = RoomRosterDelta.CHANGE_LIFE;
+    public static final int CHANGE_INVINCIBLE = RoomRosterDelta.CHANGE_INVINCIBLE;
+    public static final int CHANGE_PING_BUCKET = RoomRosterDelta.CHANGE_PING_BUCKET;
+    public static final int CHANGE_STREAK = RoomRosterDelta.CHANGE_STREAK;
 
     private final String roomKey;
     private final int rosterVersion;
-    private final List<PlayerDelta> updates;
+    private final List<RoomRosterDelta> updates;
 
-    public RoomPlayerDeltaPacket(String roomKey, int rosterVersion, List<PlayerDelta> updates) {
+    public RoomPlayerDeltaPacket(String roomKey, int rosterVersion, List<? extends RoomRosterDelta> updates) {
         this.roomKey = roomKey;
         this.rosterVersion = rosterVersion;
-        this.updates = updates == null ? List.of() : List.copyOf(updates);
+        this.updates = updates == null ? List.of() : new ArrayList<>(updates);
     }
 
     public RoomPlayerDeltaPacket(FriendlyByteBuf buf) {
         this.roomKey = buf.readUtf();
         this.rosterVersion = buf.readInt();
         int size = Math.max(0, buf.readInt());
-        List<PlayerDelta> decoded = new ArrayList<>(size);
+        List<RoomRosterDelta> decoded = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            decoded.add(PlayerDelta.read(buf));
+            decoded.add(RoomRosterDelta.read(buf));
         }
         this.updates = decoded;
     }
@@ -46,7 +47,7 @@ public class RoomPlayerDeltaPacket {
         buf.writeUtf(roomKey);
         buf.writeInt(rosterVersion);
         buf.writeInt(updates.size());
-        for (PlayerDelta update : updates) {
+        for (RoomRosterDelta update : updates) {
             update.write(buf);
         }
     }
@@ -62,20 +63,17 @@ public class RoomPlayerDeltaPacket {
         ctx.get().setPacketHandled(true);
     }
 
-    public record PlayerDelta(UUID playerId, String teamName, int changedMask, PlayerInfo snapshot) {
-        public void write(FriendlyByteBuf buf) {
-            buf.writeUUID(playerId);
-            buf.writeUtf(teamName == null ? "" : teamName);
-            buf.writeInt(changedMask);
-            snapshot.write(buf);
+    /**
+     * Legacy nested DTO retained for older callers. New code should use {@link RoomRosterDelta}.
+     */
+    public static class PlayerDelta extends RoomRosterDelta {
+        public PlayerDelta(UUID playerId, String teamName, int changedMask, PlayerInfo snapshot) {
+            super(playerId, teamName, changedMask, snapshot);
         }
 
         public static PlayerDelta read(FriendlyByteBuf buf) {
-            UUID playerId = buf.readUUID();
-            String teamName = buf.readUtf();
-            int changedMask = buf.readInt();
-            PlayerInfo snapshot = PlayerInfo.read(buf);
-            return new PlayerDelta(playerId, teamName, changedMask, snapshot);
+            RoomRosterDelta delta = RoomRosterDelta.read(buf);
+            return new PlayerDelta(delta.playerId(), delta.teamName(), delta.changedMask(), delta.snapshot());
         }
     }
 }

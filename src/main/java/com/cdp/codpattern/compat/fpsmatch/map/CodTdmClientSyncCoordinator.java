@@ -12,6 +12,7 @@ import com.cdp.codpattern.network.tdm.RoomPreviewRosterPacket;
 import com.cdp.codpattern.network.tdm.RoomPlayerDeltaPacket;
 import com.cdp.codpattern.network.tdm.ScoreUpdatePacket;
 import com.cdp.codpattern.network.tdm.TeamPlayerListPacket;
+import com.cdp.codpattern.network.match.RoomRosterDelta;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.ArrayList;
@@ -41,7 +42,7 @@ final class CodTdmClientSyncCoordinator {
     private Map<String, List<PlayerInfo>> pendingRosterSnapshot = new HashMap<>();
     private Map<UUID, PlayerRosterState> pendingRosterByPlayer = new HashMap<>();
     private Map<UUID, PlayerRosterState> lastSentRosterByPlayer = new HashMap<>();
-    private final Map<UUID, RoomPlayerDeltaPacket.PlayerDelta> pendingDeltaUpdates = new LinkedHashMap<>();
+    private final Map<UUID, RoomRosterDelta> pendingDeltaUpdates = new LinkedHashMap<>();
     private int rosterVersion = 0;
     private boolean fullSnapshotPendingForAll = true;
     private long lastDeltaFlushAtMs = 0L;
@@ -166,7 +167,7 @@ final class CodTdmClientSyncCoordinator {
                 continue;
             }
 
-            pendingDeltaUpdates.put(playerId, new RoomPlayerDeltaPacket.PlayerDelta(
+            pendingDeltaUpdates.put(playerId, new RoomRosterDelta(
                     playerId,
                     entry.getValue().teamName(),
                     changedMask,
@@ -243,7 +244,7 @@ final class CodTdmClientSyncCoordinator {
 
     private void sendDeltaPacket(Collection<ServerPlayer> recipients, long now) {
         int nextRosterVersion = Math.max(1, rosterVersion + 1);
-        List<RoomPlayerDeltaPacket.PlayerDelta> updates = new ArrayList<>(pendingDeltaUpdates.values());
+        List<RoomRosterDelta> updates = new ArrayList<>(pendingDeltaUpdates.values());
         RoomPlayerDeltaPacket packet = new RoomPlayerDeltaPacket(port.roomKey(), nextRosterVersion, updates);
         for (ServerPlayer player : recipients) {
             ModNetworkChannel.sendToPlayer(packet, player);
@@ -284,22 +285,22 @@ final class CodTdmClientSyncCoordinator {
     private int buildChangedMask(PlayerInfo previous, PlayerInfo current) {
         int mask = 0;
         if (previous.isReady() != current.isReady()) {
-            mask |= RoomPlayerDeltaPacket.CHANGE_READY;
+            mask |= RoomRosterDelta.CHANGE_READY;
         }
         if (previous.kills() != current.kills() || previous.deaths() != current.deaths()) {
-            mask |= RoomPlayerDeltaPacket.CHANGE_STATS;
+            mask |= RoomRosterDelta.CHANGE_STATS;
         }
         if (previous.isAlive() != current.isAlive()) {
-            mask |= RoomPlayerDeltaPacket.CHANGE_LIFE;
+            mask |= RoomRosterDelta.CHANGE_LIFE;
         }
         if (previous.isInvincible() != current.isInvincible()) {
-            mask |= RoomPlayerDeltaPacket.CHANGE_INVINCIBLE;
+            mask |= RoomRosterDelta.CHANGE_INVINCIBLE;
         }
         if (pingBucket(previous.pingMs()) != pingBucket(current.pingMs())) {
-            mask |= RoomPlayerDeltaPacket.CHANGE_PING_BUCKET;
+            mask |= RoomRosterDelta.CHANGE_PING_BUCKET;
         }
         if (previous.maxKillStreak() != current.maxKillStreak()) {
-            mask |= RoomPlayerDeltaPacket.CHANGE_STREAK;
+            mask |= RoomRosterDelta.CHANGE_STREAK;
         }
         return mask;
     }
