@@ -1,6 +1,8 @@
 package com.phasetranscrystal.fpsmatch.common.packet;
 
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
+import com.phasetranscrystal.fpsmatch.core.data.AreaData;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
@@ -23,11 +25,43 @@ public class OpenSpawnPointToolScreenS2CPacket {
     private final String selectedKind;
     private final int selectedIndex;
     private final List<SpawnPointData> spawnPoints;
+    private final String editMode;
+    private final List<String> availableAreaLayers;
+    private final String selectedAreaLayer;
+    private final int selectedAreaIndex;
+    private final List<AreaData> areas;
+    private final BlockPos areaPos1;
+    private final BlockPos areaPos2;
 
     public OpenSpawnPointToolScreenS2CPacket(List<String> availableTypes, String selectedType, List<String> availableMaps,
             String selectedMap, List<String> availableTeams, String selectedTeam, List<String> availableKinds,
             String selectedKind, int selectedIndex,
             List<SpawnPointData> spawnPoints) {
+        this(
+                availableTypes,
+                selectedType,
+                availableMaps,
+                selectedMap,
+                availableTeams,
+                selectedTeam,
+                availableKinds,
+                selectedKind,
+                selectedIndex,
+                spawnPoints,
+                "POINT",
+                List.of(),
+                "",
+                -1,
+                List.of(),
+                null,
+                null);
+    }
+
+    public OpenSpawnPointToolScreenS2CPacket(List<String> availableTypes, String selectedType, List<String> availableMaps,
+            String selectedMap, List<String> availableTeams, String selectedTeam, List<String> availableKinds,
+            String selectedKind, int selectedIndex,
+            List<SpawnPointData> spawnPoints, String editMode, List<String> availableAreaLayers,
+            String selectedAreaLayer, int selectedAreaIndex, List<AreaData> areas, BlockPos areaPos1, BlockPos areaPos2) {
         this.availableTypes = List.copyOf(availableTypes);
         this.selectedType = selectedType;
         this.availableMaps = List.copyOf(availableMaps);
@@ -38,6 +72,13 @@ public class OpenSpawnPointToolScreenS2CPacket {
         this.selectedKind = selectedKind;
         this.selectedIndex = selectedIndex;
         this.spawnPoints = List.copyOf(spawnPoints);
+        this.editMode = editMode == null ? "POINT" : editMode;
+        this.availableAreaLayers = List.copyOf(availableAreaLayers);
+        this.selectedAreaLayer = selectedAreaLayer == null ? "" : selectedAreaLayer;
+        this.selectedAreaIndex = selectedAreaIndex;
+        this.areas = List.copyOf(areas);
+        this.areaPos1 = areaPos1;
+        this.areaPos2 = areaPos2;
     }
 
     public List<String> availableTypes() {
@@ -80,6 +121,34 @@ public class OpenSpawnPointToolScreenS2CPacket {
         return spawnPoints;
     }
 
+    public String editMode() {
+        return editMode;
+    }
+
+    public List<String> availableAreaLayers() {
+        return availableAreaLayers;
+    }
+
+    public String selectedAreaLayer() {
+        return selectedAreaLayer;
+    }
+
+    public int selectedAreaIndex() {
+        return selectedAreaIndex;
+    }
+
+    public List<AreaData> areas() {
+        return areas;
+    }
+
+    public BlockPos areaPos1() {
+        return areaPos1;
+    }
+
+    public BlockPos areaPos2() {
+        return areaPos2;
+    }
+
     public void encode(FriendlyByteBuf buf) {
         writeStringList(buf, availableTypes);
         buf.writeUtf(selectedType);
@@ -98,6 +167,17 @@ public class OpenSpawnPointToolScreenS2CPacket {
             buf.writeFloat(point.getPitch());
             buf.writeUtf(point.getKind().serializedName());
         }
+        buf.writeUtf(editMode);
+        writeStringList(buf, availableAreaLayers);
+        buf.writeUtf(selectedAreaLayer);
+        buf.writeVarInt(selectedAreaIndex);
+        buf.writeVarInt(areas.size());
+        for (AreaData area : areas) {
+            buf.writeBlockPos(area.pos1());
+            buf.writeBlockPos(area.pos2());
+        }
+        writeNullableBlockPos(buf, areaPos1);
+        writeNullableBlockPos(buf, areaPos2);
     }
 
     public static OpenSpawnPointToolScreenS2CPacket decode(FriendlyByteBuf buf) {
@@ -126,6 +206,17 @@ public class OpenSpawnPointToolScreenS2CPacket {
                     com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind.fromSerializedName(buf.readUtf())
             ));
         }
+        String editMode = buf.readUtf();
+        List<String> availableAreaLayers = readStringList(buf);
+        String selectedAreaLayer = buf.readUtf();
+        int selectedAreaIndex = buf.readVarInt();
+        int areaCount = buf.readVarInt();
+        List<AreaData> areas = new ArrayList<>(areaCount);
+        for (int i = 0; i < areaCount; i++) {
+            areas.add(new AreaData(buf.readBlockPos(), buf.readBlockPos()));
+        }
+        BlockPos areaPos1 = readNullableBlockPos(buf);
+        BlockPos areaPos2 = readNullableBlockPos(buf);
         return new OpenSpawnPointToolScreenS2CPacket(
                 availableTypes,
                 selectedType,
@@ -136,7 +227,14 @@ public class OpenSpawnPointToolScreenS2CPacket {
                 availableKinds,
                 selectedKind,
                 selectedIndex,
-                spawnPoints
+                spawnPoints,
+                editMode,
+                availableAreaLayers,
+                selectedAreaLayer,
+                selectedAreaIndex,
+                areas,
+                areaPos1,
+                areaPos2
         );
     }
 
@@ -159,5 +257,16 @@ public class OpenSpawnPointToolScreenS2CPacket {
             values.add(buf.readUtf());
         }
         return values;
+    }
+
+    private static void writeNullableBlockPos(FriendlyByteBuf buf, BlockPos pos) {
+        buf.writeBoolean(pos != null);
+        if (pos != null) {
+            buf.writeBlockPos(pos);
+        }
+    }
+
+    private static BlockPos readNullableBlockPos(FriendlyByteBuf buf) {
+        return buf.readBoolean() ? buf.readBlockPos() : null;
     }
 }

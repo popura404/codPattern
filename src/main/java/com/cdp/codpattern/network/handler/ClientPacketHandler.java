@@ -1,7 +1,11 @@
 package com.cdp.codpattern.network.handler;
 
 import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.model.ModeObjectState;
+import com.cdp.codpattern.app.match.model.ModeRuntimeStateSnapshot;
 import com.cdp.codpattern.client.ClientMatchState;
+import com.cdp.codpattern.client.ClientModeObjectState;
+import com.cdp.codpattern.client.ClientModeRuntimeState;
 import com.cdp.codpattern.client.TdmCombatMarkerTracker;
 import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
 import com.cdp.codpattern.client.gui.screen.ModeRoomScreen;
@@ -244,6 +248,14 @@ public class ClientPacketHandler {
                 barVisibleGraceTicks));
     }
 
+    public static void handleModeRuntimeState(ModeRuntimeStateSnapshot snapshot) {
+        Minecraft.getInstance().execute(() -> ClientModeRuntimeState.update(snapshot));
+    }
+
+    public static void handleModeObjectStates(String roomKey, List<ModeObjectState> states, long revision) {
+        Minecraft.getInstance().execute(() -> ClientModeObjectState.replaceRoomStates(roomKey, states, revision));
+    }
+
     public static void handleJoinRoomResult(boolean success, String roomKey, String reasonCode, String reasonMessage) {
         Minecraft.getInstance().execute(() -> {
             if (success) {
@@ -259,6 +271,11 @@ public class ClientPacketHandler {
     public static void handleLeaveRoomResult(boolean success, String roomKey, String reasonCode, String reasonMessage) {
         Minecraft.getInstance().execute(() -> {
             if (success) {
+                String clearedRoomKey = roomKey == null || roomKey.isBlank()
+                        ? ClientMatchState.roomContextName()
+                        : roomKey;
+                ClientModeRuntimeState.clear(clearedRoomKey);
+                ClientModeObjectState.clear(clearedRoomKey);
                 ClientMatchState.clearRoomContext();
             }
             Screen screen = Minecraft.getInstance().screen;

@@ -24,6 +24,7 @@ public final class CommandRegistration {
                             }
                             return 1;
                         }))
+                .then(ModeDebugCommand.buildCommand())
                 .then(MapManagementCommand.buildCommand())
                 .then(MainMenuScreenCommand.buildCommand())
                 .then(UpdateWeaponFilterConfigCommand.buildCommand())

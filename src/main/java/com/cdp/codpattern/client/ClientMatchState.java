@@ -83,6 +83,8 @@ public final class ClientMatchState {
 
     public static void resetMatchState() {
         STORE.resetMatchState();
+        ClientModeRuntimeState.clearAll();
+        ClientModeObjectState.clearAll();
         TdmCombatMarkerTracker.INSTANCE.clear();
     }
 

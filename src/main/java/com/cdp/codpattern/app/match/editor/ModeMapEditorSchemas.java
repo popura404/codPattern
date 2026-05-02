@@ -43,6 +43,26 @@ public final class ModeMapEditorSchemas {
         return resolvePointLayerKey(gameType, layerKey).isPresent();
     }
 
+    public static List<String> areaLayerKeys(String gameType) {
+        registerDefaults();
+        return ModeMapEditorSchemaRegistry.areaLayerKeys(gameType);
+    }
+
+    public static Optional<String> resolveAreaLayerKey(String gameType, String rawLayerKey) {
+        registerDefaults();
+        String requestedKey = rawLayerKey == null ? "" : rawLayerKey.trim();
+        if (requestedKey.isBlank()) {
+            return Optional.empty();
+        }
+        return ModeMapEditorSchemaRegistry.areaLayerKeys(gameType).stream()
+                .filter(key -> key.equalsIgnoreCase(requestedKey))
+                .findFirst();
+    }
+
+    public static boolean supportsAreaLayer(String gameType, String layerKey) {
+        return resolveAreaLayerKey(gameType, layerKey).isPresent();
+    }
+
     public static Optional<SpawnPointKind> legacySpawnPointKind(String layerKey) {
         if (layerKey == null || layerKey.isBlank()) {
             return Optional.of(SpawnPointKind.INITIAL);

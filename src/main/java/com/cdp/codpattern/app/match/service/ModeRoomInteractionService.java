@@ -4,6 +4,7 @@ import com.cdp.codpattern.app.match.model.JoinRoomRequest;
 import com.cdp.codpattern.app.match.model.JoinRoomResult;
 import com.cdp.codpattern.app.match.model.LeaveRoomResult;
 import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.port.ModePlayerRuntimeStatePort;
 import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
 import com.cdp.codpattern.app.match.port.ReadyStatePort;
 import com.cdp.codpattern.app.match.port.TeamRoomPort;
@@ -48,7 +49,12 @@ public final class ModeRoomInteractionService {
         if (lifecyclePort.isEmpty()) {
             return new LeaveResult(false, "", CODE_NOT_IN_ROOM, "");
         }
-        return fromResult(lifecyclePort.get().leave(player));
+        Optional<ModePlayerRuntimeStatePort> playerStatePort = gateway.findPlayerStatePort(player);
+        LeaveResult result = fromResult(lifecyclePort.get().leave(player));
+        if (result.success() && player != null) {
+            playerStatePort.ifPresent(port -> port.clearPlayerState(player.getUUID()));
+        }
+        return result;
     }
 
     public static void selectTeamInRoom(ServerPlayer player, String roomKey, String teamName) {

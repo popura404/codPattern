@@ -46,6 +46,20 @@ public final class ModeMapEditorSchemaRegistry {
                 .orElse(false);
     }
 
+    public static List<String> areaLayerKeys(String gameType) {
+        return find(gameType)
+                .map(schema -> schema.areaLayers().stream()
+                        .map(AreaLayerDefinition::key)
+                        .toList())
+                .orElseGet(List::of);
+    }
+
+    public static boolean supportsAreaLayer(String gameType, String key) {
+        return find(gameType)
+                .map(schema -> schema.supportsAreaLayer(key))
+                .orElse(false);
+    }
+
     public static boolean supportsObjectFeature(String gameType, String key) {
         return find(gameType)
                 .map(schema -> schema.supportsObjectFeature(key))

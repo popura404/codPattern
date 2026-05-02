@@ -3,6 +3,7 @@ package com.phasetranscrystal.fpsmatch.common.packet;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.ModeRoomBackedMap;
 import com.cdp.codpattern.app.match.ModeRoomHandle;
+import com.cdp.codpattern.app.match.editor.ModeAreaData;
 import com.cdp.codpattern.app.match.editor.ModeMapEditorSchemas;
 import com.cdp.codpattern.app.match.editor.ModePointData;
 import com.cdp.codpattern.app.match.port.ModeMapEditPort;
@@ -12,11 +13,14 @@ import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.SpawnPointTool;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolAccessHelper;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
+import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
 import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -35,7 +39,8 @@ public class SpawnPointToolActionC2SPacket {
         SAVE_SELECTIONS,
         DELETE_SELECTED,
         CLEAR_TEAM,
-        MERGE_DYNAMIC
+        MERGE_DYNAMIC,
+        ADD_AREA
     }
 
     private final Action action;
@@ -44,15 +49,35 @@ public class SpawnPointToolActionC2SPacket {
     private final String selectedTeam;
     private final String selectedKind;
     private final int selectedIndex;
+    private final String editMode;
+    private final String selectedAreaLayer;
+    private final int selectedAreaIndex;
 
     public SpawnPointToolActionC2SPacket(Action action, String selectedType, String selectedMap, String selectedTeam,
             String selectedKind, int selectedIndex) {
+        this(
+                action,
+                selectedType,
+                selectedMap,
+                selectedTeam,
+                selectedKind,
+                selectedIndex,
+                SpawnPointTool.EDIT_MODE_POINT,
+                "",
+                -1);
+    }
+
+    public SpawnPointToolActionC2SPacket(Action action, String selectedType, String selectedMap, String selectedTeam,
+            String selectedKind, int selectedIndex, String editMode, String selectedAreaLayer, int selectedAreaIndex) {
         this.action = action;
         this.selectedType = selectedType;
         this.selectedMap = selectedMap;
         this.selectedTeam = selectedTeam;
         this.selectedKind = selectedKind;
         this.selectedIndex = selectedIndex;
+        this.editMode = editMode;
+        this.selectedAreaLayer = selectedAreaLayer;
+        this.selectedAreaIndex = selectedAreaIndex;
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -62,6 +87,9 @@ public class SpawnPointToolActionC2SPacket {
         buf.writeUtf(selectedTeam);
         buf.writeUtf(selectedKind);
         buf.writeVarInt(selectedIndex);
+        buf.writeUtf(editMode);
+        buf.writeUtf(selectedAreaLayer);
+        buf.writeVarInt(selectedAreaIndex);
     }
 
     public static SpawnPointToolActionC2SPacket decode(FriendlyByteBuf buf) {
@@ -71,19 +99,41 @@ public class SpawnPointToolActionC2SPacket {
                 buf.readUtf(),
                 buf.readUtf(),
                 buf.readUtf(),
+                buf.readVarInt(),
+                buf.readUtf(),
+                buf.readUtf(),
                 buf.readVarInt()
         );
     }
 
     public static void sendScreen(ServerPlayer player, ItemStack stack, String requestedType, String requestedMap,
             String requestedTeam, String requestedKind, int requestedIndex) {
+        sendScreen(
+                player,
+                stack,
+                requestedType,
+                requestedMap,
+                requestedTeam,
+                requestedKind,
+                requestedIndex,
+                SpawnPointTool.getEditMode(stack),
+                SpawnPointTool.getSelectedAreaLayer(stack),
+                0);
+    }
+
+    public static void sendScreen(ServerPlayer player, ItemStack stack, String requestedType, String requestedMap,
+            String requestedTeam, String requestedKind, int requestedIndex, String requestedEditMode,
+            String requestedAreaLayer, int requestedAreaIndex) {
         SelectionSnapshot snapshot = resolveSelection(
                 stack,
                 requestedType,
                 requestedMap,
                 requestedTeam,
                 requestedKind,
-                requestedIndex
+                requestedIndex,
+                requestedEditMode,
+                requestedAreaLayer,
+                requestedAreaIndex
         );
         FPSMatch.sendToPlayer(player, new OpenSpawnPointToolScreenS2CPacket(
                 snapshot.availableTypes(),
@@ -95,7 +145,14 @@ public class SpawnPointToolActionC2SPacket {
                 snapshot.availableKinds(),
                 snapshot.selectedKind(),
                 snapshot.selectedIndex(),
-                snapshot.spawnPoints()
+                snapshot.spawnPoints(),
+                snapshot.editMode(),
+                snapshot.availableAreaLayers(),
+                snapshot.selectedAreaLayer(),
+                snapshot.selectedAreaIndex(),
+                snapshot.areas().stream().map(ModeAreaData::area).toList(),
+                SpawnPointTool.getAreaPos1(stack),
+                SpawnPointTool.getAreaPos2(stack)
         ));
     }
 
@@ -115,11 +172,31 @@ public class SpawnPointToolActionC2SPacket {
             }
 
             switch (action) {
-                case REFRESH -> sendScreen(player, stack, selectedType, selectedMap, selectedTeam, selectedKind, selectedIndex);
-                case SAVE_SELECTIONS -> resolveSelection(stack, selectedType, selectedMap, selectedTeam, selectedKind, selectedIndex);
+                case REFRESH -> sendScreen(
+                        player,
+                        stack,
+                        selectedType,
+                        selectedMap,
+                        selectedTeam,
+                        selectedKind,
+                        selectedIndex,
+                        editMode,
+                        selectedAreaLayer,
+                        selectedAreaIndex);
+                case SAVE_SELECTIONS -> resolveSelection(
+                        stack,
+                        selectedType,
+                        selectedMap,
+                        selectedTeam,
+                        selectedKind,
+                        selectedIndex,
+                        editMode,
+                        selectedAreaLayer,
+                        selectedAreaIndex);
                 case DELETE_SELECTED -> deleteSelected(player, stack);
                 case CLEAR_TEAM -> clearTeam(player, stack);
                 case MERGE_DYNAMIC -> mergeDynamicCandidates(player, stack);
+                case ADD_AREA -> addArea(player, stack);
             }
         });
         ctx.get().setPacketHandled(true);
@@ -132,8 +209,15 @@ public class SpawnPointToolActionC2SPacket {
                 selectedMap,
                 selectedTeam,
                 selectedKind,
-                selectedIndex
+                selectedIndex,
+                editMode,
+                selectedAreaLayer,
+                selectedAreaIndex
         );
+        if (SpawnPointTool.EDIT_MODE_AREA.equals(snapshot.editMode())) {
+            deleteSelectedArea(player, stack, snapshot);
+            return;
+        }
         if (snapshot.team().isEmpty()) {
             player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.team_not_found", snapshot.selectedTeam()), false);
             return;
@@ -146,7 +230,10 @@ public class SpawnPointToolActionC2SPacket {
                     snapshot.selectedMap(),
                     snapshot.selectedTeam(),
                     snapshot.selectedKind(),
-                    -1
+                    -1,
+                    snapshot.editMode(),
+                    snapshot.selectedAreaLayer(),
+                    snapshot.selectedAreaIndex()
             );
             return;
         }
@@ -170,7 +257,10 @@ public class SpawnPointToolActionC2SPacket {
                     snapshot.selectedMap(),
                     snapshot.selectedTeam(),
                     snapshot.selectedKind(),
-                    -1
+                    -1,
+                    snapshot.editMode(),
+                    snapshot.selectedAreaLayer(),
+                    snapshot.selectedAreaIndex()
             );
             return;
         }
@@ -190,7 +280,10 @@ public class SpawnPointToolActionC2SPacket {
                     snapshot.selectedMap(),
                     snapshot.selectedTeam(),
                     snapshot.selectedKind(),
-                    snapshot.selectedIndex()
+                    snapshot.selectedIndex(),
+                    snapshot.editMode(),
+                    snapshot.selectedAreaLayer(),
+                    snapshot.selectedAreaIndex()
             );
             return;
         }
@@ -202,7 +295,89 @@ public class SpawnPointToolActionC2SPacket {
                 snapshot.selectedMap(),
                 snapshot.selectedTeam(),
                 snapshot.selectedKind(),
-                snapshot.selectedIndex()
+                snapshot.selectedIndex(),
+                snapshot.editMode(),
+                snapshot.selectedAreaLayer(),
+                snapshot.selectedAreaIndex()
+        );
+    }
+
+    private void deleteSelectedArea(ServerPlayer player, ItemStack stack, SelectionSnapshot snapshot) {
+        if (snapshot.areaMapEditPort().isEmpty()) {
+            player.displayClientMessage(Component.literal("Unsupported area layer: " + snapshot.selectedAreaLayer()), false);
+            return;
+        }
+        if (snapshot.selectedAreaIndex() < 0 || snapshot.selectedAreaIndex() >= snapshot.areas().size()) {
+            sendScreen(
+                    player,
+                    stack,
+                    snapshot.selectedType(),
+                    snapshot.selectedMap(),
+                    snapshot.selectedTeam(),
+                    snapshot.selectedKind(),
+                    snapshot.selectedIndex(),
+                    snapshot.editMode(),
+                    snapshot.selectedAreaLayer(),
+                    -1
+            );
+            return;
+        }
+
+        ModeMapEditPort editPort = snapshot.areaMapEditPort().get();
+        List<ModeAreaData> previousAreas = snapshot.areas();
+        Optional<ModeAreaData> removed = editPort.removeAreaLayerArea(
+                snapshot.selectedAreaLayer(),
+                snapshot.selectedAreaIndex());
+        if (removed.isEmpty()) {
+            sendScreen(
+                    player,
+                    stack,
+                    snapshot.selectedType(),
+                    snapshot.selectedMap(),
+                    snapshot.selectedTeam(),
+                    snapshot.selectedKind(),
+                    snapshot.selectedIndex(),
+                    snapshot.editMode(),
+                    snapshot.selectedAreaLayer(),
+                    -1
+            );
+            return;
+        }
+        try {
+            CodMapPersistence.saveMapOrRollback(
+                    snapshot.map().orElseThrow(),
+                    () -> editPort.replaceAreaLayerAreas(snapshot.selectedAreaLayer(), previousAreas));
+        } catch (RuntimeException e) {
+            player.displayClientMessage(Component.translatable(
+                    "message.codpattern.map.save_failed",
+                    snapshot.selectedType(),
+                    snapshot.selectedMap()), false);
+            sendScreen(
+                    player,
+                    stack,
+                    snapshot.selectedType(),
+                    snapshot.selectedMap(),
+                    snapshot.selectedTeam(),
+                    snapshot.selectedKind(),
+                    snapshot.selectedIndex(),
+                    snapshot.editMode(),
+                    snapshot.selectedAreaLayer(),
+                    snapshot.selectedAreaIndex()
+            );
+            return;
+        }
+        snapshot.map().ifPresent(BaseMap::syncToClient);
+        sendScreen(
+                player,
+                stack,
+                snapshot.selectedType(),
+                snapshot.selectedMap(),
+                snapshot.selectedTeam(),
+                snapshot.selectedKind(),
+                snapshot.selectedIndex(),
+                snapshot.editMode(),
+                snapshot.selectedAreaLayer(),
+                snapshot.selectedAreaIndex()
         );
     }
 
@@ -213,8 +388,15 @@ public class SpawnPointToolActionC2SPacket {
                 selectedMap,
                 selectedTeam,
                 selectedKind,
-                selectedIndex
+                selectedIndex,
+                editMode,
+                selectedAreaLayer,
+                selectedAreaIndex
         );
+        if (SpawnPointTool.EDIT_MODE_AREA.equals(snapshot.editMode())) {
+            clearAreaLayer(player, stack, snapshot);
+            return;
+        }
         if (snapshot.team().isEmpty()) {
             player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.team_not_found", snapshot.selectedTeam()), false);
             return;
@@ -244,7 +426,10 @@ public class SpawnPointToolActionC2SPacket {
                     snapshot.selectedMap(),
                     snapshot.selectedTeam(),
                     snapshot.selectedKind(),
-                    snapshot.selectedIndex()
+                    snapshot.selectedIndex(),
+                    snapshot.editMode(),
+                    snapshot.selectedAreaLayer(),
+                    snapshot.selectedAreaIndex()
             );
             return;
         }
@@ -256,7 +441,145 @@ public class SpawnPointToolActionC2SPacket {
                 snapshot.selectedMap(),
                 snapshot.selectedTeam(),
                 snapshot.selectedKind(),
+                -1,
+                snapshot.editMode(),
+                snapshot.selectedAreaLayer(),
+                snapshot.selectedAreaIndex()
+        );
+    }
+
+    private void clearAreaLayer(ServerPlayer player, ItemStack stack, SelectionSnapshot snapshot) {
+        if (snapshot.areaMapEditPort().isEmpty()) {
+            player.displayClientMessage(Component.literal("Unsupported area layer: " + snapshot.selectedAreaLayer()), false);
+            return;
+        }
+        ModeMapEditPort editPort = snapshot.areaMapEditPort().get();
+        List<ModeAreaData> previousAreas = snapshot.areas();
+        editPort.clearAreaLayerAreas(snapshot.selectedAreaLayer());
+        try {
+            CodMapPersistence.saveMapOrRollback(
+                    snapshot.map().orElseThrow(),
+                    () -> editPort.replaceAreaLayerAreas(snapshot.selectedAreaLayer(), previousAreas));
+        } catch (RuntimeException e) {
+            player.displayClientMessage(Component.translatable(
+                    "message.codpattern.map.save_failed",
+                    snapshot.selectedType(),
+                    snapshot.selectedMap()), false);
+            sendScreen(
+                    player,
+                    stack,
+                    snapshot.selectedType(),
+                    snapshot.selectedMap(),
+                    snapshot.selectedTeam(),
+                    snapshot.selectedKind(),
+                    snapshot.selectedIndex(),
+                    snapshot.editMode(),
+                    snapshot.selectedAreaLayer(),
+                    snapshot.selectedAreaIndex()
+            );
+            return;
+        }
+        snapshot.map().ifPresent(BaseMap::syncToClient);
+        sendScreen(
+                player,
+                stack,
+                snapshot.selectedType(),
+                snapshot.selectedMap(),
+                snapshot.selectedTeam(),
+                snapshot.selectedKind(),
+                snapshot.selectedIndex(),
+                snapshot.editMode(),
+                snapshot.selectedAreaLayer(),
                 -1
+        );
+    }
+
+    private void addArea(ServerPlayer player, ItemStack stack) {
+        SelectionSnapshot snapshot = resolveSelection(
+                stack,
+                selectedType,
+                selectedMap,
+                selectedTeam,
+                selectedKind,
+                selectedIndex,
+                SpawnPointTool.EDIT_MODE_AREA,
+                selectedAreaLayer,
+                selectedAreaIndex
+        );
+        if (snapshot.map().isEmpty()) {
+            player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.map_not_found", snapshot.selectedMap()), false);
+            return;
+        }
+        if (snapshot.areaMapEditPort().isEmpty()) {
+            player.displayClientMessage(Component.literal("Unsupported area layer: " + snapshot.selectedAreaLayer()), false);
+            return;
+        }
+
+        BaseMap map = snapshot.map().get();
+        BlockPos pos1 = SpawnPointTool.getAreaPos1(stack);
+        BlockPos pos2 = SpawnPointTool.getAreaPos2(stack);
+        if (pos1 == null || pos2 == null) {
+            player.displayClientMessage(Component.literal("Set both area positions before adding an area."), false);
+            return;
+        }
+        if (!map.getServerLevel().dimension().equals(player.serverLevel().dimension())) {
+            player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.dimension_mismatch"), false);
+            return;
+        }
+        if (!map.getMapArea().isBlockPosInArea(pos1) || !map.getMapArea().isBlockPosInArea(pos2)) {
+            player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.outside_map"), false);
+            return;
+        }
+
+        ModeMapEditPort editPort = snapshot.areaMapEditPort().get();
+        List<ModeAreaData> previousAreas = snapshot.areas();
+        ModeAreaData area = new ModeAreaData(
+                snapshot.selectedAreaLayer(),
+                player.serverLevel().dimension(),
+                new AreaData(pos1, pos2),
+                "",
+                new CompoundTag());
+        if (!editPort.addAreaLayerArea(area)) {
+            player.displayClientMessage(Component.literal("Area layer rejected the new area: " + snapshot.selectedAreaLayer()), false);
+            return;
+        }
+        try {
+            CodMapPersistence.saveMapOrRollback(
+                    map,
+                    () -> editPort.replaceAreaLayerAreas(snapshot.selectedAreaLayer(), previousAreas));
+        } catch (RuntimeException e) {
+            player.displayClientMessage(Component.translatable(
+                    "message.codpattern.map.save_failed",
+                    map.getGameType(),
+                    map.getMapName()), false);
+            sendScreen(
+                    player,
+                    stack,
+                    snapshot.selectedType(),
+                    snapshot.selectedMap(),
+                    snapshot.selectedTeam(),
+                    snapshot.selectedKind(),
+                    snapshot.selectedIndex(),
+                    snapshot.editMode(),
+                    snapshot.selectedAreaLayer(),
+                    snapshot.selectedAreaIndex()
+            );
+            return;
+        }
+
+        map.syncToClient();
+        player.displayClientMessage(Component.literal("Added area to " + snapshot.selectedAreaLayer()), false);
+        sendScreen(
+                player,
+                stack,
+                snapshot.selectedType(),
+                snapshot.selectedMap(),
+                snapshot.selectedTeam(),
+                snapshot.selectedKind(),
+                snapshot.selectedIndex(),
+                snapshot.editMode(),
+                snapshot.selectedAreaLayer(),
+                snapshot.areas().size()
         );
     }
 
@@ -267,7 +590,10 @@ public class SpawnPointToolActionC2SPacket {
                 selectedMap,
                 selectedTeam,
                 selectedKind,
-                selectedIndex
+                selectedIndex,
+                editMode,
+                selectedAreaLayer,
+                selectedAreaIndex
         );
         if (snapshot.map().isEmpty()) {
             player.displayClientMessage(Component.translatable("message.fpsm.spawn_point_tool.map_not_found", snapshot.selectedMap()), false);
@@ -355,7 +681,8 @@ public class SpawnPointToolActionC2SPacket {
     }
 
     private static SelectionSnapshot resolveSelection(ItemStack stack, String requestedType, String requestedMap,
-            String requestedTeam, String requestedKind, int requestedIndex) {
+            String requestedTeam, String requestedKind, int requestedIndex, String requestedEditMode,
+            String requestedAreaLayer, int requestedAreaIndex) {
         FPSMCore core = FPSMCore.getInstance();
         List<String> availableTypes = core.getGameTypes();
         String canonicalRequestedType = GameModeRegistry.canonicalize(requestedType);
@@ -381,15 +708,29 @@ public class SpawnPointToolActionC2SPacket {
         List<SpawnPointData> spawnPoints = pointLayerPoints.stream()
                 .map(point -> toDisplaySpawnPointData(selectedKind, point))
                 .toList();
+        List<String> availableAreaLayers = SpawnPointTool.availableAreaLayersForType(selectedType);
+        String editMode = SpawnPointTool.normalizeEditMode(requestedEditMode, selectedType);
+        String selectedAreaLayer = SpawnPointTool.normalizeSelectedAreaLayer(selectedType, requestedAreaLayer);
+        Optional<ModeMapEditPort> areaEditPort = map.flatMap(SpawnPointToolActionC2SPacket::mapEditPort)
+                .filter(port -> port.supportsAreaLayer(selectedAreaLayer));
+        List<ModeAreaData> areas = areaEditPort
+                .map(port -> port.areaLayerAreas(selectedAreaLayer))
+                .map(List::copyOf)
+                .orElse(List.of());
 
         SpawnPointTool.setSelectedType(stack, selectedType);
         SpawnPointTool.setSelectedMap(stack, selectedMap);
         SpawnPointTool.setSelectedTeam(stack, selectedTeam);
         SpawnPointTool.setSelectedKind(stack, selectedKind);
+        SpawnPointTool.setEditMode(stack, editMode);
+        SpawnPointTool.setSelectedAreaLayer(stack, selectedAreaLayer);
 
         int normalizedIndex = spawnPoints.isEmpty()
                 ? -1
                 : Math.max(0, Math.min(requestedIndex < 0 ? 0 : requestedIndex, spawnPoints.size() - 1));
+        int normalizedAreaIndex = areas.isEmpty()
+                ? -1
+                : Math.max(0, Math.min(requestedAreaIndex < 0 ? 0 : requestedAreaIndex, areas.size() - 1));
 
         return new SelectionSnapshot(
                 availableTypes,
@@ -405,7 +746,13 @@ public class SpawnPointToolActionC2SPacket {
                 pointLayerPoints,
                 editPort,
                 map,
-                team
+                team,
+                editMode,
+                availableAreaLayers,
+                selectedAreaLayer,
+                normalizedAreaIndex,
+                areas,
+                areaEditPort
         );
     }
 
@@ -464,7 +811,13 @@ public class SpawnPointToolActionC2SPacket {
             List<ModePointData> pointLayerPoints,
             Optional<ModeMapEditPort> mapEditPort,
             Optional<BaseMap> map,
-            Optional<BaseTeam> team
+            Optional<BaseTeam> team,
+            String editMode,
+            List<String> availableAreaLayers,
+            String selectedAreaLayer,
+            int selectedAreaIndex,
+            List<ModeAreaData> areas,
+            Optional<ModeMapEditPort> areaMapEditPort
     ) {
     }
 }

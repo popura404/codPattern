@@ -7,17 +7,26 @@ import com.cdp.codpattern.app.match.ModeRoomHandle;
 import com.cdp.codpattern.app.match.model.ModeDescriptor;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
+import com.cdp.codpattern.app.match.port.ModeEntityCombatEventPort;
+import com.cdp.codpattern.app.match.port.ModeEntityLifecyclePort;
+import com.cdp.codpattern.app.match.port.ModeInteractableObjectPort;
 import com.cdp.codpattern.app.match.port.ModeKitDistributionPort;
 import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
 import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
+import com.cdp.codpattern.app.match.port.ModePlayerRuntimeStatePort;
+import com.cdp.codpattern.app.match.port.ModeRespawnPolicyPort;
 import com.cdp.codpattern.app.match.port.ModeRosterPort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
+import com.cdp.codpattern.app.match.port.ModeRoomTickPort;
+import com.cdp.codpattern.app.match.port.ModeRuntimeStatePort;
 import com.cdp.codpattern.app.match.port.ReadyStatePort;
 import com.cdp.codpattern.app.match.port.TeamRoomPort;
 import com.cdp.codpattern.app.match.port.VoteControlPort;
+import com.cdp.codpattern.app.match.runtime.ModeEntityOwnershipRegistry;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -79,6 +88,28 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
     }
 
     @Override
+    public Optional<ModeEntityCombatEventPort> findRoomEntityCombatEventPort(RoomId roomId) {
+        return findRoomHandle(roomId).flatMap(ModeRoomHandle::entityCombatEventPort);
+    }
+
+    @Override
+    public Optional<ModeEntityCombatEventPort> findEntityCombatEventPort(Entity entity) {
+        return entityOwnershipRegistry().roomIdOf(entity)
+                .flatMap(this::findRoomEntityCombatEventPort);
+    }
+
+    @Override
+    public Optional<ModeEntityLifecyclePort> findRoomEntityLifecyclePort(RoomId roomId) {
+        return findRoomHandle(roomId).flatMap(ModeRoomHandle::entityLifecyclePort);
+    }
+
+    @Override
+    public Optional<ModeEntityLifecyclePort> findEntityLifecyclePort(Entity entity) {
+        return entityOwnershipRegistry().roomIdOf(entity)
+                .flatMap(this::findRoomEntityLifecyclePort);
+    }
+
+    @Override
     public Optional<ModeRosterPort> findRoomRosterPort(RoomId roomId) {
         return findRoomHandle(roomId).flatMap(ModeRoomHandle::rosterPort);
     }
@@ -91,6 +122,36 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
     @Override
     public Optional<ModeKitDistributionPort> findPlayerKitDistributionPort(ServerPlayer player) {
         return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::kitDistributionPort);
+    }
+
+    @Override
+    public Optional<ModeRuntimeStatePort> findRoomRuntimeStatePort(RoomId roomId) {
+        return findRoomHandle(roomId).flatMap(ModeRoomHandle::runtimeStatePort);
+    }
+
+    @Override
+    public Optional<ModeRuntimeStatePort> findPlayerRuntimeStatePort(ServerPlayer player) {
+        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::runtimeStatePort);
+    }
+
+    @Override
+    public Optional<ModeInteractableObjectPort> findPlayerInteractableObjectPort(ServerPlayer player) {
+        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::interactableObjectPort);
+    }
+
+    @Override
+    public Optional<ModePlayerRuntimeStatePort> findRoomStatePort(RoomId roomId) {
+        return findRoomHandle(roomId).flatMap(ModeRoomHandle::playerRuntimeStatePort);
+    }
+
+    @Override
+    public Optional<ModePlayerRuntimeStatePort> findPlayerStatePort(ServerPlayer player) {
+        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::playerRuntimeStatePort);
+    }
+
+    @Override
+    public Optional<ModeRespawnPolicyPort> findPlayerRespawnPolicyPort(ServerPlayer player) {
+        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::respawnPolicyPort);
     }
 
     @Override
@@ -109,6 +170,29 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
             legacyReadPort(handle).ifPresent(ports::add);
         }
         return List.copyOf(ports);
+    }
+
+    @Override
+    public List<ModeRoomTickPort> listRoomTickPorts() {
+        List<ModeRoomTickPort> ports = new ArrayList<>();
+        for (ModeRoomHandle handle : listRoomHandles()) {
+            handle.tickPort().ifPresent(ports::add);
+        }
+        return List.copyOf(ports);
+    }
+
+    @Override
+    public List<ModePlayerRuntimeStatePort> listRoomStatePorts() {
+        List<ModePlayerRuntimeStatePort> ports = new ArrayList<>();
+        for (ModeRoomHandle handle : listRoomHandles()) {
+            handle.playerRuntimeStatePort().ifPresent(ports::add);
+        }
+        return List.copyOf(ports);
+    }
+
+    @Override
+    public ModeEntityOwnershipRegistry entityOwnershipRegistry() {
+        return ModeEntityOwnershipRegistry.instance();
     }
 
     @Override

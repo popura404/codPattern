@@ -3,6 +3,7 @@ package com.cdp.codpattern.command;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.ModeRoomBackedMap;
 import com.cdp.codpattern.app.match.ModeRoomHandle;
+import com.cdp.codpattern.app.match.editor.ModeAreaData;
 import com.cdp.codpattern.app.match.editor.ModeMapEditorSchemas;
 import com.cdp.codpattern.app.match.editor.ModeObjectData;
 import com.cdp.codpattern.app.match.editor.ModePointData;
@@ -30,6 +31,7 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec2;
@@ -69,6 +71,8 @@ public final class MapManagementCommand {
             };
     private static final SuggestionProvider<CommandSourceStack> SPAWN_KIND_SUGGESTIONS =
             (context, builder) -> SharedSuggestionProvider.suggest(spawnKindsForContextType(context), builder);
+    private static final SuggestionProvider<CommandSourceStack> AREA_LAYER_SUGGESTIONS =
+            (context, builder) -> SharedSuggestionProvider.suggest(areaLayersForContextType(context), builder);
 
     private MapManagementCommand() {
     }
@@ -183,6 +187,63 @@ public final class MapManagementCommand {
                                         StringArgumentType.getString(context, "type"),
                                         StringArgumentType.getString(context, "map"))))));
         root.then(spawn);
+
+        LiteralArgumentBuilder<CommandSourceStack> area = Commands.literal("area");
+        area.then(Commands.literal("list")
+                .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
+                        .then(Commands.argument("map", StringArgumentType.string())
+                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
+                                .then(Commands.argument("layer", StringArgumentType.word())
+                                        .suggests(AREA_LAYER_SUGGESTIONS)
+                                        .executes(context -> listAreaLayerAreas(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "type"),
+                                                StringArgumentType.getString(context, "map"),
+                                                StringArgumentType.getString(context, "layer")))))));
+        area.then(Commands.literal("add")
+                .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
+                        .then(Commands.argument("map", StringArgumentType.string())
+                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
+                                .then(Commands.argument("layer", StringArgumentType.word())
+                                        .suggests(AREA_LAYER_SUGGESTIONS)
+                                        .then(Commands.argument("from", BlockPosArgument.blockPos())
+                                                .then(Commands.argument("to", BlockPosArgument.blockPos())
+                                                        .executes(context -> addAreaLayerArea(
+                                                                context.getSource(),
+                                                                StringArgumentType.getString(context, "type"),
+                                                                StringArgumentType.getString(context, "map"),
+                                                                StringArgumentType.getString(context, "layer"),
+                                                                BlockPosArgument.getLoadedBlockPos(context, "from"),
+                                                                BlockPosArgument.getLoadedBlockPos(context, "to")))))))));
+        area.then(Commands.literal("remove")
+                .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
+                        .then(Commands.argument("map", StringArgumentType.string())
+                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
+                                .then(Commands.argument("layer", StringArgumentType.word())
+                                        .suggests(AREA_LAYER_SUGGESTIONS)
+                                        .then(Commands.argument("index", IntegerArgumentType.integer(1))
+                                                .executes(context -> removeAreaLayerArea(
+                                                        context.getSource(),
+                                                        StringArgumentType.getString(context, "type"),
+                                                        StringArgumentType.getString(context, "map"),
+                                                        StringArgumentType.getString(context, "layer"),
+                                                        IntegerArgumentType.getInteger(context, "index"))))))));
+        area.then(Commands.literal("clear")
+                .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
+                        .then(Commands.argument("map", StringArgumentType.string())
+                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
+                                .then(Commands.argument("layer", StringArgumentType.word())
+                                        .suggests(AREA_LAYER_SUGGESTIONS)
+                                        .executes(context -> clearAreaLayerAreas(
+                                                context.getSource(),
+                                                StringArgumentType.getString(context, "type"),
+                                                StringArgumentType.getString(context, "map"),
+                                                StringArgumentType.getString(context, "layer")))))));
+        root.then(area);
 
         LiteralArgumentBuilder<CommandSourceStack> endtp = Commands.literal("endtp")
                 .requires(source -> source.hasPermission(END_TELEPORT_PERMISSION_LEVEL));
@@ -525,6 +586,133 @@ public final class MapManagementCommand {
         return mergeResult.uniqueDynamicPointCount();
     }
 
+    private static int listAreaLayerAreas(CommandSourceStack source, String rawType, String mapName, String rawLayerKey) {
+        BaseMap map = requireMap(source, rawType, mapName);
+        if (map == null) {
+            return 0;
+        }
+        String layerKey = resolveAreaLayer(source, map, rawLayerKey);
+        if (layerKey == null) {
+            return 0;
+        }
+        ModeMapEditPort editPort = requireAreaEditPort(source, map, layerKey);
+        if (editPort == null) {
+            return 0;
+        }
+
+        List<ModeAreaData> areas = editPort.areaLayerAreas(layerKey);
+        source.sendSuccess(() -> Component.literal("Area layer " + map.getGameType() + "/" + map.getMapName()
+                + " " + layerKey + ": " + areas.size() + " area(s)"), false);
+        for (int i = 0; i < areas.size(); i++) {
+            ModeAreaData area = areas.get(i);
+            AreaData data = area.area();
+            int index = i + 1;
+            source.sendSuccess(() -> Component.literal(index + ". "
+                    + area.dimension().location()
+                    + " from " + MapCreatorTool.formatPos(data.pos1())
+                    + " to " + MapCreatorTool.formatPos(data.pos2())
+                    + (area.scopeKey().isBlank() ? "" : " scope=" + area.scopeKey())), false);
+        }
+        return areas.size();
+    }
+
+    private static int addAreaLayerArea(CommandSourceStack source, String rawType, String mapName, String rawLayerKey,
+            BlockPos from, BlockPos to) {
+        BaseMap map = requireMap(source, rawType, mapName);
+        if (map == null) {
+            return 0;
+        }
+        if (!validateMapPosition(source, map, from) || !validateMapPosition(source, map, to)) {
+            return 0;
+        }
+        String layerKey = resolveAreaLayer(source, map, rawLayerKey);
+        if (layerKey == null) {
+            return 0;
+        }
+        ModeMapEditPort editPort = requireAreaEditPort(source, map, layerKey);
+        if (editPort == null) {
+            return 0;
+        }
+        List<ModeAreaData> previousAreas = editPort.areaLayerAreas(layerKey);
+        ModeAreaData area = new ModeAreaData(
+                layerKey,
+                source.getLevel().dimension(),
+                new AreaData(from, to),
+                "",
+                new CompoundTag());
+        if (!editPort.addAreaLayerArea(area)) {
+            source.sendFailure(Component.literal("Area layer rejected the new area: " + layerKey));
+            return 0;
+        }
+        try {
+            CodMapPersistence.saveMapOrRollback(map, () -> editPort.replaceAreaLayerAreas(layerKey, previousAreas));
+        } catch (RuntimeException e) {
+            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
+            return 0;
+        }
+        map.syncToClient();
+        source.sendSuccess(() -> Component.literal("Added area to " + layerKey + " from "
+                + MapCreatorTool.formatPos(from) + " to " + MapCreatorTool.formatPos(to)), true);
+        return 1;
+    }
+
+    private static int removeAreaLayerArea(CommandSourceStack source, String rawType, String mapName, String rawLayerKey,
+            int oneBasedIndex) {
+        BaseMap map = requireMap(source, rawType, mapName);
+        if (map == null) {
+            return 0;
+        }
+        String layerKey = resolveAreaLayer(source, map, rawLayerKey);
+        if (layerKey == null) {
+            return 0;
+        }
+        ModeMapEditPort editPort = requireAreaEditPort(source, map, layerKey);
+        if (editPort == null) {
+            return 0;
+        }
+        List<ModeAreaData> previousAreas = editPort.areaLayerAreas(layerKey);
+        Optional<ModeAreaData> removed = editPort.removeAreaLayerArea(layerKey, oneBasedIndex - 1);
+        if (removed.isEmpty()) {
+            source.sendFailure(Component.literal("Invalid area index: " + oneBasedIndex));
+            return 0;
+        }
+        try {
+            CodMapPersistence.saveMapOrRollback(map, () -> editPort.replaceAreaLayerAreas(layerKey, previousAreas));
+        } catch (RuntimeException e) {
+            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
+            return 0;
+        }
+        map.syncToClient();
+        source.sendSuccess(() -> Component.literal("Removed area " + oneBasedIndex + " from " + layerKey), true);
+        return 1;
+    }
+
+    private static int clearAreaLayerAreas(CommandSourceStack source, String rawType, String mapName, String rawLayerKey) {
+        BaseMap map = requireMap(source, rawType, mapName);
+        if (map == null) {
+            return 0;
+        }
+        String layerKey = resolveAreaLayer(source, map, rawLayerKey);
+        if (layerKey == null) {
+            return 0;
+        }
+        ModeMapEditPort editPort = requireAreaEditPort(source, map, layerKey);
+        if (editPort == null) {
+            return 0;
+        }
+        List<ModeAreaData> previousAreas = editPort.areaLayerAreas(layerKey);
+        int removedCount = editPort.clearAreaLayerAreas(layerKey);
+        try {
+            CodMapPersistence.saveMapOrRollback(map, () -> editPort.replaceAreaLayerAreas(layerKey, previousAreas));
+        } catch (RuntimeException e) {
+            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
+            return 0;
+        }
+        map.syncToClient();
+        source.sendSuccess(() -> Component.literal("Cleared " + removedCount + " area(s) from " + layerKey), true);
+        return removedCount;
+    }
+
     private static int showMatchEndTeleport(CommandSourceStack source, String mapName) {
         BaseMap map = requireUniqueMap(source, mapName);
         if (map == null) {
@@ -668,6 +856,18 @@ public final class MapManagementCommand {
         return null;
     }
 
+    private static String resolveAreaLayer(CommandSourceStack source, BaseMap map, String rawLayerKey) {
+        Optional<String> layerKey = ModeMapEditorSchemas.resolveAreaLayerKey(
+                map == null ? defaultGameType() : map.getGameType(),
+                rawLayerKey);
+        if (layerKey.isPresent()) {
+            return layerKey.get();
+        }
+        source.sendFailure(Component.literal("Unsupported area layer: "
+                + (rawLayerKey == null || rawLayerKey.isBlank() ? "<blank>" : rawLayerKey)));
+        return null;
+    }
+
     private static ModeMapEditPort requireMapEditPort(CommandSourceStack source, BaseMap map, String layerKey) {
         Optional<ModeMapEditPort> editPort = mapEditPort(map)
                 .filter(port -> port.supportsPointLayer(layerKey));
@@ -675,6 +875,16 @@ public final class MapManagementCommand {
             return editPort.get();
         }
         source.sendFailure(Component.translatable("command.codpattern.map.invalid_kind", layerKey));
+        return null;
+    }
+
+    private static ModeMapEditPort requireAreaEditPort(CommandSourceStack source, BaseMap map, String layerKey) {
+        Optional<ModeMapEditPort> editPort = mapEditPort(map)
+                .filter(port -> port.supportsAreaLayer(layerKey));
+        if (editPort.isPresent()) {
+            return editPort.get();
+        }
+        source.sendFailure(Component.literal("Unsupported area layer: " + layerKey));
         return null;
     }
 
@@ -776,6 +986,19 @@ public final class MapManagementCommand {
             return ModeMapEditorSchemas.spawnPointLayerKeys(type);
         } catch (IllegalArgumentException ignored) {
             return ModeMapEditorSchemas.spawnPointLayerKeys(defaultGameType());
+        }
+    }
+
+    private static List<String> areaLayersForContextType(CommandContext<CommandSourceStack> context) {
+        try {
+            String rawType = StringArgumentType.getString(context, "type");
+            String type = GameModeRegistry.canonicalize(rawType);
+            if (!FPSMCore.getInstance().checkGameType(type)) {
+                return List.of();
+            }
+            return ModeMapEditorSchemas.areaLayerKeys(type);
+        } catch (IllegalArgumentException ignored) {
+            return List.of();
         }
     }
 

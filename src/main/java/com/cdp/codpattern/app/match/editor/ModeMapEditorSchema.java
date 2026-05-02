@@ -20,6 +20,16 @@ public interface ModeMapEditorSchema {
         return pointLayer(key).isPresent();
     }
 
+    default Optional<AreaLayerDefinition> areaLayer(String key) {
+        return areaLayers().stream()
+                .filter(layer -> layer.key().equals(key))
+                .findFirst();
+    }
+
+    default boolean supportsAreaLayer(String key) {
+        return areaLayer(key).isPresent();
+    }
+
     default boolean supportsObjectFeature(String key) {
         return objectFeatures().stream()
                 .anyMatch(feature -> feature.key().equals(key));

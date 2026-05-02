@@ -5,12 +5,21 @@ import com.cdp.codpattern.app.match.model.DamageContext;
 import com.cdp.codpattern.app.match.model.DamageDecision;
 import com.cdp.codpattern.app.match.model.DeathContext;
 import com.cdp.codpattern.app.match.model.DeathDecision;
+import com.cdp.codpattern.app.match.model.EntityDamageContext;
+import com.cdp.codpattern.app.match.model.EntityDeathContext;
+import com.cdp.codpattern.app.match.model.EntityLifecycleContext;
+import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.port.ModeEntityCombatEventPort;
+import com.cdp.codpattern.app.match.runtime.ModeEntityOwnershipRegistry;
 import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
+import com.cdp.codpattern.compat.fpsmatch.FpsMatchGateway;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMapEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
@@ -40,10 +49,35 @@ public class CodTdmEventHandler {
      */
     @SubscribeEvent
     public static void onLivingHurt(LivingHurtEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            handlePlayerHurt(event, player);
             return;
         }
 
+        LivingEntity entity = event.getEntity();
+        if (entity.level().isClientSide) {
+            return;
+        }
+        FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
+        Optional<RoomId> roomId = gateway.entityOwnershipRegistry().roomIdOf(entity);
+        if (roomId.isEmpty()) {
+            return;
+        }
+        Optional<ModeEntityCombatEventPort> combatPortOptional = gateway.findRoomEntityCombatEventPort(roomId.get());
+        if (combatPortOptional.isEmpty()) {
+            return;
+        }
+
+        DamageDecision decision = combatPortOptional.get().onEntityHurt(entity, new EntityDamageContext(
+                roomId.get(),
+                event.getSource(),
+                event.getSource().getDirectEntity(),
+                Optional.ofNullable(resolveAttacker(event)),
+                event.getAmount()));
+        applyDamageDecision(event, decision);
+    }
+
+    private static void handlePlayerHurt(LivingHurtEvent event, ServerPlayer player) {
         Optional<ModeCombatEventPort> combatPortOptional = FpsMatchGatewayProvider.gateway()
                 .findPlayerCombatEventPort(player);
         if (combatPortOptional.isEmpty()) {
@@ -55,6 +89,10 @@ public class CodTdmEventHandler {
                 event.getSource().getDirectEntity(),
                 Optional.ofNullable(resolveAttacker(event)),
                 event.getAmount()));
+        applyDamageDecision(event, decision);
+    }
+
+    private static void applyDamageDecision(LivingHurtEvent event, DamageDecision decision) {
         if (decision == null) {
             return;
         }
@@ -70,10 +108,34 @@ public class CodTdmEventHandler {
      */
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public static void onPlayerDeath(LivingDeathEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            handlePlayerDeath(event, player);
             return;
         }
 
+        LivingEntity entity = event.getEntity();
+        if (entity.level().isClientSide) {
+            return;
+        }
+        FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
+        Optional<RoomId> roomId = gateway.entityOwnershipRegistry().roomIdOf(entity);
+        if (roomId.isEmpty()) {
+            return;
+        }
+        Optional<ModeEntityCombatEventPort> combatPortOptional = gateway.findRoomEntityCombatEventPort(roomId.get());
+        if (combatPortOptional.isEmpty()) {
+            return;
+        }
+
+        DeathDecision decision = combatPortOptional.get().onEntityDeath(entity, new EntityDeathContext(
+                roomId.get(),
+                event.getSource(),
+                event.getSource().getDirectEntity(),
+                Optional.ofNullable(resolveKiller(event))));
+        applyDeathDecision(event, entity, decision);
+    }
+
+    private static void handlePlayerDeath(LivingDeathEvent event, ServerPlayer player) {
         ServerPlayer killer = resolveKiller(event);
         Optional<ModeCombatEventPort> combatPortOptional = FpsMatchGatewayProvider.gateway()
                 .findPlayerCombatEventPort(player);
@@ -85,6 +147,10 @@ public class CodTdmEventHandler {
                 event.getSource(),
                 event.getSource().getDirectEntity(),
                 Optional.ofNullable(killer)));
+        applyDeathDecision(event, player, decision);
+    }
+
+    private static void applyDeathDecision(LivingDeathEvent event, LivingEntity entity, DeathDecision decision) {
         if (decision == null) {
             return;
         }
@@ -92,8 +158,26 @@ public class CodTdmEventHandler {
             event.setCanceled(true);
         }
         if (decision.restoreFullHealth()) {
-            player.setHealth(player.getMaxHealth());
+            entity.setHealth(entity.getMaxHealth());
         }
+    }
+
+    @SubscribeEvent
+    public static void onEntityLeaveLevel(EntityLeaveLevelEvent event) {
+        Entity entity = event.getEntity();
+        if (entity == null || entity.level().isClientSide || entity instanceof ServerPlayer) {
+            return;
+        }
+
+        FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
+        ModeEntityOwnershipRegistry registry = gateway.entityOwnershipRegistry();
+        Optional<RoomId> roomId = registry.roomIdOf(entity);
+        if (roomId.isEmpty()) {
+            return;
+        }
+        gateway.findRoomEntityLifecyclePort(roomId.get())
+                .ifPresent(port -> port.onRoomEntityRemoved(entity, new EntityLifecycleContext(roomId.get())));
+        registry.unregister(entity);
     }
 
     private static ServerPlayer resolveKiller(LivingDeathEvent event) {

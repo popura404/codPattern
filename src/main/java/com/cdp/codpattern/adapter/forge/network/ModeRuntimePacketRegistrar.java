@@ -5,6 +5,8 @@ import com.cdp.codpattern.network.match.CountdownPacket;
 import com.cdp.codpattern.network.match.DeathCamPacket;
 import com.cdp.codpattern.network.match.GamePhasePacket;
 import com.cdp.codpattern.network.match.KillFeedPacket;
+import com.cdp.codpattern.network.match.ModeObjectStateSyncPacket;
+import com.cdp.codpattern.network.match.ModeRuntimeStatePacket;
 import com.cdp.codpattern.network.match.PhysicsMobRetainPacket;
 import com.cdp.codpattern.network.match.ScoreUpdatePacket;
 import net.minecraftforge.network.NetworkDirection;
@@ -54,6 +56,18 @@ final class ModeRuntimePacketRegistrar {
                 .decoder(CombatMarkerConfigPacket::decode)
                 .encoder(CombatMarkerConfigPacket::encode)
                 .consumerMainThread(CombatMarkerConfigPacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(ModeRuntimeStatePacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(ModeRuntimeStatePacket::decode)
+                .encoder(ModeRuntimeStatePacket::encode)
+                .consumerMainThread(ModeRuntimeStatePacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(ModeObjectStateSyncPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(ModeObjectStateSyncPacket::decode)
+                .encoder(ModeObjectStateSyncPacket::encode)
+                .consumerMainThread(ModeObjectStateSyncPacket::handle)
                 .add();
     }
 }
