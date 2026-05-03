@@ -104,7 +104,7 @@ final class ZombiesRoomHandleFactory {
                 Optional.of(entityLifecyclePort),
                 Optional.empty(),
                 Optional.of(ports),
-                Optional.empty(),
+                Optional.of(map.objectInteractionService()),
                 Optional.empty(),
                 Optional.of(respawnPolicy));
     }

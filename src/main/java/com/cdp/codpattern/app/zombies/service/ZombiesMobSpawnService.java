@@ -6,13 +6,11 @@ import com.cdp.codpattern.app.zombies.map.ZombiesMapObjects;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesZombieSpawnData;
 import com.cdp.codpattern.app.zombies.model.ZombiesWaveDefinition;
 import com.cdp.codpattern.app.zombies.runtime.ZombiesWaveRuntimeState;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.monster.Zombie;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +23,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class ZombiesMobSpawnService {
     public static final int DEFAULT_GLOBAL_MAX_ALIVE_ZOMBIES = 64;
 
-    private static final String VANILLA_ZOMBIE_ID = "minecraft:zombie";
     private static final AtomicInteger GLOBAL_ACTIVE_ZOMBIES = new AtomicInteger();
 
     private final ModeEntityOwnershipRegistry ownershipRegistry;
@@ -79,29 +76,29 @@ public final class ZombiesMobSpawnService {
         }
 
         ZombiesZombieSpawnData spawn = chooseSpawn(level, loadedCandidates);
-        Zombie zombie = EntityType.ZOMBIE.create(level);
-        if (zombie == null) {
+        Mob mob = createSupportedMob(level, mobId.get());
+        if (mob == null) {
             return SpawnResult.failure(SpawnFailureReason.ENTITY_CREATE_FAILED);
         }
-        zombie.moveTo(
+        mob.moveTo(
                 spawn.pos().getX() + 0.5D,
                 spawn.pos().getY(),
                 spawn.pos().getZ() + 0.5D,
                 spawn.yaw(),
                 spawn.pitch());
-        applyWaveAttributes(zombie, waveDefinition);
+        applyWaveAttributes(mob, waveDefinition);
 
-        if (!level.addFreshEntity(zombie)) {
+        if (!level.addFreshEntity(mob)) {
             return SpawnResult.failure(SpawnFailureReason.ENTITY_ADD_FAILED);
         }
         if (!waveState.consumeBudget(mobId.get())) {
-            zombie.discard();
+            mob.discard();
             return SpawnResult.failure(SpawnFailureReason.NO_BUDGET);
         }
-        ownershipRegistry.register(roomId, zombie);
-        waveState.registerActiveZombie(zombie.getUUID());
+        ownershipRegistry.register(roomId, mob);
+        waveState.registerActiveZombie(mob.getUUID());
         GLOBAL_ACTIVE_ZOMBIES.incrementAndGet();
-        return SpawnResult.spawned(zombie, mobId.get(), spawn.objectId());
+        return SpawnResult.spawned(mob, mobId.get(), spawn.objectId());
     }
 
     public void recordMobEnded() {
@@ -144,7 +141,7 @@ public final class ZombiesMobSpawnService {
         return waveState.remainingBudgetByMobIdSnapshot().entrySet().stream()
                 .filter(entry -> entry.getValue() != null && entry.getValue() > 0)
                 .map(Map.Entry::getKey)
-                .filter(ZombiesMobSpawnService::supportedMobId)
+                .filter(ZombiesWaveValidator::isSupportedEntityId)
                 .findFirst();
     }
 
@@ -237,8 +234,12 @@ public final class ZombiesMobSpawnService {
         }
     }
 
-    private static boolean supportedMobId(String rawMobId) {
-        ResourceLocation id = ResourceLocation.tryParse(rawMobId);
-        return id != null && VANILLA_ZOMBIE_ID.equals(id.toString());
+    private static Mob createSupportedMob(ServerLevel level, String rawMobId) {
+        String mobId = ZombiesWaveValidator.normalizedEntityId(rawMobId).orElse("");
+        return switch (mobId) {
+            case ZombiesWaveValidator.VANILLA_ZOMBIE_ID -> EntityType.ZOMBIE.create(level);
+            case ZombiesWaveValidator.VANILLA_HUSK_ID -> EntityType.HUSK.create(level);
+            default -> null;
+        };
     }
 }

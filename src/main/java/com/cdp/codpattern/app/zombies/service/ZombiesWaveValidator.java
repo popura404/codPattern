@@ -7,6 +7,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.StringJoiner;
 
 public final class ZombiesWaveValidator {
     public static final String NO_VALID_WAVE = "rules.no_valid_wave";
@@ -19,6 +21,12 @@ public final class ZombiesWaveValidator {
     public static final String INVALID_SPAWN_INTERVAL = "rules.invalid_spawn_interval";
     public static final String INVALID_MOB_COUNT = "rules.invalid_mob_count";
     public static final String INVALID_REWARD_POINTS = "rules.invalid_reward_points";
+
+    static final String VANILLA_ZOMBIE_ID = "minecraft:zombie";
+    static final String VANILLA_HUSK_ID = "minecraft:husk";
+
+    private static final String DEFAULT_NAMESPACE = "minecraft";
+    private static final List<String> SUPPORTED_ENTITY_IDS = List.of(VANILLA_ZOMBIE_ID, VANILLA_HUSK_ID);
 
     public ValidationReport validate(List<ZombiesWaveDefinition> waves) {
         List<ValidationIssue> issues = new ArrayList<>();
@@ -107,12 +115,12 @@ public final class ZombiesWaveValidator {
                             "Wave " + wave.getWave() + " has a mob with negative assistPoints"));
                     valid = false;
                 }
-                if (mob.getCount() > 0 && isBlank(mob.getEntity())) {
-                    issues.add(new ValidationIssue(
-                            INVALID_ENTITY,
-                            wave.getSourcePath(),
-                            "Wave " + wave.getWave() + " has a positive-count mob without an entity id"));
-                    valid = false;
+                if (mob.getCount() > 0) {
+                    EntityValidationIssue entityIssue = validateEntity(wave, mob);
+                    if (entityIssue != null) {
+                        issues.add(entityIssue.toValidationIssue(wave.getSourcePath()));
+                        valid = false;
+                    }
                 }
             }
             if (valid) {
@@ -131,12 +139,92 @@ public final class ZombiesWaveValidator {
         return value == null || value.trim().isEmpty();
     }
 
+    private static EntityValidationIssue validateEntity(ZombiesWaveDefinition wave, ZombiesWaveMobEntry mob) {
+        String entity = mob.getEntity();
+        if (isBlank(entity)) {
+            return new EntityValidationIssue(
+                    "Wave " + wave.getWave() + " has a positive-count mob without an entity id");
+        }
+        if (!isParsableEntityId(entity)) {
+            return new EntityValidationIssue(
+                    "Wave " + wave.getWave() + " has invalid entity id '" + entity.trim() + "'");
+        }
+        if (!isSupportedEntityId(entity)) {
+            return new EntityValidationIssue(
+                    "Wave " + wave.getWave() + " uses unsupported entity id '" + entity.trim()
+                            + "'. Supported entity ids: " + supportedEntityIdsDescription());
+        }
+        return null;
+    }
+
+    private static String supportedEntityIdsDescription() {
+        StringJoiner joiner = new StringJoiner(", ");
+        for (String entityId : supportedEntityIds()) {
+            joiner.add(entityId);
+        }
+        return joiner.toString();
+    }
+
+    static boolean isParsableEntityId(String rawEntityId) {
+        return normalizedEntityId(rawEntityId).isPresent();
+    }
+
+    static boolean isSupportedEntityId(String rawEntityId) {
+        return normalizedEntityId(rawEntityId)
+                .map(SUPPORTED_ENTITY_IDS::contains)
+                .orElse(false);
+    }
+
+    static List<String> supportedEntityIds() {
+        return Collections.unmodifiableList(SUPPORTED_ENTITY_IDS);
+    }
+
+    static Optional<String> normalizedEntityId(String rawEntityId) {
+        if (rawEntityId == null || rawEntityId.trim().isEmpty()) {
+            return Optional.empty();
+        }
+        String trimmed = rawEntityId.trim();
+        int separator = trimmed.indexOf(':');
+        String namespace = separator >= 0 ? trimmed.substring(0, separator) : DEFAULT_NAMESPACE;
+        String path = separator >= 0 ? trimmed.substring(separator + 1) : trimmed;
+        if (namespace.isEmpty() || path.isEmpty() || !isValidNamespace(namespace) || !isValidPath(path)) {
+            return Optional.empty();
+        }
+        return Optional.of(namespace + ":" + path);
+    }
+
+    private static boolean isValidNamespace(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if ((c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '_' && c != '-' && c != '.') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isValidPath(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if ((c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '_' && c != '-' && c != '.' && c != '/') {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static boolean isPositiveIfPresent(Integer value) {
         return value == null || value > 0;
     }
 
     private static boolean isPositiveFiniteIfPresent(Double value) {
         return value == null || Double.isFinite(value) && value > 0.0;
+    }
+
+    private record EntityValidationIssue(String message) {
+        private ValidationIssue toValidationIssue(Path path) {
+            return new ValidationIssue(INVALID_ENTITY, path, message);
+        }
     }
 
     public static final class ValidationReport {

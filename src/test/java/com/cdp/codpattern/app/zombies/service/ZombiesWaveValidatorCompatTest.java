@@ -18,6 +18,9 @@ public final class ZombiesWaveValidatorCompatTest {
         missingMobsRemainsInvalid();
         explicitEmptyWaveIsValid();
         filenameWaveConflictIsInvalid();
+        supportedDefaultEntitiesAreValid();
+        invalidEntityIdIsRejected();
+        unsupportedEntityIdIsRejected();
     }
 
     private static void descriptionFieldsDoNotAffectValidation() {
@@ -67,6 +70,43 @@ public final class ZombiesWaveValidatorCompatTest {
 
         ZombiesWaveValidator.ValidationReport report = VALIDATOR.validate(List.of(wave));
         require(report.hasIssue(ZombiesWaveValidator.WAVE_CONFLICT), "filename/wave conflict should be reported");
+    }
+
+    private static void supportedDefaultEntitiesAreValid() {
+        ZombiesWaveDefinition wave = readWave(
+                "wave_001.json",
+                1,
+                "{"
+                        + "\"wave\":1,"
+                        + "\"mobs\":["
+                        + "{\"entity\":\"minecraft:zombie\",\"count\":1},"
+                        + "{\"entity\":\"minecraft:husk\",\"count\":1}"
+                        + "]"
+                        + "}");
+
+        requireValid(wave, "default zombie and husk entities should be valid");
+    }
+
+    private static void invalidEntityIdIsRejected() {
+        ZombiesWaveDefinition wave = readWave(
+                "wave_001.json",
+                1,
+                "{\"wave\":1,\"mobs\":[{\"entity\":\"minecraft:bad id\",\"count\":1}]}");
+
+        ZombiesWaveValidator.ValidationReport report = VALIDATOR.validate(List.of(wave));
+        require(report.hasIssue(ZombiesWaveValidator.INVALID_ENTITY), "invalid entity id should be reported");
+        require(firstIssue(report).contains("invalid entity id"), "invalid entity message should identify parse failure");
+    }
+
+    private static void unsupportedEntityIdIsRejected() {
+        ZombiesWaveDefinition wave = readWave(
+                "wave_001.json",
+                1,
+                "{\"wave\":1,\"mobs\":[{\"entity\":\"minecraft:skeleton\",\"count\":1}]}");
+
+        ZombiesWaveValidator.ValidationReport report = VALIDATOR.validate(List.of(wave));
+        require(report.hasIssue(ZombiesWaveValidator.INVALID_ENTITY), "unsupported entity id should be reported");
+        require(firstIssue(report).contains("unsupported entity id"), "unsupported entity message should identify support list");
     }
 
     private static ZombiesWaveDefinition readWave(String fileName, int fileWave, String json) {

@@ -1,9 +1,16 @@
 package com.cdp.codpattern.app.zombies.map;
 
+import com.cdp.codpattern.app.zombies.map.object.ZombiesAmmoBoxData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesArmorStationData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesBarrierData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesInitialSpawnData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesMysteryBoxData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesPowerSwitchData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesSodaMachineData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesUltimateMachineData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesWeaponWallData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesWindowData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesZombieSpawnData;
-import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
@@ -14,14 +21,14 @@ public record ZombiesMapObjects(
         List<ZombiesInitialSpawnData> initialSpawns,
         List<ZombiesZombieSpawnData> zombieSpawns,
         List<ZombiesBarrierData> barriers,
-        List<ReservedObjectData> weaponWalls,
-        List<ReservedObjectData> ammoBoxes,
-        List<ReservedObjectData> armorStations,
-        Optional<ReservedObjectData> powerSwitch,
-        List<ReservedObjectData> sodaMachines,
-        List<ReservedObjectData> ultimateMachines,
-        List<ReservedObjectData> mysteryBoxes,
-        List<ReservedObjectData> windows
+        List<ZombiesWeaponWallData> weaponWalls,
+        List<ZombiesAmmoBoxData> ammoBoxes,
+        List<ZombiesArmorStationData> armorStations,
+        Optional<ZombiesPowerSwitchData> powerSwitch,
+        List<ZombiesSodaMachineData> sodaMachines,
+        List<ZombiesUltimateMachineData> ultimateMachines,
+        List<ZombiesMysteryBoxData> mysteryBoxes,
+        List<ZombiesWindowData> windows
 ) {
     public static final ZombiesMapObjects EMPTY = new ZombiesMapObjects(
             List.of(),
@@ -40,14 +47,14 @@ public record ZombiesMapObjects(
             ZombiesInitialSpawnData.CODEC.listOf().optionalFieldOf("initialSpawns", List.of()).forGetter(ZombiesMapObjects::initialSpawns),
             ZombiesZombieSpawnData.CODEC.listOf().optionalFieldOf("zombieSpawns", List.of()).forGetter(ZombiesMapObjects::zombieSpawns),
             ZombiesBarrierData.CODEC.listOf().optionalFieldOf("barriers", List.of()).forGetter(ZombiesMapObjects::barriers),
-            ReservedObjectData.CODEC.listOf().optionalFieldOf("weaponWalls", List.of()).forGetter(ZombiesMapObjects::weaponWalls),
-            ReservedObjectData.CODEC.listOf().optionalFieldOf("ammoBoxes", List.of()).forGetter(ZombiesMapObjects::ammoBoxes),
-            ReservedObjectData.CODEC.listOf().optionalFieldOf("armorStations", List.of()).forGetter(ZombiesMapObjects::armorStations),
-            ReservedObjectData.CODEC.optionalFieldOf("powerSwitch").forGetter(ZombiesMapObjects::powerSwitch),
-            ReservedObjectData.CODEC.listOf().optionalFieldOf("sodaMachines", List.of()).forGetter(ZombiesMapObjects::sodaMachines),
-            ReservedObjectData.CODEC.listOf().optionalFieldOf("ultimateMachines", List.of()).forGetter(ZombiesMapObjects::ultimateMachines),
-            ReservedObjectData.CODEC.listOf().optionalFieldOf("mysteryBoxes", List.of()).forGetter(ZombiesMapObjects::mysteryBoxes),
-            ReservedObjectData.CODEC.listOf().optionalFieldOf("windows", List.of()).forGetter(ZombiesMapObjects::windows)
+            ZombiesWeaponWallData.CODEC.listOf().optionalFieldOf("weaponWalls", List.of()).forGetter(ZombiesMapObjects::weaponWalls),
+            ZombiesAmmoBoxData.CODEC.listOf().optionalFieldOf("ammoBoxes", List.of()).forGetter(ZombiesMapObjects::ammoBoxes),
+            ZombiesArmorStationData.CODEC.listOf().optionalFieldOf("armorStations", List.of()).forGetter(ZombiesMapObjects::armorStations),
+            ZombiesPowerSwitchData.CODEC.optionalFieldOf("powerSwitch").forGetter(ZombiesMapObjects::powerSwitch),
+            ZombiesSodaMachineData.CODEC.listOf().optionalFieldOf("sodaMachines", List.of()).forGetter(ZombiesMapObjects::sodaMachines),
+            ZombiesUltimateMachineData.CODEC.listOf().optionalFieldOf("ultimateMachines", List.of()).forGetter(ZombiesMapObjects::ultimateMachines),
+            ZombiesMysteryBoxData.CODEC.listOf().optionalFieldOf("mysteryBoxes", List.of()).forGetter(ZombiesMapObjects::mysteryBoxes),
+            ZombiesWindowData.CODEC.listOf().optionalFieldOf("windows", List.of()).forGetter(ZombiesMapObjects::windows)
     ).apply(instance, ZombiesMapObjects::new));
 
     public ZombiesMapObjects {
@@ -62,9 +69,5 @@ public record ZombiesMapObjects(
         ultimateMachines = ultimateMachines == null ? List.of() : List.copyOf(ultimateMachines);
         mysteryBoxes = mysteryBoxes == null ? List.of() : List.copyOf(mysteryBoxes);
         windows = windows == null ? List.of() : List.copyOf(windows);
-    }
-
-    public record ReservedObjectData() {
-        public static final Codec<ReservedObjectData> CODEC = Codec.unit(new ReservedObjectData());
     }
 }

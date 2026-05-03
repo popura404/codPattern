@@ -14,6 +14,8 @@ import com.cdp.codpattern.app.zombies.model.ZombiesTeamNames;
 import com.cdp.codpattern.app.zombies.runtime.ZombiesLifecycleRuntime;
 import com.cdp.codpattern.app.zombies.runtime.ZombiesPhaseStateMachine;
 import com.cdp.codpattern.app.zombies.runtime.ZombiesRoomRuntimeState;
+import com.cdp.codpattern.app.zombies.service.ZombiesActiveSpawnGroupService;
+import com.cdp.codpattern.app.zombies.service.ZombiesBarrierService;
 import com.cdp.codpattern.app.zombies.service.ZombiesCleanupParticipant;
 import com.cdp.codpattern.app.zombies.service.ZombiesCleanupService;
 import com.cdp.codpattern.app.zombies.service.ZombiesConnectionStateService;
@@ -23,6 +25,8 @@ import com.cdp.codpattern.app.zombies.service.ZombiesErrorCode;
 import com.cdp.codpattern.app.zombies.service.ZombiesMapOccupancyService;
 import com.cdp.codpattern.app.zombies.service.ZombiesMobLifecycleService;
 import com.cdp.codpattern.app.zombies.service.ZombiesMobSpawnService;
+import com.cdp.codpattern.app.zombies.service.ZombiesObjectInteractionService;
+import com.cdp.codpattern.app.zombies.service.ZombiesObjectStateStore;
 import com.cdp.codpattern.app.zombies.service.ZombiesPlayerStateService;
 import com.cdp.codpattern.app.zombies.service.ZombiesReadyService;
 import com.cdp.codpattern.app.zombies.service.ZombiesServiceResult;
@@ -79,6 +83,9 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
     private final ZombiesMobLifecycleService mobLifecycleService;
     private final ZombiesDeathService deathService;
     private final ZombiesCleanupService cleanupService;
+    private final ZombiesActiveSpawnGroupService activeSpawnGroupService;
+    private final ZombiesObjectStateStore objectStateStore;
+    private final ZombiesObjectInteractionService objectInteractionService;
     private final ModeRoomHandle roomHandle;
     private Optional<SpawnPointData> matchEndTeleportPoint = Optional.empty();
     private ZombiesMapObjects objects = ZombiesMapObjects.EMPTY;
@@ -100,6 +107,21 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
                 playerStateService,
                 connectionStateService.offlineGraceTicks(),
                 new ZombiesDeathHooks());
+        this.activeSpawnGroupService = new ZombiesActiveSpawnGroupService();
+        this.objectStateStore = new ZombiesObjectStateStore();
+        ZombiesBarrierService barrierService = new ZombiesBarrierService(
+                roomId,
+                this::barriers,
+                economyService,
+                objectStateStore,
+                activeSpawnGroupService,
+                this::hasSurvivor,
+                runtimeState::phase);
+        this.objectInteractionService = new ZombiesObjectInteractionService(
+                roomId,
+                this::barriers,
+                barrierService,
+                objectStateStore);
         this.cleanupService = new ZombiesCleanupService(
                 ModeEntityOwnershipRegistry.instance(),
                 ZombiesMapOccupancyService.instance(),
@@ -251,6 +273,10 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         return cleanupService;
     }
 
+    ZombiesObjectInteractionService objectInteractionService() {
+        return objectInteractionService;
+    }
+
     ZombiesMobLifecycleService mobLifecycleService() {
         return mobLifecycleService;
     }
@@ -341,6 +367,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
 
     public void applyObjects(ZombiesMapObjects objects) {
         this.objects = objects == null ? ZombiesMapObjects.EMPTY : objects;
+        resetObjectRuntime();
         getMapTeams().getTeamByName(ZombiesTeamNames.SURVIVORS).ifPresent(team -> {
             team.resetSpawnPointData(SpawnPointKind.INITIAL);
             this.objects.initialSpawns().stream()
@@ -451,9 +478,15 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         cleanupService.cleanup(roomId, reason, this::levelForDimension);
     }
 
+    private void resetObjectRuntime() {
+        activeSpawnGroupService.resetToInitial();
+        objectStateStore.resetBarriers(objects.barriers());
+    }
+
     private void resetRuntimeForWaiting() {
         isStart = false;
         waveDirector = null;
+        resetObjectRuntime();
         lifecycleRuntime.resetToWaiting();
         playerStateService.clear();
         readyService.clear();
@@ -474,6 +507,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
     private void resetStartupRuntime(Collection<UUID> memberIds) {
         isStart = false;
         waveDirector = null;
+        resetObjectRuntime();
         lifecycleRuntime.cancelStartVote();
         playerStateService.clear();
         for (ServerPlayer player : survivorPlayers()) {
@@ -776,7 +810,13 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
                 markRosterDirty();
             }
             if (runtimeState.phase() == ZombiesGamePhase.WAVE_ACTIVE && waveDirector != null) {
-                waveDirector.tick(roomId, getServerLevel(), objects, runtimeState.waveState(), runtimeState.roomTick());
+                waveDirector.tick(
+                        roomId,
+                        getServerLevel(),
+                        objects,
+                        runtimeState.waveState(),
+                        runtimeState.roomTick(),
+                        activeSpawnGroupService.snapshot());
             }
             return ZombiesServiceResult.ok();
         }

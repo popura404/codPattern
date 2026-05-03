@@ -61,6 +61,9 @@ public class ZombiesPlayerCombatEventAdapter implements ModeCombatEventPort {
         if (context.attacker().isPresent() && !deathService.canPlayerAct(context.attacker().get().getUUID())) {
             return DamageDecision.cancel();
         }
+        if (context.attacker().isPresent() && isFriendlySurvivorDamage(victim, context.attacker().get())) {
+            return DamageDecision.cancel();
+        }
         return DamageDecision.passThrough();
     }
 
@@ -71,6 +74,13 @@ public class ZombiesPlayerCombatEventAdapter implements ModeCombatEventPort {
         }
         deathService.markPlayerDeadSpectating(victim, context, roundState.currentTick());
         return DeathDecision.cancelAndRestoreHealth();
+    }
+
+    private boolean isFriendlySurvivorDamage(ServerPlayer victim, ServerPlayer attacker) {
+        if (victim == null || attacker == null || victim.getUUID().equals(attacker.getUUID())) {
+            return false;
+        }
+        return deathService.canPlayerAct(victim.getUUID()) && deathService.canPlayerAct(attacker.getUUID());
     }
 
     public interface RoundState {

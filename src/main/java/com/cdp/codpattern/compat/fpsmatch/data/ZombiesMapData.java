@@ -5,8 +5,16 @@ import com.cdp.codpattern.app.match.persistence.CommonModeMapData;
 import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceProvider;
 import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceRegistry;
 import com.cdp.codpattern.app.zombies.map.ZombiesMapObjects;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesAmmoBoxData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesArmorStationData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesBarrierData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesInitialSpawnData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesMysteryBoxData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesPowerSwitchData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesSodaMachineData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesUltimateMachineData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesWeaponWallData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesWindowData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesZombieSpawnData;
 import com.cdp.codpattern.compat.fpsmatch.map.FpsMatchMapRegistry;
 import com.cdp.codpattern.compat.fpsmatch.map.ZombiesMap;
@@ -44,9 +52,7 @@ public class ZombiesMapData {
             String levelName,
             AreaData areaData,
             Optional<SpawnPointData> endtp,
-            List<ZombiesInitialSpawnData> initialSpawns,
-            List<ZombiesZombieSpawnData> zombieSpawns,
-            List<ZombiesBarrierData> barriers
+            ZombiesMapObjects objects
     ) {
         public static final Codec<MapData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.INT.optionalFieldOf("schemaVersion", ZombiesMapPersistenceSupport.SCHEMA_VERSION).forGetter(MapData::schemaVersion),
@@ -55,32 +61,90 @@ public class ZombiesMapData {
                 Codec.STRING.fieldOf("levelName").forGetter(MapData::levelName),
                 AreaData.CODEC.fieldOf("areaData").forGetter(MapData::areaData),
                 SpawnPointData.CODEC.optionalFieldOf("endtp").forGetter(MapData::endtp),
-                ZombiesInitialSpawnData.CODEC.listOf().optionalFieldOf("initialSpawns", List.of()).forGetter(MapData::initialSpawns),
-                ZombiesZombieSpawnData.CODEC.listOf().optionalFieldOf("zombieSpawns", List.of()).forGetter(MapData::zombieSpawns),
-                ZombiesBarrierData.CODEC.listOf().optionalFieldOf("barriers", List.of()).forGetter(MapData::barriers)
+                ZombiesMapObjects.CODEC.forGetter(MapData::objects)
         ).apply(instance, MapData::new));
 
         public MapData {
             endtp = endtp == null ? Optional.empty() : endtp;
-            initialSpawns = initialSpawns == null ? List.of() : List.copyOf(initialSpawns);
-            zombieSpawns = zombieSpawns == null ? List.of() : List.copyOf(zombieSpawns);
-            barriers = barriers == null ? List.of() : List.copyOf(barriers);
+            objects = objects == null ? ZombiesMapObjects.EMPTY : objects;
         }
 
-        public ZombiesMapObjects objects() {
-            return new ZombiesMapObjects(
-                    initialSpawns,
-                    zombieSpawns,
-                    barriers,
-                    List.of(),
-                    List.of(),
-                    List.of(),
-                    Optional.empty(),
-                    List.of(),
-                    List.of(),
-                    List.of(),
-                    List.of());
+        public MapData(
+                int schemaVersion,
+                String gameType,
+                String mapName,
+                String levelName,
+                AreaData areaData,
+                Optional<SpawnPointData> endtp,
+                List<ZombiesInitialSpawnData> initialSpawns,
+                List<ZombiesZombieSpawnData> zombieSpawns,
+                List<ZombiesBarrierData> barriers
+        ) {
+            this(
+                    schemaVersion,
+                    gameType,
+                    mapName,
+                    levelName,
+                    areaData,
+                    endtp,
+                    new ZombiesMapObjects(
+                            initialSpawns,
+                            zombieSpawns,
+                            barriers,
+                            List.of(),
+                            List.of(),
+                            List.of(),
+                            Optional.empty(),
+                            List.of(),
+                            List.of(),
+                            List.of(),
+                            List.of()));
         }
+
+        public List<ZombiesInitialSpawnData> initialSpawns() {
+            return objects.initialSpawns();
+        }
+
+        public List<ZombiesZombieSpawnData> zombieSpawns() {
+            return objects.zombieSpawns();
+        }
+
+        public List<ZombiesBarrierData> barriers() {
+            return objects.barriers();
+        }
+
+        public List<ZombiesWeaponWallData> weaponWalls() {
+            return objects.weaponWalls();
+        }
+
+        public List<ZombiesAmmoBoxData> ammoBoxes() {
+            return objects.ammoBoxes();
+        }
+
+        public List<ZombiesArmorStationData> armorStations() {
+            return objects.armorStations();
+        }
+
+        public Optional<ZombiesPowerSwitchData> powerSwitch() {
+            return objects.powerSwitch();
+        }
+
+        public List<ZombiesSodaMachineData> sodaMachines() {
+            return objects.sodaMachines();
+        }
+
+        public List<ZombiesUltimateMachineData> ultimateMachines() {
+            return objects.ultimateMachines();
+        }
+
+        public List<ZombiesMysteryBoxData> mysteryBoxes() {
+            return objects.mysteryBoxes();
+        }
+
+        public List<ZombiesWindowData> windows() {
+            return objects.windows();
+        }
+
     }
 
     @SubscribeEvent
@@ -135,9 +199,7 @@ public class ZombiesMapData {
                 map.getServerLevel().dimension().location().toString(),
                 map.getMapArea(),
                 payload.matchEndTeleportPoint(),
-                payload.objects().initialSpawns(),
-                payload.objects().zombieSpawns(),
-                payload.objects().barriers());
+                payload.objects());
     }
 
     private static CommonModeMapData toCommonData(MapData data) {
