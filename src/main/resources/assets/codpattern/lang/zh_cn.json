@@ -453,6 +453,18 @@
     "screen.codpattern.zombies_room.metric.zombies_left": "剩余僵尸",
     "screen.codpattern.zombies_room.metric.alive_players": "存活",
     "screen.codpattern.zombies_room.metric.max_players": "人数上限",
+    "screen.codpattern.zombies_room.metric.active_zombies": "场上僵尸",
     "hud.codpattern.zombies.team.survivors_short": "幸存",
+    "hud.codpattern.zombies.wave": "第 %s 波",
+    "hud.codpattern.zombies.zombies_left": "僵尸 %s",
+    "hud.codpattern.zombies.alive": "存活 %s/%s",
+    "hud.codpattern.zombies.points": "点数 %s",
+    "hud.codpattern.zombies.combat": "击杀 %s  助攻 %s  死亡 %s",
+    "hud.codpattern.zombies.phase.start_vote": "正在投票",
+    "hud.codpattern.zombies.phase.opening_countdown": "%s 秒后开始",
+    "hud.codpattern.zombies.phase.intermission": "波间准备 %s",
+    "hud.codpattern.zombies.phase.victory": "胜利",
+    "hud.codpattern.zombies.phase.failed": "失败",
+    "hud.codpattern.zombies.phase.ending": "结算中",
     "screen.codpattern.room.button": "冲锋团队竞技 / 战术团队竞技"
 }

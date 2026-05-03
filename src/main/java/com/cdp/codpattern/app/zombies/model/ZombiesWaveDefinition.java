@@ -8,6 +8,8 @@ import java.util.List;
 
 public class ZombiesWaveDefinition {
     private Integer wave;
+    // Optional example/documentation metadata; validation and runtime wave logic ignore it.
+    private Object description;
     private Double healthMultiplier;
     private Double damageMultiplier;
     private Double speedMultiplier;
@@ -26,6 +28,10 @@ public class ZombiesWaveDefinition {
 
     public int getWave() {
         return wave != null ? wave : fileWave;
+    }
+
+    public Object getDescription() {
+        return description;
     }
 
     public Double getHealthMultiplier() {

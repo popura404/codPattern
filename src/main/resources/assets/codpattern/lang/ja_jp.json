@@ -408,6 +408,18 @@
     "screen.codpattern.zombies_room.metric.zombies_left": "Zombies Left",
     "screen.codpattern.zombies_room.metric.alive_players": "Alive",
     "screen.codpattern.zombies_room.metric.max_players": "Max Players",
+    "screen.codpattern.zombies_room.metric.active_zombies": "Active Zombies",
     "hud.codpattern.zombies.team.survivors_short": "SURV",
+    "hud.codpattern.zombies.wave": "Wave %s",
+    "hud.codpattern.zombies.zombies_left": "Zombies %s",
+    "hud.codpattern.zombies.alive": "Alive %s/%s",
+    "hud.codpattern.zombies.points": "Points %s",
+    "hud.codpattern.zombies.combat": "K %s  A %s  D %s",
+    "hud.codpattern.zombies.phase.start_vote": "Vote in progress",
+    "hud.codpattern.zombies.phase.opening_countdown": "Starts in %s",
+    "hud.codpattern.zombies.phase.intermission": "Intermission %s",
+    "hud.codpattern.zombies.phase.victory": "Victory",
+    "hud.codpattern.zombies.phase.failed": "Failed",
+    "hud.codpattern.zombies.phase.ending": "Ending",
     "screen.codpattern.room.button": "Frontline / TeamDeathMatch"
 }

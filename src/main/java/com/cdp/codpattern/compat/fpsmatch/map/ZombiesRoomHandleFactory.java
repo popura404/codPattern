@@ -282,6 +282,7 @@ final class ZombiesRoomHandleFactory {
         return List.of(
                 metric(ZombiesRuntimeStateKeys.METRIC_WAVE, waveState.currentWave(), MetricDisplay.NUMBER),
                 metric(ZombiesRuntimeStateKeys.METRIC_ZOMBIES_LEFT, zombiesLeft, MetricDisplay.NUMBER),
+                metric(ZombiesRuntimeStateKeys.METRIC_ACTIVE_ZOMBIES, waveState.activeZombies(), MetricDisplay.NUMBER),
                 metric(ZombiesRuntimeStateKeys.METRIC_ALIVE_PLAYERS, alivePlayers, MetricDisplay.PLAYER_COUNT),
                 metric(ZombiesRuntimeStateKeys.METRIC_MAX_PLAYERS, ZombiesMap.SURVIVOR_LIMIT, MetricDisplay.PLAYER_COUNT)
         );

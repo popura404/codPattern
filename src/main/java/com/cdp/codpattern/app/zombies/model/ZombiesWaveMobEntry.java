@@ -4,6 +4,8 @@ import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 
 public class ZombiesWaveMobEntry {
     private String entity;
+    // Optional example/documentation metadata; validation and spawn logic ignore it.
+    private Object description;
     private int count;
     private Integer killPoints;
     private Integer assistPoints;
@@ -12,6 +14,10 @@ public class ZombiesWaveMobEntry {
 
     public String getEntity() {
         return entity;
+    }
+
+    public Object getDescription() {
+        return description;
     }
 
     public int getCount() {

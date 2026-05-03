@@ -408,6 +408,18 @@
     "screen.codpattern.zombies_room.metric.zombies_left": "剩餘殭屍",
     "screen.codpattern.zombies_room.metric.alive_players": "存活",
     "screen.codpattern.zombies_room.metric.max_players": "人數上限",
+    "screen.codpattern.zombies_room.metric.active_zombies": "場上殭屍",
     "hud.codpattern.zombies.team.survivors_short": "倖存",
+    "hud.codpattern.zombies.wave": "第 %s 波",
+    "hud.codpattern.zombies.zombies_left": "殭屍 %s",
+    "hud.codpattern.zombies.alive": "存活 %s/%s",
+    "hud.codpattern.zombies.points": "點數 %s",
+    "hud.codpattern.zombies.combat": "擊殺 %s  助攻 %s  死亡 %s",
+    "hud.codpattern.zombies.phase.start_vote": "正在投票",
+    "hud.codpattern.zombies.phase.opening_countdown": "%s 秒後開始",
+    "hud.codpattern.zombies.phase.intermission": "波間準備 %s",
+    "hud.codpattern.zombies.phase.victory": "勝利",
+    "hud.codpattern.zombies.phase.failed": "失敗",
+    "hud.codpattern.zombies.phase.ending": "結算中",
     "screen.codpattern.room.button": "衝鋒團隊競技 / 戰術團隊競技"
 }

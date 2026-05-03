@@ -1,5 +1,6 @@
 package com.cdp.codpattern.command;
 
+import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.ModeRoomBackedMap;
 import com.cdp.codpattern.app.match.ModeRoomHandle;
@@ -10,6 +11,7 @@ import com.cdp.codpattern.app.match.port.ModeMapEditPort;
 import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
 import com.cdp.codpattern.app.match.runtime.ModeEntityOwnershipRegistry;
+import com.cdp.codpattern.app.zombies.service.ZombiesDebugSnapshotService;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGateway;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -108,11 +110,17 @@ public final class ModeDebugCommand {
             return 0;
         }
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
-        List<ModeEntityOwnershipRegistry.Entry> removed = gateway.entityOwnershipRegistry().clearRoom(roomId);
-        gateway.findRoomEntityLifecyclePort(roomId).ifPresent(port -> port.onRoomEntitiesCleared(roomId));
-        source.sendSuccess(() -> Component.literal("Cleared " + removed.size()
+        int beforeCount = gateway.entityOwnershipRegistry().entitiesInRoom(roomId).size();
+        if (gateway.findRoomEntityLifecyclePort(roomId).isPresent()) {
+            gateway.findRoomEntityLifecyclePort(roomId).ifPresent(port -> port.onRoomEntitiesCleared(roomId));
+        } else {
+            gateway.entityOwnershipRegistry().clearRoom(roomId);
+        }
+        int afterCount = gateway.entityOwnershipRegistry().entitiesInRoom(roomId).size();
+        int cleared = Math.max(0, beforeCount - afterCount);
+        source.sendSuccess(() -> Component.literal("Cleared " + cleared
                 + " registered entity record(s) from " + roomId.encode() + "."), true);
-        return removed.size();
+        return cleared;
     }
 
     private static int debugRuntimeState(CommandSourceStack source, String roomKey) throws CommandSyntaxException {
@@ -135,6 +143,13 @@ public final class ModeDebugCommand {
                 + ", metrics=" + state.metrics().size()
                 + ", playerValues=" + state.playerValues().size()
                 + ", prompts=" + state.prompts().size()), false);
+        if (BuiltInGameModes.isZombies(roomId.gameType())) {
+            ZombiesDebugSnapshotService.ZombiesDebugSnapshot zombiesSnapshot = new ZombiesDebugSnapshotService().create(
+                    state,
+                    FpsMatchGatewayProvider.gateway().entityOwnershipRegistry().entitiesInRoom(roomId));
+            zombiesSnapshot.lines().forEach(line ->
+                    source.sendSuccess(() -> Component.literal(line), false));
+        }
         return 1;
     }
 

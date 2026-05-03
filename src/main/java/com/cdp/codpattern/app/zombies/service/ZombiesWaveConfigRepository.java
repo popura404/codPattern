@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -23,6 +24,34 @@ import java.util.regex.Pattern;
 public final class ZombiesWaveConfigRepository {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Pattern WAVE_FILE_PATTERN = Pattern.compile("^wave_(\\d+).*\\.json$");
+    private static final String DEFAULT_WAVE_FILE_NAME = "wave_001.json";
+    private static final String DEFAULT_WAVE_JSON = """
+            {
+              "wave": 1,
+              "description": "Example wave generated when no wave_*.json files are present. Copy or edit it for your map.",
+              "healthMultiplier": 1.25,
+              "damageMultiplier": 1.10,
+              "speedMultiplier": 1.08,
+              "maxAlive": 10,
+              "spawnIntervalTicks": 35,
+              "mobs": [
+                {
+                  "entity": "minecraft:zombie",
+                  "description": "Basic starter zombie example.",
+                  "count": 18,
+                  "killPoints": 10,
+                  "assistPoints": 3
+                },
+                {
+                  "entity": "minecraft:husk",
+                  "description": "Second vanilla mob example showing per-entry rewards.",
+                  "count": 4,
+                  "killPoints": 15,
+                  "assistPoints": 5
+                }
+              ]
+            }
+            """;
 
     private final Path wavesDirectory;
     private final ZombiesWaveValidator validator;
@@ -53,24 +82,16 @@ public final class ZombiesWaveConfigRepository {
         List<ZombiesWaveDefinition> waves = new ArrayList<>();
         List<ZombiesWaveValidator.ValidationIssue> loadIssues = new ArrayList<>();
 
-        if (wavesDirectory != null && Files.isDirectory(wavesDirectory)) {
-            try (var stream = Files.list(wavesDirectory)) {
-                List<Path> files = stream
-                        .filter(Files::isRegularFile)
-                        .filter(path -> WAVE_FILE_PATTERN.matcher(path.getFileName().toString()).matches())
-                        .sorted(Comparator.comparing(Path::getFileName))
-                        .toList();
-                for (Path file : files) {
-                    readWave(file).ifPresentOrElse(waves::add, () -> loadIssues.add(new ZombiesWaveValidator.ValidationIssue(
-                            "rules.wave_invalid",
-                            file,
-                            "Wave file could not be parsed")));
-                }
-            } catch (IOException e) {
-                loadIssues.add(new ZombiesWaveValidator.ValidationIssue(
+        if (wavesDirectory != null) {
+            List<Path> files = loadWaveFiles(loadIssues);
+            if (files.isEmpty() && ensureDefaultWave(loadIssues)) {
+                files = loadWaveFiles(loadIssues);
+            }
+            for (Path file : files) {
+                readWave(file).ifPresentOrElse(waves::add, () -> loadIssues.add(new ZombiesWaveValidator.ValidationIssue(
                         "rules.wave_invalid",
-                        wavesDirectory,
-                        "Wave directory could not be scanned: " + e.getMessage()));
+                        file,
+                        "Wave file could not be parsed")));
             }
         }
 
@@ -107,6 +128,43 @@ public final class ZombiesWaveConfigRepository {
             return Optional.of(wave);
         } catch (IOException | JsonParseException | NumberFormatException e) {
             return Optional.empty();
+        }
+    }
+
+    private List<Path> loadWaveFiles(List<ZombiesWaveValidator.ValidationIssue> loadIssues) {
+        if (!Files.isDirectory(wavesDirectory)) {
+            return List.of();
+        }
+
+        try (var stream = Files.list(wavesDirectory)) {
+            return stream
+                    .filter(Files::isRegularFile)
+                    .filter(path -> WAVE_FILE_PATTERN.matcher(path.getFileName().toString()).matches())
+                    .sorted(Comparator.comparing(Path::getFileName))
+                    .toList();
+        } catch (IOException e) {
+            loadIssues.add(new ZombiesWaveValidator.ValidationIssue(
+                    "rules.wave_invalid",
+                    wavesDirectory,
+                    "Wave directory could not be scanned: " + e.getMessage()));
+            return List.of();
+        }
+    }
+
+    private boolean ensureDefaultWave(List<ZombiesWaveValidator.ValidationIssue> loadIssues) {
+        Path defaultWaveFile = wavesDirectory.resolve(DEFAULT_WAVE_FILE_NAME);
+        try {
+            Files.createDirectories(wavesDirectory);
+            if (!Files.exists(defaultWaveFile)) {
+                Files.writeString(defaultWaveFile, DEFAULT_WAVE_JSON, StandardOpenOption.CREATE_NEW);
+            }
+            return true;
+        } catch (IOException | SecurityException e) {
+            loadIssues.add(new ZombiesWaveValidator.ValidationIssue(
+                    "rules.wave_invalid",
+                    defaultWaveFile,
+                    "Default wave example could not be created: " + e.getMessage()));
+            return false;
         }
     }
 
