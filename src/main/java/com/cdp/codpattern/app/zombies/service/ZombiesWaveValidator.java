@@ -1,0 +1,190 @@
+package com.cdp.codpattern.app.zombies.service;
+
+import com.cdp.codpattern.app.zombies.model.ZombiesWaveDefinition;
+import com.cdp.codpattern.app.zombies.model.ZombiesWaveMobEntry;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+public final class ZombiesWaveValidator {
+    public static final String NO_VALID_WAVE = "rules.no_valid_wave";
+    public static final String WAVE_CONFLICT = "rules.wave_conflict";
+    public static final String MISSING_MOBS = "rules.missing_mobs";
+    public static final String INVALID_ENTITY = "rules.invalid_entity";
+    public static final String INVALID_WAVE = "rules.invalid_wave";
+    public static final String INVALID_MULTIPLIER = "rules.invalid_multiplier";
+    public static final String INVALID_MAX_ALIVE = "rules.invalid_max_alive";
+    public static final String INVALID_SPAWN_INTERVAL = "rules.invalid_spawn_interval";
+    public static final String INVALID_MOB_COUNT = "rules.invalid_mob_count";
+    public static final String INVALID_REWARD_POINTS = "rules.invalid_reward_points";
+
+    public ValidationReport validate(List<ZombiesWaveDefinition> waves) {
+        List<ValidationIssue> issues = new ArrayList<>();
+        int validWaves = 0;
+
+        for (ZombiesWaveDefinition wave : waves == null ? Collections.<ZombiesWaveDefinition>emptyList() : waves) {
+            boolean valid = true;
+            if (wave.getWave() < 1) {
+                issues.add(new ValidationIssue(
+                        INVALID_WAVE,
+                        wave.getSourcePath(),
+                        "Wave number must be 1 or greater"));
+                valid = false;
+            }
+            if (wave.hasWaveConflict()) {
+                issues.add(new ValidationIssue(
+                        WAVE_CONFLICT,
+                        wave.getSourcePath(),
+                        "Wave file number " + wave.getFileWave() + " conflicts with wave field " + wave.getConfiguredWave()));
+                valid = false;
+            }
+            if (!wave.hasMobsField()) {
+                issues.add(new ValidationIssue(
+                        MISSING_MOBS,
+                        wave.getSourcePath(),
+                        "Wave file is missing required mobs field"));
+                valid = false;
+            }
+            if (!isPositiveFiniteIfPresent(wave.getConfiguredHealthMultiplier())) {
+                issues.add(new ValidationIssue(
+                        INVALID_MULTIPLIER,
+                        wave.getSourcePath(),
+                        "Wave " + wave.getWave() + " has an invalid health multiplier"));
+                valid = false;
+            }
+            if (!isPositiveFiniteIfPresent(wave.getConfiguredDamageMultiplier())) {
+                issues.add(new ValidationIssue(
+                        INVALID_MULTIPLIER,
+                        wave.getSourcePath(),
+                        "Wave " + wave.getWave() + " has an invalid damage multiplier"));
+                valid = false;
+            }
+            if (!isPositiveFiniteIfPresent(wave.getConfiguredSpeedMultiplier())) {
+                issues.add(new ValidationIssue(
+                        INVALID_MULTIPLIER,
+                        wave.getSourcePath(),
+                        "Wave " + wave.getWave() + " has an invalid speed multiplier"));
+                valid = false;
+            }
+            if (!isPositiveIfPresent(wave.getConfiguredMaxAlive())) {
+                issues.add(new ValidationIssue(
+                        INVALID_MAX_ALIVE,
+                        wave.getSourcePath(),
+                        "Wave " + wave.getWave() + " maxAlive must be positive when configured"));
+                valid = false;
+            }
+            if (!isPositiveIfPresent(wave.getConfiguredSpawnIntervalTicks())) {
+                issues.add(new ValidationIssue(
+                        INVALID_SPAWN_INTERVAL,
+                        wave.getSourcePath(),
+                        "Wave " + wave.getWave() + " spawnIntervalTicks must be positive when configured"));
+                valid = false;
+            }
+            for (ZombiesWaveMobEntry mob : wave.getMobs()) {
+                if (mob == null) {
+                    continue;
+                }
+                if (mob.getCount() < 0) {
+                    issues.add(new ValidationIssue(
+                            INVALID_MOB_COUNT,
+                            wave.getSourcePath(),
+                            "Wave " + wave.getWave() + " has a mob with negative count"));
+                    valid = false;
+                }
+                if (mob.getConfiguredKillPoints() != null && mob.getConfiguredKillPoints() < 0) {
+                    issues.add(new ValidationIssue(
+                            INVALID_REWARD_POINTS,
+                            wave.getSourcePath(),
+                            "Wave " + wave.getWave() + " has a mob with negative killPoints"));
+                    valid = false;
+                }
+                if (mob.getConfiguredAssistPoints() != null && mob.getConfiguredAssistPoints() < 0) {
+                    issues.add(new ValidationIssue(
+                            INVALID_REWARD_POINTS,
+                            wave.getSourcePath(),
+                            "Wave " + wave.getWave() + " has a mob with negative assistPoints"));
+                    valid = false;
+                }
+                if (mob.getCount() > 0 && isBlank(mob.getEntity())) {
+                    issues.add(new ValidationIssue(
+                            INVALID_ENTITY,
+                            wave.getSourcePath(),
+                            "Wave " + wave.getWave() + " has a positive-count mob without an entity id"));
+                    valid = false;
+                }
+            }
+            if (valid) {
+                validWaves++;
+            }
+        }
+
+        if (validWaves == 0) {
+            issues.add(new ValidationIssue(NO_VALID_WAVE, null, "No valid zombies wave files were found"));
+        }
+
+        return new ValidationReport(issues);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private static boolean isPositiveIfPresent(Integer value) {
+        return value == null || value > 0;
+    }
+
+    private static boolean isPositiveFiniteIfPresent(Double value) {
+        return value == null || Double.isFinite(value) && value > 0.0;
+    }
+
+    public static final class ValidationReport {
+        private final List<ValidationIssue> issues;
+
+        private ValidationReport(List<ValidationIssue> issues) {
+            this.issues = Collections.unmodifiableList(new ArrayList<>(issues));
+        }
+
+        public boolean isValid() {
+            return issues.isEmpty();
+        }
+
+        public List<ValidationIssue> getIssues() {
+            return issues;
+        }
+
+        public boolean hasIssue(String code) {
+            for (ValidationIssue issue : issues) {
+                if (issue.getCode().equals(code)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    public static final class ValidationIssue {
+        private final String code;
+        private final Path path;
+        private final String message;
+
+        public ValidationIssue(String code, Path path, String message) {
+            this.code = code;
+            this.path = path;
+            this.message = message;
+        }
+
+        public String getCode() {
+            return code;
+        }
+
+        public Path getPath() {
+            return path;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+    }
+}

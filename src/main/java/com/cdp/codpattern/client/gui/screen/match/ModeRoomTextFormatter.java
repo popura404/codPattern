@@ -17,9 +17,10 @@ public final class ModeRoomTextFormatter {
     public static String statusIcon(String state) {
         return switch (state) {
             case "WAITING" -> "§a●";
-            case "COUNTDOWN", "WARMUP" -> "§e●";
-            case "PLAYING" -> "§c●";
-            case "ENDED" -> "§7●";
+            case "COUNTDOWN", "WARMUP", "START_VOTE", "OPENING_COUNTDOWN", "INTERMISSION" -> "§e●";
+            case "PLAYING", "WAVE_ACTIVE" -> "§c●";
+            case "VICTORY" -> "§a●";
+            case "ENDED", "FAILED", "ENDING" -> "§7●";
             default -> "§f●";
         };
     }

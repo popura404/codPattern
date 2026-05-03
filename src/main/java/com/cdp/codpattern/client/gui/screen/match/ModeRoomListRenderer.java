@@ -583,11 +583,11 @@ public final class ModeRoomListRenderer {
             return 5;
         }
         return switch (state) {
-            case "PLAYING" -> 0;
-            case "WARMUP" -> 1;
-            case "COUNTDOWN" -> 2;
+            case "PLAYING", "WAVE_ACTIVE" -> 0;
+            case "WARMUP", "INTERMISSION" -> 1;
+            case "COUNTDOWN", "START_VOTE", "OPENING_COUNTDOWN" -> 2;
             case "WAITING" -> 3;
-            case "ENDED" -> 4;
+            case "ENDED", "VICTORY", "FAILED", "ENDING" -> 4;
             default -> 5;
         };
     }
@@ -595,9 +595,10 @@ public final class ModeRoomListRenderer {
     private static int statusColor(String state) {
         return switch (state) {
             case "WAITING" -> 0xFF69D88D;
-            case "COUNTDOWN", "WARMUP" -> 0xFFF1C15B;
-            case "PLAYING" -> 0xFFF16666;
-            case "ENDED" -> 0xFFADB8C6;
+            case "COUNTDOWN", "WARMUP", "START_VOTE", "OPENING_COUNTDOWN", "INTERMISSION" -> 0xFFF1C15B;
+            case "PLAYING", "WAVE_ACTIVE" -> 0xFFF16666;
+            case "VICTORY" -> 0xFF69D88D;
+            case "ENDED", "FAILED", "ENDING" -> 0xFFADB8C6;
             default -> 0xFFF2F5F8;
         };
     }

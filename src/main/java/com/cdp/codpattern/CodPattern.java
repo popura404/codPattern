@@ -2,6 +2,7 @@ package com.cdp.codpattern;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.tdm.model.TdmGameModeDefinitions;
+import com.cdp.codpattern.app.zombies.model.ZombiesGameModeDefinitions;
 import com.phasetranscrystal.fpsmatch.common.item.FPSMItemRegister;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.common.Mod;
@@ -14,6 +15,7 @@ public class CodPattern {
 
     public CodPattern() {
         TdmGameModeDefinitions.registerDefaults();
+        ZombiesGameModeDefinitions.registerDefaults();
         var modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         modEventBus.addListener(this::setup);
         modEventBus.addListener(FPSMItemRegister::onBuildCreativeModeTabContents);
