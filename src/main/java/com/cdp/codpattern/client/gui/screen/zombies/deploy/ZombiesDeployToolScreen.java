@@ -4,13 +4,23 @@ import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployDraft;
 import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployFieldSchema;
 import com.cdp.codpattern.app.zombies.deploy.ZombiesDeploySnapshot;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
+import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionAction;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenZombiesDeployToolScreenS2CPacket;
+import com.phasetranscrystal.fpsmatch.common.packet.ToolInteractionC2SPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.ZombiesDeployToolActionC2SPacket;
+import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3f;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -228,6 +238,19 @@ public class ZombiesDeployToolScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (super.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        if (!isInsidePanel(mouseX, mouseY)
+                && (button == GLFW.GLFW_MOUSE_BUTTON_LEFT || button == GLFW.GLFW_MOUSE_BUTTON_RIGHT)) {
+            BlockPos clickedPos = pickBlockPos(mouseX, mouseY);
+            if (clickedPos == null) {
+                return false;
+            }
+            boolean first = button == GLFW.GLFW_MOUSE_BUTTON_LEFT;
+            FPSMatch.sendToServer(new ToolInteractionC2SPacket(
+                    first ? ToolInteractionAction.LEFT_CLICK_BLOCK : ToolInteractionAction.RIGHT_CLICK_BLOCK,
+                    clickedPos));
+            updateAreaDraftFields(clickedPos, first);
             return true;
         }
         if (button != GLFW.GLFW_MOUSE_BUTTON_LEFT) {
@@ -1279,6 +1302,62 @@ public class ZombiesDeployToolScreen extends Screen {
 
     private int panelTop() {
         return Math.max(8, (this.height - PANEL_HEIGHT) / 2);
+    }
+
+    private boolean isInsidePanel(double mouseX, double mouseY) {
+        int left = panelLeft();
+        int top = panelTop();
+        return mouseX >= left && mouseX < left + PANEL_WIDTH && mouseY >= top && mouseY < top + PANEL_HEIGHT;
+    }
+
+    private BlockPos pickBlockPos(double mouseX, double mouseY) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null || minecraft.player == null) {
+            return null;
+        }
+
+        Camera camera = minecraft.gameRenderer.getMainCamera();
+        Vec3 eyePosition = camera.getPosition();
+        Vec3 direction = getRayDirection(camera, mouseX, mouseY);
+        double reach = minecraft.player.getBlockReach();
+        BlockHitResult hitResult = minecraft.level.clip(new ClipContext(
+                eyePosition,
+                eyePosition.add(direction.scale(reach)),
+                ClipContext.Block.OUTLINE,
+                ClipContext.Fluid.NONE,
+                minecraft.player
+        ));
+        return hitResult.getType() == HitResult.Type.BLOCK ? hitResult.getBlockPos() : null;
+    }
+
+    private Vec3 getRayDirection(Camera camera, double mouseX, double mouseY) {
+        double normalizedX = mouseX / (double) this.width * 2.0D - 1.0D;
+        double normalizedY = 1.0D - mouseY / (double) this.height * 2.0D;
+        double aspect = (double) this.width / (double) this.height;
+        double tanHalfFov = Math.tan(Math.toRadians(Minecraft.getInstance().options.fov().get()) / 2.0D);
+        double horizontalScale = normalizedX * aspect * tanHalfFov;
+        double verticalScale = normalizedY * tanHalfFov;
+
+        Vec3 look = toVec3(camera.getLookVector());
+        Vec3 up = toVec3(camera.getUpVector());
+        Vec3 left = toVec3(camera.getLeftVector());
+        return look.add(left.scale(-horizontalScale)).add(up.scale(verticalScale)).normalize();
+    }
+
+    private static Vec3 toVec3(Vector3f vector) {
+        return new Vec3(vector.x(), vector.y(), vector.z());
+    }
+
+    private void updateAreaDraftFields(BlockPos pos, boolean first) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level != null) {
+            this.draftFields.put("dimension", minecraft.level.dimension().location().toString());
+        }
+        String prefix = first ? "areaFrom" : "areaTo";
+        this.draftFields.put(prefix + "X", Integer.toString(pos.getX()));
+        this.draftFields.put(prefix + "Y", Integer.toString(pos.getY()));
+        this.draftFields.put(prefix + "Z", Integer.toString(pos.getZ()));
+        updateWidgets();
     }
 
     private record ListFieldPreview(

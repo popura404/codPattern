@@ -3,16 +3,24 @@ package com.phasetranscrystal.fpsmatch.common.item;
 import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployFieldSchema;
 import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployDraft;
 import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployPreviewService;
+import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployServiceResult;
+import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.tool.CreatorToolItem;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionAction;
 import com.phasetranscrystal.fpsmatch.common.item.tool.WorldToolItem;
+import com.phasetranscrystal.fpsmatch.common.packet.AddAreaDataS2CPacket;
+import com.phasetranscrystal.fpsmatch.common.packet.RemoveDebugDataByPrefixS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.ZombiesDeployToolActionC2SPacket;
+import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
@@ -28,6 +36,9 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
     private static final String DRAFT_FIELDS_TAG = "ZombiesDeployDraftFields";
     private static final String AREA_POS_1_TAG = "ZombiesDeployAreaPos1";
     private static final String AREA_POS_2_TAG = "ZombiesDeployAreaPos2";
+    private static final String HELD_AREA_PREVIEW_STATE_TAG = "HeldZombiesDeployAreaPreviewState";
+    private static final int AREA_PREVIEW_COLOR = 0xFFFFFFFF;
+    private static final int HELD_AREA_PREVIEW_REFRESH_INTERVAL = 10;
 
     public ZombiesDeployTool(Properties properties) {
         super(properties);
@@ -41,7 +52,7 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
                 if (clickedPos == null) {
                     return;
                 }
-                setAreaPos1(stack, clickedPos);
+                captureAreaPosition(player, stack, clickedPos, true);
                 player.displayClientMessage(Component.translatable(
                         "message.codpattern.zombies.deploy.area_pos1",
                         MapCreatorTool.formatPos(clickedPos)).withStyle(ChatFormatting.AQUA), true);
@@ -50,7 +61,7 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
                 if (clickedPos == null) {
                     return;
                 }
-                setAreaPos2(stack, clickedPos);
+                captureAreaPosition(player, stack, clickedPos, false);
                 player.displayClientMessage(Component.translatable(
                         "message.codpattern.zombies.deploy.area_pos2",
                         MapCreatorTool.formatPos(clickedPos)).withStyle(ChatFormatting.AQUA), true);
@@ -58,16 +69,110 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
         }
     }
 
+    @Override
+    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+        if (hand != InteractionHand.MAIN_HAND || !(stack.getItem() instanceof ZombiesDeployTool)) {
+            return InteractionResultHolder.pass(stack);
+        }
+        if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
+            ZombiesDeployToolActionC2SPacket.sendScreen(serverPlayer, stack, getDraft(stack));
+        }
+        return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
+    }
+
     public void syncHeldPreview(ServerPlayer player, ItemStack stack) {
         if (player == null || stack == null || !(stack.getItem() instanceof ZombiesDeployTool)) {
             clearHeldPreview(player);
             return;
         }
-        ZombiesDeployPreviewService.instance().refreshPreview(player, getDraft(stack));
+        ZombiesDeployServiceResult<Void> result = ZombiesDeployPreviewService.instance().refreshPreview(player, getDraft(stack));
+        if (result.success()) {
+            player.getPersistentData().remove(HELD_AREA_PREVIEW_STATE_TAG);
+            return;
+        }
+        syncStandaloneAreaPreview(player, stack);
     }
 
     public static void clearHeldPreview(ServerPlayer player) {
         ZombiesDeployPreviewService.clearHeldPreview(player);
+        clearStandaloneAreaPreview(player);
+    }
+
+    private void captureAreaPosition(ServerPlayer player, ItemStack stack, BlockPos pos, boolean first) {
+        if (first) {
+            setAreaPos1(stack, pos);
+        } else {
+            setAreaPos2(stack, pos);
+        }
+
+        ZombiesDeployDraft draft = getDraft(stack);
+        Map<String, String> fields = mergeDraftFields(draft);
+        fields.put("dimension", player.serverLevel().dimension().location().toString());
+        setPositionField(fields, first ? "areaFrom" : "areaTo", pos);
+        saveDraft(stack, draft.withFields(fields));
+    }
+
+    private Map<String, String> mergeDraftFields(ZombiesDeployDraft draft) {
+        ZombiesDeployDraft resolved = draft == null ? ZombiesDeployDraft.empty() : draft;
+        Map<String, String> fields = new LinkedHashMap<>(ZombiesDeployFieldSchema.defaultFields(resolved.objectType()));
+        resolved.fields().forEach((key, value) -> {
+            if (fields.containsKey(key)) {
+                fields.put(key, value == null ? "" : value);
+            }
+        });
+        return fields;
+    }
+
+    private void setPositionField(Map<String, String> fields, String prefix, BlockPos pos) {
+        if (!fields.containsKey(prefix + "X")) {
+            return;
+        }
+        fields.put(prefix + "X", Integer.toString(pos.getX()));
+        fields.put(prefix + "Y", Integer.toString(pos.getY()));
+        fields.put(prefix + "Z", Integer.toString(pos.getZ()));
+    }
+
+    private void syncStandaloneAreaPreview(ServerPlayer player, ItemStack stack) {
+        BlockPos pos1 = getAreaPos1(stack);
+        BlockPos pos2 = getAreaPos2(stack);
+        if (pos1 == null || pos2 == null) {
+            clearStandaloneAreaPreview(player);
+            return;
+        }
+
+        String signature = pos1.asLong() + "|" + pos2.asLong();
+        String previousSignature = player.getPersistentData().getString(HELD_AREA_PREVIEW_STATE_TAG);
+        if (signature.equals(previousSignature) && player.tickCount % HELD_AREA_PREVIEW_REFRESH_INTERVAL != 0) {
+            return;
+        }
+
+        FPSMatch.sendToPlayer(player, new RemoveDebugDataByPrefixS2CPacket(getHeldPreviewPrefix(player)));
+        FPSMatch.sendToPlayer(player, new AddAreaDataS2CPacket(
+                getHeldAreaPreviewKey(player),
+                Component.literal("Zombies area draft"),
+                AREA_PREVIEW_COLOR,
+                new AreaData(pos1, pos2)));
+        player.getPersistentData().putString(HELD_AREA_PREVIEW_STATE_TAG, signature);
+    }
+
+    private static void clearStandaloneAreaPreview(ServerPlayer player) {
+        if (player == null) {
+            return;
+        }
+        if (!player.getPersistentData().contains(HELD_AREA_PREVIEW_STATE_TAG)) {
+            return;
+        }
+        FPSMatch.sendToPlayer(player, new RemoveDebugDataByPrefixS2CPacket(getHeldPreviewPrefix(player)));
+        player.getPersistentData().remove(HELD_AREA_PREVIEW_STATE_TAG);
+    }
+
+    private static String getHeldPreviewPrefix(ServerPlayer player) {
+        return "held_tool_preview:zombies_deploy:" + player.getUUID() + ":";
+    }
+
+    private static String getHeldAreaPreviewKey(ServerPlayer player) {
+        return getHeldPreviewPrefix(player) + "area_draft";
     }
 
     public static ZombiesDeployDraft getDraft(ItemStack stack) {

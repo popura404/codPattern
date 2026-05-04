@@ -483,20 +483,28 @@ public final class ZombiesDeployToolService {
     }
 
     private List<ZombiesDeploySnapshot.ValidationLine> validationLines(ZombiesMap map, String profileKey) {
-        ZombiesMapValidationProfile profile = switch (ZombiesDeployFieldSchema.normalizeProfile(profileKey)) {
-            case ZombiesDeployFieldSchema.PROFILE_MVP2 -> ZombiesMapValidationProfile.MVP2_PURCHASES;
-            case ZombiesDeployFieldSchema.PROFILE_MVP3 -> ZombiesMapValidationProfile.MVP3_FULL_INITIAL;
-            default -> ZombiesMapValidationProfile.MVP1_MINIMAL;
-        };
-        ZombiesMapSnapshot snapshot = ZombiesMapSnapshot.fromMapObjects(
-                RoomId.of(BuiltInGameModes.ZOMBIES, map.getMapName()),
-                map.getMapName(),
-                map.matchEndTeleportPoint().isPresent(),
-                map.getServerLevel().dimension().location().toString(),
-                ZombiesMapSnapshot.BoundsSnapshot.fromAreaData(map.getMapArea()),
-                map.objects());
-        ZombiesMapValidationReport report = new ZombiesMapValidator(profile).validate(snapshot);
-        return report.issues().stream().map(this::validationLine).toList();
+        try {
+            ZombiesMapValidationProfile profile = switch (ZombiesDeployFieldSchema.normalizeProfile(profileKey)) {
+                case ZombiesDeployFieldSchema.PROFILE_MVP2 -> ZombiesMapValidationProfile.MVP2_PURCHASES;
+                case ZombiesDeployFieldSchema.PROFILE_MVP3 -> ZombiesMapValidationProfile.MVP3_FULL_INITIAL;
+                default -> ZombiesMapValidationProfile.MVP1_MINIMAL;
+            };
+            ZombiesMapSnapshot snapshot = ZombiesMapSnapshot.fromMapObjects(
+                    RoomId.of(BuiltInGameModes.ZOMBIES, map.getMapName()),
+                    map.getMapName(),
+                    map.matchEndTeleportPoint().isPresent(),
+                    map.getServerLevel().dimension().location().toString(),
+                    ZombiesMapSnapshot.BoundsSnapshot.fromAreaData(map.getMapArea()),
+                    map.objects());
+            ZombiesMapValidationReport report = new ZombiesMapValidator(profile).validate(snapshot);
+            return report.issues().stream().map(this::validationLine).toList();
+        } catch (RuntimeException e) {
+            return List.of(new ZombiesDeploySnapshot.ValidationLine(
+                    "error",
+                    "validation.exception",
+                    "validation",
+                    "Validation failed while opening the deploy tool: " + e.getMessage()));
+        }
     }
 
     private ZombiesDeploySnapshot.ValidationLine validationLine(ZombiesValidationIssue issue) {
