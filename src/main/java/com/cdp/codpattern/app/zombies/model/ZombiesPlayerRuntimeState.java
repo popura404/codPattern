@@ -1,11 +1,15 @@
 package com.cdp.codpattern.app.zombies.model;
 
 import com.cdp.codpattern.app.match.model.ModePlayerValue;
+import com.cdp.codpattern.app.zombies.sync.ZombiesRuntimeStateKeys;
 import net.minecraft.core.BlockPos;
 
 import java.util.LinkedHashMap;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 
@@ -22,6 +26,9 @@ public class ZombiesPlayerRuntimeState {
     private ZombiesConnectionState connectionState;
     private Long offlineSinceTick;
     private BlockPos lastAliveTargetPos;
+    private ZombiesWeaponInstanceState primaryWeapon;
+    private ZombiesArmorState armor;
+    private final Map<ZombiesBuffType, ZombiesBuffState> buffs = new EnumMap<>(ZombiesBuffType.class);
 
     public ZombiesPlayerRuntimeState(UUID playerId) {
         this(playerId, 0.0D, 0, 0, 0, ZombiesLifeState.ALIVE, ZombiesConnectionState.ONLINE, null, null);
@@ -38,6 +45,33 @@ public class ZombiesPlayerRuntimeState {
             Long offlineSinceTick,
             BlockPos lastAliveTargetPos
     ) {
+        this(
+                playerId,
+                points,
+                kills,
+                assists,
+                deaths,
+                lifeState,
+                connectionState,
+                offlineSinceTick,
+                lastAliveTargetPos,
+                null,
+                null);
+    }
+
+    public ZombiesPlayerRuntimeState(
+            UUID playerId,
+            double points,
+            int kills,
+            int assists,
+            int deaths,
+            ZombiesLifeState lifeState,
+            ZombiesConnectionState connectionState,
+            Long offlineSinceTick,
+            BlockPos lastAliveTargetPos,
+            ZombiesWeaponInstanceState primaryWeapon,
+            ZombiesArmorState armor
+    ) {
         this.playerId = Objects.requireNonNull(playerId, "playerId");
         this.points = sanitizePoints(points);
         this.kills = Math.max(0, kills);
@@ -47,6 +81,8 @@ public class ZombiesPlayerRuntimeState {
         this.connectionState = connectionState == null ? ZombiesConnectionState.ONLINE : connectionState;
         this.offlineSinceTick = offlineSinceTick;
         this.lastAliveTargetPos = lastAliveTargetPos;
+        this.primaryWeapon = primaryWeapon;
+        this.armor = armor;
     }
 
     public UUID playerId() {
@@ -87,6 +123,26 @@ public class ZombiesPlayerRuntimeState {
 
     public synchronized BlockPos lastAliveTargetPos() {
         return lastAliveTargetPos;
+    }
+
+    public synchronized Optional<ZombiesWeaponInstanceState> primaryWeapon() {
+        return Optional.ofNullable(primaryWeapon);
+    }
+
+    public synchronized Optional<ZombiesArmorState> armor() {
+        return Optional.ofNullable(armor);
+    }
+
+    public synchronized Map<ZombiesBuffType, ZombiesBuffState> buffs() {
+        return Collections.unmodifiableMap(new EnumMap<>(buffs));
+    }
+
+    public synchronized Optional<ZombiesBuffState> buff(ZombiesBuffType type) {
+        return Optional.ofNullable(type == null ? null : buffs.get(type));
+    }
+
+    public synchronized boolean hasBuff(ZombiesBuffType type) {
+        return type != null && buffs.containsKey(type);
     }
 
     public synchronized boolean isAlive() {
@@ -165,6 +221,38 @@ public class ZombiesPlayerRuntimeState {
         }
     }
 
+    public synchronized void setPrimaryWeapon(ZombiesWeaponInstanceState primaryWeapon) {
+        this.primaryWeapon = primaryWeapon;
+    }
+
+    public synchronized void clearPrimaryWeapon() {
+        primaryWeapon = null;
+    }
+
+    public synchronized void setArmor(ZombiesArmorState armor) {
+        this.armor = armor;
+    }
+
+    public synchronized void clearArmor() {
+        armor = null;
+    }
+
+    public synchronized void addBuff(ZombiesBuffState buff) {
+        if (buff != null) {
+            buffs.put(buff.type(), buff);
+        }
+    }
+
+    public synchronized void removeBuff(ZombiesBuffType type) {
+        if (type != null) {
+            buffs.remove(type);
+        }
+    }
+
+    public synchronized void clearBuffs() {
+        buffs.clear();
+    }
+
     public synchronized Map<String, ModePlayerValue> toPlayerValues() {
         Map<String, ModePlayerValue> values = new LinkedHashMap<>();
         values.put("points", ModePlayerValue.ofInt(displayPoints()));
@@ -173,6 +261,16 @@ public class ZombiesPlayerRuntimeState {
         values.put("deaths", ModePlayerValue.ofInt(deaths));
         values.put("life_state", ModePlayerValue.ofString(lifeState.name()));
         values.put("connection_state", ModePlayerValue.ofString(connectionState.name()));
+        values.put(ZombiesRuntimeStateKeys.PLAYER_WEAPON_PRIMARY_LEVEL,
+                ModePlayerValue.ofInt(primaryWeapon == null ? 0 : primaryWeapon.weaponLevel()));
+        values.put(ZombiesRuntimeStateKeys.PLAYER_WEAPON_PRIMARY_UPGRADE,
+                ModePlayerValue.ofInt(primaryWeapon == null ? 0 : primaryWeapon.upgradeLevel()));
+        values.put(ZombiesRuntimeStateKeys.PLAYER_ARMOR_LEVEL,
+                ModePlayerValue.ofInt(armor == null ? 0 : armor.armorLevel()));
+        for (ZombiesBuffType buffType : ZombiesBuffType.values()) {
+            values.put(ZombiesRuntimeStateKeys.playerBuff(buffType.id()),
+                    ModePlayerValue.ofBoolean(buffs.containsKey(buffType)));
+        }
         offlineSinceTick().ifPresent(tick -> values.put("offline_since_tick", ModePlayerValue.ofLong(tick)));
         return values;
     }

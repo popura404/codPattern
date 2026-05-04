@@ -956,6 +956,16 @@ HUD 数据通过僵尸模式自己的运行态快照同步，不复用 TDM 比�
 - 中途加入仍保持硬编码拒绝。
 - 通过波次文件增加更多原版实体组合和更高压的倍率、数量配置。
 
+### 当前进度标记（2026-05-03）
+
+- [x] MVP 1 已补充完成点：实体白名单和预算校验扩展到 `minecraft:zombie` / `minecraft:husk`，不可解析或未支持实体在正数预算下返回 `rules.invalid_entity`；同房 survivor 友伤已 cancel；开局冻结快照已包含地图对象初始状态，开局后编辑只影响下一局。
+- [x] MVP 2 已补充完成点：对象 schema 已由具体 DTO/codec 和 `ZombiesMapData` persistence 承载；barrier runtime 已能购买解除同组屏障、递增 revision 并激活同 group zombie spawn；wave director 已读取运行态 active spawn group；`MVP2_PURCHASES` validator profile 已开始覆盖墙枪、补给箱、装甲和基础参数；武器墙、补给箱、装甲点已有纯状态购买服务；统一对象交互入口已分发 `weapon_wall`、`ammo_box`、`armor_station`；墙枪已具备本局 current offer 和波间刷新；对象状态 payload 已覆盖屏障、active spawn group、墙枪、补给箱和装甲点基础状态。
+- [x] MVP 2 已补充完成点：购买/交互成功和失败已发送服务端 `Component.translatable(...)` 参数化反馈，覆盖屏障、墙枪、补给箱、装甲、电源、汽水和终极机器，并补四语言 key。
+- [ ] MVP 2 剩余项：部署工具 GUI2/G3、真实 `ItemStack`/枪械发放、墙枪随机化策略细化、实际屏障方块/碰撞或完整视觉、客户端 `ModePrompt`/协议参数同步、GameTest/manual 端到端验收尚未完成；不标记 MVP 2 整体完成。
+- [x] MVP 3 已补充完成点：`MVP3_FULL_INITIAL` 已覆盖缺失/重复电源、requiresPower 无电源、汽水机/终极机器基础参数、spawn/必需对象的维度坐标缺失、跨维度和地图范围越界；运行时快照已带入地图维度和 bounds。
+- [x] MVP 3 已补充完成点：波间复活已接入 `INTERMISSION` 进入流程，按本局成员固定 `INITIAL` 分配复活在线死亡观战玩家；传送成功后才标记存活、清 buff、折半 double_ammo 备弹并切回 Adventure，传送失败保持观战。
+- [ ] MVP 3 剩余项：死亡装备快照/原路发放、真实 `ItemStack`/属性/战斗事件、复活 fallback 传送、pending endtp、重启恢复、电源开关方块/红石视觉、完整视觉/方块交互和 GameTest/manual 验收尚未完成。
+
 ### MVP 4：内容扩展
 
 - 窗口破坏、修复和修复奖励。

@@ -20,6 +20,7 @@ public final class ZombiesRuntimeStateKeys {
     public static final String PLAYER_WEAPON_PRIMARY_LEVEL = "weapon.primary.level";
     public static final String PLAYER_WEAPON_PRIMARY_UPGRADE = "weapon.primary.upgrade";
     public static final String PLAYER_POWER_ENABLED = "power.enabled";
+    public static final String PLAYER_BUFF_PREFIX = "buff.";
 
     private ZombiesRuntimeStateKeys() {
     }
@@ -38,6 +39,10 @@ public final class ZombiesRuntimeStateKeys {
 
     public static String prompt(String objectType, String reason) {
         return "prompt." + clean(objectType) + "." + clean(reason);
+    }
+
+    public static String playerBuff(String buffId) {
+        return PLAYER_BUFF_PREFIX + clean(buffId);
     }
 
     private static String survivorKey(String playerId, String suffix) {

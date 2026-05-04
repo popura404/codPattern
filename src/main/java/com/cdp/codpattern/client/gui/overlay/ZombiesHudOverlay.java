@@ -57,10 +57,11 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
     }
 
     private static void renderPlayerStats(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
-        int panelWidth = 170;
+        int panelWidth = Math.max(150, Math.min(190, screenWidth - 16));
+        int panelHeight = 76;
         int x = Math.max(8, screenWidth - panelWidth - 10);
-        int y = Math.max(54, screenHeight - 58);
-        fillPanel(graphics, x, y, panelWidth, 42);
+        int y = Math.max(54, screenHeight - panelHeight - 12);
+        fillPanel(graphics, x, y, panelWidth, panelHeight);
 
         String points = Component.translatable("hud.codpattern.zombies.points", ClientZombiesState.points()).getString();
         String combat = Component.translatable(
@@ -68,8 +69,16 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
                 ClientZombiesState.kills(),
                 ClientZombiesState.assists(),
                 ClientZombiesState.deaths()).getString();
-        graphics.drawString(font, points, x + 9, y + 8, TEXT_ACCENT, true);
-        graphics.drawString(font, combat, x + 9, y + 24, TEXT_SECONDARY, true);
+        String growth = "Armor " + Math.max(0, ClientZombiesState.armorLevel())
+                + " | Upg " + Math.max(0, ClientZombiesState.primaryUpgradeLevel());
+        String power = "Power " + (ClientZombiesState.powerEnabled() ? "ON" : "OFF");
+        String buffs = "Buffs " + shortBuffList(ClientZombiesState.ownedBuffIds());
+        int textWidth = panelWidth - 18;
+        graphics.drawString(font, fit(font, points, textWidth), x + 9, y + 8, TEXT_ACCENT, true);
+        graphics.drawString(font, fit(font, combat, textWidth), x + 9, y + 22, TEXT_SECONDARY, true);
+        graphics.drawString(font, fit(font, growth, textWidth), x + 9, y + 36, TEXT_PRIMARY, true);
+        graphics.drawString(font, fit(font, power, textWidth), x + 9, y + 50, ClientZombiesState.powerEnabled() ? TEXT_OK : TEXT_DANGER, true);
+        graphics.drawString(font, fit(font, buffs, textWidth), x + 9, y + 64, TEXT_SECONDARY, true);
     }
 
     private static void renderSurvivors(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
@@ -143,6 +152,38 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
 
     private static String safeName(String name) {
         return name == null || name.isBlank() ? "Player" : name;
+    }
+
+    private static String shortBuffList(List<String> buffIds) {
+        if (buffIds == null || buffIds.isEmpty()) {
+            return "none";
+        }
+        StringBuilder builder = new StringBuilder();
+        int count = Math.min(3, buffIds.size());
+        for (int i = 0; i < count; i++) {
+            if (i > 0) {
+                builder.append(", ");
+            }
+            builder.append(shortBuffName(buffIds.get(i)));
+        }
+        if (buffIds.size() > count) {
+            builder.append(" +").append(buffIds.size() - count);
+        }
+        return builder.toString();
+    }
+
+    private static String shortBuffName(String buffId) {
+        if (buffId == null || buffId.isBlank()) {
+            return "?";
+        }
+        String[] parts = buffId.trim().toLowerCase(Locale.ROOT).split("_");
+        StringBuilder builder = new StringBuilder();
+        for (String part : parts) {
+            if (!part.isBlank()) {
+                builder.append(part.charAt(0));
+            }
+        }
+        return builder.isEmpty() ? buffId.trim() : builder.toString();
     }
 
     private static String fit(Font font, String text, int width) {

@@ -3,12 +3,14 @@ package com.cdp.codpattern.app.zombies.validation;
 import com.cdp.codpattern.app.zombies.map.ZombiesMapSnapshot;
 import com.cdp.codpattern.app.zombies.map.ZombiesMatchSnapshot;
 import com.cdp.codpattern.app.zombies.service.ZombiesErrorCode;
+import net.minecraft.core.BlockPos;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -20,6 +22,12 @@ public final class ZombiesMapValidator {
             ZombiesErrorCode.of("map.dynamic_player_spawn_unsupported");
     private static final ZombiesErrorCode MAP_DUPLICATE_OBJECT_ID =
             ZombiesErrorCode.of("map.duplicate_object_id");
+    private static final ZombiesErrorCode MAP_OBJECT_MISSING_LOCATION =
+            ZombiesErrorCode.of("map.object_missing_location");
+    private static final ZombiesErrorCode MAP_OBJECT_DIMENSION_MISMATCH =
+            ZombiesErrorCode.of("map.object_dimension_mismatch");
+    private static final ZombiesErrorCode MAP_OBJECT_OUT_OF_BOUNDS =
+            ZombiesErrorCode.of("map.object_out_of_bounds");
     private static final ZombiesErrorCode MAP_INVALID_BARRIER =
             ZombiesErrorCode.of("map.invalid_barrier");
     private static final ZombiesErrorCode MAP_INVALID_WEAPON_WALL =
@@ -38,10 +46,29 @@ public final class ZombiesMapValidator {
             ZombiesErrorCode.of("map.invalid_power_switch");
     private static final ZombiesErrorCode MAP_REQUIRES_POWER_WITHOUT_SWITCH =
             ZombiesErrorCode.of("map.requires_power_without_switch");
+    private static final ZombiesErrorCode MAP_MISSING_SODA_MACHINE =
+            ZombiesErrorCode.of("map.missing_soda_machine");
     private static final ZombiesErrorCode MAP_INVALID_SODA_MACHINE =
             ZombiesErrorCode.of("map.invalid_soda_machine");
+    private static final ZombiesErrorCode MAP_MISSING_ULTIMATE_MACHINE =
+            ZombiesErrorCode.of("map.missing_ultimate_machine");
     private static final ZombiesErrorCode MAP_INVALID_ULTIMATE_MACHINE =
             ZombiesErrorCode.of("map.invalid_ultimate_machine");
+    private static final Set<String> POWER_SWITCH_FEATURE_KEYS = Set.of(
+            "powerswitch",
+            "power_switch",
+            "zombies_power_switch",
+            "codpattern:zombies_power_switch");
+    private static final Set<String> POWER_SWITCH_BLOCKS = Set.of("codpattern:zombies_power_switch");
+    private static final Set<String> MVP3_INITIAL_BUFF_IDS = Set.of(
+            "double_health",
+            "speed_boost",
+            "reactive_explosion",
+            "double_ammo",
+            "score_multiplier",
+            "headshot_damage");
+    private static final int MIN_GENERATION_COORDINATE = -30_000_000;
+    private static final int MAX_GENERATION_COORDINATE = 30_000_000;
 
     private final ZombiesMapValidationProfile profile;
 
@@ -246,6 +273,12 @@ public final class ZombiesMapValidator {
                     subject,
                     "Weapon wall price must be non-negative."));
         }
+        if (weaponWall.maxReserveAmmo() < 0) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_WEAPON_WALL,
+                    subject,
+                    "Weapon wall maxReserveAmmo must be non-negative."));
+        }
         for (Integer refreshWave : weaponWall.refreshWaves()) {
             if (refreshWave == null || refreshWave <= 0) {
                 issues.add(ZombiesValidationIssue.error(
@@ -381,6 +414,8 @@ public final class ZombiesMapValidator {
             ZombiesMapSnapshot snapshot,
             List<ZombiesValidationIssue> issues
     ) {
+        addFullInitialLocationIssues(snapshot, issues);
+
         int powerSwitchCount = snapshot.powerSwitches().size();
         if (powerSwitchCount == 0) {
             issues.add(ZombiesValidationIssue.error(
@@ -395,20 +430,261 @@ public final class ZombiesMapValidator {
         }
 
         for (ZombiesMapSnapshot.PowerSwitchSnapshot powerSwitch : snapshot.powerSwitches()) {
-            if (powerSwitch.cost() < 0) {
-                issues.add(ZombiesValidationIssue.error(
-                        MAP_INVALID_POWER_SWITCH,
-                        subject("power_switch", powerSwitch.objectId(), powerSwitch.featureKey()),
-                        "Power switch cost must be non-negative."));
-            }
+            addPowerSwitchIssues(powerSwitch, issues);
         }
 
         boolean hasPowerSwitch = powerSwitchCount > 0;
+        if (snapshot.sodaMachines().isEmpty()) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_MISSING_SODA_MACHINE,
+                    "soda_machine",
+                    "MVP3 zombies maps require at least one soda machine."));
+        }
         for (ZombiesMapSnapshot.SodaMachineSnapshot sodaMachine : snapshot.sodaMachines()) {
             addSodaMachineIssues(sodaMachine, hasPowerSwitch, issues);
         }
+        if (snapshot.ultimateMachines().isEmpty()) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_MISSING_ULTIMATE_MACHINE,
+                    "ultimate_machine",
+                    "MVP3 zombies maps require at least one ultimate machine."));
+        }
         for (ZombiesMapSnapshot.UltimateMachineSnapshot ultimateMachine : snapshot.ultimateMachines()) {
             addUltimateMachineIssues(ultimateMachine, hasPowerSwitch, issues);
+        }
+    }
+
+    private static void addFullInitialLocationIssues(
+            ZombiesMapSnapshot snapshot,
+            List<ZombiesValidationIssue> issues
+    ) {
+        String expectedDimensionId = expectedDimensionId(snapshot);
+        ZombiesMapSnapshot.BoundsSnapshot mapBounds = snapshot.mapBounds();
+
+        for (ZombiesMapSnapshot.SpawnSnapshot spawn : snapshot.spawns()) {
+            addRequiredLocationIssues(
+                    subject("spawn", spawn.objectId(), spawn.featureKey()),
+                    spawn.dimensionId(),
+                    spawn.pos(),
+                    expectedDimensionId,
+                    mapBounds,
+                    issues);
+        }
+        for (ZombiesMapSnapshot.BarrierSnapshot barrier : snapshot.barriers()) {
+            addOptionalLocationIssues(
+                    subject("barrier", barrier.objectId(), barrier.featureKey()),
+                    barrier.dimensionId(),
+                    barrier.pos(),
+                    expectedDimensionId,
+                    mapBounds,
+                    issues);
+        }
+        for (ZombiesMapSnapshot.WeaponWallSnapshot weaponWall : snapshot.weaponWalls()) {
+            addOptionalLocationIssues(
+                    subject("weapon_wall", weaponWall.objectId(), weaponWall.featureKey()),
+                    weaponWall.dimensionId(),
+                    weaponWall.pos(),
+                    expectedDimensionId,
+                    mapBounds,
+                    issues);
+        }
+        for (ZombiesMapSnapshot.AmmoBoxSnapshot ammoBox : snapshot.ammoBoxes()) {
+            addOptionalLocationIssues(
+                    subject("ammo_box", ammoBox.objectId(), ammoBox.featureKey()),
+                    ammoBox.dimensionId(),
+                    ammoBox.pos(),
+                    expectedDimensionId,
+                    mapBounds,
+                    issues);
+        }
+        for (ZombiesMapSnapshot.ArmorStationSnapshot armorStation : snapshot.armorStations()) {
+            addOptionalLocationIssues(
+                    subject("armor_station", armorStation.objectId(), armorStation.featureKey()),
+                    armorStation.dimensionId(),
+                    armorStation.pos(),
+                    expectedDimensionId,
+                    mapBounds,
+                    issues);
+        }
+        for (ZombiesMapSnapshot.PowerSwitchSnapshot powerSwitch : snapshot.powerSwitches()) {
+            addRequiredLocationIssues(
+                    subject("power_switch", powerSwitch.objectId(), powerSwitch.featureKey()),
+                    powerSwitch.dimensionId(),
+                    powerSwitch.pos(),
+                    expectedDimensionId,
+                    mapBounds,
+                    issues);
+        }
+        for (ZombiesMapSnapshot.SodaMachineSnapshot sodaMachine : snapshot.sodaMachines()) {
+            addRequiredLocationIssues(
+                    subject("soda_machine", sodaMachine.objectId(), sodaMachine.featureKey()),
+                    sodaMachine.dimensionId(),
+                    sodaMachine.pos(),
+                    expectedDimensionId,
+                    mapBounds,
+                    issues);
+        }
+        for (ZombiesMapSnapshot.UltimateMachineSnapshot ultimateMachine : snapshot.ultimateMachines()) {
+            addRequiredLocationIssues(
+                    subject("ultimate_machine", ultimateMachine.objectId(), ultimateMachine.featureKey()),
+                    ultimateMachine.dimensionId(),
+                    ultimateMachine.pos(),
+                    expectedDimensionId,
+                    mapBounds,
+                    issues);
+        }
+        for (ZombiesMapSnapshot.ObjectIdSnapshot object : snapshot.extraObjects()) {
+            addOptionalLocationIssues(
+                    subject("object", object.objectId(), object.featureKey()),
+                    object.dimensionId(),
+                    object.pos(),
+                    expectedDimensionId,
+                    mapBounds,
+                    issues);
+        }
+    }
+
+    private static void addRequiredLocationIssues(
+            String subject,
+            String dimensionId,
+            BlockPos pos,
+            String expectedDimensionId,
+            ZombiesMapSnapshot.BoundsSnapshot mapBounds,
+            List<ZombiesValidationIssue> issues
+    ) {
+        if (normalizeKey(dimensionId).isEmpty() || pos == null) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_OBJECT_MISSING_LOCATION,
+                    subject,
+                    "MVP3 zombies map entries require non-empty dimension and position."));
+        }
+        addLocationConsistencyIssues(subject, dimensionId, pos, expectedDimensionId, mapBounds, issues);
+    }
+
+    private static void addOptionalLocationIssues(
+            String subject,
+            String dimensionId,
+            BlockPos pos,
+            String expectedDimensionId,
+            ZombiesMapSnapshot.BoundsSnapshot mapBounds,
+            List<ZombiesValidationIssue> issues
+    ) {
+        boolean hasDimension = !normalizeKey(dimensionId).isEmpty();
+        boolean hasPosition = pos != null;
+        if (!hasDimension && !hasPosition) {
+            return;
+        }
+        if (!hasDimension || !hasPosition) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_OBJECT_MISSING_LOCATION,
+                    subject,
+                    "Located zombies map entries require both dimension and position."));
+        }
+        addLocationConsistencyIssues(subject, dimensionId, pos, expectedDimensionId, mapBounds, issues);
+    }
+
+    private static void addLocationConsistencyIssues(
+            String subject,
+            String dimensionId,
+            BlockPos pos,
+            String expectedDimensionId,
+            ZombiesMapSnapshot.BoundsSnapshot mapBounds,
+            List<ZombiesValidationIssue> issues
+    ) {
+        String normalizedDimensionId = normalizeKey(dimensionId);
+        String normalizedExpectedDimensionId = normalizeKey(expectedDimensionId);
+        if (!normalizedDimensionId.isEmpty()
+                && !normalizedExpectedDimensionId.isEmpty()
+                && !normalizedDimensionId.equals(normalizedExpectedDimensionId)) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_OBJECT_DIMENSION_MISMATCH,
+                    subject,
+                    "Zombies map entry dimension must match the map and spawn dimension."));
+        }
+        if (pos == null) {
+            return;
+        }
+        if (!insideGenerationBoundary(pos)) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_OBJECT_OUT_OF_BOUNDS,
+                    subject,
+                    "Zombies map entry position is outside the supported generation boundary."));
+        }
+        if (mapBounds != null && !mapBounds.contains(pos)) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_OBJECT_OUT_OF_BOUNDS,
+                    subject,
+                    "Zombies map entry position must be inside the map bounds."));
+        }
+    }
+
+    private static String expectedDimensionId(ZombiesMapSnapshot snapshot) {
+        String mapDimensionId = normalizeKey(snapshot.mapDimensionId());
+        if (!mapDimensionId.isEmpty()) {
+            return mapDimensionId;
+        }
+        for (ZombiesMapSnapshot.SpawnSnapshot spawn : snapshot.spawns()) {
+            if (spawn.initialPlayerSpawn() && !normalizeKey(spawn.dimensionId()).isEmpty()) {
+                return normalizeKey(spawn.dimensionId());
+            }
+        }
+        for (ZombiesMapSnapshot.SpawnSnapshot spawn : snapshot.spawns()) {
+            if (spawn.zombieSpawn() && !normalizeKey(spawn.dimensionId()).isEmpty()) {
+                return normalizeKey(spawn.dimensionId());
+            }
+        }
+        for (ZombiesMapSnapshot.SpawnSnapshot spawn : snapshot.spawns()) {
+            if (!normalizeKey(spawn.dimensionId()).isEmpty()) {
+                return normalizeKey(spawn.dimensionId());
+            }
+        }
+        for (ZombiesMapSnapshot.PowerSwitchSnapshot powerSwitch : snapshot.powerSwitches()) {
+            if (!normalizeKey(powerSwitch.dimensionId()).isEmpty()) {
+                return normalizeKey(powerSwitch.dimensionId());
+            }
+        }
+        for (ZombiesMapSnapshot.SodaMachineSnapshot sodaMachine : snapshot.sodaMachines()) {
+            if (!normalizeKey(sodaMachine.dimensionId()).isEmpty()) {
+                return normalizeKey(sodaMachine.dimensionId());
+            }
+        }
+        for (ZombiesMapSnapshot.UltimateMachineSnapshot ultimateMachine : snapshot.ultimateMachines()) {
+            if (!normalizeKey(ultimateMachine.dimensionId()).isEmpty()) {
+                return normalizeKey(ultimateMachine.dimensionId());
+            }
+        }
+        return "";
+    }
+
+    private static boolean insideGenerationBoundary(BlockPos pos) {
+        return pos.getX() >= MIN_GENERATION_COORDINATE
+                && pos.getX() <= MAX_GENERATION_COORDINATE
+                && pos.getZ() >= MIN_GENERATION_COORDINATE
+                && pos.getZ() <= MAX_GENERATION_COORDINATE;
+    }
+
+    private static void addPowerSwitchIssues(
+            ZombiesMapSnapshot.PowerSwitchSnapshot powerSwitch,
+            List<ZombiesValidationIssue> issues
+    ) {
+        String subject = subject("power_switch", powerSwitch.objectId(), powerSwitch.featureKey());
+        if (powerSwitch.cost() < 0) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_POWER_SWITCH,
+                    subject,
+                    "Power switch cost must be non-negative."));
+        }
+        if (powerSwitch.featureKey().isBlank() || !POWER_SWITCH_FEATURE_KEYS.contains(normalizeKey(powerSwitch.featureKey()))) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_POWER_SWITCH,
+                    subject,
+                    "Power switch featureKey must identify a zombies power switch."));
+        }
+        if (powerSwitch.block().isBlank() || !POWER_SWITCH_BLOCKS.contains(normalizeKey(powerSwitch.block()))) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_POWER_SWITCH,
+                    subject,
+                    "Power switch block must be codpattern:zombies_power_switch."));
         }
     }
 
@@ -429,6 +705,11 @@ public final class ZombiesMapValidator {
                     MAP_INVALID_SODA_MACHINE,
                     subject,
                     "Soda machine buffId must be non-empty."));
+        } else if (!MVP3_INITIAL_BUFF_IDS.contains(normalizeKey(sodaMachine.buffId()))) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_SODA_MACHINE,
+                    subject,
+                    "Soda machine buffId is not in the MVP3 initial allowed set."));
         }
         if (sodaMachine.cost() < 0) {
             issues.add(ZombiesValidationIssue.error(
@@ -522,6 +803,10 @@ public final class ZombiesMapValidator {
                     subject,
                     "Duplicate objectId '" + objectId + "' also used by " + previous + "."));
         }
+    }
+
+    private static String normalizeKey(String value) {
+        return Objects.requireNonNullElse(value, "").trim().toLowerCase(Locale.ROOT);
     }
 
     private static String subject(String type, String objectId, String featureKey) {

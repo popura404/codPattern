@@ -245,6 +245,9 @@ final class ZombiesRoomHandleFactory {
             if (viewer != null) {
                 playerValues.putAll(map.playerStateService().playerValues(viewer.getUUID()));
             }
+            playerValues.put(
+                    ZombiesRuntimeStateKeys.PLAYER_POWER_ENABLED,
+                    ModePlayerValue.ofBoolean(map.powerService().isPowerOn()));
             playerValues.putAll(map.playerStateService().survivorValues());
 
             return new ModeRuntimeStateSnapshot(

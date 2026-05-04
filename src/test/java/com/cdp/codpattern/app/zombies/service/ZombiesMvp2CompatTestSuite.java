@@ -8,5 +8,7 @@ public final class ZombiesMvp2CompatTestSuite {
 
     public static void main(String[] args) {
         ZombiesMapValidatorMvp2Mvp3CompatTest.main(args);
+        ZombiesPurchaseStateServicesCompatTest.main(args);
+        ZombiesObjectStateStoreMvp2CompatTest.main(args);
     }
 }

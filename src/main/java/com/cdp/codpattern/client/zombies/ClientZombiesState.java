@@ -5,6 +5,7 @@ import com.cdp.codpattern.app.match.model.ModePlayerValue;
 import com.cdp.codpattern.app.match.model.ModeRuntimeStateSnapshot;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.model.RoomSummaryMetric;
+import com.cdp.codpattern.app.zombies.model.ZombiesBuffType;
 import com.cdp.codpattern.app.zombies.model.ZombiesTeamNames;
 import com.cdp.codpattern.app.zombies.sync.ZombiesRuntimeStateKeys;
 import com.cdp.codpattern.client.ClientMatchState;
@@ -14,9 +15,11 @@ import net.minecraft.client.Minecraft;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public final class ClientZombiesState {
@@ -24,12 +27,21 @@ public final class ClientZombiesState {
     }
 
     public static Optional<ModeRuntimeStateSnapshot> snapshot() {
-        String roomKey = ClientMatchState.roomContextName();
-        Optional<ModeRuntimeStateSnapshot> current = ClientModeRuntimeState.snapshot(roomKey)
-                .filter(snapshot -> isZombiesRoom(snapshot.roomKey()));
-        if (current.isPresent()) {
-            return current;
+        Optional<ModeRuntimeStateSnapshot> latest = latestZombiesSnapshot();
+        try {
+            String roomKey = ClientMatchState.roomContextName();
+            Optional<ModeRuntimeStateSnapshot> current = ClientModeRuntimeState.snapshot(roomKey)
+                    .filter(snapshot -> isZombiesRoom(snapshot.roomKey()));
+            if (current.isPresent()) {
+                return current;
+            }
+        } catch (ExceptionInInitializerError | NoClassDefFoundError ignored) {
+            // Pure Java compatibility tests can exercise cached runtime snapshots without bootstrapping Minecraft client state.
         }
+        return latest;
+    }
+
+    private static Optional<ModeRuntimeStateSnapshot> latestZombiesSnapshot() {
         return ClientModeRuntimeState.snapshots().values().stream()
                 .filter(snapshot -> isZombiesRoom(snapshot.roomKey()))
                 .max(Comparator.comparingLong(ModeRuntimeStateSnapshot::revision));
@@ -87,6 +99,55 @@ public final class ClientZombiesState {
         return snapshot()
                 .map(snapshot -> intValue(snapshot.playerValues().get(ZombiesRuntimeStateKeys.PLAYER_DEATHS), 0))
                 .orElse(0);
+    }
+
+    public static boolean powerEnabled() {
+        return snapshot()
+                .map(snapshot -> booleanValue(snapshot.playerValues().get(ZombiesRuntimeStateKeys.PLAYER_POWER_ENABLED), false))
+                .orElse(false);
+    }
+
+    public static int armorLevel() {
+        return snapshot()
+                .map(snapshot -> intValue(snapshot.playerValues().get(ZombiesRuntimeStateKeys.PLAYER_ARMOR_LEVEL), 0))
+                .orElse(0);
+    }
+
+    public static int primaryUpgradeLevel() {
+        return snapshot()
+                .map(snapshot -> intValue(snapshot.playerValues().get(ZombiesRuntimeStateKeys.PLAYER_WEAPON_PRIMARY_UPGRADE), 0))
+                .orElse(0);
+    }
+
+    public static boolean buffEnabled(String buffId) {
+        return snapshot()
+                .map(snapshot -> booleanValue(snapshot.playerValues().get(ZombiesRuntimeStateKeys.playerBuff(buffId)), false))
+                .orElse(false);
+    }
+
+    public static List<String> ownedBuffIds() {
+        Optional<ModeRuntimeStateSnapshot> snapshotOptional = snapshot();
+        if (snapshotOptional.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> buffIds = new LinkedHashSet<>();
+        for (ZombiesBuffType type : ZombiesBuffType.values()) {
+            if (buffEnabled(type.id())) {
+                buffIds.add(type.id());
+            }
+        }
+        snapshotOptional.get().playerValues().forEach((key, value) -> {
+            if (key != null
+                    && key.startsWith(ZombiesRuntimeStateKeys.PLAYER_BUFF_PREFIX)
+                    && booleanValue(value, false)) {
+                String buffId = key.substring(ZombiesRuntimeStateKeys.PLAYER_BUFF_PREFIX.length()).trim();
+                if (!buffId.isBlank()) {
+                    buffIds.add(buffId);
+                }
+            }
+        });
+        return List.copyOf(buffIds);
     }
 
     public static List<SurvivorStatus> survivors() {
@@ -152,6 +213,13 @@ public final class ClientZombiesState {
         } catch (NumberFormatException ignored) {
             return fallback;
         }
+    }
+
+    private static boolean booleanValue(ModePlayerValue value, boolean fallback) {
+        if (value == null || value.value().isBlank()) {
+            return fallback;
+        }
+        return Boolean.parseBoolean(value.value());
     }
 
     private static String stringValue(ModePlayerValue value, String fallback) {
