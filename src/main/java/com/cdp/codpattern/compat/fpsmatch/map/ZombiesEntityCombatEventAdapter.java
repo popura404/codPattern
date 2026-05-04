@@ -10,6 +10,7 @@ import com.cdp.codpattern.app.match.port.ModeEntityCombatEventPort;
 import com.cdp.codpattern.app.match.runtime.ModeEntityOwnershipRegistry;
 import com.cdp.codpattern.app.zombies.service.ZombiesEconomyService;
 import com.cdp.codpattern.app.zombies.service.ZombiesPlayerStateService;
+import com.cdp.codpattern.app.zombies.service.ZombiesWeaponItemStackService;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 
@@ -28,6 +29,7 @@ public class ZombiesEntityCombatEventAdapter implements ModeEntityCombatEventPor
     private final ModeEntityOwnershipRegistry ownershipRegistry;
     private final RewardResolver rewardResolver;
     private final LifecycleHook lifecycleHook;
+    private final ZombiesWeaponItemStackService weaponItemStackService;
     private final ConcurrentMap<UUID, Set<UUID>> contributorsByEntity = new ConcurrentHashMap<>();
 
     public ZombiesEntityCombatEventAdapter(
@@ -39,6 +41,27 @@ public class ZombiesEntityCombatEventAdapter implements ModeEntityCombatEventPor
             RewardResolver rewardResolver,
             LifecycleHook lifecycleHook
     ) {
+        this(
+                roomId,
+                modeDisplayNameKey,
+                economyService,
+                playerStateService,
+                ownershipRegistry,
+                rewardResolver,
+                lifecycleHook,
+                new ZombiesWeaponItemStackService());
+    }
+
+    public ZombiesEntityCombatEventAdapter(
+            RoomId roomId,
+            String modeDisplayNameKey,
+            ZombiesEconomyService economyService,
+            ZombiesPlayerStateService playerStateService,
+            ModeEntityOwnershipRegistry ownershipRegistry,
+            RewardResolver rewardResolver,
+            LifecycleHook lifecycleHook,
+            ZombiesWeaponItemStackService weaponItemStackService
+    ) {
         this.roomId = Objects.requireNonNull(roomId, "roomId");
         this.modeDisplayNameKey = modeDisplayNameKey == null || modeDisplayNameKey.isBlank()
                 ? GameModeRegistry.getOrDefault(roomId.gameType()).displayNameKey()
@@ -48,6 +71,7 @@ public class ZombiesEntityCombatEventAdapter implements ModeEntityCombatEventPor
         this.ownershipRegistry = ownershipRegistry == null ? ModeEntityOwnershipRegistry.instance() : ownershipRegistry;
         this.rewardResolver = rewardResolver == null ? RewardResolver.defaults() : rewardResolver;
         this.lifecycleHook = lifecycleHook == null ? (entity, reason) -> { } : lifecycleHook;
+        this.weaponItemStackService = Objects.requireNonNull(weaponItemStackService, "weaponItemStackService");
     }
 
     @Override
@@ -72,7 +96,7 @@ public class ZombiesEntityCombatEventAdapter implements ModeEntityCombatEventPor
 
     @Override
     public DamageDecision onEntityHurt(LivingEntity entity, EntityDamageContext context) {
-        if (entity == null || context == null || !isOwnedByThisRoom(entity) || context.amount() <= 0.0F) {
+        if (entity == null || context == null || !isOwnedByThisRoom(entity) || !isPositiveFinite(context.amount())) {
             return DamageDecision.passThrough();
         }
         ServerPlayer attacker = context.attacker().orElse(null);
@@ -85,7 +109,11 @@ public class ZombiesEntityCombatEventAdapter implements ModeEntityCombatEventPor
         contributorsByEntity
                 .computeIfAbsent(entity.getUUID(), ignored -> ConcurrentHashMap.newKeySet())
                 .add(attacker.getUUID());
-        return DamageDecision.passThrough();
+        double damageMultiplier = weaponItemStackService.sameRoomDamageMultiplier(attacker.getMainHandItem(), roomId);
+        float adjustedAmount = scaledDamageAmount(context.amount(), damageMultiplier);
+        return adjustedAmount == context.amount()
+                ? DamageDecision.passThrough()
+                : DamageDecision.setAmount(adjustedAmount);
     }
 
     @Override
@@ -129,6 +157,21 @@ public class ZombiesEntityCombatEventAdapter implements ModeEntityCombatEventPor
         return other != null
                 && GameModeRegistry.canonicalize(other.gameType()).equals(gameType())
                 && other.mapName().equals(mapName());
+    }
+
+    static float scaledDamageAmount(float amount, double multiplier) {
+        if (!isPositiveFinite(amount) || !Double.isFinite(multiplier) || multiplier <= 0.0D || multiplier == 1.0D) {
+            return amount;
+        }
+        double scaled = amount * multiplier;
+        if (!Double.isFinite(scaled)) {
+            return amount;
+        }
+        return scaled >= Float.MAX_VALUE ? Float.MAX_VALUE : (float) scaled;
+    }
+
+    private static boolean isPositiveFinite(float amount) {
+        return Float.isFinite(amount) && amount > 0.0F;
     }
 
     public interface RewardResolver {

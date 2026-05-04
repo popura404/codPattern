@@ -1,5 +1,7 @@
 package com.cdp.codpattern.app.zombies.service;
 
+import com.cdp.codpattern.app.zombies.model.ZombiesBuffState;
+import com.cdp.codpattern.app.zombies.model.ZombiesBuffType;
 import com.cdp.codpattern.app.zombies.model.ZombiesConnectionState;
 import com.cdp.codpattern.app.zombies.model.ZombiesLifeState;
 import com.cdp.codpattern.app.zombies.model.ZombiesPlayerRuntimeState;
@@ -16,6 +18,7 @@ public final class ZombiesEconomyConnectionServiceCompatTest {
         spendSuccessDeductsPoints();
         spendFailuresKeepBalanceAndReturnExpectedErrors();
         killAndAssistsSkipsKillerAndLeftContributor();
+        scoreMultiplierAppliesToKillAndAssistRewards();
         offlineGraceCountsAlivePlayersUntilTimeout();
     }
 
@@ -95,6 +98,27 @@ public final class ZombiesEconomyConnectionServiceCompatTest {
         requireState(players, killerId, 10.0D, 1, 0, "killer should receive kill points but no self assist");
         requireState(players, assisterId, 3.0D, 0, 1, "eligible contributor should receive one assist");
         requireState(players, leftContributorId, 0.0D, 0, 0, "left contributor should not receive assist credit");
+    }
+
+    private static void scoreMultiplierAppliesToKillAndAssistRewards() {
+        ZombiesPlayerStateService players = new ZombiesPlayerStateService();
+        ZombiesEconomyService economy = new ZombiesEconomyService(players);
+        UUID killerId = playerId(20);
+        UUID assisterId = playerId(21);
+        players.getOrCreate(killerId).addBuff(ZombiesBuffState.defaultFor(ZombiesBuffType.SCORE_MULTIPLIER));
+        players.getOrCreate(assisterId).addBuff(new ZombiesBuffState(ZombiesBuffType.SCORE_MULTIPLIER, 2.0D));
+
+        ZombiesServiceResult<ZombiesEconomyService.RewardSummary> result = economy.awardKillAndAssists(
+                killerId,
+                List.of(assisterId),
+                10.0D,
+                3.0D);
+
+        requireSuccess(result, "score multiplier reward should succeed");
+        requireState(players, killerId, 12.5D, 1, 0,
+                "killer score_multiplier should scale kill reward");
+        requireState(players, assisterId, 6.0D, 0, 1,
+                "assister score_multiplier should scale assist reward");
     }
 
     private static void offlineGraceCountsAlivePlayersUntilTimeout() {

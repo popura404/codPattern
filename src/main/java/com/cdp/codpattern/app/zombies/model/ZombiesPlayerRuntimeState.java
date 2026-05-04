@@ -26,8 +26,10 @@ public class ZombiesPlayerRuntimeState {
     private ZombiesConnectionState connectionState;
     private Long offlineSinceTick;
     private BlockPos lastAliveTargetPos;
+    private ZombiesWeaponInstanceState starterWeapon;
     private ZombiesWeaponInstanceState primaryWeapon;
     private ZombiesArmorState armor;
+    private ZombiesEquipmentSnapshot deathEquipmentSnapshot;
     private final Map<ZombiesBuffType, ZombiesBuffState> buffs = new EnumMap<>(ZombiesBuffType.class);
 
     public ZombiesPlayerRuntimeState(UUID playerId) {
@@ -81,8 +83,10 @@ public class ZombiesPlayerRuntimeState {
         this.connectionState = connectionState == null ? ZombiesConnectionState.ONLINE : connectionState;
         this.offlineSinceTick = offlineSinceTick;
         this.lastAliveTargetPos = lastAliveTargetPos;
+        this.starterWeapon = null;
         this.primaryWeapon = primaryWeapon;
         this.armor = armor;
+        this.deathEquipmentSnapshot = null;
     }
 
     public UUID playerId() {
@@ -125,12 +129,20 @@ public class ZombiesPlayerRuntimeState {
         return lastAliveTargetPos;
     }
 
+    public synchronized Optional<ZombiesWeaponInstanceState> starterWeapon() {
+        return Optional.ofNullable(starterWeapon);
+    }
+
     public synchronized Optional<ZombiesWeaponInstanceState> primaryWeapon() {
         return Optional.ofNullable(primaryWeapon);
     }
 
     public synchronized Optional<ZombiesArmorState> armor() {
         return Optional.ofNullable(armor);
+    }
+
+    public synchronized Optional<ZombiesEquipmentSnapshot> deathEquipmentSnapshot() {
+        return Optional.ofNullable(deathEquipmentSnapshot);
     }
 
     public synchronized Map<ZombiesBuffType, ZombiesBuffState> buffs() {
@@ -221,6 +233,14 @@ public class ZombiesPlayerRuntimeState {
         }
     }
 
+    public synchronized void setStarterWeapon(ZombiesWeaponInstanceState starterWeapon) {
+        this.starterWeapon = starterWeapon;
+    }
+
+    public synchronized void clearStarterWeapon() {
+        starterWeapon = null;
+    }
+
     public synchronized void setPrimaryWeapon(ZombiesWeaponInstanceState primaryWeapon) {
         this.primaryWeapon = primaryWeapon;
     }
@@ -235,6 +255,16 @@ public class ZombiesPlayerRuntimeState {
 
     public synchronized void clearArmor() {
         armor = null;
+    }
+
+    public synchronized void setDeathEquipmentSnapshot(ZombiesEquipmentSnapshot deathEquipmentSnapshot) {
+        this.deathEquipmentSnapshot = deathEquipmentSnapshot == null || deathEquipmentSnapshot.isEmpty()
+                ? null
+                : deathEquipmentSnapshot;
+    }
+
+    public synchronized void clearDeathEquipmentSnapshot() {
+        deathEquipmentSnapshot = null;
     }
 
     public synchronized void addBuff(ZombiesBuffState buff) {

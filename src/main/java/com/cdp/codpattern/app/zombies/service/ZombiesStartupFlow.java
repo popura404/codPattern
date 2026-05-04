@@ -69,6 +69,7 @@ public final class ZombiesStartupFlow {
 
         ZombiesServiceResult<ZombiesStarterKitDistributor.PreparedStarterKits> starterKitResult =
                 starterKitDistributor.prepareStarterWeapons(
+                        request.roomId(),
                         request.memberIds(),
                         request.backpackConfig(),
                         request.weaponFilterConfig());

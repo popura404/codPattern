@@ -1,5 +1,8 @@
 package com.cdp.codpattern.app.zombies.service;
 
+import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.zombies.model.ZombiesEquipmentSlot;
+import com.cdp.codpattern.app.zombies.model.ZombiesWeaponInstanceState;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.zombies.ZombiesBackpackConfig;
 import com.cdp.codpattern.config.zombies.ZombiesWeaponFilterConfig;
@@ -27,14 +30,25 @@ import java.util.UUID;
 
 public final class ZombiesStarterKitDistributor {
     private static final int STARTER_SLOT = 0;
+    private final ZombiesWeaponItemStackService weaponItemStackService = new ZombiesWeaponItemStackService();
 
     public ZombiesServiceResult<PreparedStarterKits> prepareStarterWeapons(
             Collection<UUID> playerIds,
             ZombiesBackpackConfig backpackConfig,
             ZombiesWeaponFilterConfig filterConfig
     ) {
+        return prepareStarterWeapons(null, playerIds, backpackConfig, filterConfig);
+    }
+
+    public ZombiesServiceResult<PreparedStarterKits> prepareStarterWeapons(
+            RoomId roomId,
+            Collection<UUID> playerIds,
+            ZombiesBackpackConfig backpackConfig,
+            ZombiesWeaponFilterConfig filterConfig
+    ) {
         List<UUID> members = normalizeMembers(playerIds);
         Map<UUID, ItemStack> weapons = new LinkedHashMap<>();
+        Map<UUID, ZombiesWeaponInstanceState> starterWeaponStates = new LinkedHashMap<>();
         ZombiesBackpackConfig resolvedBackpackConfig = backpackConfig == null ? new ZombiesBackpackConfig() : backpackConfig;
         ZombiesWeaponFilterConfig resolvedFilterConfig = filterConfig == null ? new ZombiesWeaponFilterConfig() : filterConfig;
         resolvedBackpackConfig.normalize();
@@ -52,9 +66,26 @@ public final class ZombiesStarterKitDistributor {
                         weaponResult.params(),
                         weaponResult.logMessage());
             }
-            weapons.put(playerId, weaponResult.value().get().copy());
+            ItemStack weapon = weaponResult.value().get().copy();
+            if (roomId != null) {
+                ZombiesWeaponInstanceState starterWeaponState = starterWeaponState(weapon);
+                ZombiesServiceResult<ZombiesWeaponItemStackService.ZombiesWeaponTagData> tagResult =
+                        weaponItemStackService.writeWeaponTags(
+                                weapon,
+                                roomId,
+                                ZombiesEquipmentSlot.STARTER,
+                                starterWeaponState);
+                if (!tagResult.success()) {
+                    return ZombiesServiceResult.failure(
+                            ZombiesErrorCode.STARTUP_STARTER_WEAPON_MISSING,
+                            tagResult.params(),
+                            tagResult.logMessage());
+                }
+                starterWeaponStates.put(playerId, starterWeaponState);
+            }
+            weapons.put(playerId, weapon);
         }
-        return ZombiesServiceResult.success(new PreparedStarterKits(weapons));
+        return ZombiesServiceResult.success(new PreparedStarterKits(weapons, starterWeaponStates));
     }
 
     public ZombiesServiceResult<Void> applyStarterWeapons(ServerLevel level, PreparedStarterKits starterKits) {
@@ -168,6 +199,21 @@ public final class ZombiesStarterKitDistributor {
         return Optional.ofNullable(fallbackItemId);
     }
 
+    private static ZombiesWeaponInstanceState starterWeaponState(ItemStack stack) {
+        String gunId = TaczGatewayProvider.gateway().resolveGunId(stack)
+                .orElseGet(() -> BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
+        int reserveAmmo = Math.max(0, TaczGatewayProvider.gateway().resolveReserveAmmo(stack));
+        int maxReserveAmmo = Math.max(reserveAmmo, TaczGatewayProvider.gateway().resolveMaxReserveAmmo(stack));
+        return new ZombiesWeaponInstanceState(
+                gunId,
+                0,
+                0,
+                1.0D,
+                1.0D,
+                reserveAmmo,
+                maxReserveAmmo);
+    }
+
     private static boolean hasBlockedInstalledAttachment(ZombiesWeaponFilterConfig filterConfig, ItemStack stack) {
         if (stack == null || stack.isEmpty() || !TaczGatewayProvider.gateway().isGun(stack)) {
             return false;
@@ -211,7 +257,14 @@ public final class ZombiesStarterKitDistributor {
         return List.copyOf(members);
     }
 
-    public record PreparedStarterKits(Map<UUID, ItemStack> weapons) {
+    public record PreparedStarterKits(
+            Map<UUID, ItemStack> weapons,
+            Map<UUID, ZombiesWeaponInstanceState> starterWeaponStates
+    ) {
+        public PreparedStarterKits(Map<UUID, ItemStack> weapons) {
+            this(weapons, Map.of());
+        }
+
         public PreparedStarterKits {
             Objects.requireNonNull(weapons, "weapons");
             Map<UUID, ItemStack> copied = new LinkedHashMap<>();
@@ -221,6 +274,15 @@ public final class ZombiesStarterKitDistributor {
                 }
             }
             weapons = Map.copyOf(copied);
+            Map<UUID, ZombiesWeaponInstanceState> copiedStates = new LinkedHashMap<>();
+            if (starterWeaponStates != null) {
+                for (Map.Entry<UUID, ZombiesWeaponInstanceState> entry : starterWeaponStates.entrySet()) {
+                    if (entry.getKey() != null && entry.getValue() != null) {
+                        copiedStates.put(entry.getKey(), entry.getValue());
+                    }
+                }
+            }
+            starterWeaponStates = Map.copyOf(copiedStates);
         }
 
         public List<UUID> playerIds() {
@@ -230,6 +292,10 @@ public final class ZombiesStarterKitDistributor {
         public Optional<ItemStack> weapon(UUID playerId) {
             ItemStack stack = weapons.get(playerId);
             return stack == null || stack.isEmpty() ? Optional.empty() : Optional.of(stack.copy());
+        }
+
+        public Optional<ZombiesWeaponInstanceState> starterWeaponState(UUID playerId) {
+            return Optional.ofNullable(starterWeaponStates.get(playerId));
         }
     }
 }

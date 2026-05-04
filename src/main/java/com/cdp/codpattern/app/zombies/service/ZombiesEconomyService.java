@@ -1,6 +1,8 @@
 package com.cdp.codpattern.app.zombies.service;
 
 import com.cdp.codpattern.app.match.model.ModePlayerValue;
+import com.cdp.codpattern.app.zombies.model.ZombiesBuffState;
+import com.cdp.codpattern.app.zombies.model.ZombiesBuffType;
 import com.cdp.codpattern.app.zombies.model.ZombiesConnectionState;
 import com.cdp.codpattern.app.zombies.model.ZombiesPlayerRuntimeState;
 import com.cdp.codpattern.app.zombies.model.ZombiesWaveMobEntry;
@@ -50,7 +52,7 @@ public class ZombiesEconomyService {
             return ZombiesServiceResult.failure(ZombiesErrorCode.PLAYER_LEFT);
         }
         killer.addKill();
-        killer.addPoints(killPoints);
+        killer.addPoints(applyScoreMultiplier(killerId, killPoints));
         return ZombiesServiceResult.success(killer.points());
     }
 
@@ -67,7 +69,7 @@ public class ZombiesEconomyService {
             return ZombiesServiceResult.failure(ZombiesErrorCode.PLAYER_LEFT);
         }
         contributor.addAssist();
-        contributor.addPoints(assistPoints);
+        contributor.addPoints(applyScoreMultiplier(contributorId, assistPoints));
         return ZombiesServiceResult.success(contributor.points());
     }
 
@@ -177,6 +179,23 @@ public class ZombiesEconomyService {
 
     private static int rewardOrDefault(Integer value, int defaultValue) {
         return value == null || value < 0 ? defaultValue : value;
+    }
+
+    private double applyScoreMultiplier(UUID playerId, double points) {
+        double multiplier = scoreMultiplier(playerId);
+        double adjusted = points * multiplier;
+        return Double.isFinite(adjusted) ? adjusted : points;
+    }
+
+    private double scoreMultiplier(UUID playerId) {
+        if (playerId == null) {
+            return 1.0D;
+        }
+        return playerStateService.get(playerId)
+                .flatMap(state -> state.buff(ZombiesBuffType.SCORE_MULTIPLIER))
+                .map(ZombiesBuffState::multiplier)
+                .filter(multiplier -> Double.isFinite(multiplier) && multiplier > 0.0D)
+                .orElse(1.0D);
     }
 
     @FunctionalInterface

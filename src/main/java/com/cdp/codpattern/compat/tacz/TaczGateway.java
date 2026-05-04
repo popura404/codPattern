@@ -29,4 +29,10 @@ public interface TaczGateway {
     void postAttachmentChanged(Player player, ItemStack gunStack);
 
     void configureGunAmmo(ItemStack stack, int ammoMultiple);
+
+    int resolveReserveAmmo(ItemStack stack);
+
+    int resolveMaxReserveAmmo(ItemStack stack);
+
+    void setReserveAmmo(ItemStack stack, int reserveAmmo, int maxReserveAmmo);
 }

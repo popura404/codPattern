@@ -10,6 +10,7 @@
     "screen.codpattern.rename_backpack.prompt": "新しいバックパック名を入力",
     "screen.codpattern.inventory.throwable_1": "投1",
     "screen.codpattern.inventory.throwable_2": "投2",
+    "block.codpattern.zombies_power_switch": "ゾンビ電源スイッチ",
     "screen.codpattern.room.title": "マルチモード - ルーム選択",
     "screen.codpattern.room.header": "§e§lルーム選択",
     "screen.codpattern.room.create_hint": "§7コマンドでルームマップを作成:",

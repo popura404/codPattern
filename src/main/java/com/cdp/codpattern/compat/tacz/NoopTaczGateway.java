@@ -59,4 +59,18 @@ public final class NoopTaczGateway implements TaczGateway {
     @Override
     public void configureGunAmmo(ItemStack stack, int ammoMultiple) {
     }
+
+    @Override
+    public int resolveReserveAmmo(ItemStack stack) {
+        return 0;
+    }
+
+    @Override
+    public int resolveMaxReserveAmmo(ItemStack stack) {
+        return 0;
+    }
+
+    @Override
+    public void setReserveAmmo(ItemStack stack, int reserveAmmo, int maxReserveAmmo) {
+    }
 }

@@ -9,7 +9,8 @@ public record ZombiesWeaponInstanceState(
         String gunId,
         int weaponLevel,
         int upgradeLevel,
-        double damageMultiplier,
+        double levelDamageMultiplier,
+        double upgradeDamageMultiplier,
         int reserveAmmo,
         int maxReserveAmmo
 ) {
@@ -17,9 +18,28 @@ public record ZombiesWeaponInstanceState(
         gunId = Objects.requireNonNullElse(gunId, "").trim();
         weaponLevel = Math.max(0, weaponLevel);
         upgradeLevel = Math.max(0, upgradeLevel);
-        damageMultiplier = sanitizePositive(damageMultiplier, 1.0D);
+        levelDamageMultiplier = sanitizePositive(levelDamageMultiplier, 1.0D);
+        upgradeDamageMultiplier = sanitizePositive(upgradeDamageMultiplier, 1.0D);
         maxReserveAmmo = Math.max(0, maxReserveAmmo);
         reserveAmmo = clampReserve(reserveAmmo, maxReserveAmmo);
+    }
+
+    public ZombiesWeaponInstanceState(
+            String gunId,
+            int weaponLevel,
+            int upgradeLevel,
+            double damageMultiplier,
+            int reserveAmmo,
+            int maxReserveAmmo
+    ) {
+        this(
+                gunId,
+                weaponLevel,
+                upgradeLevel,
+                upgradeLevel > 0 ? 1.0D : damageMultiplier,
+                upgradeLevel > 0 ? damageMultiplier : 1.0D,
+                reserveAmmo,
+                maxReserveAmmo);
     }
 
     public static ZombiesWeaponInstanceState primary(
@@ -28,7 +48,14 @@ public record ZombiesWeaponInstanceState(
             double damageMultiplier,
             int maxReserveAmmo
     ) {
-        return new ZombiesWeaponInstanceState(gunId, weaponLevel, 0, damageMultiplier, maxReserveAmmo, maxReserveAmmo);
+        return new ZombiesWeaponInstanceState(
+                gunId,
+                weaponLevel,
+                0,
+                damageMultiplier,
+                1.0D,
+                maxReserveAmmo,
+                maxReserveAmmo);
     }
 
     public boolean sameGunAndLevel(String gunId, int weaponLevel) {
@@ -49,7 +76,8 @@ public record ZombiesWeaponInstanceState(
                 gunId,
                 weaponLevel,
                 upgradeLevel,
-                damageMultiplier,
+                levelDamageMultiplier,
+                upgradeDamageMultiplier,
                 reserveAmmo,
                 maxReserveAmmo);
     }
@@ -61,19 +89,32 @@ public record ZombiesWeaponInstanceState(
                 gunId,
                 weaponLevel,
                 upgradeLevel,
-                damageMultiplier,
+                levelDamageMultiplier,
+                upgradeDamageMultiplier,
                 nextReserveAmmo,
                 sanitizedMaxReserveAmmo);
     }
 
-    public ZombiesWeaponInstanceState withUpgrade(int upgradeLevel, double damageMultiplier) {
+    public ZombiesWeaponInstanceState withUpgrade(int upgradeLevel, double upgradeDamageMultiplier) {
         return new ZombiesWeaponInstanceState(
                 gunId,
                 weaponLevel,
                 upgradeLevel,
-                damageMultiplier,
+                levelDamageMultiplier,
+                upgradeDamageMultiplier,
                 reserveAmmo,
                 maxReserveAmmo);
+    }
+
+    /**
+     * Backward-compatible view used by existing MVP2/MVP3 services.
+     */
+    public double damageMultiplier() {
+        return upgradeLevel > 0 ? upgradeDamageMultiplier : levelDamageMultiplier;
+    }
+
+    public double finalDamageMultiplier() {
+        return levelDamageMultiplier * upgradeDamageMultiplier;
     }
 
     public static boolean isValidGunId(String gunId) {

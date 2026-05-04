@@ -193,6 +193,33 @@ public final class TaczCoreGateway implements TaczGateway {
         iGun.setDummyAmmoAmount(stack, reserveAmmo);
     }
 
+    @Override
+    public int resolveReserveAmmo(ItemStack stack) {
+        return resolveGun(stack)
+                .map(iGun -> Math.max(0, iGun.getDummyAmmoAmount(stack)))
+                .orElse(0);
+    }
+
+    @Override
+    public int resolveMaxReserveAmmo(ItemStack stack) {
+        return resolveGun(stack)
+                .map(iGun -> Math.max(0, iGun.getMaxDummyAmmoAmount(stack)))
+                .orElse(0);
+    }
+
+    @Override
+    public void setReserveAmmo(ItemStack stack, int reserveAmmo, int maxReserveAmmo) {
+        Optional<IGun> iGunOpt = resolveGun(stack);
+        if (iGunOpt.isEmpty()) {
+            return;
+        }
+        IGun iGun = iGunOpt.get();
+        int safeMaxReserveAmmo = Math.max(0, maxReserveAmmo);
+        int safeReserveAmmo = Math.max(0, Math.min(reserveAmmo, safeMaxReserveAmmo));
+        iGun.setMaxDummyAmmoAmount(stack, safeMaxReserveAmmo);
+        iGun.setDummyAmmoAmount(stack, safeReserveAmmo);
+    }
+
     private static Optional<IGun> resolveGun(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return Optional.empty();

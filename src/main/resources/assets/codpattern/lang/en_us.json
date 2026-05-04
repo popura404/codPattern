@@ -10,6 +10,7 @@
     "screen.codpattern.rename_backpack.prompt": "Enter new backpack name",
     "screen.codpattern.inventory.throwable_1": "T1",
     "screen.codpattern.inventory.throwable_2": "T2",
+    "block.codpattern.zombies_power_switch": "Zombies Power Switch",
     "screen.codpattern.room.title": "Multi-Mode - Room Selection",
     "screen.codpattern.room.header": "§e§lRoom Selection",
     "screen.codpattern.room.create_hint": "§7Use a command to create a room map:",

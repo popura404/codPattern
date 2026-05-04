@@ -10,6 +10,7 @@
     "screen.codpattern.rename_backpack.prompt": "請輸入新的背包名稱",
     "screen.codpattern.inventory.throwable_1": "投1",
     "screen.codpattern.inventory.throwable_2": "投2",
+    "block.codpattern.zombies_power_switch": "殭屍電源開關",
     "screen.codpattern.room.title": "多模式 - 房間選擇",
     "screen.codpattern.room.header": "§e§l房間選擇",
     "screen.codpattern.room.create_hint": "§7使用指令建立房間地圖:",

@@ -1,0 +1,10 @@
+{
+    "variants": {
+        "powered=false": {
+            "model": "codpattern:block/zombies_power_switch"
+        },
+        "powered=true": {
+            "model": "codpattern:block/zombies_power_switch_powered"
+        }
+    }
+}
