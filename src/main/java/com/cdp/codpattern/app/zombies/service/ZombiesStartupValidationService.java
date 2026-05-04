@@ -5,6 +5,7 @@ import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.zombies.map.ZombiesMapObjects;
 import com.cdp.codpattern.app.zombies.map.ZombiesMapSnapshot;
 import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidationReport;
+import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidationProfile;
 import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidator;
 import com.cdp.codpattern.config.zombies.ZombiesRulesRepository;
 
@@ -22,7 +23,7 @@ public final class ZombiesStartupValidationService {
     private final Supplier<ZombiesWaveConfigRepository> waveRepositorySupplier;
 
     public ZombiesStartupValidationService(Path wavesDirectory) {
-        this(new ZombiesMapValidator(), repositorySupplier(wavesDirectory));
+        this(defaultMapValidator(), repositorySupplier(wavesDirectory));
     }
 
     public ZombiesStartupValidationService(ZombiesMapValidator mapValidator, Path wavesDirectory) {
@@ -30,7 +31,7 @@ public final class ZombiesStartupValidationService {
     }
 
     public ZombiesStartupValidationService(ZombiesWaveConfigRepository waveRepository) {
-        this(new ZombiesMapValidator(), waveRepository);
+        this(defaultMapValidator(), waveRepository);
     }
 
     public ZombiesStartupValidationService(
@@ -44,7 +45,7 @@ public final class ZombiesStartupValidationService {
             ZombiesMapValidator mapValidator,
             Supplier<ZombiesWaveConfigRepository> waveRepositorySupplier
     ) {
-        this.mapValidator = mapValidator == null ? new ZombiesMapValidator() : mapValidator;
+        this.mapValidator = mapValidator == null ? defaultMapValidator() : mapValidator;
         this.waveRepositorySupplier = Objects.requireNonNull(waveRepositorySupplier, "waveRepositorySupplier");
     }
 
@@ -182,5 +183,9 @@ public final class ZombiesStartupValidationService {
                 wavesDirectory,
                 ZombiesRulesRepository.getConfig().getDefaults(),
                 new ZombiesWaveValidator());
+    }
+
+    private static ZombiesMapValidator defaultMapValidator() {
+        return new ZombiesMapValidator(ZombiesMapValidationProfile.MVP3_FULL_INITIAL);
     }
 }

@@ -21,6 +21,7 @@ import com.cdp.codpattern.app.zombies.service.ZombiesActiveSpawnGroupService;
 import com.cdp.codpattern.app.zombies.service.ZombiesAmmoBoxService;
 import com.cdp.codpattern.app.zombies.service.ZombiesArmorService;
 import com.cdp.codpattern.app.zombies.service.ZombiesBarrierService;
+import com.cdp.codpattern.app.zombies.service.ZombiesBarrierVisualService;
 import com.cdp.codpattern.app.zombies.service.ZombiesBuffService;
 import com.cdp.codpattern.app.zombies.service.ZombiesCleanupParticipant;
 import com.cdp.codpattern.app.zombies.service.ZombiesCleanupService;
@@ -109,6 +110,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
     private final ZombiesUltimateMachineService ultimateMachineService;
     private final ZombiesObjectStateStore objectStateStore;
     private final ZombiesObjectInteractionService objectInteractionService;
+    private final ZombiesBarrierVisualService barrierVisualService;
     private final ModeRoomHandle roomHandle;
     private Optional<SpawnPointData> matchEndTeleportPoint = Optional.empty();
     private ZombiesMapObjects objects = ZombiesMapObjects.EMPTY;
@@ -147,6 +149,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         this.intermissionRespawnService = new ZombiesIntermissionRespawnService(playerStateService, buffService);
         this.ultimateMachineService = new ZombiesUltimateMachineService(economyService, powerService);
         this.objectStateStore = new ZombiesObjectStateStore(powerService::isPowerOn);
+        this.barrierVisualService = ZombiesBarrierVisualService.instance();
         ZombiesBarrierService barrierService = new ZombiesBarrierService(
                 roomId,
                 this::runtimeBarriers,
@@ -201,6 +204,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
             startVoteService.tickVoteSession();
         }
         lifecycleRuntime.tick();
+        syncBarrierVisuals();
     }
 
     @Override
@@ -272,6 +276,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
             return;
         }
         connectionStateService.markOffline(player.getUUID(), runtimeState.roomTick());
+        barrierVisualService.clearPlayer(player, roomId);
         markRosterDirty();
     }
 
@@ -284,6 +289,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         if (runtimeState.phase() == ZombiesGamePhase.WAITING) {
             readyService.initializeReadyState(player);
         }
+        syncBarrierVisual(player);
         markRosterDirty();
     }
 
@@ -389,6 +395,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
             return;
         }
         UUID playerId = player.getUUID();
+        barrierVisualService.clearPlayer(player, roomId);
         postGameTeleportService.clearPending(playerId);
         runtimeMarkerService.clearMarker(player);
         readyService.removePlayer(playerId);
@@ -407,6 +414,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
             return;
         }
         playerStateService.remove(player.getUUID());
+        barrierVisualService.clearPlayer(player, roomId);
         runtimeMarkerService.clearTemporaryPlayerState(player, clearInventory);
         runtimeMarkerService.clearMarker(player);
         markRosterDirty();
@@ -471,6 +479,41 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
 
     public List<ZombiesBarrierData> barriers() {
         return objects.barriers();
+    }
+
+    public ZombiesGamePhase currentPhase() {
+        return runtimeState.phase();
+    }
+
+    public List<ZombiesBarrierData> runtimeBarrierSnapshot() {
+        return List.copyOf(runtimeBarriers());
+    }
+
+    public boolean isRuntimeBarrierCleared(ZombiesBarrierData barrier) {
+        return objectStateStore.isBarrierCleared(barrier);
+    }
+
+    public boolean isAliveSurvivor(UUID playerId) {
+        return hasSurvivor(playerId) && playerStateService.canInteract(playerId);
+    }
+
+    private void syncBarrierVisuals() {
+        for (ServerPlayer player : survivorPlayers()) {
+            syncBarrierVisual(player);
+        }
+    }
+
+    private void syncBarrierVisual(ServerPlayer player) {
+        barrierVisualService.syncPlayer(
+                player,
+                roomId,
+                runtimeState.phase(),
+                runtimeBarriers(),
+                objectStateStore::isBarrierCleared);
+    }
+
+    private void clearBarrierVisuals() {
+        barrierVisualService.clearRoom(survivorPlayers(), roomId);
     }
 
     private List<ZombiesBarrierData> runtimeBarriers() {
@@ -1113,6 +1156,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         @Override
         public void beforeCleanup(ZombiesCleanupParticipant.ZombiesCleanupContext context) {
             preparePostGameTeleportPending(context);
+            clearBarrierVisuals();
         }
 
         @Override

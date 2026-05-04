@@ -21,6 +21,11 @@ public final class FPSMItemRegister {
             () -> new SpawnPointTool(new Item.Properties().stacksTo(1))
     );
 
+    public static final RegistryObject<ZombiesDeployTool> ZOMBIES_DEPLOY_TOOL = ITEMS.register(
+            "zombies_deploy_tool",
+            () -> new ZombiesDeployTool(new Item.Properties().stacksTo(1))
+    );
+
     private FPSMItemRegister() {
     }
 
@@ -28,6 +33,7 @@ public final class FPSMItemRegister {
         if (event.hasPermissions() && CreativeModeTabs.TOOLS_AND_UTILITIES.equals(event.getTabKey())) {
             event.accept(MAP_CREATOR_TOOL);
             event.accept(SPAWN_POINT_TOOL);
+            event.accept(ZOMBIES_DEPLOY_TOOL);
         }
     }
 }

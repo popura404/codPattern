@@ -44,6 +44,14 @@ public final class ZombiesLifecycleRuntime {
     }
 
     public void cancelStartVote() {
+        ZombiesGamePhase currentPhase = state.phase();
+        if (currentPhase == ZombiesGamePhase.WAITING) {
+            return;
+        }
+        if (currentPhase == ZombiesGamePhase.START_VOTE) {
+            state.transitionTo(ZombiesGamePhase.WAITING);
+            return;
+        }
         transitionTo(ZombiesGamePhase.WAITING);
     }
 

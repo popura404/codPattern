@@ -27,6 +27,10 @@ public class ZombiesEconomyService {
         return playerStateService.get(playerId);
     }
 
+    ZombiesPlayerRuntimeState stateOrCreate(UUID playerId) {
+        return playerStateService.getOrCreate(playerId);
+    }
+
     public int displayPoints(UUID playerId) {
         return playerStateService.get(playerId)
                 .map(ZombiesPlayerRuntimeState::displayPoints)
@@ -148,7 +152,7 @@ public class ZombiesEconomyService {
         return validateSpendEligibility(playerStateService.getOrCreate(playerId), cost);
     }
 
-    private ZombiesServiceResult<Void> validateSpendEligibility(ZombiesPlayerRuntimeState state, double cost) {
+    ZombiesServiceResult<Void> validateSpendEligibility(ZombiesPlayerRuntimeState state, double cost) {
         if (!state.lifeState().isAlive()) {
             return ZombiesServiceResult.failure(ZombiesErrorCode.PLAYER_DEAD);
         }

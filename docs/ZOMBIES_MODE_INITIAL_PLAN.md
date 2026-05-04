@@ -958,12 +958,14 @@ HUD 数据通过僵尸模式自己的运行态快照同步，不复用 TDM 比�
 
 ### 当前进度标记（2026-05-04）
 
-- [x] MVP 1 完成点：房间、地图、规则冻结、初始装备、波次、战斗、死亡观战、cleanup、HUD 和 debug 代码 checkpoint 基本完成。
-- [ ] MVP 1 剩余点：胜利路径、失败路径、无残留人工/E2E 和 Forge/GameTest 尚未执行；不标记整体完成。
-- [x] MVP 2 完成点：对象 schema/runtime、屏障/墙枪/补给箱/装甲购买、交互提示、真实墙枪 primary 发放、补给箱 tagged weapon 备弹同步和装备 NBT 基础已具备。
-- [ ] MVP 2 剩余点：部署工具 GUI、屏障完整视觉/碰撞、GameTest/manual E2E 尚未完成；不标记整体完成。
-- [x] MVP 3 完成点：`MVP3_FULL_INITIAL` validator、纯状态电源/汽水/终极服务、波间复活、cleanup/reconnect、装备快照恢复、power switch 方块注册/同步和 weapon NBT 伤害倍率读取已具备。
-- [ ] MVP 3 剩余点：完整玩家受伤 buff 效果、GameTest/manual E2E 尚未完成；不标记整体完成。
+- [x] MVP 1 完成点：房间、地图、规则冻结、初始装备、波次、战斗、死亡观战、cleanup、HUD、debug、胜利/失败 closure JVM 自动化和真实实体清理 GameTest-only 入口已具备；本轮不考虑人工验收。
+- [x] MVP 1 本轮收口：`ZombiesMvp1DeepCoverageCompatTest` 已接入阶段 suite 和 MVP123 suite；自动化/代码侧完成，不以人工验收或 MVP4+ 作为阻塞项。
+- [x] MVP 2 完成点：对象 schema/runtime、屏障/墙枪/补给箱/装甲购买、交互提示、真实墙枪 primary 发放、补给箱 tagged weapon 备弹同步、装备 NBT 基础、部署工具 LIST 行级增删改、deploy object editor 自动化、`WEAPON_WALL` CRUD 和对象交互 closure JVM 自动化已具备。
+- [x] MVP 2 本轮收口：`ZombiesMvp2DeepCoverageCompatTest` 已接入阶段 suite 和 MVP123 suite；新增屏障真实玩家移动 enforcement GameTest 覆盖；自动化/代码侧完成。
+- [x] MVP 3 完成点：`MVP3_FULL_INITIAL` validator、纯状态电源/汽水/终极服务、波间复活、cleanup/reconnect、装备快照恢复、power switch 方块注册/同步、weapon NBT 伤害倍率读取、runtime closure JVM 自动化、纯 JVM MVP123 自动化烟测和更多 GameTest-only 覆盖入口已具备。
+- [x] MVP 3 本轮收口：`ZombiesMvp3DeepCoverageCompatTest` 已接入阶段 suite 和 MVP123 suite；新增 power switch placed block + points、ammo box tagged primary inventory sync GameTest 覆盖；自动化/代码侧完成。
+- [x] 本轮验证：`./gradlew compileJava --rerun-tasks`、`./gradlew testClasses`、普通 JVM `ZombiesMvp123CompatTestSuite` 和 `./gradlew runGameTestServer` 已通过；GameTest 汇总为 `13 GAME TESTS COMPLETE` / `All 13 required tests passed :)`。
+- [x] 本轮结论：在不考虑人工验收点、不考虑 MVP4+ 的口径下，MVP 1 到 MVP 3 自动化/代码侧完成。
 
 ### MVP 4：内容扩展
 

@@ -129,6 +129,18 @@ tasks.named('processResources', ProcessResources).configure {
     }
 }
 
+tasks.register('syncGameTestStructures', Copy) {
+    group = 'verification'
+    description = 'Copy GameTest SNBT templates into the run directory used by Forge GameTest.'
+    from layout.projectDirectory.dir('src/main/resources/gameteststructures')
+    into layout.projectDirectory.dir('run/gameteststructures')
+    include '**/*.snbt'
+}
+
+tasks.matching { it.name == 'runGameTestServer' }.configureEach {
+    dependsOn tasks.named('syncGameTestStructures')
+}
+
 tasks.named('jar', Jar).configure {
     manifest {
         attributes([

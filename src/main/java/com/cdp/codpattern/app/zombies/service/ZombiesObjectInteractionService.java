@@ -213,7 +213,11 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
             case ARMOR_STATION -> purchaseArmor(player, target, (ZombiesArmorStationData) target.data());
             case POWER_SWITCH -> purchasePowerSwitch(player, target, (ZombiesPowerSwitchData) target.data());
             case SODA_MACHINE -> purchaseSodaMachine(player, target, (ZombiesSodaMachineData) target.data());
-            case ULTIMATE_MACHINE -> useUltimateMachine(player, target, (ZombiesUltimateMachineData) target.data());
+            case ULTIMATE_MACHINE -> useUltimateMachine(
+                    player,
+                    target,
+                    (ZombiesUltimateMachineData) target.data(),
+                    context.itemStack());
         };
     }
 
@@ -265,23 +269,17 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         }
 
         ZombiesServiceResult<ZombiesWeaponInstanceService.WallWeaponPurchaseResult> result =
-                purchaseWeaponWallState(player.getUUID(), offer);
+                purchaseWeaponWallState(player.getUUID(), offer, (currentWeapon, purchasedWeapon) ->
+                        weaponInventoryService.applyPreparedPrimaryWeapon(
+                                player,
+                                roomId,
+                                preparedResult.value().get(),
+                                purchasedWeapon));
         if (result.success()) {
             ZombiesWeaponInstanceService.WallWeaponPurchaseResult purchase = result.value().orElse(null);
             String gunId = purchase == null ? offer.gunId() : purchase.weapon().gunId();
             int weaponLevel = purchase == null ? offer.weaponLevel() : purchase.weapon().weaponLevel();
             double cost = purchase == null ? offer.price() : purchase.cost();
-            ZombiesWeaponInstanceState purchasedWeapon = purchase == null ? offeredWeapon : purchase.weapon();
-            ZombiesServiceResult<ZombiesWeaponInventoryService.InventoryMutationResult> inventoryResult =
-                    weaponInventoryService.applyPreparedPrimaryWeapon(
-                            player,
-                            roomId,
-                            preparedResult.value().get(),
-                            purchasedWeapon);
-            if (!inventoryResult.success()) {
-                sendFailureMessage(player, target, inventoryResult);
-                return InteractionResult.FAIL;
-            }
             objectStateStore.markWeaponWallPurchased(weaponWall);
             sendMessage(player, SUCCESS_WEAPON_WALL, gunId, weaponLevel, target.objectId(), displayCost(cost));
             return InteractionResult.SUCCESS;
@@ -306,9 +304,34 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         return result;
     }
 
+    ZombiesServiceResult<ZombiesWeaponInstanceService.WallWeaponPurchaseResult> purchaseWeaponWall(
+            UUID playerId,
+            ZombiesWeaponWallData weaponWall,
+            ZombiesWeaponInstanceService.WallWeaponCommitGuard commitGuard
+    ) {
+        ZombiesObjectStateStore.WeaponWallOffer offer = objectStateStore.currentWeaponWallOffer(weaponWall);
+        if (!offer.purchasable()) {
+            return ZombiesServiceResult.failure(ZombiesErrorCode.of("weapon_wall.invalid_offer"));
+        }
+        ZombiesServiceResult<ZombiesWeaponInstanceService.WallWeaponPurchaseResult> result =
+                purchaseWeaponWallState(playerId, offer, commitGuard);
+        if (result.success()) {
+            objectStateStore.markWeaponWallPurchased(weaponWall);
+        }
+        return result;
+    }
+
     private ZombiesServiceResult<ZombiesWeaponInstanceService.WallWeaponPurchaseResult> purchaseWeaponWallState(
             UUID playerId,
             ZombiesObjectStateStore.WeaponWallOffer offer
+    ) {
+        return purchaseWeaponWallState(playerId, offer, null);
+    }
+
+    private ZombiesServiceResult<ZombiesWeaponInstanceService.WallWeaponPurchaseResult> purchaseWeaponWallState(
+            UUID playerId,
+            ZombiesObjectStateStore.WeaponWallOffer offer,
+            ZombiesWeaponInstanceService.WallWeaponCommitGuard commitGuard
     ) {
         if (offer == null || !offer.purchasable()) {
             return ZombiesServiceResult.failure(ZombiesErrorCode.of("weapon_wall.invalid_offer"));
@@ -320,7 +343,8 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
                         offer.weaponLevel(),
                         offer.levelDamageMultiplier(),
                         offer.maxReserveAmmo(),
-                        offer.price());
+                        offer.price(),
+                        commitGuard);
         return result;
     }
 
@@ -364,21 +388,18 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         }
 
         ZombiesServiceResult<ZombiesAmmoBoxService.AmmoRefillResult> result =
-                ammoBoxService.refillPrimaryWeapon(player.getUUID(), ammoBox.pricesByWeaponLevel());
+                ammoBoxService.refillPrimaryWeapon(
+                        player.getUUID(),
+                        ammoBox.pricesByWeaponLevel(),
+                        (currentWeapon, refilled) -> weaponInventoryService.syncReserveAmmo(
+                                player,
+                                roomId,
+                                ZombiesEquipmentSlot.PRIMARY,
+                                refilled,
+                                currentItemStack));
         if (result.success()) {
             ZombiesAmmoBoxService.AmmoRefillResult refill = result.value().orElse(null);
             ZombiesWeaponInstanceState weapon = refill == null ? refilledWeapon : refill.weapon();
-            ZombiesServiceResult<ZombiesWeaponInventoryService.InventoryMutationResult> syncResult =
-                    weaponInventoryService.syncReserveAmmo(
-                            player,
-                            roomId,
-                            ZombiesEquipmentSlot.PRIMARY,
-                            weapon,
-                            currentItemStack);
-            if (!syncResult.success()) {
-                sendFailureMessage(player, target, syncResult);
-                return InteractionResult.FAIL;
-            }
             objectStateStore.markAmmoBoxUsed(ammoBox);
             String gunId = refill == null ? "" : refill.weapon().gunId();
             int weaponLevel = refill == null ? 0 : refill.weapon().weaponLevel();
@@ -388,6 +409,22 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         }
         sendFailureMessage(player, target, result);
         return InteractionResult.FAIL;
+    }
+
+    ZombiesServiceResult<ZombiesAmmoBoxService.AmmoRefillResult> refillPrimaryAmmoBox(
+            UUID playerId,
+            ZombiesAmmoBoxData ammoBox,
+            ZombiesAmmoBoxService.AmmoRefillCommitGuard commitGuard
+    ) {
+        if (ammoBox == null) {
+            return ZombiesServiceResult.failure(ZombiesErrorCode.OBJECT_NOT_FOUND);
+        }
+        ZombiesServiceResult<ZombiesAmmoBoxService.AmmoRefillResult> result =
+                ammoBoxService.refillPrimaryWeapon(playerId, ammoBox.pricesByWeaponLevel(), commitGuard);
+        if (result.success()) {
+            objectStateStore.markAmmoBoxUsed(ammoBox);
+        }
+        return result;
     }
 
     private InteractionResult refillStarterAmmoBox(
@@ -545,9 +582,20 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         return result;
     }
 
-    private InteractionResult useUltimateMachine(ServerPlayer player, InteractionTarget target, ZombiesUltimateMachineData ultimateMachine) {
+    private InteractionResult useUltimateMachine(
+            ServerPlayer player,
+            InteractionTarget target,
+            ZombiesUltimateMachineData ultimateMachine,
+            ItemStack currentItemStack
+    ) {
         ZombiesServiceResult<ZombiesUltimateMachineService.WeaponUpgradeResult> result =
-                useUltimateMachine(player.getUUID(), ultimateMachine);
+                useUltimateMachine(player.getUUID(), ultimateMachine, (currentWeapon, upgradedWeapon) ->
+                        weaponInventoryService.syncReserveAmmo(
+                                player,
+                                roomId,
+                                ZombiesEquipmentSlot.PRIMARY,
+                                upgradedWeapon,
+                                currentItemStack));
         if (result.success()) {
             ZombiesUltimateMachineService.WeaponUpgradeResult upgrade = result.value().orElse(null);
             String gunId = upgrade == null ? "" : upgrade.weapon().gunId();
@@ -570,6 +618,22 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         }
         ZombiesServiceResult<ZombiesUltimateMachineService.WeaponUpgradeResult> result =
                 ultimateMachineService.upgradePrimaryWeapon(playerId, ultimateMachine);
+        if (result.success()) {
+            objectStateStore.markUltimateMachineUsed(ultimateMachine);
+        }
+        return result;
+    }
+
+    ZombiesServiceResult<ZombiesUltimateMachineService.WeaponUpgradeResult> useUltimateMachine(
+            UUID playerId,
+            ZombiesUltimateMachineData ultimateMachine,
+            ZombiesUltimateMachineService.WeaponUpgradeCommitGuard commitGuard
+    ) {
+        if (ultimateMachine == null) {
+            return ZombiesServiceResult.failure(ZombiesErrorCode.OBJECT_NOT_FOUND);
+        }
+        ZombiesServiceResult<ZombiesUltimateMachineService.WeaponUpgradeResult> result =
+                ultimateMachineService.upgradePrimaryWeapon(playerId, ultimateMachine, commitGuard);
         if (result.success()) {
             objectStateStore.markUltimateMachineUsed(ultimateMachine);
         }

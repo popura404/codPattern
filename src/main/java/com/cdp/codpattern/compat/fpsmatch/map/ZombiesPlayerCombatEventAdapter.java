@@ -6,25 +6,42 @@ import com.cdp.codpattern.app.match.model.DeathContext;
 import com.cdp.codpattern.app.match.model.DeathDecision;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
+import com.cdp.codpattern.app.zombies.service.ZombiesBuffCombatService;
 import com.cdp.codpattern.app.zombies.service.ZombiesDeathService;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Objects;
+import java.util.Optional;
 
 public class ZombiesPlayerCombatEventAdapter implements ModeCombatEventPort {
     private final RoomId roomId;
     private final String modeDisplayNameKey;
     private final ZombiesDeathService deathService;
     private final RoundState roundState;
+    private final ZombiesBuffCombatService buffCombatService;
 
     public ZombiesPlayerCombatEventAdapter(RoomId roomId, String modeDisplayNameKey, ZombiesDeathService deathService, RoundState roundState) {
+        this(roomId, modeDisplayNameKey, deathService, roundState, null);
+    }
+
+    public ZombiesPlayerCombatEventAdapter(
+            RoomId roomId,
+            String modeDisplayNameKey,
+            ZombiesDeathService deathService,
+            RoundState roundState,
+            ZombiesBuffCombatService buffCombatService
+    ) {
         this.roomId = Objects.requireNonNull(roomId, "roomId");
         this.modeDisplayNameKey = modeDisplayNameKey == null || modeDisplayNameKey.isBlank()
                 ? GameModeRegistry.getOrDefault(roomId.gameType()).displayNameKey()
                 : modeDisplayNameKey;
         this.deathService = Objects.requireNonNull(deathService, "deathService");
         this.roundState = roundState == null ? RoundState.started() : roundState;
+        this.buffCombatService = buffCombatService;
+        if (buffCombatService != null) {
+            ZombiesBuffCombatService.register(buffCombatService);
+        }
     }
 
     @Override
@@ -63,6 +80,20 @@ public class ZombiesPlayerCombatEventAdapter implements ModeCombatEventPort {
         }
         if (context.attacker().isPresent() && isFriendlySurvivorDamage(victim, context.attacker().get())) {
             return DamageDecision.cancel();
+        }
+        Optional<ZombiesBuffCombatService> service = buffCombatService == null
+                ? ZombiesBuffCombatService.serviceFor(roomId)
+                : Optional.of(buffCombatService);
+        if (service.isEmpty()) {
+            return DamageDecision.passThrough();
+        }
+        ZombiesBuffCombatService.DamageApplicationResult damageResult =
+                service.get().applyPlayerDamage(victim, context, roundState.currentTick());
+        if (!damageResult.roomMonsterDamage()) {
+            return DamageDecision.passThrough();
+        }
+        if (damageResult.amountChanged()) {
+            return DamageDecision.setAmount(damageResult.adjustedAmount());
         }
         return DamageDecision.passThrough();
     }

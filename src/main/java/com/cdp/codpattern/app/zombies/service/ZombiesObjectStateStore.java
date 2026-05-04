@@ -498,27 +498,20 @@ public final class ZombiesObjectStateStore {
         return revision;
     }
 
-    private static <T> void resetStableRevisions(Map<String, Long> revisionsByObjectId, List<T> objects) {
+    private <T> void resetStableRevisions(Map<String, Long> revisionsByObjectId, List<T> objects) {
         Map<String, Long> next = new LinkedHashMap<>();
         for (T object : objects) {
-            next.put(objectKey(object), 0L);
+            next.put(objectKey(object), nextRevision());
         }
         revisionsByObjectId.clear();
         revisionsByObjectId.putAll(next);
     }
 
-    private static void resetPowerSwitchRevision(
-            Map<String, Long> revisionsByObjectId,
-            Optional<ZombiesPowerSwitchData> powerSwitch
-    ) {
-        Map<String, Long> next = new LinkedHashMap<>();
-        safePowerSwitch(powerSwitch).forEach(value -> next.put(objectKey(value), 0L));
-        revisionsByObjectId.clear();
-        revisionsByObjectId.putAll(next);
-    }
-
     private void resetPowerSwitchRevision(Optional<ZombiesPowerSwitchData> powerSwitch) {
-        resetPowerSwitchRevision(powerSwitchRevisionsByObjectId, powerSwitch);
+        Map<String, Long> next = new LinkedHashMap<>();
+        safePowerSwitch(powerSwitch).forEach(value -> next.put(objectKey(value), nextRevision()));
+        powerSwitchRevisionsByObjectId.clear();
+        powerSwitchRevisionsByObjectId.putAll(next);
     }
 
     private void bumpRequiresPowerObjectRevisions() {
@@ -536,7 +529,7 @@ public final class ZombiesObjectStateStore {
         for (ZombiesWeaponWallData weaponWall : weaponWalls) {
             next.put(
                     objectKey(weaponWall),
-                    new WeaponWallRuntimeState(selectOffer(weaponWall, offerWave, maxWave), 0L, 0));
+                    new WeaponWallRuntimeState(selectOffer(weaponWall, offerWave, maxWave), nextRevision(), 0));
         }
         weaponWallsByObjectId.clear();
         weaponWallsByObjectId.putAll(next);

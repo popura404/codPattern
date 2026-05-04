@@ -16,7 +16,7 @@ public final class ZombiesClientModePresentations {
                 "textures/gui/modes/zombies_preview.png",
                 16047,
                 9001,
-                0xFF6FD17A,
+                0xFF9B2F2F,
                 "screen.codpattern.mode_select.hover_zombies",
                 "zombies");
     }

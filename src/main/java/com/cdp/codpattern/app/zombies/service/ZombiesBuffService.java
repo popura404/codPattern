@@ -53,14 +53,24 @@ public final class ZombiesBuffService {
             return ZombiesServiceResult.success(new BuffPurchaseResult(currentState.buff(type).orElseThrow(), 0.0D, true));
         }
 
-        return economyService.spendAtomically(playerId, cost, state -> {
+        if (!ZombiesPlayerRuntimeState.isValidCost(cost)) {
+            return ZombiesServiceResult.failure(ZombiesErrorCode.ECONOMY_INVALID_COST);
+        }
+
+        ZombiesPlayerRuntimeState state = economyService.stateOrCreate(playerId);
+        synchronized (state) {
             if (state.hasBuff(type)) {
                 return ZombiesServiceResult.success(new BuffPurchaseResult(state.buff(type).orElseThrow(), 0.0D, true));
             }
+            ZombiesServiceResult<Void> eligibility = economyService.validateSpendEligibility(state, cost);
+            if (!eligibility.success()) {
+                return ZombiesServiceResult.failure(eligibility.code(), eligibility.params(), eligibility.logMessage());
+            }
             ZombiesBuffState buff = ZombiesBuffState.defaultFor(type);
             state.addBuff(buff);
+            state.spendPoints(cost);
             return ZombiesServiceResult.success(new BuffPurchaseResult(buff, cost, false));
-        });
+        }
     }
 
     public ZombiesServiceResult<BuffClearResult> clearBuffsForDeathOrRevive(UUID playerId) {

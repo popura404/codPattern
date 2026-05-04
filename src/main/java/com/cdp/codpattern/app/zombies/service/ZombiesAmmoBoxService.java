@@ -26,6 +26,14 @@ public final class ZombiesAmmoBoxService {
             UUID playerId,
             Map<?, Integer> pricesByWeaponLevel
     ) {
+        return refillPrimaryWeapon(playerId, pricesByWeaponLevel, null);
+    }
+
+    public ZombiesServiceResult<AmmoRefillResult> refillPrimaryWeapon(
+            UUID playerId,
+            Map<?, Integer> pricesByWeaponLevel,
+            AmmoRefillCommitGuard commitGuard
+    ) {
         ZombiesPlayerRuntimeState state = economyService.state(playerId).orElse(null);
         if (state == null) {
             return ZombiesServiceResult.failure(ZombiesErrorCode.WEAPON_INVALID_CURRENT_WEAPON);
@@ -61,6 +69,15 @@ public final class ZombiesAmmoBoxService {
             }
 
             ZombiesWeaponInstanceState refilledWeapon = lockedWeapon.refillReserveAmmo();
+            ZombiesServiceResult<?> guardResult = commitGuard == null
+                    ? ZombiesServiceResult.ok()
+                    : commitGuard.beforeCommit(lockedWeapon, refilledWeapon);
+            if (guardResult == null || !guardResult.success()) {
+                return ZombiesServiceResult.failure(
+                        guardResult == null ? ZombiesErrorCode.WEAPON_INVALID_CURRENT_WEAPON : guardResult.code(),
+                        guardResult == null ? Map.of() : guardResult.params(),
+                        guardResult == null ? "" : guardResult.logMessage());
+            }
             lockedState.setPrimaryWeapon(refilledWeapon);
             return ZombiesServiceResult.success(new AmmoRefillResult(refilledWeapon, cost, false));
         });
@@ -102,6 +119,13 @@ public final class ZombiesAmmoBoxService {
             Objects.requireNonNull(weapon, "weapon");
             cost = Math.max(0.0D, cost);
         }
+    }
+
+    @FunctionalInterface
+    public interface AmmoRefillCommitGuard {
+        ZombiesServiceResult<?> beforeCommit(
+                ZombiesWeaponInstanceState currentWeapon,
+                ZombiesWeaponInstanceState refilledWeapon);
     }
 
     public record StarterAmmoRefillResult(

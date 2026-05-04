@@ -24,6 +24,8 @@ public final class ZombiesErrorCode {
     public static final ZombiesErrorCode PLAYER_LEFT = new ZombiesErrorCode("player.left");
     public static final ZombiesErrorCode PLAYER_OFFLINE = new ZombiesErrorCode("player.offline");
 
+    public static final ZombiesErrorCode WAVE_TIMEOUT = new ZombiesErrorCode("wave.timeout");
+
     public static final ZombiesErrorCode ECONOMY_NOT_ENOUGH_POINTS = new ZombiesErrorCode("economy.not_enough_points");
     public static final ZombiesErrorCode ECONOMY_INVALID_COST = new ZombiesErrorCode("economy.invalid_cost");
 

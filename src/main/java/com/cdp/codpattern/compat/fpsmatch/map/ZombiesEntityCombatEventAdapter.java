@@ -8,6 +8,7 @@ import com.cdp.codpattern.app.match.model.EntityDeathContext;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.port.ModeEntityCombatEventPort;
 import com.cdp.codpattern.app.match.runtime.ModeEntityOwnershipRegistry;
+import com.cdp.codpattern.app.zombies.service.ZombiesBuffCombatService;
 import com.cdp.codpattern.app.zombies.service.ZombiesEconomyService;
 import com.cdp.codpattern.app.zombies.service.ZombiesPlayerStateService;
 import com.cdp.codpattern.app.zombies.service.ZombiesWeaponItemStackService;
@@ -30,6 +31,7 @@ public class ZombiesEntityCombatEventAdapter implements ModeEntityCombatEventPor
     private final RewardResolver rewardResolver;
     private final LifecycleHook lifecycleHook;
     private final ZombiesWeaponItemStackService weaponItemStackService;
+    private final ZombiesBuffCombatService buffCombatService;
     private final ConcurrentMap<UUID, Set<UUID>> contributorsByEntity = new ConcurrentHashMap<>();
 
     public ZombiesEntityCombatEventAdapter(
@@ -49,7 +51,8 @@ public class ZombiesEntityCombatEventAdapter implements ModeEntityCombatEventPor
                 ownershipRegistry,
                 rewardResolver,
                 lifecycleHook,
-                new ZombiesWeaponItemStackService());
+                new ZombiesWeaponItemStackService(),
+                null);
     }
 
     public ZombiesEntityCombatEventAdapter(
@@ -62,6 +65,29 @@ public class ZombiesEntityCombatEventAdapter implements ModeEntityCombatEventPor
             LifecycleHook lifecycleHook,
             ZombiesWeaponItemStackService weaponItemStackService
     ) {
+        this(
+                roomId,
+                modeDisplayNameKey,
+                economyService,
+                playerStateService,
+                ownershipRegistry,
+                rewardResolver,
+                lifecycleHook,
+                weaponItemStackService,
+                null);
+    }
+
+    public ZombiesEntityCombatEventAdapter(
+            RoomId roomId,
+            String modeDisplayNameKey,
+            ZombiesEconomyService economyService,
+            ZombiesPlayerStateService playerStateService,
+            ModeEntityOwnershipRegistry ownershipRegistry,
+            RewardResolver rewardResolver,
+            LifecycleHook lifecycleHook,
+            ZombiesWeaponItemStackService weaponItemStackService,
+            ZombiesBuffCombatService buffCombatService
+    ) {
         this.roomId = Objects.requireNonNull(roomId, "roomId");
         this.modeDisplayNameKey = modeDisplayNameKey == null || modeDisplayNameKey.isBlank()
                 ? GameModeRegistry.getOrDefault(roomId.gameType()).displayNameKey()
@@ -72,6 +98,10 @@ public class ZombiesEntityCombatEventAdapter implements ModeEntityCombatEventPor
         this.rewardResolver = rewardResolver == null ? RewardResolver.defaults() : rewardResolver;
         this.lifecycleHook = lifecycleHook == null ? (entity, reason) -> { } : lifecycleHook;
         this.weaponItemStackService = Objects.requireNonNull(weaponItemStackService, "weaponItemStackService");
+        this.buffCombatService = buffCombatService == null
+                ? new ZombiesBuffCombatService(this.roomId, this.playerStateService, this.ownershipRegistry)
+                : buffCombatService;
+        ZombiesBuffCombatService.register(this.buffCombatService);
     }
 
     @Override

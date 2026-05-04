@@ -2,6 +2,8 @@ package com.cdp.codpattern.app.zombies.service;
 
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.zombies.map.ZombiesMapSnapshot;
+import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidationProfile;
+import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidator;
 import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 
 import java.io.IOException;
@@ -26,6 +28,7 @@ public final class ZombiesStartupValidationServiceCompatTest {
         missingMobsFails();
         filenameWaveConflictFails();
         waveThreeOnlyPreflightSucceedsWithMaxWaveThree();
+        defaultPathConstructorUsesMvp3FullInitial();
     }
 
     private static void validMapAndValidWavePreflightSucceeds() throws IOException {
@@ -116,11 +119,32 @@ public final class ZombiesStartupValidationServiceCompatTest {
         });
     }
 
+    private static void defaultPathConstructorUsesMvp3FullInitial() throws IOException {
+        withWaves("zombies-startup-default-mvp3-", wavesDirectory -> {
+            writeWave(wavesDirectory, "wave_001.json", "{\"wave\":1,\"mobs\":[]}");
+
+            ZombiesServiceResult<ZombiesStartupPreflightSnapshot> result =
+                    new ZombiesStartupValidationService(wavesDirectory)
+                            .preflight(validMap());
+
+            require(!result.success(), "default Path constructor should fail MVP1-only map under MVP3");
+            ZombiesStartupPreflightSnapshot snapshot = requireSnapshot(result);
+            require(ZombiesMapValidationProfile.MVP3_FULL_INITIAL_KEY.equals(snapshot.mapReport().profileKey()),
+                    "default Path constructor should use MVP3_FULL_INITIAL, got "
+                            + snapshot.mapReport().profileKey());
+            requireIssue(result, "map.missing_power_switch");
+            requireIssue(result, "map.missing_soda_machine");
+            requireIssue(result, "map.missing_ultimate_machine");
+        });
+    }
+
     private static ZombiesStartupValidationService service(Path wavesDirectory) {
-        return new ZombiesStartupValidationService(new ZombiesWaveConfigRepository(
-                wavesDirectory,
-                DEFAULTS,
-                new ZombiesWaveValidator()));
+        return new ZombiesStartupValidationService(
+                new ZombiesMapValidator(ZombiesMapValidationProfile.MVP1_MINIMAL),
+                new ZombiesWaveConfigRepository(
+                        wavesDirectory,
+                        DEFAULTS,
+                        new ZombiesWaveValidator()));
     }
 
     private static ZombiesMapSnapshot validMap() {

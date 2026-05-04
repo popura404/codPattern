@@ -39,16 +39,18 @@ public final class ZombiesObjectStateStoreMvp2CompatTest {
 
         ModeObjectState wallState = state(states, "wall-1");
         require(new BlockPos(2, 64, 1).equals(wallState.position()), "wall should use interactionPos before pos");
-        require(wallState.revision() == 0L, "wall initial revision should be stable zero");
+        require(wallState.revision() > 0L, "wall initial revision should advance on reset");
         requirePayload(wallState.payload(), "weapon_wall", "wall-1", true, 600);
         require("tacz:m4a1".equals(wallState.payload().getString("gunId")), "wall state should expose selected gunId");
         require(wallState.payload().getInt("weaponLevel") == 2, "wall state should expose weapon level");
 
         ModeObjectState ammoState = state(states, "ammo-1");
         require(new BlockPos(3, 64, 1).equals(ammoState.position()), "ammo box should fall back to pos");
+        require(ammoState.revision() > wallState.revision(), "ammo initial revision should follow wall reset revision");
         requirePayload(ammoState.payload(), "ammo_box", "ammo-1", true, 350);
 
         ModeObjectState armorState = state(states, "armor-1");
+        require(armorState.revision() > ammoState.revision(), "armor initial revision should follow ammo reset revision");
         requirePayload(armorState.payload(), "armor_station", "armor-1", true, 750);
         require(armorState.payload().getInt("armorLevel") == 2, "armor state should expose armor level");
     }
@@ -63,14 +65,17 @@ public final class ZombiesObjectStateStoreMvp2CompatTest {
                 List.of(fixtures.weaponWall()),
                 List.of(fixtures.ammoBox()),
                 List.of(fixtures.armorStation()));
-        require(state(initialStates, "wall-1").revision() == 0L, "wall initial revision should be zero");
-        require(state(initialStates, "ammo-1").revision() == 0L, "ammo initial revision should be zero");
-        require(state(initialStates, "armor-1").revision() == 0L, "armor initial revision should be zero");
+        long initialWallRevision = state(initialStates, "wall-1").revision();
+        long initialAmmoRevision = state(initialStates, "ammo-1").revision();
+        long initialArmorRevision = state(initialStates, "armor-1").revision();
+        require(initialWallRevision > 0L, "wall initial revision should advance on reset");
+        require(initialAmmoRevision > initialWallRevision, "ammo initial revision should follow wall reset revision");
+        require(initialArmorRevision > initialAmmoRevision, "armor initial revision should follow ammo reset revision");
 
         long wallRevision = store.markWeaponWallPurchased(fixtures.weaponWall());
         long ammoRevision = store.markAmmoBoxUsed(fixtures.ammoBox());
         long armorRevision = store.markArmorStationPurchased(fixtures.armorStation());
-        require(wallRevision > 0L, "successful wall purchase should get positive revision");
+        require(wallRevision > initialArmorRevision, "successful wall purchase should advance past reset revisions");
         require(ammoRevision > wallRevision, "successful ammo refill should advance revision");
         require(armorRevision > ammoRevision, "successful armor purchase should advance revision");
 
@@ -116,7 +121,7 @@ public final class ZombiesObjectStateStoreMvp2CompatTest {
         store.resetObjects(List.of(), List.of(wall), List.of(), List.of(), 1, 5);
 
         ModeObjectState initial = state(store.objectStates(List.of(), List.of(wall), List.of(), List.of()), "wall-refresh");
-        require(initial.revision() == 0L, "initial wall offer revision should be stable zero");
+        require(initial.revision() > 0L, "initial wall offer revision should advance on reset");
         require("tacz:first".equals(initial.payload().getString("gunId")),
                 "wave 1 offer should use weighted current-wave candidate");
 

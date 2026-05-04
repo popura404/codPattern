@@ -5,9 +5,11 @@ import com.phasetranscrystal.fpsmatch.common.packet.AddPointDataS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.MapCreatorToolActionC2SPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenMapCreatorToolScreenS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenSpawnPointToolScreenS2CPacket;
+import com.phasetranscrystal.fpsmatch.common.packet.OpenZombiesDeployToolScreenS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.RemoveDebugDataByPrefixS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.SpawnPointToolActionC2SPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.ToolInteractionC2SPacket;
+import com.phasetranscrystal.fpsmatch.common.packet.ZombiesDeployToolActionC2SPacket;
 import net.minecraftforge.network.NetworkDirection;
 
 final class FpsmPacketRegistrar {
@@ -34,6 +36,13 @@ final class FpsmPacketRegistrar {
                 .decoder(SpawnPointToolActionC2SPacket::decode)
                 .encoder(SpawnPointToolActionC2SPacket::encode)
                 .consumerMainThread(SpawnPointToolActionC2SPacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(ZombiesDeployToolActionC2SPacket.class, ModNetworkChannel.nextMessageId(),
+                        NetworkDirection.PLAY_TO_SERVER)
+                .decoder(ZombiesDeployToolActionC2SPacket::decode)
+                .encoder(ZombiesDeployToolActionC2SPacket::encode)
+                .consumerMainThread(ZombiesDeployToolActionC2SPacket::handle)
                 .add();
 
         ModNetworkChannel.CHANNEL.messageBuilder(AddAreaDataS2CPacket.class, ModNetworkChannel.nextMessageId(),
@@ -69,6 +78,13 @@ final class FpsmPacketRegistrar {
                 .decoder(OpenSpawnPointToolScreenS2CPacket::decode)
                 .encoder(OpenSpawnPointToolScreenS2CPacket::encode)
                 .consumerMainThread(OpenSpawnPointToolScreenS2CPacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(OpenZombiesDeployToolScreenS2CPacket.class, ModNetworkChannel.nextMessageId(),
+                        NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(OpenZombiesDeployToolScreenS2CPacket::decode)
+                .encoder(OpenZombiesDeployToolScreenS2CPacket::encode)
+                .consumerMainThread(OpenZombiesDeployToolScreenS2CPacket::handle)
                 .add();
     }
 }

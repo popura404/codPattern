@@ -1,0 +1,155 @@
+package com.phasetranscrystal.fpsmatch.common.packet;
+
+import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployDraft;
+import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployServiceResult;
+import com.cdp.codpattern.app.zombies.deploy.ZombiesDeploySnapshot;
+import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployToolService;
+import com.phasetranscrystal.fpsmatch.FPSMatch;
+import com.phasetranscrystal.fpsmatch.common.item.ZombiesDeployTool;
+import com.phasetranscrystal.fpsmatch.common.item.tool.ToolAccessHelper;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.network.NetworkEvent;
+
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
+
+public class ZombiesDeployToolActionC2SPacket {
+    public enum Action {
+        REFRESH,
+        SAVE_SELECTIONS,
+        SELECT_MAP,
+        SELECT_OBJECT_TYPE,
+        SELECT_OBJECT,
+        SET_FIELD,
+        CAPTURE_PLAYER_POS,
+        CAPTURE_LOOK_BLOCK,
+        SET_AREA_POS_1,
+        SET_AREA_POS_2,
+        ADD_OBJECT,
+        UPDATE_OBJECT,
+        DUPLICATE_OBJECT,
+        DELETE_OBJECT,
+        CLEAR_OBJECT_TYPE,
+        VALIDATE_MAP
+    }
+
+    private final Action action;
+    private final ZombiesDeployDraft draft;
+    private final String fieldKey;
+    private final String fieldValue;
+
+    public ZombiesDeployToolActionC2SPacket(Action action, ZombiesDeployDraft draft) {
+        this(action, draft, "", "");
+    }
+
+    public ZombiesDeployToolActionC2SPacket(Action action, ZombiesDeployDraft draft, String fieldKey, String fieldValue) {
+        this.action = action == null ? Action.REFRESH : action;
+        this.draft = draft == null ? ZombiesDeployDraft.empty() : draft;
+        this.fieldKey = fieldKey == null ? "" : fieldKey;
+        this.fieldValue = fieldValue == null ? "" : fieldValue;
+    }
+
+    public void encode(FriendlyByteBuf buf) {
+        buf.writeEnum(action);
+        buf.writeUtf(draft.selectedMap());
+        buf.writeUtf(draft.objectType());
+        buf.writeVarInt(draft.selectedIndex());
+        buf.writeUtf(draft.profileKey());
+        buf.writeVarInt(draft.fields().size());
+        draft.fields().forEach((key, value) -> {
+            buf.writeUtf(key);
+            buf.writeUtf(value);
+        });
+        buf.writeUtf(fieldKey);
+        buf.writeUtf(fieldValue);
+    }
+
+    public static ZombiesDeployToolActionC2SPacket decode(FriendlyByteBuf buf) {
+        Action action = buf.readEnum(Action.class);
+        String selectedMap = buf.readUtf();
+        String objectType = buf.readUtf();
+        int selectedIndex = buf.readVarInt();
+        String profileKey = buf.readUtf();
+        int fieldCount = buf.readVarInt();
+        Map<String, String> fields = new LinkedHashMap<>();
+        for (int i = 0; i < fieldCount; i++) {
+            fields.put(buf.readUtf(), buf.readUtf());
+        }
+        return new ZombiesDeployToolActionC2SPacket(
+                action,
+                new ZombiesDeployDraft(selectedMap, objectType, selectedIndex, profileKey, fields),
+                buf.readUtf(),
+                buf.readUtf());
+    }
+
+    public static void sendScreen(ServerPlayer player, ItemStack stack, ZombiesDeployDraft request) {
+        if (player == null || stack == null || !(stack.getItem() instanceof ZombiesDeployTool)) {
+            return;
+        }
+        if (!ToolAccessHelper.ensureAdminAccess(player)) {
+            return;
+        }
+        ZombiesDeployServiceResult<ZombiesDeploySnapshot> result = ZombiesDeployToolService.instance().snapshot(
+                player,
+                stack,
+                request,
+                "message.codpattern.zombies.deploy.opened",
+                "ok",
+                "");
+        result.value().ifPresent(snapshot -> FPSMatch.sendToPlayer(player, new OpenZombiesDeployToolScreenS2CPacket(snapshot)));
+    }
+
+    public void handle(Supplier<NetworkEvent.Context> ctx) {
+        ctx.get().enqueueWork(() -> {
+            ServerPlayer player = ctx.get().getSender();
+            if (player == null) {
+                return;
+            }
+            ItemStack stack = player.getMainHandItem();
+            if (!(stack.getItem() instanceof ZombiesDeployTool)) {
+                return;
+            }
+            if (!ToolAccessHelper.ensureAdminAccess(player)) {
+                return;
+            }
+            ZombiesDeployServiceResult<ZombiesDeploySnapshot> result = dispatch(player, stack);
+            result.value().ifPresent(snapshot -> FPSMatch.sendToPlayer(player, new OpenZombiesDeployToolScreenS2CPacket(snapshot)));
+            if (!result.messageKey().isBlank()) {
+                List<String> args = result.arguments();
+                player.displayClientMessage(Component.translatable(result.messageKey(), args.toArray()), false);
+            }
+        });
+        ctx.get().setPacketHandled(true);
+    }
+
+    private ZombiesDeployServiceResult<ZombiesDeploySnapshot> dispatch(ServerPlayer player, ItemStack stack) {
+        ZombiesDeployToolService service = ZombiesDeployToolService.instance();
+        return switch (action) {
+            case REFRESH, SELECT_MAP, SELECT_OBJECT_TYPE, SELECT_OBJECT -> service.snapshot(
+                    player,
+                    stack,
+                    draft,
+                    "message.codpattern.zombies.deploy.refreshed",
+                    "ok",
+                    "");
+            case SAVE_SELECTIONS -> service.saveSelections(player, stack, draft);
+            case SET_FIELD -> service.setField(player, stack, draft, fieldKey, fieldValue);
+            case CAPTURE_PLAYER_POS -> service.capturePlayerPosition(player, stack, draft);
+            case CAPTURE_LOOK_BLOCK -> service.captureLookBlock(player, stack, draft);
+            case SET_AREA_POS_1 -> service.setAreaPos(player, stack, draft, true);
+            case SET_AREA_POS_2 -> service.setAreaPos(player, stack, draft, false);
+            case ADD_OBJECT -> service.addObject(player, stack, draft);
+            case UPDATE_OBJECT -> service.updateObject(player, stack, draft);
+            case DUPLICATE_OBJECT -> service.duplicateObject(player, stack, draft);
+            case DELETE_OBJECT -> service.deleteObject(player, stack, draft);
+            case CLEAR_OBJECT_TYPE -> service.clearObjectType(player, stack, draft);
+            case VALIDATE_MAP -> service.validateMap(player, stack, draft);
+        };
+    }
+}

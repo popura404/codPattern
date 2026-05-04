@@ -14,6 +14,7 @@ import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -92,6 +93,7 @@ public final class ZombiesStarterKitDistributor {
         if (level == null || starterKits == null) {
             return ZombiesServiceResult.failure(ZombiesErrorCode.STARTUP_STARTER_WEAPON_MISSING);
         }
+        List<StarterKitTarget> targets = new ArrayList<>();
         for (UUID playerId : starterKits.playerIds()) {
             ServerPlayer player = level.getServer().getPlayerList().getPlayer(playerId);
             ItemStack weapon = starterKits.weapon(playerId).orElse(ItemStack.EMPTY);
@@ -102,19 +104,192 @@ public final class ZombiesStarterKitDistributor {
                                 playerId == null ? "" : playerId.toString())),
                         "Zombies starter weapon could not be applied");
             }
+            targets.add(new MinecraftStarterKitTarget(playerId, player, weapon));
+        }
+        return applyPreparedStarterWeapons(targets);
+    }
+
+    static ZombiesServiceResult<Void> applyPreparedStarterWeapons(Collection<? extends StarterKitTarget> targets) {
+        if (targets == null) {
+            return ZombiesServiceResult.failure(ZombiesErrorCode.STARTUP_STARTER_WEAPON_MISSING);
+        }
+        List<StarterKitTarget> preparedTargets = new ArrayList<>();
+        for (StarterKitTarget target : targets) {
+            if (target == null || target.playerId() == null || !target.canApplyStarterWeapon()) {
+                return ZombiesServiceResult.failure(
+                        ZombiesErrorCode.STARTUP_STARTER_WEAPON_MISSING,
+                        Map.of("playerId", com.cdp.codpattern.app.match.model.ModePlayerValue.ofString(
+                                target == null || target.playerId() == null ? "" : target.playerId().toString())),
+                        "Zombies starter weapon could not be applied");
+            }
+            preparedTargets.add(target);
         }
 
-        for (UUID playerId : starterKits.playerIds()) {
-            ServerPlayer player = level.getServer().getPlayerList().getPlayer(playerId);
-            ItemStack weapon = starterKits.weapon(playerId).orElse(ItemStack.EMPTY).copy();
+        Map<UUID, StarterKitSnapshot> snapshots = new LinkedHashMap<>();
+        StarterKitTarget currentTarget = null;
+        try {
+            for (StarterKitTarget target : preparedTargets) {
+                currentTarget = target;
+                StarterKitSnapshot snapshot = target.captureSnapshot();
+                snapshots.put(target.playerId(), snapshot);
+                target.clearInventoryAndRuntime();
+                target.applyStarterWeapon();
+                target.syncInventory();
+            }
+        } catch (RuntimeException exception) {
+            RestoreReport restoreReport = restoreSnapshots(preparedTargets, snapshots);
+            Map<String, com.cdp.codpattern.app.match.model.ModePlayerValue> params = new LinkedHashMap<>();
+            params.put("reason", com.cdp.codpattern.app.match.model.ModePlayerValue.ofString(
+                    exception.getClass().getSimpleName()));
+            params.put("playerId", com.cdp.codpattern.app.match.model.ModePlayerValue.ofString(
+                    currentTarget == null || currentTarget.playerId() == null
+                            ? ""
+                            : currentTarget.playerId().toString()));
+            params.put("restored", com.cdp.codpattern.app.match.model.ModePlayerValue.ofInt(
+                    restoreReport.restored()));
+            params.put("restoreFailures", com.cdp.codpattern.app.match.model.ModePlayerValue.ofInt(
+                    restoreReport.failures()));
+            return ZombiesServiceResult.failure(
+                    ZombiesErrorCode.STARTUP_STARTER_WEAPON_MISSING,
+                    params,
+                    "Zombies starter kit apply threw " + exception.getClass().getName()
+                            + "; restored=" + restoreReport.restored()
+                            + "; restoreFailures=" + restoreReport.failures());
+        }
+        return ZombiesServiceResult.ok();
+    }
+
+    private static RestoreReport restoreSnapshots(
+            List<StarterKitTarget> targets,
+            Map<UUID, StarterKitSnapshot> snapshots
+    ) {
+        int restored = 0;
+        int failures = 0;
+        for (StarterKitTarget target : targets) {
+            StarterKitSnapshot snapshot = snapshots.get(target.playerId());
+            if (snapshot == null) {
+                continue;
+            }
+            try {
+                target.restoreSnapshot(snapshot);
+                target.syncInventory();
+                restored++;
+            } catch (RuntimeException restoreException) {
+                failures++;
+            }
+        }
+        return new RestoreReport(restored, failures);
+    }
+
+    interface StarterKitTarget {
+        UUID playerId();
+
+        boolean canApplyStarterWeapon();
+
+        StarterKitSnapshot captureSnapshot();
+
+        void clearInventoryAndRuntime();
+
+        void applyStarterWeapon();
+
+        void syncInventory();
+
+        void restoreSnapshot(StarterKitSnapshot snapshot);
+    }
+
+    interface StarterKitSnapshot {
+    }
+
+    private record RestoreReport(int restored, int failures) {
+    }
+
+    private record MinecraftStarterKitTarget(
+            UUID playerId,
+            ServerPlayer player,
+            ItemStack starterWeapon
+    ) implements StarterKitTarget {
+        @Override
+        public boolean canApplyStarterWeapon() {
+            return player != null && starterWeapon != null && !starterWeapon.isEmpty();
+        }
+
+        @Override
+        public StarterKitSnapshot captureSnapshot() {
+            return MinecraftStarterKitSnapshot.capture(player);
+        }
+
+        @Override
+        public void clearInventoryAndRuntime() {
             player.getInventory().clearContent();
             ThrowableInventoryService.clearRuntime(player, true);
-            player.getInventory().setItem(STARTER_SLOT, weapon);
+        }
+
+        @Override
+        public void applyStarterWeapon() {
+            player.getInventory().setItem(STARTER_SLOT, starterWeapon.copy());
+        }
+
+        @Override
+        public void syncInventory() {
             player.inventoryMenu.broadcastChanges();
             player.inventoryMenu.slotsChanged(player.getInventory());
             ThrowableInventoryService.sync(player);
         }
-        return ZombiesServiceResult.ok();
+
+        @Override
+        public void restoreSnapshot(StarterKitSnapshot snapshot) {
+            if (snapshot instanceof MinecraftStarterKitSnapshot minecraftSnapshot) {
+                minecraftSnapshot.restore(player);
+            }
+        }
+    }
+
+    private record MinecraftStarterKitSnapshot(
+            List<ItemStack> inventory,
+            Optional<ThrowableRuntimeSnapshot> throwableRuntime
+    ) implements StarterKitSnapshot {
+        private static MinecraftStarterKitSnapshot capture(ServerPlayer player) {
+            Inventory inventory = player.getInventory();
+            List<ItemStack> snapshot = new ArrayList<>(inventory.getContainerSize());
+            for (int i = 0; i < inventory.getContainerSize(); i++) {
+                snapshot.add(inventory.getItem(i).copy());
+            }
+            Optional<ThrowableRuntimeSnapshot> throwableSnapshot = ThrowableInventoryService.getState(player)
+                    .map(state -> new ThrowableRuntimeSnapshot(state.copyStacks(), state.getActiveSlot()));
+            return new MinecraftStarterKitSnapshot(List.copyOf(snapshot), throwableSnapshot);
+        }
+
+        private void restore(ServerPlayer player) {
+            Inventory playerInventory = player.getInventory();
+            int restoreSize = Math.min(playerInventory.getContainerSize(), inventory.size());
+            for (int i = 0; i < restoreSize; i++) {
+                playerInventory.setItem(i, inventory.get(i).copy());
+            }
+            for (int i = restoreSize; i < playerInventory.getContainerSize(); i++) {
+                playerInventory.setItem(i, ItemStack.EMPTY);
+            }
+            throwableRuntime.ifPresent(snapshot ->
+                    ThrowableInventoryService.applyClientSync(player, snapshot.stacksCopy(), snapshot.activeSlot()));
+        }
+    }
+
+    private record ThrowableRuntimeSnapshot(ItemStack[] stacks, int activeSlot) {
+        private ThrowableRuntimeSnapshot {
+            stacks = copyStacks(stacks);
+        }
+
+        private ItemStack[] stacksCopy() {
+            return copyStacks(stacks);
+        }
+
+        private static ItemStack[] copyStacks(ItemStack[] source) {
+            ItemStack[] copy = new ItemStack[ThrowableInventoryService.SLOT_COUNT];
+            for (int i = 0; i < copy.length; i++) {
+                ItemStack stack = source != null && i < source.length ? source[i] : ItemStack.EMPTY;
+                copy[i] = stack == null ? ItemStack.EMPTY : stack.copy();
+            }
+            return copy;
+        }
     }
 
     public ZombiesServiceResult<ItemStack> createStarterWeapon(

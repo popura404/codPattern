@@ -1,9 +1,11 @@
 package com.phasetranscrystal.fpsmatch.common.client;
 
+import com.cdp.codpattern.client.gui.screen.zombies.deploy.ZombiesDeployToolScreen;
 import com.phasetranscrystal.fpsmatch.common.client.screen.MapCreatorToolScreen;
 import com.phasetranscrystal.fpsmatch.common.client.screen.SpawnPointToolScreen;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenMapCreatorToolScreenS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenSpawnPointToolScreenS2CPacket;
+import com.phasetranscrystal.fpsmatch.common.packet.OpenZombiesDeployToolScreenS2CPacket;
 import net.minecraft.client.Minecraft;
 
 public final class FpsmClientPacketHandler {
@@ -25,6 +27,15 @@ public final class FpsmClientPacketHandler {
             screen.applyData(packet);
         } else {
             minecraft.setScreen(new SpawnPointToolScreen(packet));
+        }
+    }
+
+    public static void handleOpenZombiesDeployToolScreen(OpenZombiesDeployToolScreenS2CPacket packet) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof ZombiesDeployToolScreen screen) {
+            screen.applyData(packet);
+        } else {
+            minecraft.setScreen(new ZombiesDeployToolScreen(packet));
         }
     }
 }

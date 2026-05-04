@@ -29,6 +29,18 @@ public final class ZombiesWeaponInstanceService {
             int maxReserveAmmo,
             double cost
     ) {
+        return purchaseWallWeapon(playerId, gunId, weaponLevel, damageMultiplier, maxReserveAmmo, cost, null);
+    }
+
+    public ZombiesServiceResult<WallWeaponPurchaseResult> purchaseWallWeapon(
+            UUID playerId,
+            String gunId,
+            int weaponLevel,
+            double damageMultiplier,
+            int maxReserveAmmo,
+            double cost,
+            WallWeaponCommitGuard commitGuard
+    ) {
         if (!ZombiesWeaponInstanceState.isValidGunId(gunId)
                 || !ZombiesWeaponInstanceState.isValidWeaponLevel(weaponLevel)
                 || !ZombiesWeaponInstanceState.isValidDamageMultiplier(damageMultiplier)
@@ -46,7 +58,8 @@ public final class ZombiesWeaponInstanceService {
         }
 
         return economyService.spendAtomically(playerId, cost, state -> {
-            if (state.primaryWeapon().filter(weapon -> weapon.sameGunAndLevel(gunId, weaponLevel)).isPresent()) {
+            ZombiesWeaponInstanceState currentWeapon = state.primaryWeapon().orElse(null);
+            if (currentWeapon != null && currentWeapon.sameGunAndLevel(gunId, weaponLevel)) {
                 return ZombiesServiceResult.failure(
                         ZombiesErrorCode.WEAPON_ALREADY_OWNED,
                         weaponParams(gunId, weaponLevel),
@@ -58,6 +71,15 @@ public final class ZombiesWeaponInstanceService {
                     weaponLevel,
                     damageMultiplier,
                     maxReserveAmmo);
+            ZombiesServiceResult<?> guardResult = commitGuard == null
+                    ? ZombiesServiceResult.ok()
+                    : commitGuard.beforeCommit(currentWeapon, weapon);
+            if (guardResult == null || !guardResult.success()) {
+                return ZombiesServiceResult.failure(
+                        guardResult == null ? ZombiesErrorCode.WEAPON_INVALID_CURRENT_WEAPON : guardResult.code(),
+                        guardResult == null ? Map.of() : guardResult.params(),
+                        guardResult == null ? "" : guardResult.logMessage());
+            }
             state.setPrimaryWeapon(weapon);
             return ZombiesServiceResult.success(new WallWeaponPurchaseResult(weapon, cost));
         });
@@ -85,5 +107,12 @@ public final class ZombiesWeaponInstanceService {
             Objects.requireNonNull(weapon, "weapon");
             cost = Math.max(0.0D, cost);
         }
+    }
+
+    @FunctionalInterface
+    public interface WallWeaponCommitGuard {
+        ZombiesServiceResult<?> beforeCommit(
+                ZombiesWeaponInstanceState currentWeapon,
+                ZombiesWeaponInstanceState purchasedWeapon);
     }
 }

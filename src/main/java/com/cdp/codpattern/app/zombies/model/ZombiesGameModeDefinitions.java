@@ -60,7 +60,7 @@ public final class ZombiesGameModeDefinitions {
                 new TeamDescriptor(ZombiesTeamNames.SURVIVORS,
                         "screen.codpattern.zombies_room.team.survivors",
                         "hud.codpattern.zombies.team.survivors_short",
-                        0xFF6FD17A)
+                        0xFF9B2F2F)
         );
     }
 }
