@@ -20,8 +20,10 @@ import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidator;
 import com.cdp.codpattern.app.zombies.validation.ZombiesValidationIssue;
 import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.cdp.codpattern.compat.fpsmatch.map.ZombiesMap;
+import com.phasetranscrystal.fpsmatch.common.service.MapCreationService;
 import com.phasetranscrystal.fpsmatch.common.item.ZombiesDeployTool;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
+import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
@@ -190,6 +192,139 @@ public final class ZombiesDeployToolService {
                 "");
     }
 
+    public ZombiesDeployServiceResult<ZombiesDeploySnapshot> selectWorkspaceStage(
+            ServerPlayer player,
+            ItemStack stack,
+            ZombiesDeployDraft request
+    ) {
+        ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
+        ZombiesDeployTool.saveDraft(stack, draft);
+        return snapshot(player, stack, draft, "message.codpattern.zombies.deploy.refreshed", "ok", "");
+    }
+
+    public ZombiesDeployServiceResult<ZombiesDeploySnapshot> selectCapturePreset(
+            ServerPlayer player,
+            ItemStack stack,
+            ZombiesDeployDraft request
+    ) {
+        ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
+        ZombiesDeployTool.saveDraft(stack, draft);
+        return snapshot(player, stack, draft, "message.codpattern.zombies.deploy.refreshed", "ok", "");
+    }
+
+    public ZombiesDeployServiceResult<ZombiesDeploySnapshot> createMap(
+            ServerPlayer player,
+            ItemStack stack,
+            ZombiesDeployDraft request
+    ) {
+        ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
+        MapCreationService.Result created = MapCreationService.instance().createMap(
+                player,
+                BuiltInGameModes.ZOMBIES,
+                draft.draftMapName(),
+                draft.mapPos1(),
+                draft.mapPos2());
+        if (!created.success()) {
+            ZombiesDeployTool.saveDraft(stack, draft);
+            ZombiesDeploySnapshot snapshot = buildSnapshot(draft, created.messageKey(), created.code(), String.join(" ", created.arguments()));
+            return ZombiesDeployServiceResult.failure(
+                    created.code(),
+                    created.messageKey(),
+                    snapshot,
+                    created.arguments().toArray(String[]::new));
+        }
+        ZombiesDeployDraft updated = new ZombiesDeployDraft(
+                ZombiesDeployDraft.STAGE_OBJECT_MARKING,
+                created.mapName(),
+                "",
+                draft.mapPos1(),
+                draft.mapPos2(),
+                ZombiesDeployFieldSchema.INITIAL,
+                ZombiesDeployDraft.CAPTURE_DEFAULT,
+                -1,
+                draft.validationView(),
+                defaultFields(player, ZombiesDeployFieldSchema.INITIAL));
+        ZombiesDeployTool.saveDraft(stack, updated);
+        return snapshot(player, stack, updated, created.messageKey(), "ok.map_created", created.mapName());
+    }
+
+    public ZombiesDeployServiceResult<ZombiesDeploySnapshot> updateMapArea(
+            ServerPlayer player,
+            ItemStack stack,
+            ZombiesDeployDraft request
+    ) {
+        ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
+        if (draft.mapPos1() == null || draft.mapPos2() == null) {
+            return failure(player, stack, draft, "map.invalid_area", "message.fpsm.map_creator_tool.invalid_area", "");
+        }
+        Optional<ZombiesMap> resolvedMap = resolveMap(draft.selectedMap());
+        if (resolvedMap.isEmpty()) {
+            return failure(player, stack, draft, "map.not_found", "message.codpattern.zombies.deploy.map_not_found", draft.selectedMap());
+        }
+        ZombiesMap oldMap = resolvedMap.get();
+        if (ZombiesMapOccupancyService.instance().isOccupied(BuiltInGameModes.ZOMBIES, oldMap.getMapName())) {
+            return failure(player, stack, draft, "map.active_area_update_deferred", "message.codpattern.zombies.deploy.saved_active_map", "当前地图进行中，范围更新已拒绝");
+        }
+
+        FPSMCore core = FPSMCore.getInstance();
+        ZombiesMap replacement = new ZombiesMap(oldMap.getServerLevel(), oldMap.getMapName(), new AreaData(draft.mapPos1(), draft.mapPos2()));
+        replacement.applyObjects(oldMap.objects());
+        oldMap.matchEndTeleportPoint().ifPresent(replacement::setMatchEndTeleportPoint);
+        core.unregisterMap(oldMap);
+        core.registerMap(BuiltInGameModes.ZOMBIES, replacement);
+        try {
+            CodMapPersistence.saveMapOrRollback(replacement, () -> {
+                core.unregisterMap(replacement);
+                core.registerMap(BuiltInGameModes.ZOMBIES, oldMap);
+            });
+        } catch (RuntimeException e) {
+            ZombiesDeployTool.saveDraft(stack, draft);
+            ZombiesDeploySnapshot snapshot = buildSnapshot(draft, "message.codpattern.zombies.deploy.save_failed_rollback", "save_failed_rolled_back", oldMap.getMapName());
+            return ZombiesDeployServiceResult.failure("save_failed_rolled_back", "message.codpattern.zombies.deploy.save_failed_rollback", snapshot, oldMap.getMapName());
+        }
+        replacement.syncToClient();
+        ZombiesDeployTool.saveDraft(stack, draft);
+        return snapshot(player, stack, draft, "message.codpattern.zombies.deploy.object_saved", "ok.map_area_updated", oldMap.getMapName());
+    }
+
+    public ZombiesDeployServiceResult<ZombiesDeploySnapshot> captureWorldClick(
+            ServerPlayer player,
+            ItemStack stack,
+            ZombiesDeployDraft request,
+            BlockPos clickedPos,
+            boolean leftClick
+    ) {
+        if (clickedPos == null) {
+            return failure(player, stack, request, "capture.no_block", "message.codpattern.zombies.deploy.no_look_block", "");
+        }
+        ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
+        if (ZombiesDeployDraft.STAGE_MAP_REGISTRATION.equals(draft.workspaceStage())) {
+            ZombiesDeployDraft updated = leftClick
+                    ? draft.withMapDraft(draft.draftMapName(), clickedPos, draft.mapPos2())
+                    : draft.withMapDraft(draft.draftMapName(), draft.mapPos1(), clickedPos);
+            ZombiesDeployTool.saveDraft(stack, updated);
+            return snapshot(
+                    player,
+                    stack,
+                    updated,
+                    leftClick ? "message.codpattern.zombies.deploy.area_pos1" : "message.codpattern.zombies.deploy.area_pos2",
+                    leftClick ? "capture.map_pos1" : "capture.map_pos2",
+                    formatPos(clickedPos));
+        }
+
+        String target = captureTarget(draft.objectType(), draft.capturePreset(), leftClick);
+        if (target.isBlank()) {
+            ZombiesDeployTool.saveDraft(stack, draft);
+            return snapshot(player, stack, draft, "message.codpattern.zombies.deploy.refreshed", "capture.slot_empty", formatPos(clickedPos));
+        }
+        Map<String, String> fields = new LinkedHashMap<>(draft.fields());
+        fields.put("dimension", player.serverLevel().dimension().location().toString());
+        setPosition(fields, target, clickedPos);
+        ZombiesDeployDraft updated = draft.withFields(fields);
+        ZombiesDeployTool.saveDraft(stack, updated);
+        return snapshot(player, stack, updated, "message.codpattern.zombies.deploy.captured_look_block", "capture." + target, formatPos(clickedPos));
+    }
+
     public ZombiesDeployServiceResult<ZombiesDeploySnapshot> addObject(ServerPlayer player, ItemStack stack, ZombiesDeployDraft request) {
         return editObject(player, stack, request, ZombiesDeployObjectEditor.Operation.ADD, "object.added");
     }
@@ -238,10 +373,15 @@ public final class ZombiesDeployToolService {
                 draft.selectedIndex(),
                 draft.fields());
         ZombiesDeployDraft resultDraft = new ZombiesDeployDraft(
+                draft.workspaceStage(),
                 draft.selectedMap(),
+                draft.draftMapName(),
+                draft.mapPos1(),
+                draft.mapPos2(),
                 draft.objectType(),
+                draft.capturePreset(),
                 edit.selectedIndex(),
-                draft.profileKey(),
+                draft.validationView(),
                 edit.fields());
         if (!edit.success()) {
             ZombiesDeployTool.saveDraft(stack, resultDraft);
@@ -306,16 +446,22 @@ public final class ZombiesDeployToolService {
         List<String> maps = availableMaps();
         String selectedMap = selectMap(base.selectedMap(), stored.selectedMap(), maps);
         String objectType = ZombiesDeployFieldSchema.normalizeObjectType(base.objectType());
+        String capturePreset = ZombiesDeployDraft.normalizeCapturePreset(base.capturePreset(), objectType);
         int count = resolveMap(selectedMap).map(map -> objectSummaries(map.objects(), objectType).size()).orElse(0);
         int selectedIndex = count <= 0 ? -1 : Math.max(0, Math.min(base.selectedIndex() < 0 ? 0 : base.selectedIndex(), count - 1));
         Map<String, String> fields = base.fields().isEmpty()
                 ? defaultFields(player, objectType)
                 : mergeDefaults(objectType, base.fields());
         return new ZombiesDeployDraft(
+                base.workspaceStage(),
                 selectedMap,
+                base.draftMapName(),
+                base.mapPos1() == null ? stored.mapPos1() : base.mapPos1(),
+                base.mapPos2() == null ? stored.mapPos2() : base.mapPos2(),
                 objectType,
+                capturePreset,
                 selectedIndex,
-                ZombiesDeployFieldSchema.normalizeProfile(base.profileKey()),
+                ZombiesDeployFieldSchema.normalizeProfile(base.validationView()),
                 fields);
     }
 
@@ -333,17 +479,27 @@ public final class ZombiesDeployToolService {
                 .orElse(false);
         return new ZombiesDeploySnapshot(
                 availableMaps(),
+                draft.workspaceStage(),
                 draft.selectedMap(),
+                draft.draftMapName(),
+                draft.mapPos1(),
+                draft.mapPos2(),
                 ZombiesDeployFieldSchema.objectTypes().stream()
                         .map(type -> new ZombiesDeploySnapshot.ObjectTypeOption(type.key(), type.labelKey()))
                         .toList(),
                 draft.objectType(),
+                draft.capturePreset(),
+                captureTarget(draft.objectType(), draft.capturePreset(), true),
+                captureTarget(draft.objectType(), draft.capturePreset(), false),
                 draft.selectedIndex(),
                 summaries,
                 fieldValues(draft.objectType(), draft.fields()),
-                draft.profileKey(),
+                draft.validationView(),
                 ZombiesDeployFieldSchema.profiles(),
-                map.map(value -> validationLines(value, draft.profileKey())).orElse(List.of()),
+                map.map(value -> validationLines(value, draft.validationView())).orElse(List.of()),
+                map.map(this::validationSummaries).orElse(List.of()),
+                objectCounts(objects),
+                stepStatuses(map.isPresent(), objects),
                 activeMap,
                 map.map(value -> Math.abs(Objects.hash(value.getMapName(), value.objects(), value.matchEndTeleportPoint()))).orElse(0),
                 Objects.requireNonNullElse(statusKey, ""),
@@ -516,6 +672,100 @@ public final class ZombiesDeployToolService {
                 issue.code().key(),
                 issue.subject(),
                 issue.message());
+    }
+
+    private List<ZombiesDeploySnapshot.ValidationSummary> validationSummaries(ZombiesMap map) {
+        List<ZombiesDeploySnapshot.ValidationSummary> summaries = new ArrayList<>();
+        for (String profile : ZombiesDeployFieldSchema.profiles()) {
+            List<ZombiesDeploySnapshot.ValidationLine> lines = validationLines(map, profile);
+            int errors = 0;
+            int warnings = 0;
+            for (ZombiesDeploySnapshot.ValidationLine line : lines) {
+                if ("error".equalsIgnoreCase(line.severity())) {
+                    errors++;
+                } else if ("warning".equalsIgnoreCase(line.severity())) {
+                    warnings++;
+                }
+            }
+            summaries.add(new ZombiesDeploySnapshot.ValidationSummary(profile, errors, warnings));
+        }
+        return summaries;
+    }
+
+    private List<ZombiesDeploySnapshot.ObjectTypeCount> objectCounts(ZombiesMapObjects objects) {
+        ZombiesMapObjects resolved = objects == null ? ZombiesMapObjects.EMPTY : objects;
+        return ZombiesDeployFieldSchema.objectTypes().stream()
+                .map(type -> new ZombiesDeploySnapshot.ObjectTypeCount(
+                        type.key(),
+                        countObjects(resolved, type.key()),
+                        type.singleObject(),
+                        requiredObjectType(type.key())))
+                .toList();
+    }
+
+    private int countObjects(ZombiesMapObjects objects, String objectType) {
+        return switch (ZombiesDeployFieldSchema.normalizeObjectType(objectType)) {
+            case ZombiesDeployFieldSchema.INITIAL -> objects.initialSpawns().size();
+            case ZombiesDeployFieldSchema.ZOMBIE_SPAWN -> objects.zombieSpawns().size();
+            case ZombiesDeployFieldSchema.BARRIER -> objects.barriers().size();
+            case ZombiesDeployFieldSchema.WEAPON_WALL -> objects.weaponWalls().size();
+            case ZombiesDeployFieldSchema.AMMO_BOX -> objects.ammoBoxes().size();
+            case ZombiesDeployFieldSchema.ARMOR_STATION -> objects.armorStations().size();
+            case ZombiesDeployFieldSchema.POWER_SWITCH -> objects.powerSwitch().isPresent() ? 1 : 0;
+            case ZombiesDeployFieldSchema.SODA_MACHINE -> objects.sodaMachines().size();
+            case ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> objects.ultimateMachines().size();
+            default -> 0;
+        };
+    }
+
+    private boolean requiredObjectType(String objectType) {
+        return switch (ZombiesDeployFieldSchema.normalizeObjectType(objectType)) {
+            case ZombiesDeployFieldSchema.INITIAL,
+                 ZombiesDeployFieldSchema.ZOMBIE_SPAWN,
+                 ZombiesDeployFieldSchema.BARRIER,
+                 ZombiesDeployFieldSchema.POWER_SWITCH,
+                 ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> true;
+            default -> false;
+        };
+    }
+
+    private List<ZombiesDeploySnapshot.StepStatus> stepStatuses(boolean hasMap, ZombiesMapObjects objects) {
+        ZombiesMapObjects resolved = objects == null ? ZombiesMapObjects.EMPTY : objects;
+        boolean hasPurchases = !resolved.weaponWalls().isEmpty()
+                || !resolved.ammoBoxes().isEmpty()
+                || !resolved.armorStations().isEmpty()
+                || !resolved.sodaMachines().isEmpty()
+                || !resolved.ultimateMachines().isEmpty();
+        return List.of(
+                new ZombiesDeploySnapshot.StepStatus("map", "1 地图", hasMap ? "已创建" : "未创建", hasMap),
+                new ZombiesDeploySnapshot.StepStatus("initial", "2 玩家出生点", Integer.toString(resolved.initialSpawns().size()), !resolved.initialSpawns().isEmpty()),
+                new ZombiesDeploySnapshot.StepStatus("zombie_spawn", "3 僵尸刷怪点", Integer.toString(resolved.zombieSpawns().size()), !resolved.zombieSpawns().isEmpty()),
+                new ZombiesDeploySnapshot.StepStatus("barrier", "4 屏障", Integer.toString(resolved.barriers().size()), !resolved.barriers().isEmpty()),
+                new ZombiesDeploySnapshot.StepStatus("interact", "5 交互对象", hasPurchases ? "已放置" : "缺失", hasPurchases),
+                new ZombiesDeploySnapshot.StepStatus("validate", "6 校验", "查看右侧", hasMap)
+        );
+    }
+
+    private String captureTarget(String objectType, String capturePreset, boolean leftClick) {
+        String type = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
+        if (ZombiesDeployFieldSchema.BARRIER.equals(type)) {
+            String preset = ZombiesDeployDraft.normalizeCapturePreset(capturePreset, type);
+            if (ZombiesDeployDraft.CAPTURE_BARRIER_INTERACTION.equals(preset)) {
+                return leftClick ? "interaction" : "";
+            }
+            return leftClick ? "areaFrom" : "areaTo";
+        }
+        return switch (type) {
+            case ZombiesDeployFieldSchema.WEAPON_WALL,
+                 ZombiesDeployFieldSchema.AMMO_BOX,
+                 ZombiesDeployFieldSchema.ARMOR_STATION,
+                 ZombiesDeployFieldSchema.SODA_MACHINE,
+                 ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> leftClick ? "pos" : "interaction";
+            case ZombiesDeployFieldSchema.INITIAL,
+                 ZombiesDeployFieldSchema.ZOMBIE_SPAWN,
+                 ZombiesDeployFieldSchema.POWER_SWITCH -> leftClick ? "pos" : "";
+            default -> "";
+        };
     }
 
     private Optional<BlockPos> lookBlock(ServerPlayer player) {

@@ -1,23 +1,18 @@
 package com.phasetranscrystal.fpsmatch.common.packet;
 
 import com.cdp.codpattern.app.match.GameModeRegistry;
-import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
-import com.mojang.datafixers.util.Function3;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.MapCreatorTool;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolAccessHelper;
+import com.phasetranscrystal.fpsmatch.common.service.MapCreationService;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
-import com.phasetranscrystal.fpsmatch.core.data.AreaData;
-import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.network.NetworkEvent;
 
-import java.util.Optional;
 import java.util.function.Supplier;
 
 public class MapCreatorToolActionC2SPacket {
@@ -90,62 +85,20 @@ public class MapCreatorToolActionC2SPacket {
     }
 
     private void createMap(ServerPlayer player, ItemStack stack) {
-        String type = GameModeRegistry.canonicalize(selectedType);
         FPSMCore core = FPSMCore.getInstance();
-        if (!core.checkGameType(type)) {
-            player.displayClientMessage(Component.translatable("message.fpsm.map_creator_tool.invalid_type"), false);
+        MapCreationService.Result result = MapCreationService.instance().createMap(player, selectedType, draftMapName, pos1, pos2);
+        if (!result.success()) {
+            player.displayClientMessage(Component.translatable(result.messageKey(), result.arguments().toArray()), false);
             return;
         }
 
-        String mapName = draftMapName.trim();
-        if (mapName.isEmpty()) {
-            player.displayClientMessage(Component.translatable("message.fpsm.map_creator_tool.invalid_name"), false);
-            return;
-        }
-
-        Optional<AreaData> area = createArea();
-        if (area.isEmpty()) {
-            player.displayClientMessage(Component.translatable("message.fpsm.map_creator_tool.invalid_area"), false);
-            return;
-        }
-
-        if (core.isRegistered(type, mapName)) {
-            player.displayClientMessage(Component.translatable("message.fpsm.map_creator_tool.duplicate_map", mapName), false);
-            return;
-        }
-
-        Function3<ServerLevel, String, AreaData, BaseMap> factory = core.getPreBuildGame(type);
-        if (factory == null) {
-            player.displayClientMessage(Component.translatable("message.fpsm.map_creator_tool.invalid_type"), false);
-            return;
-        }
-
-        BaseMap newMap = factory.apply(player.serverLevel(), mapName, area.get());
-        core.registerMap(type, newMap);
-        try {
-            CodMapPersistence.saveMapOrRollback(newMap, () -> core.unregisterMap(newMap));
-        } catch (RuntimeException e) {
-            player.displayClientMessage(Component.translatable(
-                    "message.codpattern.map.create_save_failed_rollback",
-                    type,
-                    mapName), false);
-            return;
-        }
-
-        MapCreatorTool.setSelectedType(stack, type);
+        MapCreatorTool.setSelectedType(stack, result.type());
         MapCreatorTool.setBlockPos(stack, MapCreatorTool.BLOCK_POS_TAG_1, pos1);
         MapCreatorTool.setBlockPos(stack, MapCreatorTool.BLOCK_POS_TAG_2, pos2);
         MapCreatorTool.setDraftMapName(stack, "");
 
-        player.displayClientMessage(Component.translatable("commands.fpsm.create.success", mapName), false);
+        player.displayClientMessage(Component.translatable(result.messageKey(), result.arguments().toArray()), false);
         FPSMatch.sendToPlayer(player, OpenMapCreatorToolScreenS2CPacket.fromStack(stack, core.getGameTypes()));
-    }
-
-    private Optional<AreaData> createArea() {
-        if (pos1 == null || pos2 == null) {
-            return Optional.empty();
-        }
-        return Optional.of(new AreaData(pos1, pos2));
     }
 
     private static void writeNullableBlockPos(FriendlyByteBuf buf, BlockPos pos) {

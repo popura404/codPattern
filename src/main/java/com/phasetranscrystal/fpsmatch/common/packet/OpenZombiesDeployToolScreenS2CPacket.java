@@ -2,6 +2,7 @@ package com.phasetranscrystal.fpsmatch.common.packet;
 
 import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployFieldSchema;
 import com.cdp.codpattern.app.zombies.deploy.ZombiesDeploySnapshot;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
 
@@ -22,13 +23,20 @@ public class OpenZombiesDeployToolScreenS2CPacket {
 
     public void encode(FriendlyByteBuf buf) {
         writeStringList(buf, snapshot.availableMaps());
+        buf.writeUtf(snapshot.workspaceStage());
         buf.writeUtf(snapshot.selectedMap());
+        buf.writeUtf(snapshot.draftMapName());
+        writeNullableBlockPos(buf, snapshot.mapPos1());
+        writeNullableBlockPos(buf, snapshot.mapPos2());
         buf.writeVarInt(snapshot.objectTypes().size());
         for (ZombiesDeploySnapshot.ObjectTypeOption option : snapshot.objectTypes()) {
             buf.writeUtf(option.key());
             buf.writeUtf(option.labelKey());
         }
         buf.writeUtf(snapshot.selectedObjectType());
+        buf.writeUtf(snapshot.capturePreset());
+        buf.writeUtf(snapshot.captureSlotA());
+        buf.writeUtf(snapshot.captureSlotB());
         buf.writeVarInt(snapshot.selectedIndex());
         buf.writeVarInt(snapshot.objects().size());
         for (ZombiesDeploySnapshot.ObjectSummary object : snapshot.objects()) {
@@ -55,6 +63,26 @@ public class OpenZombiesDeployToolScreenS2CPacket {
             buf.writeUtf(line.subject());
             buf.writeUtf(line.message());
         }
+        buf.writeVarInt(snapshot.validationSummaries().size());
+        for (ZombiesDeploySnapshot.ValidationSummary summary : snapshot.validationSummaries()) {
+            buf.writeUtf(summary.profileKey());
+            buf.writeVarInt(summary.errors());
+            buf.writeVarInt(summary.warnings());
+        }
+        buf.writeVarInt(snapshot.objectCounts().size());
+        for (ZombiesDeploySnapshot.ObjectTypeCount count : snapshot.objectCounts()) {
+            buf.writeUtf(count.objectType());
+            buf.writeVarInt(count.count());
+            buf.writeBoolean(count.singleton());
+            buf.writeBoolean(count.required());
+        }
+        buf.writeVarInt(snapshot.stepStatuses().size());
+        for (ZombiesDeploySnapshot.StepStatus status : snapshot.stepStatuses()) {
+            buf.writeUtf(status.key());
+            buf.writeUtf(status.label());
+            buf.writeUtf(status.detail());
+            buf.writeBoolean(status.complete());
+        }
         buf.writeBoolean(snapshot.activeMap());
         buf.writeVarInt(snapshot.revision());
         buf.writeUtf(snapshot.statusKey());
@@ -64,13 +92,20 @@ public class OpenZombiesDeployToolScreenS2CPacket {
 
     public static OpenZombiesDeployToolScreenS2CPacket decode(FriendlyByteBuf buf) {
         List<String> maps = readStringList(buf);
+        String workspaceStage = buf.readUtf();
         String selectedMap = buf.readUtf();
+        String draftMapName = buf.readUtf();
+        BlockPos mapPos1 = readNullableBlockPos(buf);
+        BlockPos mapPos2 = readNullableBlockPos(buf);
         int typeCount = buf.readVarInt();
         List<ZombiesDeploySnapshot.ObjectTypeOption> objectTypes = new ArrayList<>(typeCount);
         for (int i = 0; i < typeCount; i++) {
             objectTypes.add(new ZombiesDeploySnapshot.ObjectTypeOption(buf.readUtf(), buf.readUtf()));
         }
         String selectedObjectType = buf.readUtf();
+        String capturePreset = buf.readUtf();
+        String captureSlotA = buf.readUtf();
+        String captureSlotB = buf.readUtf();
         int selectedIndex = buf.readVarInt();
         int objectCount = buf.readVarInt();
         List<ZombiesDeploySnapshot.ObjectSummary> objects = new ArrayList<>(objectCount);
@@ -103,17 +138,53 @@ public class OpenZombiesDeployToolScreenS2CPacket {
                     buf.readUtf(),
                     buf.readUtf()));
         }
+        int validationSummaryCount = buf.readVarInt();
+        List<ZombiesDeploySnapshot.ValidationSummary> validationSummaries = new ArrayList<>(validationSummaryCount);
+        for (int i = 0; i < validationSummaryCount; i++) {
+            validationSummaries.add(new ZombiesDeploySnapshot.ValidationSummary(
+                    buf.readUtf(),
+                    buf.readVarInt(),
+                    buf.readVarInt()));
+        }
+        int objectTypeCount = buf.readVarInt();
+        List<ZombiesDeploySnapshot.ObjectTypeCount> objectCounts = new ArrayList<>(objectTypeCount);
+        for (int i = 0; i < objectTypeCount; i++) {
+            objectCounts.add(new ZombiesDeploySnapshot.ObjectTypeCount(
+                    buf.readUtf(),
+                    buf.readVarInt(),
+                    buf.readBoolean(),
+                    buf.readBoolean()));
+        }
+        int stepCount = buf.readVarInt();
+        List<ZombiesDeploySnapshot.StepStatus> stepStatuses = new ArrayList<>(stepCount);
+        for (int i = 0; i < stepCount; i++) {
+            stepStatuses.add(new ZombiesDeploySnapshot.StepStatus(
+                    buf.readUtf(),
+                    buf.readUtf(),
+                    buf.readUtf(),
+                    buf.readBoolean()));
+        }
         ZombiesDeploySnapshot snapshot = new ZombiesDeploySnapshot(
                 maps,
+                workspaceStage,
                 selectedMap,
+                draftMapName,
+                mapPos1,
+                mapPos2,
                 objectTypes,
                 selectedObjectType,
+                capturePreset,
+                captureSlotA,
+                captureSlotB,
                 selectedIndex,
                 objects,
                 fields,
                 profileKey,
                 profiles,
                 validationLines,
+                validationSummaries,
+                objectCounts,
+                stepStatuses,
                 buf.readBoolean(),
                 buf.readVarInt(),
                 buf.readUtf(),
@@ -141,5 +212,16 @@ public class OpenZombiesDeployToolScreenS2CPacket {
             values.add(buf.readUtf());
         }
         return values;
+    }
+
+    private static void writeNullableBlockPos(FriendlyByteBuf buf, BlockPos pos) {
+        buf.writeBoolean(pos != null);
+        if (pos != null) {
+            buf.writeBlockPos(pos);
+        }
+    }
+
+    private static BlockPos readNullableBlockPos(FriendlyByteBuf buf) {
+        return buf.readBoolean() ? buf.readBlockPos() : null;
     }
 }

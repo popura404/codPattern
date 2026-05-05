@@ -7,6 +7,7 @@ import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployToolService;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.ZombiesDeployTool;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolAccessHelper;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -36,7 +37,11 @@ public class ZombiesDeployToolActionC2SPacket {
         DUPLICATE_OBJECT,
         DELETE_OBJECT,
         CLEAR_OBJECT_TYPE,
-        VALIDATE_MAP
+        VALIDATE_MAP,
+        SELECT_WORKSPACE_STAGE,
+        CREATE_MAP,
+        UPDATE_MAP_AREA,
+        SELECT_CAPTURE_PRESET
     }
 
     private final Action action;
@@ -57,10 +62,15 @@ public class ZombiesDeployToolActionC2SPacket {
 
     public void encode(FriendlyByteBuf buf) {
         buf.writeEnum(action);
+        buf.writeUtf(draft.workspaceStage());
         buf.writeUtf(draft.selectedMap());
+        buf.writeUtf(draft.draftMapName());
+        writeNullableBlockPos(buf, draft.mapPos1());
+        writeNullableBlockPos(buf, draft.mapPos2());
         buf.writeUtf(draft.objectType());
+        buf.writeUtf(draft.capturePreset());
         buf.writeVarInt(draft.selectedIndex());
-        buf.writeUtf(draft.profileKey());
+        buf.writeUtf(draft.validationView());
         buf.writeVarInt(draft.fields().size());
         draft.fields().forEach((key, value) -> {
             buf.writeUtf(key);
@@ -72,10 +82,15 @@ public class ZombiesDeployToolActionC2SPacket {
 
     public static ZombiesDeployToolActionC2SPacket decode(FriendlyByteBuf buf) {
         Action action = buf.readEnum(Action.class);
+        String workspaceStage = buf.readUtf();
         String selectedMap = buf.readUtf();
+        String draftMapName = buf.readUtf();
+        BlockPos mapPos1 = readNullableBlockPos(buf);
+        BlockPos mapPos2 = readNullableBlockPos(buf);
         String objectType = buf.readUtf();
+        String capturePreset = buf.readUtf();
         int selectedIndex = buf.readVarInt();
-        String profileKey = buf.readUtf();
+        String validationView = buf.readUtf();
         int fieldCount = buf.readVarInt();
         Map<String, String> fields = new LinkedHashMap<>();
         for (int i = 0; i < fieldCount; i++) {
@@ -83,7 +98,17 @@ public class ZombiesDeployToolActionC2SPacket {
         }
         return new ZombiesDeployToolActionC2SPacket(
                 action,
-                new ZombiesDeployDraft(selectedMap, objectType, selectedIndex, profileKey, fields),
+                new ZombiesDeployDraft(
+                        workspaceStage,
+                        selectedMap,
+                        draftMapName,
+                        mapPos1,
+                        mapPos2,
+                        objectType,
+                        capturePreset,
+                        selectedIndex,
+                        validationView,
+                        fields),
                 buf.readUtf(),
                 buf.readUtf());
     }
@@ -150,6 +175,21 @@ public class ZombiesDeployToolActionC2SPacket {
             case DELETE_OBJECT -> service.deleteObject(player, stack, draft);
             case CLEAR_OBJECT_TYPE -> service.clearObjectType(player, stack, draft);
             case VALIDATE_MAP -> service.validateMap(player, stack, draft);
+            case SELECT_WORKSPACE_STAGE -> service.selectWorkspaceStage(player, stack, draft);
+            case CREATE_MAP -> service.createMap(player, stack, draft);
+            case UPDATE_MAP_AREA -> service.updateMapArea(player, stack, draft);
+            case SELECT_CAPTURE_PRESET -> service.selectCapturePreset(player, stack, draft);
         };
+    }
+
+    private static void writeNullableBlockPos(FriendlyByteBuf buf, BlockPos pos) {
+        buf.writeBoolean(pos != null);
+        if (pos != null) {
+            buf.writeBlockPos(pos);
+        }
+    }
+
+    private static BlockPos readNullableBlockPos(FriendlyByteBuf buf) {
+        return buf.readBoolean() ? buf.readBlockPos() : null;
     }
 }

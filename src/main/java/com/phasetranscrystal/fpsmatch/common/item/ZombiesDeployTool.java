@@ -1,14 +1,17 @@
 package com.phasetranscrystal.fpsmatch.common.item;
 
-import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployFieldSchema;
 import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployDraft;
+import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployFieldSchema;
 import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployPreviewService;
 import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployServiceResult;
+import com.cdp.codpattern.app.zombies.deploy.ZombiesDeploySnapshot;
+import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployToolService;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.tool.CreatorToolItem;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionAction;
 import com.phasetranscrystal.fpsmatch.common.item.tool.WorldToolItem;
 import com.phasetranscrystal.fpsmatch.common.packet.AddAreaDataS2CPacket;
+import com.phasetranscrystal.fpsmatch.common.packet.OpenZombiesDeployToolScreenS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.RemoveDebugDataByPrefixS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.ZombiesDeployToolActionC2SPacket;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
@@ -30,6 +33,11 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
     private static final String OBJECT_TYPE_TAG = "SelectedZombiesObjectType";
     private static final String SELECTED_INDEX_TAG = "SelectedZombiesObjectIndex";
     private static final String PROFILE_TAG = "SelectedZombiesValidationProfile";
+    private static final String WORKSPACE_STAGE_TAG = "ZombiesDeployWorkspaceStage";
+    private static final String DRAFT_MAP_NAME_TAG = "ZombiesDeployDraftMapName";
+    private static final String MAP_POS_1_TAG = "ZombiesDeployMapPos1";
+    private static final String MAP_POS_2_TAG = "ZombiesDeployMapPos2";
+    private static final String CAPTURE_PRESET_TAG = "ZombiesDeployCapturePreset";
     private static final String DRAFT_FIELDS_TAG = "ZombiesDeployDraftFields";
     private static final String AREA_POS_1_TAG = "ZombiesDeployAreaPos1";
     private static final String AREA_POS_2_TAG = "ZombiesDeployAreaPos2";
@@ -49,19 +57,13 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
                 if (clickedPos == null) {
                     return;
                 }
-                captureAreaPosition(player, stack, clickedPos, true);
-                player.displayClientMessage(Component.translatable(
-                        "message.codpattern.zombies.deploy.area_pos1",
-                        MapCreatorTool.formatPos(clickedPos)).withStyle(ChatFormatting.AQUA), true);
+                captureWorldClick(player, stack, clickedPos, true);
             }
             case RIGHT_CLICK_BLOCK -> {
                 if (clickedPos == null) {
                     return;
                 }
-                captureAreaPosition(player, stack, clickedPos, false);
-                player.displayClientMessage(Component.translatable(
-                        "message.codpattern.zombies.deploy.area_pos2",
-                        MapCreatorTool.formatPos(clickedPos)).withStyle(ChatFormatting.AQUA), true);
+                captureWorldClick(player, stack, clickedPos, false);
             }
         }
     }
@@ -84,38 +86,15 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
         clearStandaloneAreaPreview(player);
     }
 
-    private void captureAreaPosition(ServerPlayer player, ItemStack stack, BlockPos pos, boolean first) {
-        if (first) {
-            setAreaPos1(stack, pos);
-        } else {
-            setAreaPos2(stack, pos);
+    private void captureWorldClick(ServerPlayer player, ItemStack stack, BlockPos pos, boolean leftClick) {
+        ZombiesDeployServiceResult<ZombiesDeploySnapshot> result = ZombiesDeployToolService.instance()
+                .captureWorldClick(player, stack, getDraft(stack), pos, leftClick);
+        result.value().ifPresent(snapshot -> FPSMatch.sendToPlayer(player, new OpenZombiesDeployToolScreenS2CPacket(snapshot)));
+        if (!result.messageKey().isBlank()) {
+            player.displayClientMessage(Component.translatable(
+                    result.messageKey(),
+                    result.arguments().toArray()).withStyle(result.success() ? ChatFormatting.AQUA : ChatFormatting.RED), true);
         }
-
-        ZombiesDeployDraft draft = getDraft(stack);
-        Map<String, String> fields = mergeDraftFields(draft);
-        fields.put("dimension", player.serverLevel().dimension().location().toString());
-        setPositionField(fields, first ? "areaFrom" : "areaTo", pos);
-        saveDraft(stack, draft.withFields(fields));
-    }
-
-    private Map<String, String> mergeDraftFields(ZombiesDeployDraft draft) {
-        ZombiesDeployDraft resolved = draft == null ? ZombiesDeployDraft.empty() : draft;
-        Map<String, String> fields = new LinkedHashMap<>(ZombiesDeployFieldSchema.defaultFields(resolved.objectType()));
-        resolved.fields().forEach((key, value) -> {
-            if (fields.containsKey(key)) {
-                fields.put(key, value == null ? "" : value);
-            }
-        });
-        return fields;
-    }
-
-    private void setPositionField(Map<String, String> fields, String prefix, BlockPos pos) {
-        if (!fields.containsKey(prefix + "X")) {
-            return;
-        }
-        fields.put(prefix + "X", Integer.toString(pos.getX()));
-        fields.put(prefix + "Y", Integer.toString(pos.getY()));
-        fields.put(prefix + "Z", Integer.toString(pos.getZ()));
     }
 
     private void syncStandaloneAreaPreview(ServerPlayer player, ItemStack stack) {
@@ -162,8 +141,13 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
 
     public static ZombiesDeployDraft getDraft(ItemStack stack) {
         return new ZombiesDeployDraft(
+                getWorkspaceStage(stack),
                 getSelectedMap(stack),
+                getDraftMapName(stack),
+                getMapPos1(stack),
+                getMapPos2(stack),
                 getSelectedObjectType(stack),
+                getCapturePreset(stack),
                 getSelectedIndex(stack),
                 getProfileKey(stack),
                 getDraftFields(stack));
@@ -171,11 +155,56 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
 
     public static void saveDraft(ItemStack stack, ZombiesDeployDraft draft) {
         ZombiesDeployDraft resolved = draft == null ? ZombiesDeployDraft.empty() : draft;
+        setWorkspaceStage(stack, resolved.workspaceStage());
         setSelectedMap(stack, resolved.selectedMap());
+        setDraftMapName(stack, resolved.draftMapName());
+        setMapPos1(stack, resolved.mapPos1());
+        setMapPos2(stack, resolved.mapPos2());
         setSelectedObjectType(stack, resolved.objectType());
+        setCapturePreset(stack, resolved.capturePreset());
         setSelectedIndex(stack, resolved.selectedIndex());
-        setProfileKey(stack, resolved.profileKey());
+        setProfileKey(stack, resolved.validationView());
         setDraftFields(stack, resolved.fields());
+    }
+
+    public static void setWorkspaceStage(ItemStack stack, String workspaceStage) {
+        setStringTag(stack, WORKSPACE_STAGE_TAG, ZombiesDeployDraft.normalizeStage(workspaceStage));
+    }
+
+    public static String getWorkspaceStage(ItemStack stack) {
+        return ZombiesDeployDraft.normalizeStage(getStringTag(stack, WORKSPACE_STAGE_TAG));
+    }
+
+    public static void setDraftMapName(ItemStack stack, String mapName) {
+        setStringTag(stack, DRAFT_MAP_NAME_TAG, mapName);
+    }
+
+    public static String getDraftMapName(ItemStack stack) {
+        return getStringTag(stack, DRAFT_MAP_NAME_TAG);
+    }
+
+    public static void setMapPos1(ItemStack stack, BlockPos pos) {
+        setBlockPos(stack, MAP_POS_1_TAG, pos);
+    }
+
+    public static void setMapPos2(ItemStack stack, BlockPos pos) {
+        setBlockPos(stack, MAP_POS_2_TAG, pos);
+    }
+
+    public static BlockPos getMapPos1(ItemStack stack) {
+        return getBlockPos(stack, MAP_POS_1_TAG);
+    }
+
+    public static BlockPos getMapPos2(ItemStack stack) {
+        return getBlockPos(stack, MAP_POS_2_TAG);
+    }
+
+    public static void setCapturePreset(ItemStack stack, String capturePreset) {
+        setStringTag(stack, CAPTURE_PRESET_TAG, capturePreset);
+    }
+
+    public static String getCapturePreset(ItemStack stack) {
+        return getStringTag(stack, CAPTURE_PRESET_TAG);
     }
 
     public static void setSelectedMap(ItemStack stack, String selectedMap) {
