@@ -48,6 +48,10 @@ public class ZombiesDeployToolScreen extends Screen {
     private static final int ERROR_TEXT = 0xFFFF7777;
     private static final int WARNING_TEXT = 0xFFFFCC66;
     private static final int INFO_TEXT = 0xFFAED7FF;
+    private static final int CONTROL_ROW_Y = 332;
+    private static final int FIELD_LABEL_Y = 354;
+    private static final int FIELD_INPUT_Y = 368;
+    private static final int BOTTOM_ROW_Y = 396;
 
     private ZombiesDeploySnapshot snapshot;
     private String selectedMap;
@@ -77,7 +81,7 @@ public class ZombiesDeployToolScreen extends Screen {
     private EditBox fieldValueBox;
 
     public ZombiesDeployToolScreen(OpenZombiesDeployToolScreenS2CPacket packet) {
-        super(Component.literal("Zombies Deploy"));
+        super(Component.translatable("gui.codpattern.zombies.deploy.title"));
         applySnapshot(packet.snapshot());
     }
 
@@ -98,94 +102,94 @@ public class ZombiesDeployToolScreen extends Screen {
                 .pos(left + 332, top + 30)
                 .size(126, 20)
                 .build());
-        this.addRenderableWidget(new Button.Builder(Component.literal("Refresh"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.REFRESH))
+        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.refresh"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.REFRESH))
                 .pos(left + 464, top + 30)
                 .size(78, 20)
                 .build());
-        this.addRenderableWidget(new Button.Builder(Component.literal("Save selections"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_SELECTIONS))
+        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.save_selections"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_SELECTIONS))
                 .pos(left + 548, top + 30)
                 .size(114, 20)
                 .build());
-        this.addRenderableWidget(new Button.Builder(Component.literal("Validate"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.VALIDATE_MAP))
+        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.validate"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.VALIDATE_MAP))
                 .pos(left + 668, top + 30)
                 .size(88, 20)
                 .build());
 
         this.objectPrevButton = this.addRenderableWidget(new Button.Builder(Component.literal("<"), button -> stepObject(-1))
-                .pos(left + 16, top + 332)
+                .pos(left + 16, top + CONTROL_ROW_Y)
                 .size(24, 20)
                 .build());
         this.objectNextButton = this.addRenderableWidget(new Button.Builder(Component.literal(">"), button -> stepObject(1))
-                .pos(left + 44, top + 332)
+                .pos(left + 44, top + CONTROL_ROW_Y)
                 .size(24, 20)
                 .build());
-        this.addRenderableWidget(new Button.Builder(Component.literal("Add"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.ADD_OBJECT))
-                .pos(left + 76, top + 332)
+        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.add"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.ADD_OBJECT))
+                .pos(left + 76, top + CONTROL_ROW_Y)
                 .size(58, 20)
                 .build());
-        this.updateObjectButton = this.addRenderableWidget(new Button.Builder(Component.literal("Update"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.UPDATE_OBJECT))
-                .pos(left + 140, top + 332)
+        this.updateObjectButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.update"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.UPDATE_OBJECT))
+                .pos(left + 140, top + CONTROL_ROW_Y)
                 .size(68, 20)
                 .build());
-        this.deleteObjectButton = this.addRenderableWidget(new Button.Builder(Component.literal("Delete"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.DELETE_OBJECT))
-                .pos(left + 214, top + 332)
+        this.deleteObjectButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.delete"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.DELETE_OBJECT))
+                .pos(left + 214, top + CONTROL_ROW_Y)
                 .size(68, 20)
                 .build());
 
         this.fieldPrevButton = this.addRenderableWidget(new Button.Builder(Component.literal("<"), button -> stepField(-1))
-                .pos(left + 294, top + 332)
+                .pos(left + 294, top + CONTROL_ROW_Y)
                 .size(24, 20)
                 .build());
         this.fieldNextButton = this.addRenderableWidget(new Button.Builder(Component.literal(">"), button -> stepField(1))
-                .pos(left + 322, top + 332)
+                .pos(left + 322, top + CONTROL_ROW_Y)
                 .size(24, 20)
                 .build());
-        this.setFieldButton = this.addRenderableWidget(new Button.Builder(Component.literal("Set field"), button -> setCurrentField())
-                .pos(left + 352, top + 332)
+        this.setFieldButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.set_field"), button -> setCurrentField())
+                .pos(left + 352, top + CONTROL_ROW_Y)
                 .size(86, 20)
                 .build());
-        this.addRenderableWidget(new Button.Builder(Component.literal("Player pos"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.CAPTURE_PLAYER_POS))
-                .pos(left + 444, top + 332)
+        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.player_pos"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.CAPTURE_PLAYER_POS))
+                .pos(left + 444, top + CONTROL_ROW_Y)
                 .size(86, 20)
                 .build());
-        this.addRenderableWidget(new Button.Builder(Component.literal("Look block"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.CAPTURE_LOOK_BLOCK))
-                .pos(left + 536, top + 332)
+        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.look_block"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.CAPTURE_LOOK_BLOCK))
+                .pos(left + 536, top + CONTROL_ROW_Y)
                 .size(86, 20)
                 .build());
-        this.addRenderableWidget(new Button.Builder(Component.literal("Area 1"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.SET_AREA_POS_1))
-                .pos(left + 628, top + 332)
+        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.area_1"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.SET_AREA_POS_1))
+                .pos(left + 628, top + CONTROL_ROW_Y)
                 .size(62, 20)
                 .build());
-        this.addRenderableWidget(new Button.Builder(Component.literal("Area 2"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.SET_AREA_POS_2))
-                .pos(left + 696, top + 332)
+        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.area_2"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.SET_AREA_POS_2))
+                .pos(left + 696, top + CONTROL_ROW_Y)
                 .size(62, 20)
                 .build());
 
-        this.fieldValueBox = this.addRenderableWidget(new EditBox(this.font, left + 294, top + 360, 464, 20, Component.empty()));
+        this.fieldValueBox = this.addRenderableWidget(new EditBox(this.font, left + 294, top + FIELD_INPUT_Y, 464, 20, Component.empty()));
         this.fieldValueBox.setMaxLength(2048);
 
-        this.addRenderableWidget(new Button.Builder(Component.literal("Close"), button -> onClose())
-                .pos(left + 696, top + 396)
+        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.fpsm.close"), button -> onClose())
+                .pos(left + 696, top + BOTTOM_ROW_Y)
                 .size(62, 20)
                 .build());
-        this.listRowPrevButton = this.addRenderableWidget(new Button.Builder(Component.literal("Row <"), button -> stepListRow(-1))
-                .pos(left + 294, top + 396)
+        this.listRowPrevButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.row_prev"), button -> stepListRow(-1))
+                .pos(left + 294, top + BOTTOM_ROW_Y)
                 .size(44, 20)
                 .build());
-        this.listRowNextButton = this.addRenderableWidget(new Button.Builder(Component.literal("Row >"), button -> stepListRow(1))
-                .pos(left + 342, top + 396)
+        this.listRowNextButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.row_next"), button -> stepListRow(1))
+                .pos(left + 342, top + BOTTOM_ROW_Y)
                 .size(44, 20)
                 .build());
-        this.listRowInsertButton = this.addRenderableWidget(new Button.Builder(Component.literal("Insert"), button -> insertCurrentListRow())
-                .pos(left + 394, top + 396)
+        this.listRowInsertButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.insert"), button -> insertCurrentListRow())
+                .pos(left + 394, top + BOTTOM_ROW_Y)
                 .size(54, 20)
                 .build());
-        this.listRowUpdateButton = this.addRenderableWidget(new Button.Builder(Component.literal("Update"), button -> updateCurrentListRow())
-                .pos(left + 452, top + 396)
+        this.listRowUpdateButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.update"), button -> updateCurrentListRow())
+                .pos(left + 452, top + BOTTOM_ROW_Y)
                 .size(58, 20)
                 .build());
-        this.listRowDeleteButton = this.addRenderableWidget(new Button.Builder(Component.literal("Delete"), button -> deleteCurrentListRow())
-                .pos(left + 514, top + 396)
+        this.listRowDeleteButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.delete"), button -> deleteCurrentListRow())
+                .pos(left + 514, top + BOTTOM_ROW_Y)
                 .size(58, 20)
                 .build());
 
@@ -218,20 +222,20 @@ public class ZombiesDeployToolScreen extends Screen {
         guiGraphics.drawString(this.font, this.title, left + 12, top + 10, TEXT, false);
         drawStatus(guiGraphics, left + 470, top + 10, 338);
 
-        drawSection(guiGraphics, left + 12, top + 62, 270, 262, "Objects");
+        drawSection(guiGraphics, left + 12, top + 62, 270, 262, tr("gui.codpattern.zombies.deploy.objects"));
         drawObjects(guiGraphics, left + 18, top + 82, 258);
 
-        drawSection(guiGraphics, left + 290, top + 62, 230, 262, "Fields");
+        drawSection(guiGraphics, left + 290, top + 62, 230, 262, tr("gui.codpattern.zombies.deploy.fields"));
         drawFields(guiGraphics, left + 296, top + 82, 218);
 
-        drawSection(guiGraphics, left + 528, top + 62, 280, 262, "Validation");
+        drawSection(guiGraphics, left + 528, top + 62, 280, 262, tr("gui.codpattern.zombies.deploy.validation"));
         boolean showListPreview = isCurrentListField();
         drawValidation(guiGraphics, left + 534, top + 82, 268, showListPreview ? 7 : 16);
         if (showListPreview) {
             drawListPreview(guiGraphics, left + 534, top + 220, 268);
         }
 
-        drawCurrentField(guiGraphics, left + 294, top + 356, 392);
+        drawCurrentField(guiGraphics, left + 294, top + FIELD_LABEL_Y, 392);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
@@ -285,8 +289,12 @@ public class ZombiesDeployToolScreen extends Screen {
             setCurrentField();
             return true;
         }
+        boolean editorFocused = this.fieldValueBox != null && this.fieldValueBox.isFocused();
         if (this.fieldValueBox != null && this.fieldValueBox.keyPressed(keyCode, scanCode, modifiers)) {
             return true;
+        }
+        if (editorFocused) {
+            return super.keyPressed(keyCode, scanCode, modifiers);
         }
         if (keyCode == GLFW.GLFW_KEY_R) {
             sendAction(ZombiesDeployToolActionC2SPacket.Action.REFRESH);
@@ -321,8 +329,12 @@ public class ZombiesDeployToolScreen extends Screen {
 
     @Override
     public void onClose() {
-        sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_SELECTIONS);
         super.onClose();
+    }
+
+    @Override
+    public boolean shouldCloseOnEsc() {
+        return true;
     }
 
     @Override
@@ -369,7 +381,7 @@ public class ZombiesDeployToolScreen extends Screen {
         this.mapButton.setMessage(Component.literal(labelOrDash(this.selectedMap)));
         this.mapButton.active = !snapshot.availableMaps().isEmpty();
 
-        this.typeButton.setMessage(Component.literal(labelOrDash(this.selectedObjectType)));
+        this.typeButton.setMessage(Component.literal(labelOrDash(objectTypeLabel(this.selectedObjectType))));
         this.typeButton.active = !snapshot.objectTypes().isEmpty();
 
         this.profileButton.setMessage(Component.literal(labelOrDash(this.selectedProfile)));
@@ -389,7 +401,9 @@ public class ZombiesDeployToolScreen extends Screen {
         boolean editableField = field != null && field.editable();
         int listRowCount = listField ? listRows(field.key(), draftFields.getOrDefault(field.key(), field.value())).size() : 0;
         this.selectedListRowIndex = clampIndex(this.selectedListRowIndex, listRowCount);
-        this.setFieldButton.setMessage(Component.literal(listField ? "Set row" : "Set field"));
+        this.setFieldButton.setMessage(Component.translatable(listField
+                ? "gui.codpattern.zombies.deploy.set_row"
+                : "gui.codpattern.zombies.deploy.set_field"));
         this.setFieldButton.active = editableField;
 
         if (this.listRowPrevButton != null) {
@@ -635,7 +649,9 @@ public class ZombiesDeployToolScreen extends Screen {
 
     private void drawObjects(GuiGraphics guiGraphics, int left, int top, int width) {
         if (snapshot.objects().isEmpty()) {
-            guiGraphics.drawString(this.font, Component.literal("No objects for " + labelOrDash(selectedObjectType)), left, top, MUTED_TEXT, false);
+            guiGraphics.drawString(this.font, Component.literal(trimToWidth(
+                    tr("gui.codpattern.zombies.deploy.no_objects") + " " + labelOrDash(objectTypeLabel(selectedObjectType)),
+                    width)), left, top, MUTED_TEXT, false);
             return;
         }
         int start = visibleObjectStart();
@@ -655,7 +671,7 @@ public class ZombiesDeployToolScreen extends Screen {
 
     private void drawFields(GuiGraphics guiGraphics, int left, int top, int width) {
         if (snapshot.fields().isEmpty()) {
-            guiGraphics.drawString(this.font, Component.literal("No fields"), left, top, MUTED_TEXT, false);
+            guiGraphics.drawString(this.font, Component.translatable("gui.codpattern.zombies.deploy.no_fields"), left, top, MUTED_TEXT, false);
             return;
         }
         int start = visibleFieldStart();
@@ -667,23 +683,27 @@ public class ZombiesDeployToolScreen extends Screen {
                 guiGraphics.fill(left - 3, y - 2, left + width, y + 18, HIGHLIGHT);
             }
             String value = draftFields.getOrDefault(field.key(), field.value());
-            String first = field.key() + "  " + field.type().name().toLowerCase(Locale.ROOT);
+            String first = tr(field.labelKey()) + "  " + field.type().name().toLowerCase(Locale.ROOT);
             String second = field.type() == ZombiesDeployFieldSchema.FieldType.LIST
                     ? listFieldSummary(field.key(), value)
-                    : (value.isBlank() ? "(blank)" : value);
+                    : (value.isBlank() ? tr("gui.codpattern.zombies.deploy.blank") : value);
             guiGraphics.drawString(this.font, Component.literal(trimToWidth(first, width)), left, y, field.editable() ? TEXT : MUTED_TEXT, false);
             guiGraphics.drawString(this.font, Component.literal(trimToWidth(second, width)), left, y + 10, MUTED_TEXT, false);
         }
     }
 
     private void drawValidation(GuiGraphics guiGraphics, int left, int top, int width, int maxLines) {
-        guiGraphics.drawString(this.font, Component.literal("Map: " + labelOrDash(selectedMap)), left, top, LABEL_TEXT, false);
-        guiGraphics.drawString(this.font, Component.literal("Profile: " + labelOrDash(selectedProfile)), left, top + 12, LABEL_TEXT, false);
-        guiGraphics.drawString(this.font, Component.literal("Active: " + (snapshot.activeMap() ? "yes" : "no") + "  Rev: " + snapshot.revision()), left, top + 24, LABEL_TEXT, false);
+        guiGraphics.drawString(this.font, Component.literal(trimToWidth(tr("gui.codpattern.zombies.deploy.map") + ": " + labelOrDash(selectedMap), width)), left, top, LABEL_TEXT, false);
+        guiGraphics.drawString(this.font, Component.literal(trimToWidth(tr("gui.codpattern.zombies.deploy.profile") + ": " + labelOrDash(selectedProfile), width)), left, top + 12, LABEL_TEXT, false);
+        guiGraphics.drawString(this.font, Component.literal(trimToWidth(
+                tr("gui.codpattern.zombies.deploy.active") + ": "
+                        + (snapshot.activeMap() ? tr("gui.codpattern.zombies.deploy.yes") : tr("gui.codpattern.zombies.deploy.no"))
+                        + "  " + tr("gui.codpattern.zombies.deploy.revision") + ": " + snapshot.revision(),
+                width)), left, top + 24, LABEL_TEXT, false);
 
         List<ZombiesDeploySnapshot.ValidationLine> lines = snapshot.validationLines();
         if (lines.isEmpty()) {
-            guiGraphics.drawString(this.font, Component.literal("No validation issues"), left, top + 46, INFO_TEXT, false);
+            guiGraphics.drawString(this.font, Component.translatable("gui.codpattern.zombies.deploy.no_validation_issues"), left, top + 46, INFO_TEXT, false);
             return;
         }
         for (int i = 0; i < Math.min(lines.size(), maxLines); i++) {
@@ -693,7 +713,7 @@ public class ZombiesDeployToolScreen extends Screen {
             guiGraphics.drawString(this.font, Component.literal(trimToWidth(text, width)), left, y, colorForSeverity(line.severity()), false);
         }
         if (lines.size() > maxLines) {
-            guiGraphics.drawString(this.font, Component.literal("+" + (lines.size() - maxLines) + " more"), left, top + 46 + maxLines * 12, MUTED_TEXT, false);
+            guiGraphics.drawString(this.font, Component.literal(ta("gui.codpattern.zombies.deploy.more", lines.size() - maxLines)), left, top + 46 + maxLines * 12, MUTED_TEXT, false);
         }
     }
 
@@ -708,14 +728,14 @@ public class ZombiesDeployToolScreen extends Screen {
 
         guiGraphics.fill(left - 4, top - 4, left + width, top + 96, 0x8014181D);
         drawBorder(guiGraphics, left - 4, top - 4, width + 4, 100, 0xFF39424B);
-        guiGraphics.drawString(this.font, Component.literal(trimToWidth("List helper: " + field.key(), width - 4)), left, top, LABEL_TEXT, false);
+        guiGraphics.drawString(this.font, Component.literal(trimToWidth(tr("gui.codpattern.zombies.deploy.list_helper") + ": " + tr(field.labelKey()), width - 4)), left, top, LABEL_TEXT, false);
         guiGraphics.drawString(this.font, Component.literal(trimToWidth(preview.hint(), width - 4)), left, top + 12, MUTED_TEXT, false);
-        guiGraphics.drawString(this.font, Component.literal(trimToWidth(preview.statusLine(), width - 4)), left, top + 24, statusColor, false);
+        guiGraphics.drawString(this.font, Component.literal(trimToWidth(statusLine(preview), width - 4)), left, top + 24, statusColor, false);
 
         int y = top + 38;
         int issueLimit = Math.min(2, preview.issues().size());
         for (int i = 0; i < issueLimit; i++) {
-            guiGraphics.drawString(this.font, Component.literal(trimToWidth(preview.issues().get(i), width - 4)), left, y, statusColor, false);
+            guiGraphics.drawString(this.font, Component.literal(trimToWidth(issueText(preview.issues().get(i)), width - 4)), left, y, statusColor, false);
             y += 10;
         }
 
@@ -730,18 +750,20 @@ public class ZombiesDeployToolScreen extends Screen {
             y += 10;
         }
         if (preview.rows().size() > rowLimit) {
-            String range = "Rows " + (rowStart + 1) + "-" + rowEnd + " of " + preview.rows().size();
+            String range = ta("gui.codpattern.zombies.deploy.rows_range", rowStart + 1, rowEnd, preview.rows().size());
             guiGraphics.drawString(this.font, Component.literal(range), left, y, MUTED_TEXT, false);
         }
     }
 
     private void drawCurrentField(GuiGraphics guiGraphics, int left, int top, int width) {
         ZombiesDeploySnapshot.FieldValue field = currentField();
-        String label = field == null ? "Field value" : "Field value: " + field.key();
+        String label = field == null
+                ? tr("gui.codpattern.zombies.deploy.field_value")
+                : tr("gui.codpattern.zombies.deploy.field_value") + ": " + tr(field.labelKey());
         if (field != null && field.type() == ZombiesDeployFieldSchema.FieldType.LIST) {
             List<String> rows = listRows(field.key(), draftFields.getOrDefault(field.key(), field.value()));
             String row = rows.isEmpty() ? "0/0" : (clampIndex(this.selectedListRowIndex, rows.size()) + 1) + "/" + rows.size();
-            label = label + " row " + row;
+            label = label + "  " + tr("gui.codpattern.zombies.deploy.row") + " " + row;
         }
         guiGraphics.drawString(this.font, Component.literal(trimToWidth(label, width)), left, top, LABEL_TEXT, false);
     }
@@ -780,14 +802,14 @@ public class ZombiesDeployToolScreen extends Screen {
 
     private String listFieldSummary(String fieldKey, String value) {
         ListFieldPreview preview = listPreview(fieldKey, value);
-        String prefix = preview.rows().size() == 1 ? "1 row" : preview.rows().size() + " rows";
+        String prefix = ta("gui.codpattern.zombies.deploy.rows_count", preview.rows().size());
         if (preview.hasErrors()) {
-            return prefix + "  error";
+            return prefix + "  " + tr("gui.codpattern.zombies.deploy.error");
         }
         if (preview.hasWarnings()) {
-            return prefix + "  warning";
+            return prefix + "  " + tr("gui.codpattern.zombies.deploy.warning");
         }
-        return prefix + "  ok";
+        return prefix + "  " + tr("gui.codpattern.zombies.deploy.ok");
     }
 
     private ListFieldPreview listPreview(String fieldKey, String value) {
@@ -795,7 +817,7 @@ public class ZombiesDeployToolScreen extends Screen {
             case "refreshWaves" -> previewRefreshWaves(value);
             case "rarityPools" -> previewRarityPools(value);
             case "weapons" -> previewWeapons(value);
-            case "pricesByWeaponLevel" -> previewIntegerMap(value, "Use level=cost rows separated by comma or semicolon.", "level", "cost");
+            case "pricesByWeaponLevel" -> previewIntegerMap(value, tr("gui.codpattern.zombies.deploy.hint.prices"), tr("gui.codpattern.zombies.deploy.level"), tr("gui.codpattern.zombies.deploy.cost"));
             case "levels" -> previewUltimateLevels(value);
             default -> previewGenericList(value);
         };
@@ -811,7 +833,7 @@ public class ZombiesDeployToolScreen extends Screen {
             String entry = entries.get(i);
             Integer wave = parseInteger(entry);
             if (wave == null || wave < 1) {
-                issues.add("Error row " + (i + 1) + ": wave must be an integer >= 1.");
+                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.wave_invalid", i + 1));
                 rows.add("#" + (i + 1) + "  " + entry);
                 continue;
             }
@@ -821,10 +843,10 @@ public class ZombiesDeployToolScreen extends Screen {
             rows.add("#" + (i + 1) + "  wave " + wave);
         }
         if (!duplicates.isEmpty()) {
-            issues.add("Warning: duplicate waves " + joinIntegers(duplicates) + ".");
+            issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.duplicate_waves", joinIntegers(duplicates)));
         }
         return new ListFieldPreview(
-                "Use comma/semicolon separated waves, e.g. 1,4,7.",
+                tr("gui.codpattern.zombies.deploy.hint.refresh_waves"),
                 rows,
                 issues,
                 containsError(issues),
@@ -841,14 +863,14 @@ public class ZombiesDeployToolScreen extends Screen {
             String entry = entries.get(i);
             int equals = entry.indexOf('=');
             if (equals <= 0 || equals == entry.length() - 1) {
-                issues.add("Error row " + (i + 1) + ": use id=rank,baseWeight,waveFactor.");
+                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.rarity_format", i + 1));
                 rows.add("#" + (i + 1) + "  " + entry);
                 continue;
             }
             String id = entry.substring(0, equals).trim();
             String[] parts = entry.substring(equals + 1).split(",");
             if (id.isEmpty() || parts.length != 3) {
-                issues.add("Error row " + (i + 1) + ": use id=rank,baseWeight,waveFactor.");
+                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.rarity_format", i + 1));
                 rows.add("#" + (i + 1) + "  " + entry);
                 continue;
             }
@@ -856,13 +878,13 @@ public class ZombiesDeployToolScreen extends Screen {
             Double baseWeight = parseFiniteDouble(parts[1]);
             Double waveFactor = parseFiniteDouble(parts[2]);
             if (rank == null || baseWeight == null || waveFactor == null) {
-                issues.add("Error row " + (i + 1) + ": rank/base/wave must be numeric.");
+                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.rarity_numeric", i + 1));
             } else {
                 if (!ids.add(id)) {
-                    issues.add("Warning row " + (i + 1) + ": duplicate rarity id " + id + ".");
+                    issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.duplicate_rarity", i + 1, id));
                 }
                 if (!ranks.add(rank)) {
-                    issues.add("Warning row " + (i + 1) + ": duplicate rank " + rank + ".");
+                    issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.duplicate_rank", i + 1, rank));
                 }
                 rows.add("#" + (i + 1) + "  " + id + "  rank " + rank + "  base " + baseWeight + "  wave " + waveFactor);
                 continue;
@@ -870,7 +892,7 @@ public class ZombiesDeployToolScreen extends Screen {
             rows.add("#" + (i + 1) + "  " + entry);
         }
         return new ListFieldPreview(
-                "Use ; between rows: id=rank,baseWeight,waveFactor.",
+                tr("gui.codpattern.zombies.deploy.hint.rarity_pools"),
                 rows,
                 issues,
                 containsError(issues),
@@ -886,14 +908,14 @@ public class ZombiesDeployToolScreen extends Screen {
             String entry = entries.get(i);
             int separator = entry.indexOf('|');
             if (separator <= 0 || separator == entry.length() - 1) {
-                issues.add("Error row " + (i + 1) + ": use gunId|rarity=weight,rarity=weight.");
+                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.weapon_format", i + 1));
                 rows.add("#" + (i + 1) + "  " + entry);
                 continue;
             }
             String gunId = entry.substring(0, separator).trim();
             List<String> weights = splitLooseEntries(entry.substring(separator + 1));
             if (gunId.isEmpty() || weights.isEmpty()) {
-                issues.add("Error row " + (i + 1) + ": gunId and weights are required.");
+                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.weapon_required", i + 1));
                 rows.add("#" + (i + 1) + "  " + entry);
                 continue;
             }
@@ -901,24 +923,24 @@ public class ZombiesDeployToolScreen extends Screen {
             for (String weightEntry : weights) {
                 int equals = weightEntry.indexOf('=');
                 if (equals <= 0 || equals == weightEntry.length() - 1) {
-                    issues.add("Error row " + (i + 1) + ": weight must be rarity=positiveDecimal.");
+                    issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.weight_format", i + 1));
                     continue;
                 }
                 String rarity = weightEntry.substring(0, equals).trim();
                 Double weight = parseFiniteDouble(weightEntry.substring(equals + 1));
                 if (rarity.isEmpty() || weight == null || weight <= 0.0D) {
-                    issues.add("Error row " + (i + 1) + ": weight must be rarity=positiveDecimal.");
+                    issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.weight_format", i + 1));
                     continue;
                 }
                 if (!rarityIds.isEmpty() && !rarityIds.contains(rarity)) {
-                    issues.add("Warning row " + (i + 1) + ": unknown rarity " + rarity + ".");
+                    issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.unknown_rarity", i + 1, rarity));
                 }
                 parsedWeights.add(rarity + "=" + weight);
             }
             rows.add("#" + (i + 1) + "  " + gunId + "  " + String.join(", ", parsedWeights));
         }
         return new ListFieldPreview(
-                "Use ; between rows: gunId|rarity=weight,rarity=weight.",
+                tr("gui.codpattern.zombies.deploy.hint.weapons"),
                 rows,
                 issues,
                 containsError(issues),
@@ -934,7 +956,7 @@ public class ZombiesDeployToolScreen extends Screen {
             String entry = entries.get(i);
             int equals = entry.indexOf('=');
             if (equals <= 0 || equals == entry.length() - 1) {
-                issues.add("Error row " + (i + 1) + ": use " + keyLabel + "=" + valueLabel + ".");
+                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.integer_map_format", i + 1, keyLabel, valueLabel));
                 rows.add("#" + (i + 1) + "  " + entry);
                 continue;
             }
@@ -942,10 +964,10 @@ public class ZombiesDeployToolScreen extends Screen {
             Integer parsedKey = parseInteger(key);
             Integer parsedValue = parseInteger(entry.substring(equals + 1));
             if (parsedKey == null || parsedKey < 1 || parsedValue == null || parsedValue < 0) {
-                issues.add("Error row " + (i + 1) + ": " + keyLabel + " must be >= 1 and " + valueLabel + " >= 0.");
+                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.integer_map_range", i + 1, keyLabel, valueLabel));
             }
             if (!keys.add(key)) {
-                issues.add("Warning row " + (i + 1) + ": duplicate " + keyLabel + " " + key + ".");
+                issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.duplicate_key", i + 1, keyLabel, key));
             }
             rows.add("#" + (i + 1) + "  " + keyLabel + " " + key + " -> " + valueLabel + " " + entry.substring(equals + 1).trim());
         }
@@ -962,7 +984,7 @@ public class ZombiesDeployToolScreen extends Screen {
             int equals = entry.indexOf('=');
             int colon = entry.indexOf(':', equals + 1);
             if (equals <= 0 || colon <= equals + 1 || colon == entry.length() - 1) {
-                issues.add("Error row " + (i + 1) + ": use level=cost:damageMultiplier.");
+                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.ultimate_format", i + 1));
                 rows.add("#" + (i + 1) + "  " + entry);
                 continue;
             }
@@ -973,9 +995,9 @@ public class ZombiesDeployToolScreen extends Screen {
             Integer cost = parseInteger(costText);
             Double multiplier = parseFiniteDouble(multiplierText);
             if (level == null || level < 1 || cost == null || cost < 0 || multiplier == null || multiplier <= 0.0D) {
-                issues.add("Error row " + (i + 1) + ": level >= 1, cost >= 0, multiplier > 0.");
+                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.ultimate_range", i + 1));
             } else if (!levels.add(level)) {
-                issues.add("Warning row " + (i + 1) + ": duplicate level " + level + ".");
+                issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.duplicate_level", i + 1, level));
             }
             rows.add("#" + (i + 1) + "  level " + levelText + " -> cost " + costText + "  x" + multiplierText);
         }
@@ -984,19 +1006,19 @@ public class ZombiesDeployToolScreen extends Screen {
         if (maxLevel != null && maxLevel > 0 && !containsError(issues)) {
             for (int level = 1; level <= maxLevel; level++) {
                 if (!levels.contains(level)) {
-                    issues.add("Warning: missing level " + level + " for maxUpgradeLevel " + maxLevel + ".");
+                    issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.missing_level", level, maxLevel));
                     break;
                 }
             }
             for (Integer level : levels) {
                 if (level > maxLevel) {
-                    issues.add("Warning: level " + level + " is above maxUpgradeLevel " + maxLevel + ".");
+                    issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.level_above_max", level, maxLevel));
                     break;
                 }
             }
         }
         return new ListFieldPreview(
-                "Use comma/semicolon rows: level=cost:damageMultiplier.",
+                tr("gui.codpattern.zombies.deploy.hint.ultimate_levels"),
                 rows,
                 issues,
                 containsError(issues),
@@ -1010,7 +1032,7 @@ public class ZombiesDeployToolScreen extends Screen {
             rows.add("#" + (i + 1) + "  " + entries.get(i));
         }
         return new ListFieldPreview(
-                "Use semicolon or newline between rows.",
+                tr("gui.codpattern.zombies.deploy.hint.generic_list"),
                 rows,
                 List.of(),
                 false,
@@ -1107,11 +1129,37 @@ public class ZombiesDeployToolScreen extends Screen {
     }
 
     private boolean containsError(List<String> issues) {
-        return issues.stream().anyMatch(issue -> issue.startsWith("Error"));
+        return issues.stream().anyMatch(issue -> issue.startsWith("E|"));
     }
 
     private boolean containsWarning(List<String> issues) {
-        return issues.stream().anyMatch(issue -> issue.startsWith("Warning"));
+        return issues.stream().anyMatch(issue -> issue.startsWith("W|"));
+    }
+
+    private String errorIssue(String key, Object... args) {
+        return "E|" + ta(key, args);
+    }
+
+    private String warningIssue(String key, Object... args) {
+        return "W|" + ta(key, args);
+    }
+
+    private String issueText(String issue) {
+        if (issue == null) {
+            return "";
+        }
+        return issue.startsWith("E|") || issue.startsWith("W|") ? issue.substring(2) : issue;
+    }
+
+    private String statusLine(ListFieldPreview preview) {
+        String count = ta("gui.codpattern.zombies.deploy.parsed_rows", preview.rows().size());
+        if (preview.hasErrors()) {
+            return tr("gui.codpattern.zombies.deploy.error") + ": " + count;
+        }
+        if (preview.hasWarnings()) {
+            return tr("gui.codpattern.zombies.deploy.warning") + ": " + count;
+        }
+        return tr("gui.codpattern.zombies.deploy.ok") + ": " + count;
     }
 
     private String joinIntegers(Set<Integer> values) {
@@ -1131,10 +1179,10 @@ public class ZombiesDeployToolScreen extends Screen {
             parts.add(snapshot.statusDetail());
         }
         if (parts.isEmpty() && !snapshot.statusKey().isBlank()) {
-            parts.add(snapshot.statusKey());
+            parts.add(tr(snapshot.statusKey()));
         }
-        String status = parts.isEmpty() ? "ready" : String.join(" ", parts);
-        guiGraphics.drawString(this.font, Component.literal(trimToWidth("Status: " + status, width)), left, top, INFO_TEXT, false);
+        String status = parts.isEmpty() ? tr("gui.codpattern.zombies.deploy.ready") : String.join(" ", parts);
+        guiGraphics.drawString(this.font, Component.literal(trimToWidth(tr("gui.codpattern.zombies.deploy.status") + ": " + status, width)), left, top, INFO_TEXT, false);
     }
 
     private int colorForSeverity(String severity) {
@@ -1283,6 +1331,20 @@ public class ZombiesDeployToolScreen extends Screen {
         return value == null || value.isBlank() ? "-" : value;
     }
 
+    private String objectTypeLabel(String objectType) {
+        return ZombiesDeployFieldSchema.objectType(objectType)
+                .map(type -> tr(type.labelKey()))
+                .orElse(labelOrDash(objectType));
+    }
+
+    private String tr(String key) {
+        return Component.translatable(key).getString();
+    }
+
+    private String ta(String key, Object... args) {
+        return Component.translatable(key, args).getString();
+    }
+
     private String trimToWidth(String value, int width) {
         String text = value == null ? "" : value;
         if (this.font.width(text) <= width) {
@@ -1371,17 +1433,6 @@ public class ZombiesDeployToolScreen extends Screen {
             hint = Objects.requireNonNullElse(hint, "");
             rows = rows == null ? List.of() : List.copyOf(rows);
             issues = issues == null ? List.of() : List.copyOf(issues);
-        }
-
-        private String statusLine() {
-            String count = rows.size() == 1 ? "1 parsed row" : rows.size() + " parsed rows";
-            if (hasErrors) {
-                return "Error: " + count;
-            }
-            if (hasWarnings) {
-                return "Warning: " + count;
-            }
-            return "OK: " + count;
         }
     }
 }

@@ -18,9 +18,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
@@ -67,18 +64,6 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
                         MapCreatorTool.formatPos(clickedPos)).withStyle(ChatFormatting.AQUA), true);
             }
         }
-    }
-
-    @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        ItemStack stack = player.getItemInHand(hand);
-        if (hand != InteractionHand.MAIN_HAND || !(stack.getItem() instanceof ZombiesDeployTool)) {
-            return InteractionResultHolder.pass(stack);
-        }
-        if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
-            ZombiesDeployToolActionC2SPacket.sendScreen(serverPlayer, stack, getDraft(stack));
-        }
-        return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
     }
 
     public void syncHeldPreview(ServerPlayer player, ItemStack stack) {

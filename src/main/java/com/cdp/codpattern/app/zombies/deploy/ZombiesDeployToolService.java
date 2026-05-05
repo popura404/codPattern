@@ -276,7 +276,7 @@ public final class ZombiesDeployToolService {
 
         map.syncToClient();
         ZombiesDeployTool.saveDraft(stack, resultDraft);
-        boolean activeMap = ZombiesMapOccupancyService.instance().isOccupied(BuiltInGameModes.ZOMBIES, draft.selectedMap());
+        boolean activeMap = ZombiesMapOccupancyService.instance().isOccupied(BuiltInGameModes.ZOMBIES, map.getMapName());
         String statusKey = activeMap
                 ? "message.codpattern.zombies.deploy.saved_active_map"
                 : "message.codpattern.zombies.deploy.object_saved";
@@ -328,6 +328,9 @@ public final class ZombiesDeployToolService {
         Optional<ZombiesMap> map = resolveMap(draft.selectedMap());
         ZombiesMapObjects objects = map.map(ZombiesMap::objects).orElse(ZombiesMapObjects.EMPTY);
         List<ZombiesDeploySnapshot.ObjectSummary> summaries = objectSummaries(objects, draft.objectType());
+        boolean activeMap = map
+                .map(value -> ZombiesMapOccupancyService.instance().isOccupied(BuiltInGameModes.ZOMBIES, value.getMapName()))
+                .orElse(false);
         return new ZombiesDeploySnapshot(
                 availableMaps(),
                 draft.selectedMap(),
@@ -341,7 +344,7 @@ public final class ZombiesDeployToolService {
                 draft.profileKey(),
                 ZombiesDeployFieldSchema.profiles(),
                 map.map(value -> validationLines(value, draft.profileKey())).orElse(List.of()),
-                ZombiesMapOccupancyService.instance().isOccupied(BuiltInGameModes.ZOMBIES, draft.selectedMap()),
+                activeMap,
                 map.map(value -> Math.abs(Objects.hash(value.getMapName(), value.objects(), value.matchEndTeleportPoint()))).orElse(0),
                 Objects.requireNonNullElse(statusKey, ""),
                 Objects.requireNonNullElse(statusCode, ""),
