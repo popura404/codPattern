@@ -28,11 +28,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -43,7 +39,6 @@ import java.util.Optional;
 
 public final class ZombiesDeployToolService {
     private static final ZombiesDeployToolService INSTANCE = new ZombiesDeployToolService();
-    private static final double BLOCK_PICK_REACH = 8.0D;
 
     public static ZombiesDeployToolService instance() {
         return INSTANCE;
@@ -96,84 +91,6 @@ public final class ZombiesDeployToolService {
             fields.put(fieldKey.trim(), fieldValue == null ? "" : fieldValue);
         }
         return saveSelections(player, stack, draft.withFields(fields));
-    }
-
-    public ZombiesDeployServiceResult<ZombiesDeploySnapshot> capturePlayerPosition(
-            ServerPlayer player,
-            ItemStack stack,
-            ZombiesDeployDraft request
-    ) {
-        ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
-        Map<String, String> fields = new LinkedHashMap<>(draft.fields());
-        BlockPos pos = player.blockPosition();
-        fields.put("dimension", player.serverLevel().dimension().location().toString());
-        setPosition(fields, "pos", pos);
-        setPosition(fields, "interaction", pos);
-        fields.put("yaw", Float.toString(player.getYRot()));
-        fields.put("pitch", Float.toString(player.getXRot()));
-        ZombiesDeployDraft updated = draft.withFields(fields);
-        ZombiesDeployTool.saveDraft(stack, updated);
-        return snapshot(
-                player,
-                stack,
-                updated,
-                "message.codpattern.zombies.deploy.captured_player_pos",
-                "ok",
-                formatPos(pos));
-    }
-
-    public ZombiesDeployServiceResult<ZombiesDeploySnapshot> captureLookBlock(
-            ServerPlayer player,
-            ItemStack stack,
-            ZombiesDeployDraft request
-    ) {
-        Optional<BlockPos> hit = lookBlock(player);
-        if (hit.isEmpty()) {
-            return failure(player, stack, request, "capture.no_block", "message.codpattern.zombies.deploy.no_look_block", "");
-        }
-        ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
-        Map<String, String> fields = new LinkedHashMap<>(draft.fields());
-        fields.put("dimension", player.serverLevel().dimension().location().toString());
-        setPosition(fields, "pos", hit.get());
-        setPosition(fields, "interaction", hit.get());
-        ZombiesDeployDraft updated = draft.withFields(fields);
-        ZombiesDeployTool.saveDraft(stack, updated);
-        return snapshot(
-                player,
-                stack,
-                updated,
-                "message.codpattern.zombies.deploy.captured_look_block",
-                "ok",
-                formatPos(hit.get()));
-    }
-
-    public ZombiesDeployServiceResult<ZombiesDeploySnapshot> setAreaPos(
-            ServerPlayer player,
-            ItemStack stack,
-            ZombiesDeployDraft request,
-            boolean first
-    ) {
-        BlockPos pos = lookBlock(player).orElseGet(player::blockPosition);
-        if (first) {
-            ZombiesDeployTool.setAreaPos1(stack, pos);
-        } else {
-            ZombiesDeployTool.setAreaPos2(stack, pos);
-        }
-        ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
-        Map<String, String> fields = new LinkedHashMap<>(draft.fields());
-        fields.put("dimension", player.serverLevel().dimension().location().toString());
-        setPosition(fields, first ? "areaFrom" : "areaTo", pos);
-        ZombiesDeployDraft updated = draft.withFields(fields);
-        ZombiesDeployTool.saveDraft(stack, updated);
-        return snapshot(
-                player,
-                stack,
-                updated,
-                first
-                        ? "message.codpattern.zombies.deploy.area_pos1"
-                        : "message.codpattern.zombies.deploy.area_pos2",
-                "ok",
-                formatPos(pos));
     }
 
     public ZombiesDeployServiceResult<ZombiesDeploySnapshot> validateMap(
@@ -302,6 +219,11 @@ public final class ZombiesDeployToolService {
             ZombiesDeployDraft updated = leftClick
                     ? draft.withMapDraft(draft.draftMapName(), clickedPos, draft.mapPos2())
                     : draft.withMapDraft(draft.draftMapName(), draft.mapPos1(), clickedPos);
+            if (leftClick) {
+                ZombiesDeployTool.setAreaPos1(stack, clickedPos);
+            } else {
+                ZombiesDeployTool.setAreaPos2(stack, clickedPos);
+            }
             ZombiesDeployTool.saveDraft(stack, updated);
             return snapshot(
                     player,
@@ -312,7 +234,9 @@ public final class ZombiesDeployToolService {
                     formatPos(clickedPos));
         }
 
-        String target = captureTarget(draft.objectType(), draft.capturePreset(), leftClick);
+        String target = ZombiesDeployCaptureBinding.forDraft(draft).target(leftClick
+                ? ZombiesDeployCaptureBinding.CaptureSlot.A
+                : ZombiesDeployCaptureBinding.CaptureSlot.B);
         if (target.isBlank()) {
             ZombiesDeployTool.saveDraft(stack, draft);
             return snapshot(player, stack, draft, "message.codpattern.zombies.deploy.refreshed", "capture.slot_empty", formatPos(clickedPos));
@@ -477,6 +401,7 @@ public final class ZombiesDeployToolService {
         boolean activeMap = map
                 .map(value -> ZombiesMapOccupancyService.instance().isOccupied(BuiltInGameModes.ZOMBIES, value.getMapName()))
                 .orElse(false);
+        ZombiesDeployCaptureBinding binding = ZombiesDeployCaptureBinding.forDraft(draft);
         return new ZombiesDeploySnapshot(
                 availableMaps(),
                 draft.workspaceStage(),
@@ -489,8 +414,8 @@ public final class ZombiesDeployToolService {
                         .toList(),
                 draft.objectType(),
                 draft.capturePreset(),
-                captureTarget(draft.objectType(), draft.capturePreset(), true),
-                captureTarget(draft.objectType(), draft.capturePreset(), false),
+                binding.slotA(),
+                binding.slotB(),
                 draft.selectedIndex(),
                 summaries,
                 fieldValues(draft.objectType(), draft.fields()),
@@ -744,40 +669,6 @@ public final class ZombiesDeployToolService {
                 new ZombiesDeploySnapshot.StepStatus("interact", "5 交互对象", hasPurchases ? "已放置" : "缺失", hasPurchases),
                 new ZombiesDeploySnapshot.StepStatus("validate", "6 校验", "查看右侧", hasMap)
         );
-    }
-
-    private String captureTarget(String objectType, String capturePreset, boolean leftClick) {
-        String type = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
-        if (ZombiesDeployFieldSchema.BARRIER.equals(type)) {
-            String preset = ZombiesDeployDraft.normalizeCapturePreset(capturePreset, type);
-            if (ZombiesDeployDraft.CAPTURE_BARRIER_INTERACTION.equals(preset)) {
-                return leftClick ? "interaction" : "";
-            }
-            return leftClick ? "areaFrom" : "areaTo";
-        }
-        return switch (type) {
-            case ZombiesDeployFieldSchema.WEAPON_WALL,
-                 ZombiesDeployFieldSchema.AMMO_BOX,
-                 ZombiesDeployFieldSchema.ARMOR_STATION,
-                 ZombiesDeployFieldSchema.SODA_MACHINE,
-                 ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> leftClick ? "pos" : "interaction";
-            case ZombiesDeployFieldSchema.INITIAL,
-                 ZombiesDeployFieldSchema.ZOMBIE_SPAWN,
-                 ZombiesDeployFieldSchema.POWER_SWITCH -> leftClick ? "pos" : "";
-            default -> "";
-        };
-    }
-
-    private Optional<BlockPos> lookBlock(ServerPlayer player) {
-        Vec3 eyePosition = player.getEyePosition();
-        Vec3 look = player.getLookAngle();
-        BlockHitResult hit = player.serverLevel().clip(new ClipContext(
-                eyePosition,
-                eyePosition.add(look.scale(BLOCK_PICK_REACH)),
-                ClipContext.Block.OUTLINE,
-                ClipContext.Fluid.NONE,
-                player));
-        return hit.getType() == HitResult.Type.BLOCK ? Optional.of(hit.getBlockPos()) : Optional.empty();
     }
 
     private void setPosition(Map<String, String> fields, String prefix, BlockPos pos) {

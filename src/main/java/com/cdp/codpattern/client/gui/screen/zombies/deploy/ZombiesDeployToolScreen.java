@@ -24,6 +24,7 @@ import org.joml.Vector3f;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -52,6 +53,13 @@ public class ZombiesDeployToolScreen extends Screen {
     private static final int FIELD_LABEL_Y = 354;
     private static final int FIELD_INPUT_Y = 368;
     private static final int BOTTOM_ROW_Y = 396;
+    private static final int LEFT_COLUMN_X = 16;
+    private static final int LEFT_COLUMN_Y = 84;
+    private static final int LEFT_COLUMN_WIDTH = 154;
+    private static final int CENTER_X = 178;
+    private static final int CENTER_WIDTH = 340;
+    private static final int RIGHT_X = 528;
+    private static final int RIGHT_WIDTH = 280;
 
     private ZombiesDeploySnapshot snapshot;
     private String workspaceStage;
@@ -66,17 +74,20 @@ public class ZombiesDeployToolScreen extends Screen {
     private int selectedFieldIndex;
     private int selectedListRowIndex;
     private String selectedListFieldKey = "";
+    private boolean showAdvancedFields;
     private final Map<String, String> draftFields = new LinkedHashMap<>();
 
     private Button mapButton;
     private Button stageButton;
     private Button capturePresetButton;
     private Button typeButton;
+    private final List<Button> objectTypeButtons = new ArrayList<>();
     private Button profileButton;
     private Button objectPrevButton;
     private Button objectNextButton;
     private Button fieldPrevButton;
     private Button fieldNextButton;
+    private Button advancedFieldsButton;
     private Button setFieldButton;
     private Button listRowPrevButton;
     private Button listRowNextButton;
@@ -99,6 +110,7 @@ public class ZombiesDeployToolScreen extends Screen {
     protected void init() {
         int left = panelLeft();
         int top = panelTop();
+        this.objectTypeButtons.clear();
 
         this.mapButton = this.addRenderableWidget(new Button.Builder(Component.empty(), button -> cycleMap())
                 .pos(left + 16, top + 30)
@@ -126,11 +138,11 @@ public class ZombiesDeployToolScreen extends Screen {
                 .build());
         this.mapNameBox = this.addRenderableWidget(new EditBox(this.font, left + 16, top + 56, 148, 18, Component.empty()));
         this.mapNameBox.setMaxLength(64);
-        this.createMapButton = this.addRenderableWidget(new Button.Builder(Component.literal("创建地图"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.CREATE_MAP))
+        this.createMapButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.create_map"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.CREATE_MAP))
                 .pos(left + 170, top + 55)
                 .size(78, 20)
                 .build());
-        this.updateMapAreaButton = this.addRenderableWidget(new Button.Builder(Component.literal("更新范围"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.UPDATE_MAP_AREA))
+        this.updateMapAreaButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.update_map_area"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.UPDATE_MAP_AREA))
                 .pos(left + 254, top + 55)
                 .size(78, 20)
                 .build());
@@ -138,62 +150,61 @@ public class ZombiesDeployToolScreen extends Screen {
                 .pos(left + 338, top + 55)
                 .size(112, 20)
                 .build());
+        this.advancedFieldsButton = this.addRenderableWidget(new Button.Builder(Component.empty(), button -> toggleAdvancedFields())
+                .pos(left + CENTER_X + 244, top + 207)
+                .size(88, 18)
+                .build());
         this.profileButton = this.addRenderableWidget(new Button.Builder(Component.empty(), button -> cycleProfile())
-                .pos(left + 668, top + 55)
-                .size(88, 20)
+                .pos(left + RIGHT_X + 174, top + 302)
+                .size(96, 20)
                 .build());
 
+        for (int i = 0; i < this.snapshot.objectTypes().size(); i++) {
+            ZombiesDeploySnapshot.ObjectTypeOption option = this.snapshot.objectTypes().get(i);
+            int column = i % 2;
+            int row = i / 2;
+            Button button = this.addRenderableWidget(new Button.Builder(Component.empty(), ignored -> selectObjectType(option.key()))
+                    .pos(left + LEFT_COLUMN_X + 6 + column * 70, top + 204 + row * 20)
+                    .size(66, 18)
+                    .build());
+            this.objectTypeButtons.add(button);
+        }
+
         this.objectPrevButton = this.addRenderableWidget(new Button.Builder(Component.literal("<"), button -> stepObject(-1))
-                .pos(left + 16, top + CONTROL_ROW_Y)
+                .pos(left + CENTER_X, top + CONTROL_ROW_Y)
                 .size(24, 20)
                 .build());
         this.objectNextButton = this.addRenderableWidget(new Button.Builder(Component.literal(">"), button -> stepObject(1))
-                .pos(left + 44, top + CONTROL_ROW_Y)
+                .pos(left + CENTER_X + 28, top + CONTROL_ROW_Y)
                 .size(24, 20)
                 .build());
         this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.add"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.ADD_OBJECT))
-                .pos(left + 76, top + CONTROL_ROW_Y)
+                .pos(left + CENTER_X + 60, top + CONTROL_ROW_Y)
                 .size(58, 20)
                 .build());
         this.updateObjectButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.update"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.UPDATE_OBJECT))
-                .pos(left + 140, top + CONTROL_ROW_Y)
+                .pos(left + CENTER_X + 124, top + CONTROL_ROW_Y)
                 .size(68, 20)
                 .build());
         this.deleteObjectButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.delete"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.DELETE_OBJECT))
-                .pos(left + 214, top + CONTROL_ROW_Y)
+                .pos(left + CENTER_X + 198, top + CONTROL_ROW_Y)
                 .size(68, 20)
                 .build());
 
         this.fieldPrevButton = this.addRenderableWidget(new Button.Builder(Component.literal("<"), button -> stepField(-1))
-                .pos(left + 294, top + CONTROL_ROW_Y)
+                .pos(left + CENTER_X + 274, top + CONTROL_ROW_Y)
                 .size(24, 20)
                 .build());
         this.fieldNextButton = this.addRenderableWidget(new Button.Builder(Component.literal(">"), button -> stepField(1))
-                .pos(left + 322, top + CONTROL_ROW_Y)
+                .pos(left + CENTER_X + 302, top + CONTROL_ROW_Y)
                 .size(24, 20)
                 .build());
         this.setFieldButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.set_field"), button -> setCurrentField())
-                .pos(left + 352, top + CONTROL_ROW_Y)
+                .pos(left + RIGHT_X, top + CONTROL_ROW_Y)
                 .size(86, 20)
-                .build());
-        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.player_pos"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.CAPTURE_PLAYER_POS))
-                .pos(left + 444, top + CONTROL_ROW_Y)
-                .size(86, 20)
-                .build());
-        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.look_block"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.CAPTURE_LOOK_BLOCK))
-                .pos(left + 536, top + CONTROL_ROW_Y)
-                .size(86, 20)
-                .build());
-        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.area_1"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.SET_AREA_POS_1))
-                .pos(left + 628, top + CONTROL_ROW_Y)
-                .size(62, 20)
-                .build());
-        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.area_2"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.SET_AREA_POS_2))
-                .pos(left + 696, top + CONTROL_ROW_Y)
-                .size(62, 20)
                 .build());
 
-        this.fieldValueBox = this.addRenderableWidget(new EditBox(this.font, left + 294, top + FIELD_INPUT_Y, 464, 20, Component.empty()));
+        this.fieldValueBox = this.addRenderableWidget(new EditBox(this.font, left + CENTER_X, top + FIELD_INPUT_Y, CENTER_WIDTH, 20, Component.empty()));
         this.fieldValueBox.setMaxLength(2048);
 
         this.addRenderableWidget(new Button.Builder(Component.translatable("gui.fpsm.close"), button -> onClose())
@@ -201,23 +212,23 @@ public class ZombiesDeployToolScreen extends Screen {
                 .size(62, 20)
                 .build());
         this.listRowPrevButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.row_prev"), button -> stepListRow(-1))
-                .pos(left + 294, top + BOTTOM_ROW_Y)
+                .pos(left + CENTER_X, top + BOTTOM_ROW_Y)
                 .size(44, 20)
                 .build());
         this.listRowNextButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.row_next"), button -> stepListRow(1))
-                .pos(left + 342, top + BOTTOM_ROW_Y)
+                .pos(left + CENTER_X + 48, top + BOTTOM_ROW_Y)
                 .size(44, 20)
                 .build());
         this.listRowInsertButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.insert"), button -> insertCurrentListRow())
-                .pos(left + 394, top + BOTTOM_ROW_Y)
+                .pos(left + CENTER_X + 100, top + BOTTOM_ROW_Y)
                 .size(54, 20)
                 .build());
         this.listRowUpdateButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.update"), button -> updateCurrentListRow())
-                .pos(left + 452, top + BOTTOM_ROW_Y)
+                .pos(left + CENTER_X + 158, top + BOTTOM_ROW_Y)
                 .size(58, 20)
                 .build());
         this.listRowDeleteButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.delete"), button -> deleteCurrentListRow())
-                .pos(left + 514, top + BOTTOM_ROW_Y)
+                .pos(left + CENTER_X + 220, top + BOTTOM_ROW_Y)
                 .size(58, 20)
                 .build());
 
@@ -255,21 +266,26 @@ public class ZombiesDeployToolScreen extends Screen {
 
         drawStageSummary(guiGraphics, left + 464, top + 55, 190);
 
-        drawSection(guiGraphics, left + 12, top + 82, 270, 242, tr("gui.codpattern.zombies.deploy.objects"));
-        drawCompactSteps(guiGraphics, left + 88, top + 88, 188);
-        drawObjects(guiGraphics, left + 18, top + 104, 258);
+        drawSection(guiGraphics, left + LEFT_COLUMN_X - 4, top + LEFT_COLUMN_Y - 2, LEFT_COLUMN_WIDTH, 240, tr("gui.codpattern.zombies.deploy.section.workflow"));
+        drawWorkflowAndTypes(guiGraphics, left + LEFT_COLUMN_X + 2, top + LEFT_COLUMN_Y + 18, LEFT_COLUMN_WIDTH - 10);
 
-        drawSection(guiGraphics, left + 290, top + 82, 230, 242, tr("gui.codpattern.zombies.deploy.fields"));
-        drawFields(guiGraphics, left + 296, top + 104, 218);
+        drawSection(guiGraphics, left + CENTER_X - 4, top + 82, CENTER_WIDTH + 8, 118, tr("gui.codpattern.zombies.deploy.section.objects_draft"));
+        drawObjectDraftSummary(guiGraphics, left + CENTER_X + 6, top + 100, CENTER_WIDTH - 12);
+        drawObjects(guiGraphics, left + CENTER_X + 6, top + 136, CENTER_WIDTH - 12);
 
-        drawSection(guiGraphics, left + 528, top + 82, 280, 242, tr("gui.codpattern.zombies.deploy.validation"));
+        drawSection(guiGraphics, left + CENTER_X - 4, top + 206, CENTER_WIDTH + 8, 118, tr("gui.codpattern.zombies.deploy.section.properties"));
+        drawFields(guiGraphics, left + CENTER_X + 6, top + 228, CENTER_WIDTH - 12);
+
+        drawSection(guiGraphics, left + RIGHT_X, top + 82, RIGHT_WIDTH, 242, tr("gui.codpattern.zombies.deploy.section.validation_status"));
         boolean showListPreview = isCurrentListField();
-        drawValidation(guiGraphics, left + 534, top + 104, 268, showListPreview ? 5 : 14);
+        drawValidation(guiGraphics, left + RIGHT_X + 6, top + 104, RIGHT_WIDTH - 12, showListPreview ? 5 : 14);
         if (showListPreview) {
-            drawListPreview(guiGraphics, left + 534, top + 220, 268);
+            drawListPreview(guiGraphics, left + RIGHT_X + 6, top + 220, RIGHT_WIDTH - 12);
         }
+        drawValidationProfileLabel(guiGraphics, left + RIGHT_X + 6, top + 306, 164);
 
-        drawCurrentField(guiGraphics, left + 294, top + FIELD_LABEL_Y, 392);
+        drawStatusBar(guiGraphics, left + RIGHT_X, top + 350, RIGHT_WIDTH);
+        drawCurrentField(guiGraphics, left + CENTER_X, top + FIELD_LABEL_Y, CENTER_WIDTH);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
@@ -296,19 +312,19 @@ public class ZombiesDeployToolScreen extends Screen {
 
         int left = panelLeft();
         int top = panelTop();
-        int objectIndex = listIndexAt(mouseX, mouseY, left + 18, top + 104, visibleObjectCount());
+        int objectIndex = listIndexAt(mouseX, mouseY, left + CENTER_X + 6, top + 136, visibleObjectCount(), CENTER_WIDTH - 12);
         if (objectIndex >= 0) {
             selectVisibleObject(objectIndex);
             return true;
         }
 
-        int listRowIndex = listRowIndexAt(mouseX, mouseY, left + 534, top + 220, 268);
+        int listRowIndex = listRowIndexAt(mouseX, mouseY, left + RIGHT_X + 6, top + 220, RIGHT_WIDTH - 12);
         if (listRowIndex >= 0) {
             selectListRow(listRowIndex);
             return true;
         }
 
-        int fieldIndex = listIndexAt(mouseX, mouseY, left + 296, top + 104, visibleFieldCount());
+        int fieldIndex = listIndexAt(mouseX, mouseY, left + CENTER_X + 6, top + 228, visibleFieldCount(), CENTER_WIDTH - 12);
         if (fieldIndex >= 0) {
             selectVisibleField(fieldIndex);
             return true;
@@ -318,6 +334,13 @@ public class ZombiesDeployToolScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        boolean mapNameFocused = this.mapNameBox != null && this.mapNameBox.isFocused();
+        if (mapNameFocused && this.mapNameBox.keyPressed(keyCode, scanCode, modifiers)) {
+            return true;
+        }
+        if (mapNameFocused) {
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
         if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
             setCurrentField();
             return true;
@@ -354,6 +377,9 @@ public class ZombiesDeployToolScreen extends Screen {
 
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
+        if (this.mapNameBox != null && this.mapNameBox.charTyped(codePoint, modifiers)) {
+            return true;
+        }
         if (this.fieldValueBox != null && this.fieldValueBox.charTyped(codePoint, modifiers)) {
             return true;
         }
@@ -433,10 +459,16 @@ public class ZombiesDeployToolScreen extends Screen {
         this.capturePresetButton.setMessage(Component.literal(capturePresetLabel(this.capturePreset)));
         this.capturePresetButton.active = ZombiesDeployFieldSchema.BARRIER.equals(this.selectedObjectType);
 
-        this.typeButton.setMessage(Component.literal(labelOrDash(objectTypeLabel(this.selectedObjectType))));
-        this.typeButton.active = !snapshot.objectTypes().isEmpty();
+        this.typeButton.setMessage(Component.literal(trimButton(ta("gui.codpattern.zombies.deploy.current_type", labelOrDash(objectTypeLabel(this.selectedObjectType))), 148)));
+        this.typeButton.active = false;
+        for (int i = 0; i < this.objectTypeButtons.size() && i < snapshot.objectTypes().size(); i++) {
+            ZombiesDeploySnapshot.ObjectTypeOption option = snapshot.objectTypes().get(i);
+            int count = objectCount(option.key());
+            String marker = option.key().equals(this.selectedObjectType) ? "> " : "";
+            this.objectTypeButtons.get(i).setMessage(Component.literal(trimButton(marker + shortObjectTypeLabel(option.key()) + " " + count, 60)));
+        }
 
-        this.profileButton.setMessage(Component.literal("校验 " + labelOrDash(this.selectedProfile)));
+        this.profileButton.setMessage(Component.literal(ta("gui.codpattern.zombies.deploy.view_profile", profileShortLabel(this.selectedProfile))));
         this.profileButton.active = snapshot.availableProfiles().size() > 1;
 
         if (this.mapNameBox != null && !this.mapNameBox.isFocused() && !Objects.equals(this.mapNameBox.getValue(), this.draftMapName)) {
@@ -452,9 +484,13 @@ public class ZombiesDeployToolScreen extends Screen {
         this.updateObjectButton.active = hasObjects;
         this.deleteObjectButton.active = hasObjects;
 
-        boolean hasFields = !snapshot.fields().isEmpty();
+        ensureVisibleFieldSelected();
+        boolean hasFields = !fieldDisplayOrder().isEmpty();
         this.fieldPrevButton.active = hasFields;
         this.fieldNextButton.active = hasFields;
+        this.advancedFieldsButton.setMessage(Component.literal(this.showAdvancedFields
+                ? tr("gui.codpattern.zombies.deploy.advanced_on")
+                : tr("gui.codpattern.zombies.deploy.advanced_off")));
         ZombiesDeploySnapshot.FieldValue field = currentField();
         boolean listField = field != null && field.type() == ZombiesDeployFieldSchema.FieldType.LIST;
         boolean editableField = field != null && field.editable();
@@ -544,6 +580,17 @@ public class ZombiesDeployToolScreen extends Screen {
         sendAction(ZombiesDeployToolActionC2SPacket.Action.SELECT_OBJECT_TYPE);
     }
 
+    private void selectObjectType(String objectType) {
+        String normalized = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
+        if (normalized.equals(this.selectedObjectType)) {
+            return;
+        }
+        this.selectedObjectType = normalized;
+        this.selectedIndex = -1;
+        this.selectedFieldIndex = 0;
+        sendAction(ZombiesDeployToolActionC2SPacket.Action.SELECT_OBJECT_TYPE);
+    }
+
     private void cycleWorkspaceStage() {
         this.workspaceStage = ZombiesDeployDraft.STAGE_MAP_REGISTRATION.equals(this.workspaceStage)
                 ? ZombiesDeployDraft.STAGE_OBJECT_MARKING
@@ -560,6 +607,12 @@ public class ZombiesDeployToolScreen extends Screen {
                 ? ZombiesDeployDraft.CAPTURE_BARRIER_AREA
                 : ZombiesDeployDraft.CAPTURE_BARRIER_INTERACTION;
         sendAction(ZombiesDeployToolActionC2SPacket.Action.SELECT_CAPTURE_PRESET);
+    }
+
+    private void toggleAdvancedFields() {
+        this.showAdvancedFields = !this.showAdvancedFields;
+        ensureVisibleFieldSelected();
+        updateWidgets();
     }
 
     private void cycleProfile() {
@@ -590,7 +643,18 @@ public class ZombiesDeployToolScreen extends Screen {
     }
 
     private void stepField(int offset) {
-        this.selectedFieldIndex = clampIndex(this.selectedFieldIndex + offset, snapshot.fields().size());
+        List<Integer> order = fieldDisplayOrder();
+        if (order.isEmpty()) {
+            this.selectedFieldIndex = 0;
+            updateWidgets();
+            return;
+        }
+        int position = order.indexOf(this.selectedFieldIndex);
+        if (position < 0) {
+            position = 0;
+        }
+        int next = Math.max(0, Math.min(position + offset, order.size() - 1));
+        this.selectedFieldIndex = order.get(next);
         updateWidgets();
     }
 
@@ -730,12 +794,12 @@ public class ZombiesDeployToolScreen extends Screen {
     }
 
     private void drawStageSummary(GuiGraphics guiGraphics, int left, int top, int width) {
-        String binding = "左键 -> " + labelOrDash(snapshot.captureSlotA()) + "  右键 -> " + labelOrDash(snapshot.captureSlotB());
+        String binding = ta("gui.codpattern.zombies.deploy.binding", labelOrDash(snapshot.captureSlotA()), labelOrDash(snapshot.captureSlotB()));
         if (ZombiesDeployDraft.STAGE_MAP_REGISTRATION.equals(this.workspaceStage)) {
-            binding = "左键 -> mapPos1  右键 -> mapPos2";
+            binding = ta("gui.codpattern.zombies.deploy.binding", "mapPos1", "mapPos2");
         }
         guiGraphics.drawString(this.font, Component.literal(trimToWidth(binding, width)), left, top, INFO_TEXT, false);
-        String mapLine = "地图范围 A " + formatPos(this.mapPos1) + " / B " + formatPos(this.mapPos2);
+        String mapLine = ta("gui.codpattern.zombies.deploy.map_area_ab", formatPos(this.mapPos1), formatPos(this.mapPos2));
         guiGraphics.drawString(this.font, Component.literal(trimToWidth(mapLine, width)), left, top + 10, MUTED_TEXT, false);
         int y = top + 22;
         for (int i = 0; i < Math.min(2, snapshot.stepStatuses().size()); i++) {
@@ -746,15 +810,46 @@ public class ZombiesDeployToolScreen extends Screen {
         }
     }
 
-    private void drawCompactSteps(GuiGraphics guiGraphics, int left, int top, int width) {
-        if (snapshot.stepStatuses().isEmpty()) {
-            return;
-        }
-        List<String> parts = new ArrayList<>();
+    private void drawWorkflowAndTypes(GuiGraphics guiGraphics, int left, int top, int width) {
+        int y = top;
+        guiGraphics.drawString(this.font, Component.literal(ta("gui.codpattern.zombies.deploy.stage_line", stageLabel(this.workspaceStage))), left, y, LABEL_TEXT, false);
+        y += 13;
         for (ZombiesDeploySnapshot.StepStatus status : snapshot.stepStatuses()) {
-            parts.add((status.complete() ? "+" : "!") + status.label().substring(0, 1));
+            int color = status.complete() ? INFO_TEXT : WARNING_TEXT;
+            String line = (status.complete()
+                    ? tr("gui.codpattern.zombies.deploy.step_done")
+                    : tr("gui.codpattern.zombies.deploy.step_missing"))
+                    + " " + status.label() + " " + status.detail();
+            guiGraphics.drawString(this.font, Component.literal(trimToWidth(line, width)), left, y, color, false);
+            y += 11;
         }
-        guiGraphics.drawString(this.font, Component.literal(trimToWidth(String.join(" ", parts), width)), left, top, MUTED_TEXT, false);
+        y += 6;
+        guiGraphics.drawString(this.font, Component.translatable("gui.codpattern.zombies.deploy.object_types"), left, y, LABEL_TEXT, false);
+    }
+
+    private void drawObjectDraftSummary(GuiGraphics guiGraphics, int left, int top, int width) {
+        String selected = selectedIndex < 0
+                ? tr("gui.codpattern.zombies.deploy.new_draft")
+                : ta("gui.codpattern.zombies.deploy.object_index", selectedIndex);
+        String dirty = draftDirty()
+                ? tr("gui.codpattern.zombies.deploy.draft_unsaved")
+                : tr("gui.codpattern.zombies.deploy.draft_synced");
+        guiGraphics.drawString(this.font, Component.literal(trimToWidth(objectTypeLabel(selectedObjectType) + " / " + selected, width)), left, top, LABEL_TEXT, false);
+        guiGraphics.drawString(this.font, Component.literal(trimToWidth(dirty + "  " + captureBindingLabel(), width)), left, top + 12, draftDirty() ? WARNING_TEXT : INFO_TEXT, false);
+        String detail = ta("gui.codpattern.zombies.deploy.map_existing_count", labelOrDash(selectedMap), snapshot.objects().size());
+        guiGraphics.drawString(this.font, Component.literal(trimToWidth(detail, width)), left, top + 24, MUTED_TEXT, false);
+    }
+
+    private void drawStatusBar(GuiGraphics guiGraphics, int left, int top, int width) {
+        guiGraphics.fill(left, top, left + width, top + 24, 0xA014181D);
+        drawBorder(guiGraphics, left, top, width, 24, 0xFF39424B);
+        String saveState = draftDirty()
+                ? tr("gui.codpattern.zombies.deploy.status.draft_unsaved")
+                : (snapshot.activeMap()
+                ? tr("gui.codpattern.zombies.deploy.status.saved_active")
+                : tr("gui.codpattern.zombies.deploy.status.saved_ready"));
+        String line = saveState + "  |  " + captureBindingLabel();
+        guiGraphics.drawString(this.font, Component.literal(trimToWidth(line, width - 10)), left + 5, top + 7, draftDirty() ? WARNING_TEXT : INFO_TEXT, false);
     }
 
     private void drawObjects(GuiGraphics guiGraphics, int left, int top, int width) {
@@ -784,16 +879,19 @@ public class ZombiesDeployToolScreen extends Screen {
             guiGraphics.drawString(this.font, Component.translatable("gui.codpattern.zombies.deploy.no_fields"), left, top, MUTED_TEXT, false);
             return;
         }
+        List<Integer> order = fieldDisplayOrder();
         int start = visibleFieldStart();
-        int end = Math.min(snapshot.fields().size(), start + visibleFieldCount());
+        int end = Math.min(order.size(), start + visibleFieldCount());
         for (int i = start; i < end; i++) {
-            ZombiesDeploySnapshot.FieldValue field = snapshot.fields().get(i);
+            int fieldIndex = order.get(i);
+            ZombiesDeploySnapshot.FieldValue field = snapshot.fields().get(fieldIndex);
             int y = top + (i - start) * 22;
-            if (i == selectedFieldIndex) {
+            if (fieldIndex == selectedFieldIndex) {
                 guiGraphics.fill(left - 3, y - 2, left + width, y + 18, HIGHLIGHT);
             }
             String value = draftFields.getOrDefault(field.key(), field.value());
-            String first = tr(field.labelKey()) + "  " + field.type().name().toLowerCase(Locale.ROOT);
+            String tier = isAdvancedField(field.key()) ? tr("gui.codpattern.zombies.deploy.advanced") : tr("gui.codpattern.zombies.deploy.common");
+            String first = tier + "  " + tr(field.labelKey()) + "  " + field.type().name().toLowerCase(Locale.ROOT);
             String second = field.type() == ZombiesDeployFieldSchema.FieldType.LIST
                     ? listFieldSummary(field.key(), value)
                     : (value.isBlank() ? tr("gui.codpattern.zombies.deploy.blank") : value);
@@ -802,21 +900,21 @@ public class ZombiesDeployToolScreen extends Screen {
         }
     }
 
+    private void drawValidationProfileLabel(GuiGraphics guiGraphics, int left, int top, int width) {
+        String line = tr("gui.codpattern.zombies.deploy.validation_view") + ": " + profileShortLabel(this.selectedProfile);
+        guiGraphics.drawString(this.font, Component.literal(trimToWidth(line, width)), left, top + 5, LABEL_TEXT, false);
+    }
+
     private void drawValidation(GuiGraphics guiGraphics, int left, int top, int width, int maxLines) {
         guiGraphics.drawString(this.font, Component.literal(trimToWidth(tr("gui.codpattern.zombies.deploy.map") + ": " + labelOrDash(selectedMap), width)), left, top, LABEL_TEXT, false);
-        guiGraphics.drawString(this.font, Component.literal(trimToWidth(tr("gui.codpattern.zombies.deploy.profile") + ": " + labelOrDash(selectedProfile), width)), left, top + 12, LABEL_TEXT, false);
         guiGraphics.drawString(this.font, Component.literal(trimToWidth(
                 tr("gui.codpattern.zombies.deploy.active") + ": "
                         + (snapshot.activeMap() ? tr("gui.codpattern.zombies.deploy.yes") : tr("gui.codpattern.zombies.deploy.no"))
                         + "  " + tr("gui.codpattern.zombies.deploy.revision") + ": " + snapshot.revision(),
-                width)), left, top + 24, LABEL_TEXT, false);
-        int summaryY = top + 36;
-        for (ZombiesDeploySnapshot.ValidationSummary summary : snapshot.validationSummaries()) {
-            String text = summary.profileKey() + " E" + summary.errors() + " W" + summary.warnings();
-            int color = summary.errors() > 0 ? ERROR_TEXT : (summary.warnings() > 0 ? WARNING_TEXT : INFO_TEXT);
-            guiGraphics.drawString(this.font, Component.literal(trimToWidth(text, width)), left, summaryY, color, false);
-            summaryY += 10;
-        }
+                width)), left, top + 12, LABEL_TEXT, false);
+        int summaryY = top + 28;
+        drawValidationCards(guiGraphics, left, summaryY, width);
+        summaryY += 48;
 
         List<ZombiesDeploySnapshot.ValidationLine> lines = snapshot.validationLines();
         if (lines.isEmpty()) {
@@ -832,6 +930,19 @@ public class ZombiesDeployToolScreen extends Screen {
         }
         if (lines.size() > lineLimit) {
             guiGraphics.drawString(this.font, Component.literal(ta("gui.codpattern.zombies.deploy.more", lines.size() - lineLimit)), left, summaryY + 2 + lineLimit * 12, MUTED_TEXT, false);
+        }
+    }
+
+    private void drawValidationCards(GuiGraphics guiGraphics, int left, int top, int width) {
+        int cardWidth = Math.max(72, (width - 8) / 3);
+        for (int i = 0; i < Math.min(3, snapshot.validationSummaries().size()); i++) {
+            ZombiesDeploySnapshot.ValidationSummary summary = snapshot.validationSummaries().get(i);
+            int x = left + i * (cardWidth + 4);
+            int color = summary.errors() > 0 ? ERROR_TEXT : (summary.warnings() > 0 ? WARNING_TEXT : INFO_TEXT);
+            guiGraphics.fill(x, top, x + cardWidth, top + 40, 0x8014181D);
+            drawBorder(guiGraphics, x, top, cardWidth, 40, color);
+            guiGraphics.drawString(this.font, Component.literal(trimToWidth(profileShortLabel(summary.profileKey()), cardWidth - 8)), x + 4, top + 5, LABEL_TEXT, false);
+            guiGraphics.drawString(this.font, Component.literal("E" + summary.errors() + " W" + summary.warnings()), x + 4, top + 19, color, false);
         }
     }
 
@@ -1324,11 +1435,16 @@ public class ZombiesDeployToolScreen extends Screen {
     }
 
     private int visibleFieldStart() {
-        int count = snapshot.fields().size();
+        List<Integer> order = fieldDisplayOrder();
+        int count = order.size();
         if (count <= visibleFieldCount()) {
             return 0;
         }
-        return Math.max(0, Math.min(selectedFieldIndex - visibleFieldCount() / 2, count - visibleFieldCount()));
+        int position = order.indexOf(selectedFieldIndex);
+        if (position < 0) {
+            position = 0;
+        }
+        return Math.max(0, Math.min(position - visibleFieldCount() / 2, count - visibleFieldCount()));
     }
 
     private int visibleListRowStart(int rowCount, int rowLimit) {
@@ -1340,11 +1456,57 @@ public class ZombiesDeployToolScreen extends Screen {
     }
 
     private int visibleObjectCount() {
-        return 10;
+        return 3;
     }
 
     private int visibleFieldCount() {
-        return 10;
+        return 4;
+    }
+
+    private List<Integer> fieldDisplayOrder() {
+        List<Integer> order = new ArrayList<>();
+        for (int i = 0; i < snapshot.fields().size(); i++) {
+            if (this.showAdvancedFields || !isAdvancedField(snapshot.fields().get(i).key())) {
+                order.add(i);
+            }
+        }
+        if (order.isEmpty() && !snapshot.fields().isEmpty()) {
+            for (int i = 0; i < snapshot.fields().size(); i++) {
+                order.add(i);
+            }
+        }
+        order.sort(Comparator
+                .comparingInt((Integer index) -> fieldPriority(snapshot.fields().get(index).key()))
+                .thenComparingInt(Integer::intValue));
+        return order;
+    }
+
+    private int fieldPriority(String fieldKey) {
+        String key = Objects.requireNonNullElse(fieldKey, "");
+        return switch (key) {
+            case "objectId" -> 0;
+            case "posX", "posY", "posZ" -> 1;
+            case "interactionX", "interactionY", "interactionZ" -> 2;
+            case "areaFromX", "areaFromY", "areaFromZ", "areaToX", "areaToY", "areaToZ" -> 3;
+            case "group", "weight", "cost", "price", "weaponLevel", "armorLevel", "buyCost", "buffId", "requiresPower", "maxUpgradeLevel" -> 4;
+            case "dimension", "yaw", "pitch" -> 5;
+            default -> 8;
+        };
+    }
+
+    private boolean isAdvancedField(String fieldKey) {
+        return fieldPriority(fieldKey) >= 5;
+    }
+
+    private void ensureVisibleFieldSelected() {
+        List<Integer> order = fieldDisplayOrder();
+        if (order.isEmpty()) {
+            this.selectedFieldIndex = 0;
+            return;
+        }
+        if (!order.contains(this.selectedFieldIndex)) {
+            this.selectedFieldIndex = order.get(0);
+        }
     }
 
     private int selectedObjectListPosition() {
@@ -1356,8 +1518,8 @@ public class ZombiesDeployToolScreen extends Screen {
         return 0;
     }
 
-    private int listIndexAt(double mouseX, double mouseY, int left, int top, int visibleCount) {
-        if (mouseX < left - 3 || mouseX > left + 270 || mouseY < top - 2) {
+    private int listIndexAt(double mouseX, double mouseY, int left, int top, int visibleCount, int width) {
+        if (mouseX < left - 3 || mouseX > left + width || mouseY < top - 2) {
             return -1;
         }
         int row = (int) ((mouseY - top) / 22);
@@ -1394,11 +1556,12 @@ public class ZombiesDeployToolScreen extends Screen {
     }
 
     private void selectVisibleField(int visibleRow) {
+        List<Integer> order = fieldDisplayOrder();
         int index = visibleFieldStart() + visibleRow;
-        if (index < 0 || index >= snapshot.fields().size()) {
+        if (index < 0 || index >= order.size()) {
             return;
         }
-        this.selectedFieldIndex = index;
+        this.selectedFieldIndex = order.get(index);
         updateWidgets();
     }
 
@@ -1449,24 +1612,79 @@ public class ZombiesDeployToolScreen extends Screen {
         return value == null || value.isBlank() ? "-" : value;
     }
 
+    private boolean draftDirty() {
+        if (this.mapNameBox != null && !Objects.equals(this.mapNameBox.getValue(), this.draftMapName)) {
+            return true;
+        }
+        ZombiesDeploySnapshot.FieldValue field = currentField();
+        if (field != null && this.fieldValueBox != null && field.editable()) {
+            String current = currentFieldEditorValue(field);
+            String stored = this.draftFields.getOrDefault(field.key(), field.value());
+            if (!Objects.equals(current, stored)) {
+                return true;
+            }
+        }
+        for (ZombiesDeploySnapshot.FieldValue value : snapshot.fields()) {
+            if (!Objects.equals(this.draftFields.get(value.key()), value.value())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int objectCount(String objectType) {
+        String normalized = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
+        for (ZombiesDeploySnapshot.ObjectTypeCount count : snapshot.objectCounts()) {
+            if (count.objectType().equals(normalized)) {
+                return count.count();
+            }
+        }
+        return 0;
+    }
+
+    private String captureBindingLabel() {
+        if (ZombiesDeployDraft.STAGE_MAP_REGISTRATION.equals(this.workspaceStage)) {
+            return ta("gui.codpattern.zombies.deploy.binding_short",
+                    tr("gui.codpattern.zombies.deploy.map_slot_a"),
+                    tr("gui.codpattern.zombies.deploy.map_slot_b"));
+        }
+        return ta("gui.codpattern.zombies.deploy.binding_short",
+                labelOrDash(snapshot.captureSlotA()),
+                labelOrDash(snapshot.captureSlotB()));
+    }
+
     private String objectTypeLabel(String objectType) {
         return ZombiesDeployFieldSchema.objectType(objectType)
                 .map(type -> tr(type.labelKey()))
                 .orElse(labelOrDash(objectType));
     }
 
+    private String shortObjectTypeLabel(String objectType) {
+        return objectTypeLabel(objectType);
+    }
+
+    private String profileShortLabel(String profileKey) {
+        return switch (ZombiesDeployFieldSchema.normalizeProfile(profileKey)) {
+            case ZombiesDeployFieldSchema.PROFILE_MVP2 -> "MVP2";
+            case ZombiesDeployFieldSchema.PROFILE_MVP3 -> "MVP3";
+            default -> "MVP1";
+        };
+    }
+
     private String stageLabel(String stage) {
-        return ZombiesDeployDraft.STAGE_OBJECT_MARKING.equals(stage) ? "功能点标注" : "地图注册";
+        return ZombiesDeployDraft.STAGE_OBJECT_MARKING.equals(stage)
+                ? tr("gui.codpattern.zombies.deploy.stage.object_marking")
+                : tr("gui.codpattern.zombies.deploy.stage.map_registration");
     }
 
     private String capturePresetLabel(String preset) {
         if (ZombiesDeployDraft.CAPTURE_BARRIER_INTERACTION.equals(preset)) {
-            return "屏障交互";
+            return tr("gui.codpattern.zombies.deploy.capture.barrier_interaction");
         }
         if (ZombiesDeployDraft.CAPTURE_BARRIER_AREA.equals(preset)) {
-            return "屏障范围";
+            return tr("gui.codpattern.zombies.deploy.capture.barrier_area");
         }
-        return "默认捕获";
+        return tr("gui.codpattern.zombies.deploy.capture.default");
     }
 
     private String formatPos(BlockPos pos) {
@@ -1492,6 +1710,10 @@ public class ZombiesDeployToolScreen extends Screen {
             end--;
         }
         return end <= 0 ? suffix : text.substring(0, end) + suffix;
+    }
+
+    private String trimButton(String value, int width) {
+        return trimToWidth(value, Math.max(20, width));
     }
 
     private int panelLeft() {

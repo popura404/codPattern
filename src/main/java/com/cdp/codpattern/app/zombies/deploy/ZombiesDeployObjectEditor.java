@@ -510,7 +510,7 @@ final class ZombiesDeployObjectEditor {
                 intMap(fields, "pricesByWeaponLevel"),
                 dimension(fields),
                 blockPos(fields, "pos"),
-                Optional.empty());
+                Optional.of(blockPos(fields, "interaction")));
     }
 
     private static ZombiesWeaponWallData parseWeaponWall(
@@ -530,7 +530,7 @@ final class ZombiesDeployObjectEditor {
                 weaponCandidates(fields, "weapons"),
                 dimension(fields),
                 blockPos(fields, "pos"),
-                Optional.empty());
+                Optional.of(blockPos(fields, "interaction")));
     }
 
     private static ZombiesArmorStationData parseArmorStation(
@@ -546,7 +546,7 @@ final class ZombiesDeployObjectEditor {
                 doubleField(fields, "damageTakenMultiplier"),
                 dimension(fields),
                 blockPos(fields, "pos"),
-                Optional.empty());
+                Optional.of(blockPos(fields, "interaction")));
     }
 
     private static ZombiesPowerSwitchData parsePowerSwitch(
@@ -578,7 +578,7 @@ final class ZombiesDeployObjectEditor {
                 booleanField(fields, "requiresPower"),
                 dimension(fields),
                 blockPos(fields, "pos"),
-                Optional.empty());
+                Optional.of(blockPos(fields, "interaction")));
     }
 
     private static ZombiesUltimateMachineData parseUltimateMachine(
@@ -594,7 +594,7 @@ final class ZombiesDeployObjectEditor {
                 booleanField(fields, "requiresPower"),
                 dimension(fields),
                 blockPos(fields, "pos"),
-                Optional.empty());
+                Optional.of(blockPos(fields, "interaction")));
     }
 
     private static EditResult unsupported(String type, ZombiesMapObjects objects, Map<String, String> fields) {
@@ -703,6 +703,7 @@ final class ZombiesDeployObjectEditor {
         Map<String, String> fields = basePositionFields(ZombiesDeployFieldSchema.AMMO_BOX, data.dimension(), data.pos());
         fields.put("objectId", data.objectId());
         fields.put("pricesByWeaponLevel", serializeIntMap(data.pricesByWeaponLevel()));
+        putPosition(fields, "interaction", data.interactionPos().orElse(data.pos()));
         return fields;
     }
 
@@ -716,6 +717,7 @@ final class ZombiesDeployObjectEditor {
         fields.put("refreshWaves", serializeIntList(data.refreshWaves()));
         fields.put("rarityPools", serializeRarityPools(data.rarityPools()));
         fields.put("weapons", serializeWeaponCandidates(data.weapons()));
+        putPosition(fields, "interaction", data.interactionPos().orElse(data.pos()));
         return fields;
     }
 
@@ -725,6 +727,7 @@ final class ZombiesDeployObjectEditor {
         fields.put("armorLevel", Integer.toString(data.armorLevel()));
         fields.put("buyCost", Integer.toString(data.buyCost()));
         fields.put("damageTakenMultiplier", Double.toString(data.damageTakenMultiplier()));
+        putPosition(fields, "interaction", data.interactionPos().orElse(data.pos()));
         return fields;
     }
 
@@ -743,6 +746,7 @@ final class ZombiesDeployObjectEditor {
         fields.put("buffId", data.buffId());
         fields.put("cost", Integer.toString(data.cost()));
         fields.put("requiresPower", Boolean.toString(data.requiresPower()));
+        putPosition(fields, "interaction", data.interactionPos().orElse(data.pos()));
         return fields;
     }
 
@@ -752,6 +756,7 @@ final class ZombiesDeployObjectEditor {
         fields.put("maxUpgradeLevel", Integer.toString(data.maxUpgradeLevel()));
         fields.put("levels", serializeUltimateLevels(data.levels()));
         fields.put("requiresPower", Boolean.toString(data.requiresPower()));
+        putPosition(fields, "interaction", data.interactionPos().orElse(data.pos()));
         return fields;
     }
 

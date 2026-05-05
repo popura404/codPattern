@@ -74,7 +74,10 @@ public final class ZombiesDeployFieldSchema {
                     field("dimension", FieldType.TEXT, "minecraft:overworld"),
                     field("posX", FieldType.INTEGER, "0"),
                     field("posY", FieldType.INTEGER, "64"),
-                    field("posZ", FieldType.INTEGER, "0")
+                    field("posZ", FieldType.INTEGER, "0"),
+                    field("interactionX", FieldType.INTEGER, "0"),
+                    field("interactionY", FieldType.INTEGER, "64"),
+                    field("interactionZ", FieldType.INTEGER, "0")
             )),
             new ObjectTypeSchema(AMMO_BOX, "gui.codpattern.zombies.deploy.type.ammo_box", false, false, List.of(
                     field("objectId", FieldType.TEXT, ""),
@@ -82,7 +85,10 @@ public final class ZombiesDeployFieldSchema {
                     field("dimension", FieldType.TEXT, "minecraft:overworld"),
                     field("posX", FieldType.INTEGER, "0"),
                     field("posY", FieldType.INTEGER, "64"),
-                    field("posZ", FieldType.INTEGER, "0")
+                    field("posZ", FieldType.INTEGER, "0"),
+                    field("interactionX", FieldType.INTEGER, "0"),
+                    field("interactionY", FieldType.INTEGER, "64"),
+                    field("interactionZ", FieldType.INTEGER, "0")
             )),
             new ObjectTypeSchema(ARMOR_STATION, "gui.codpattern.zombies.deploy.type.armor_station", false, false, List.of(
                     field("objectId", FieldType.TEXT, ""),
@@ -92,7 +98,10 @@ public final class ZombiesDeployFieldSchema {
                     field("dimension", FieldType.TEXT, "minecraft:overworld"),
                     field("posX", FieldType.INTEGER, "0"),
                     field("posY", FieldType.INTEGER, "64"),
-                    field("posZ", FieldType.INTEGER, "0")
+                    field("posZ", FieldType.INTEGER, "0"),
+                    field("interactionX", FieldType.INTEGER, "0"),
+                    field("interactionY", FieldType.INTEGER, "64"),
+                    field("interactionZ", FieldType.INTEGER, "0")
             )),
             new ObjectTypeSchema(POWER_SWITCH, "gui.codpattern.zombies.deploy.type.power_switch", false, true, List.of(
                     field("objectId", FieldType.TEXT, "power_switch"),
@@ -112,7 +121,10 @@ public final class ZombiesDeployFieldSchema {
                     field("dimension", FieldType.TEXT, "minecraft:overworld"),
                     field("posX", FieldType.INTEGER, "0"),
                     field("posY", FieldType.INTEGER, "64"),
-                    field("posZ", FieldType.INTEGER, "0")
+                    field("posZ", FieldType.INTEGER, "0"),
+                    field("interactionX", FieldType.INTEGER, "0"),
+                    field("interactionY", FieldType.INTEGER, "64"),
+                    field("interactionZ", FieldType.INTEGER, "0")
             )),
             new ObjectTypeSchema(ULTIMATE_MACHINE, "gui.codpattern.zombies.deploy.type.ultimate_machine", false, false, List.of(
                     field("objectId", FieldType.TEXT, ""),
@@ -122,7 +134,10 @@ public final class ZombiesDeployFieldSchema {
                     field("dimension", FieldType.TEXT, "minecraft:overworld"),
                     field("posX", FieldType.INTEGER, "0"),
                     field("posY", FieldType.INTEGER, "64"),
-                    field("posZ", FieldType.INTEGER, "0")
+                    field("posZ", FieldType.INTEGER, "0"),
+                    field("interactionX", FieldType.INTEGER, "0"),
+                    field("interactionY", FieldType.INTEGER, "64"),
+                    field("interactionZ", FieldType.INTEGER, "0")
             ))
     );
 

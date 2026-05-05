@@ -73,6 +73,7 @@ public final class ZombiesDeployPreviewService {
         return refreshPreview(player, new PreviewRequest(
                 draft.selectedMap(),
                 type,
+                draft.capturePreset(),
                 draft.selectedIndex(),
                 fields));
     }
@@ -94,6 +95,7 @@ public final class ZombiesDeployPreviewService {
         return refreshPreview(player, new PreviewRequest(
                 snapshot.selectedMap(),
                 snapshot.selectedObjectType(),
+                snapshot.capturePreset(),
                 snapshot.selectedIndex(),
                 fieldMap(snapshot)));
     }
@@ -129,7 +131,11 @@ public final class ZombiesDeployPreviewService {
 
         DraftPreview draftPreview;
         try {
-            draftPreview = parseDraftPreview(request.selectedObjectType(), request.fields(), player.serverLevel().dimension());
+            draftPreview = parseDraftPreview(
+                    request.selectedObjectType(),
+                    request.capturePreset(),
+                    request.fields(),
+                    player.serverLevel().dimension());
         } catch (PreviewParseException e) {
             clearHeldPreview(player);
             return ZombiesDeployServiceResult.failure(
@@ -227,6 +233,7 @@ public final class ZombiesDeployPreviewService {
 
     private DraftPreview parseDraftPreview(
             String objectType,
+            String capturePreset,
             Map<String, String> fields,
             ResourceKey<Level> expectedDimension
     ) {
@@ -238,16 +245,22 @@ public final class ZombiesDeployPreviewService {
                     "field dimension does not match the selected map dimension: " + dimension.location());
         }
         if (ZombiesDeployFieldSchema.BARRIER.equals(type)) {
+            BlockPos interactionPos = optionalBlockPos(fields, "interaction");
+            if (ZombiesDeployDraft.CAPTURE_BARRIER_INTERACTION.equals(
+                    ZombiesDeployDraft.normalizeCapturePreset(capturePreset, type))) {
+                return DraftPreview.point(dimension, interactionPos, null, Float.NaN);
+            }
             return DraftPreview.area(
                     dimension,
                     blockPos(fields, "areaFrom"),
-                    blockPos(fields, "areaTo"));
+                    blockPos(fields, "areaTo"),
+                    interactionPos);
         }
         float yaw = switch (type) {
             case ZombiesDeployFieldSchema.INITIAL, ZombiesDeployFieldSchema.ZOMBIE_SPAWN -> floatField(fields, "yaw");
             default -> Float.NaN;
         };
-        return DraftPreview.point(dimension, blockPos(fields, "pos"), yaw);
+        return DraftPreview.point(dimension, blockPos(fields, "pos"), optionalBlockPos(fields, "interaction"), yaw);
     }
 
     private void sendCurrentObjectList(
@@ -296,6 +309,7 @@ public final class ZombiesDeployPreviewService {
                             data.dimension(),
                             data.areaFrom(),
                             data.areaTo());
+                    sendInteractionPoint(player, request, type, i, data.objectId(), data.dimension(), data.interactionPos());
                 }
             }
             case ZombiesDeployFieldSchema.WEAPON_WALL -> {
@@ -309,6 +323,7 @@ public final class ZombiesDeployPreviewService {
                             data.dimension(),
                             data.pos(),
                             Float.NaN);
+                    sendInteractionPoint(player, request, type, i, data.objectId(), data.dimension(), data.interactionPos().orElse(null));
                 }
             }
             case ZombiesDeployFieldSchema.AMMO_BOX -> {
@@ -322,6 +337,7 @@ public final class ZombiesDeployPreviewService {
                             data.dimension(),
                             data.pos(),
                             Float.NaN);
+                    sendInteractionPoint(player, request, type, i, data.objectId(), data.dimension(), data.interactionPos().orElse(null));
                 }
             }
             case ZombiesDeployFieldSchema.ARMOR_STATION -> {
@@ -335,6 +351,7 @@ public final class ZombiesDeployPreviewService {
                             data.dimension(),
                             data.pos(),
                             Float.NaN);
+                    sendInteractionPoint(player, request, type, i, data.objectId(), data.dimension(), data.interactionPos().orElse(null));
                 }
             }
             case ZombiesDeployFieldSchema.POWER_SWITCH -> resolved.powerSwitch().ifPresent(data -> sendPoint(
@@ -356,6 +373,7 @@ public final class ZombiesDeployPreviewService {
                             data.dimension(),
                             data.pos(),
                             Float.NaN);
+                    sendInteractionPoint(player, request, type, i, data.objectId(), data.dimension(), data.interactionPos().orElse(null));
                 }
             }
             case ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> {
@@ -369,6 +387,7 @@ public final class ZombiesDeployPreviewService {
                             data.dimension(),
                             data.pos(),
                             Float.NaN);
+                    sendInteractionPoint(player, request, type, i, data.objectId(), data.dimension(), data.interactionPos().orElse(null));
                 }
             }
             default -> {
@@ -387,6 +406,14 @@ public final class ZombiesDeployPreviewService {
                     draftPreview.dimension(),
                     draftPreview.areaFrom(),
                     draftPreview.areaTo());
+            sendPoint(
+                    player,
+                    getHeldPreviewDraftKey(player) + ":interaction",
+                    type + " draft interaction",
+                    draftColor(type),
+                    draftPreview.dimension(),
+                    draftPreview.interactionPos(),
+                    Float.NaN);
             return;
         }
         sendPoint(
@@ -397,6 +424,36 @@ public final class ZombiesDeployPreviewService {
                 draftPreview.dimension(),
                 draftPreview.pos(),
                 draftPreview.yaw());
+        sendPoint(
+                player,
+                getHeldPreviewDraftKey(player) + ":interaction",
+                type + " draft interaction",
+                draftColor(type),
+                draftPreview.dimension(),
+                draftPreview.interactionPos(),
+                Float.NaN);
+    }
+
+    private void sendInteractionPoint(
+            ServerPlayer player,
+            PreviewRequest request,
+            String type,
+            int index,
+            String objectId,
+            ResourceKey<Level> dimension,
+            BlockPos interactionPos
+    ) {
+        if (interactionPos == null || ZombiesDeployCaptureBinding.forObject(type, request.capturePreset()).slotB().isBlank()) {
+            return;
+        }
+        sendPoint(
+                player,
+                getHeldPreviewObjectKey(player, type, index) + ":interaction",
+                label(type, objectId, index) + " interaction",
+                objectColor(type, request.selectedIndex() == index),
+                dimension,
+                interactionPos,
+                Float.NaN);
     }
 
     private void sendPoint(
@@ -477,6 +534,15 @@ public final class ZombiesDeployPreviewService {
                 intField(fields, prefix + "X"),
                 intField(fields, prefix + "Y"),
                 intField(fields, prefix + "Z"));
+    }
+
+    private BlockPos optionalBlockPos(Map<String, String> fields, String prefix) {
+        if (!fields.containsKey(prefix + "X")
+                || !fields.containsKey(prefix + "Y")
+                || !fields.containsKey(prefix + "Z")) {
+            return null;
+        }
+        return blockPos(fields, prefix);
     }
 
     private int intField(Map<String, String> fields, String key) {
@@ -571,12 +637,14 @@ public final class ZombiesDeployPreviewService {
     private record PreviewRequest(
             String selectedMap,
             String selectedObjectType,
+            String capturePreset,
             int selectedIndex,
             Map<String, String> fields
     ) {
         private PreviewRequest {
             selectedMap = Objects.requireNonNullElse(selectedMap, "").trim();
             selectedObjectType = ZombiesDeployFieldSchema.normalizeObjectType(selectedObjectType);
+            capturePreset = ZombiesDeployDraft.normalizeCapturePreset(capturePreset, selectedObjectType);
             selectedIndex = Math.max(-1, selectedIndex);
             fields = fields == null ? Map.of() : Map.copyOf(new LinkedHashMap<>(fields));
         }
@@ -585,24 +653,35 @@ public final class ZombiesDeployPreviewService {
     private record DraftPreview(
             ResourceKey<Level> dimension,
             BlockPos pos,
+            BlockPos interactionPos,
             BlockPos areaFrom,
             BlockPos areaTo,
             float yaw,
             boolean area
     ) {
-        static DraftPreview point(ResourceKey<Level> dimension, BlockPos pos, float yaw) {
-            return new DraftPreview(dimension, pos, null, null, yaw, false);
+        static DraftPreview point(ResourceKey<Level> dimension, BlockPos pos, BlockPos interactionPos, float yaw) {
+            return new DraftPreview(dimension, pos, interactionPos, null, null, yaw, false);
         }
 
-        static DraftPreview area(ResourceKey<Level> dimension, BlockPos areaFrom, BlockPos areaTo) {
-            return new DraftPreview(dimension, null, areaFrom, areaTo, Float.NaN, true);
+        static DraftPreview area(ResourceKey<Level> dimension, BlockPos areaFrom, BlockPos areaTo, BlockPos interactionPos) {
+            return new DraftPreview(dimension, null, interactionPos, areaFrom, areaTo, Float.NaN, true);
         }
 
         String signature() {
             if (area) {
-                return "area@" + dimension.location() + ":" + areaFrom.asLong() + ":" + areaTo.asLong();
+                return "area@" + dimension.location()
+                        + ":" + areaFrom.asLong()
+                        + ":" + areaTo.asLong()
+                        + ":" + posSignature(interactionPos);
             }
-            return "point@" + dimension.location() + ":" + pos.asLong() + ":" + yaw;
+            return "point@" + dimension.location()
+                    + ":" + posSignature(pos)
+                    + ":" + posSignature(interactionPos)
+                    + ":" + yaw;
+        }
+
+        private String posSignature(BlockPos value) {
+            return value == null ? "-" : Long.toString(value.asLong());
         }
     }
 

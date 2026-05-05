@@ -28,10 +28,6 @@ public class ZombiesDeployToolActionC2SPacket {
         SELECT_OBJECT_TYPE,
         SELECT_OBJECT,
         SET_FIELD,
-        CAPTURE_PLAYER_POS,
-        CAPTURE_LOOK_BLOCK,
-        SET_AREA_POS_1,
-        SET_AREA_POS_2,
         ADD_OBJECT,
         UPDATE_OBJECT,
         DUPLICATE_OBJECT,
@@ -165,10 +161,6 @@ public class ZombiesDeployToolActionC2SPacket {
                     "");
             case SAVE_SELECTIONS -> service.saveSelections(player, stack, draft);
             case SET_FIELD -> service.setField(player, stack, draft, fieldKey, fieldValue);
-            case CAPTURE_PLAYER_POS -> service.capturePlayerPosition(player, stack, draft);
-            case CAPTURE_LOOK_BLOCK -> service.captureLookBlock(player, stack, draft);
-            case SET_AREA_POS_1 -> service.setAreaPos(player, stack, draft, true);
-            case SET_AREA_POS_2 -> service.setAreaPos(player, stack, draft, false);
             case ADD_OBJECT -> service.addObject(player, stack, draft);
             case UPDATE_OBJECT -> service.updateObject(player, stack, draft);
             case DUPLICATE_OBJECT -> service.duplicateObject(player, stack, draft);
