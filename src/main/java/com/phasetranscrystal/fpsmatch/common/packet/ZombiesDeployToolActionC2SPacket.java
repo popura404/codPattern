@@ -35,6 +35,11 @@ public class ZombiesDeployToolActionC2SPacket {
         CLEAR_OBJECT_TYPE,
         VALIDATE_MAP,
         SELECT_WORKSPACE_STAGE,
+        SELECT_WORKFLOW_STEP,
+        GO_NEXT_STEP,
+        SAVE_AND_VALIDATE_MVP1,
+        JUMP_TO_ISSUE,
+        JUMP_TO_ISSUE_TARGET,
         CREATE_MAP,
         UPDATE_MAP_AREA,
         SELECT_CAPTURE_PRESET
@@ -44,21 +49,43 @@ public class ZombiesDeployToolActionC2SPacket {
     private final ZombiesDeployDraft draft;
     private final String fieldKey;
     private final String fieldValue;
+    private final String issueWorkflowStep;
+    private final String issueObjectType;
+    private final int issueTargetIndex;
+    private final boolean issueMapStage;
 
     public ZombiesDeployToolActionC2SPacket(Action action, ZombiesDeployDraft draft) {
-        this(action, draft, "", "");
+        this(action, draft, "", "", "", "", -1, false);
     }
 
     public ZombiesDeployToolActionC2SPacket(Action action, ZombiesDeployDraft draft, String fieldKey, String fieldValue) {
+        this(action, draft, fieldKey, fieldValue, "", "", -1, false);
+    }
+
+    public ZombiesDeployToolActionC2SPacket(
+            Action action,
+            ZombiesDeployDraft draft,
+            String fieldKey,
+            String fieldValue,
+            String issueWorkflowStep,
+            String issueObjectType,
+            int issueTargetIndex,
+            boolean issueMapStage
+    ) {
         this.action = action == null ? Action.REFRESH : action;
         this.draft = draft == null ? ZombiesDeployDraft.empty() : draft;
         this.fieldKey = fieldKey == null ? "" : fieldKey;
         this.fieldValue = fieldValue == null ? "" : fieldValue;
+        this.issueWorkflowStep = issueWorkflowStep == null ? "" : issueWorkflowStep;
+        this.issueObjectType = issueObjectType == null ? "" : issueObjectType;
+        this.issueTargetIndex = Math.max(-1, issueTargetIndex);
+        this.issueMapStage = issueMapStage;
     }
 
     public void encode(FriendlyByteBuf buf) {
         buf.writeEnum(action);
         buf.writeUtf(draft.workspaceStage());
+        buf.writeUtf(draft.workflowStep());
         buf.writeUtf(draft.selectedMap());
         buf.writeUtf(draft.draftMapName());
         writeNullableBlockPos(buf, draft.mapPos1());
@@ -74,11 +101,16 @@ public class ZombiesDeployToolActionC2SPacket {
         });
         buf.writeUtf(fieldKey);
         buf.writeUtf(fieldValue);
+        buf.writeUtf(issueWorkflowStep);
+        buf.writeUtf(issueObjectType);
+        buf.writeVarInt(issueTargetIndex);
+        buf.writeBoolean(issueMapStage);
     }
 
     public static ZombiesDeployToolActionC2SPacket decode(FriendlyByteBuf buf) {
         Action action = buf.readEnum(Action.class);
         String workspaceStage = buf.readUtf();
+        String workflowStep = buf.readUtf();
         String selectedMap = buf.readUtf();
         String draftMapName = buf.readUtf();
         BlockPos mapPos1 = readNullableBlockPos(buf);
@@ -96,6 +128,7 @@ public class ZombiesDeployToolActionC2SPacket {
                 action,
                 new ZombiesDeployDraft(
                         workspaceStage,
+                        workflowStep,
                         selectedMap,
                         draftMapName,
                         mapPos1,
@@ -106,7 +139,11 @@ public class ZombiesDeployToolActionC2SPacket {
                         validationView,
                         fields),
                 buf.readUtf(),
-                buf.readUtf());
+                buf.readUtf(),
+                buf.readUtf(),
+                buf.readUtf(),
+                buf.readVarInt(),
+                buf.readBoolean());
     }
 
     public static void sendScreen(ServerPlayer player, ItemStack stack, ZombiesDeployDraft request) {
@@ -168,6 +205,20 @@ public class ZombiesDeployToolActionC2SPacket {
             case CLEAR_OBJECT_TYPE -> service.clearObjectType(player, stack, draft);
             case VALIDATE_MAP -> service.validateMap(player, stack, draft);
             case SELECT_WORKSPACE_STAGE -> service.selectWorkspaceStage(player, stack, draft);
+            case SELECT_WORKFLOW_STEP -> service.selectWorkflowStep(player, stack, draft);
+            case GO_NEXT_STEP -> service.goNextStep(player, stack, draft);
+            case SAVE_AND_VALIDATE_MVP1 -> service.saveAndValidateMvp1(player, stack, draft);
+            case JUMP_TO_ISSUE -> service.jumpToIssue(player, stack, draft, fieldKey, fieldValue);
+            case JUMP_TO_ISSUE_TARGET -> service.jumpToIssueTarget(
+                    player,
+                    stack,
+                    draft,
+                    fieldKey,
+                    fieldValue,
+                    issueWorkflowStep,
+                    issueObjectType,
+                    issueTargetIndex,
+                    issueMapStage);
             case CREATE_MAP -> service.createMap(player, stack, draft);
             case UPDATE_MAP_AREA -> service.updateMapArea(player, stack, draft);
             case SELECT_CAPTURE_PRESET -> service.selectCapturePreset(player, stack, draft);

@@ -19,6 +19,12 @@ public final class ZombiesMvp123CompatTestSuite {
             new ZombiesCompatSuiteRunner.TestEntry("MVP2 deploy object editor compat",
                     "com.cdp.codpattern.app.zombies.deploy.ZombiesDeployObjectEditorCompatTest",
                     true),
+            new ZombiesCompatSuiteRunner.TestEntry("MVP2 deploy issue routing packet compat",
+                    "com.cdp.codpattern.app.zombies.deploy.ZombiesDeployIssueRoutingCompatTest",
+                    true),
+            new ZombiesCompatSuiteRunner.TestEntry("MVP2 deploy issue target service compat",
+                    "com.cdp.codpattern.app.zombies.deploy.ZombiesDeployToolServiceIssueTargetCompatTest",
+                    true),
             new ZombiesCompatSuiteRunner.TestEntry("MVP2 purchase state services compat",
                     "com.cdp.codpattern.app.zombies.service.ZombiesPurchaseStateServicesCompatTest",
                     true),
@@ -97,6 +103,14 @@ public final class ZombiesMvp123CompatTestSuite {
                     "MVP2",
                     "deep object/deploy coverage",
                     "barrier group clear isolation, deploy save rollback, and weapon-wall LIST edit round trips preserve object consistency"),
+            new CoverageItem(
+                    "MVP2",
+                    "deploy issue routing packet compat",
+                    "structured issue target snapshot payload and JUMP_TO_ISSUE_TARGET packet round trip stay backward compatible with legacy jump flow"),
+            new CoverageItem(
+                    "MVP2",
+                    "deploy issue target service fallback compat",
+                    "invalid structured target step/type falls back to legacy resolver and structured index clamps to existing object bounds"),
             new CoverageItem(
                     "MVP2",
                     "object interaction closure",

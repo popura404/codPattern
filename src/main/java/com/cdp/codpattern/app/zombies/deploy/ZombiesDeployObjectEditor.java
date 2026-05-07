@@ -669,6 +669,12 @@ final class ZombiesDeployObjectEditor {
         };
     }
 
+    static Map<String, String> fieldsForSnapshotSelection(ZombiesMapObjects objects, String objectType, int selectedIndex) {
+        return fieldsForSelection(objects == null ? ZombiesMapObjects.EMPTY : objects,
+                ZombiesDeployFieldSchema.normalizeObjectType(objectType),
+                selectedIndex);
+    }
+
     private static Map<String, String> fieldsFrom(ZombiesInitialSpawnData data) {
         Map<String, String> fields = basePositionFields(ZombiesDeployFieldSchema.INITIAL, data.dimension(), data.pos());
         fields.put("yaw", Float.toString(data.yaw()));

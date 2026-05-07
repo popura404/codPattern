@@ -23,6 +23,13 @@ public final class MapCreationService {
     private MapCreationService() {
     }
 
+    public Result createMap(ServerPlayer player, CreateRequest request) {
+        CreateRequest resolved = request == null
+                ? new CreateRequest("", "", null, null)
+                : request;
+        return createMap(player, resolved.selectedType(), resolved.draftMapName(), resolved.pos1(), resolved.pos2());
+    }
+
     public Result createMap(ServerPlayer player, String selectedType, String draftMapName, BlockPos pos1, BlockPos pos2) {
         String type = GameModeRegistry.canonicalize(selectedType);
         FPSMCore core = FPSMCore.getInstance();
@@ -82,6 +89,18 @@ public final class MapCreationService {
 
         public static Result failure(String code, String messageKey, String... args) {
             return new Result(false, code, "", "", null, messageKey, List.of(args));
+        }
+    }
+
+    public record CreateRequest(
+            String selectedType,
+            String draftMapName,
+            BlockPos pos1,
+            BlockPos pos2
+    ) {
+        public CreateRequest {
+            selectedType = selectedType == null ? "" : selectedType.trim();
+            draftMapName = draftMapName == null ? "" : draftMapName;
         }
     }
 }

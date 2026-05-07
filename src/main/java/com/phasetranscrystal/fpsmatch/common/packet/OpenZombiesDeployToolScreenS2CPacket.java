@@ -24,6 +24,11 @@ public class OpenZombiesDeployToolScreenS2CPacket {
     public void encode(FriendlyByteBuf buf) {
         writeStringList(buf, snapshot.availableMaps());
         buf.writeUtf(snapshot.workspaceStage());
+        buf.writeUtf(snapshot.currentWorkflowStep());
+        buf.writeUtf(snapshot.nextWorkflowStep());
+        buf.writeUtf(snapshot.blockingReason());
+        buf.writeUtf(snapshot.nextActionLabel());
+        buf.writeBoolean(snapshot.nextActionEnabled());
         buf.writeUtf(snapshot.selectedMap());
         buf.writeUtf(snapshot.draftMapName());
         writeNullableBlockPos(buf, snapshot.mapPos1());
@@ -63,6 +68,15 @@ public class OpenZombiesDeployToolScreenS2CPacket {
             buf.writeUtf(line.subject());
             buf.writeUtf(line.message());
         }
+        buf.writeVarInt(snapshot.issueTargets().size());
+        for (ZombiesDeploySnapshot.IssueTarget target : snapshot.issueTargets()) {
+            buf.writeUtf(target.issueCode());
+            buf.writeUtf(target.issueSubject());
+            buf.writeUtf(target.workflowStep());
+            buf.writeUtf(target.targetObjectType());
+            buf.writeVarInt(target.targetIndex());
+            buf.writeBoolean(target.mapStage());
+        }
         buf.writeVarInt(snapshot.validationSummaries().size());
         for (ZombiesDeploySnapshot.ValidationSummary summary : snapshot.validationSummaries()) {
             buf.writeUtf(summary.profileKey());
@@ -83,6 +97,8 @@ public class OpenZombiesDeployToolScreenS2CPacket {
             buf.writeUtf(status.detail());
             buf.writeBoolean(status.complete());
         }
+        buf.writeBoolean(snapshot.dirty());
+        buf.writeUtf(snapshot.nearestObjectHint());
         buf.writeBoolean(snapshot.activeMap());
         buf.writeVarInt(snapshot.revision());
         buf.writeUtf(snapshot.statusKey());
@@ -93,6 +109,11 @@ public class OpenZombiesDeployToolScreenS2CPacket {
     public static OpenZombiesDeployToolScreenS2CPacket decode(FriendlyByteBuf buf) {
         List<String> maps = readStringList(buf);
         String workspaceStage = buf.readUtf();
+        String currentWorkflowStep = buf.readUtf();
+        String nextWorkflowStep = buf.readUtf();
+        String blockingReason = buf.readUtf();
+        String nextActionLabel = buf.readUtf();
+        boolean nextActionEnabled = buf.readBoolean();
         String selectedMap = buf.readUtf();
         String draftMapName = buf.readUtf();
         BlockPos mapPos1 = readNullableBlockPos(buf);
@@ -138,6 +159,17 @@ public class OpenZombiesDeployToolScreenS2CPacket {
                     buf.readUtf(),
                     buf.readUtf()));
         }
+        int issueTargetCount = buf.readVarInt();
+        List<ZombiesDeploySnapshot.IssueTarget> issueTargets = new ArrayList<>(issueTargetCount);
+        for (int i = 0; i < issueTargetCount; i++) {
+            issueTargets.add(new ZombiesDeploySnapshot.IssueTarget(
+                    buf.readUtf(),
+                    buf.readUtf(),
+                    buf.readUtf(),
+                    buf.readUtf(),
+                    buf.readVarInt(),
+                    buf.readBoolean()));
+        }
         int validationSummaryCount = buf.readVarInt();
         List<ZombiesDeploySnapshot.ValidationSummary> validationSummaries = new ArrayList<>(validationSummaryCount);
         for (int i = 0; i < validationSummaryCount; i++) {
@@ -164,9 +196,16 @@ public class OpenZombiesDeployToolScreenS2CPacket {
                     buf.readUtf(),
                     buf.readBoolean()));
         }
+        boolean dirty = buf.readBoolean();
+        String nearestObjectHint = buf.readUtf();
         ZombiesDeploySnapshot snapshot = new ZombiesDeploySnapshot(
                 maps,
                 workspaceStage,
+                currentWorkflowStep,
+                nextWorkflowStep,
+                blockingReason,
+                nextActionLabel,
+                nextActionEnabled,
                 selectedMap,
                 draftMapName,
                 mapPos1,
@@ -182,9 +221,12 @@ public class OpenZombiesDeployToolScreenS2CPacket {
                 profileKey,
                 profiles,
                 validationLines,
+                issueTargets,
                 validationSummaries,
                 objectCounts,
                 stepStatuses,
+                dirty,
+                nearestObjectHint,
                 buf.readBoolean(),
                 buf.readVarInt(),
                 buf.readUtf(),

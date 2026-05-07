@@ -307,3 +307,23 @@ tasks.register('buildAndCopyToMods') {
         println "Copied ${jarFile.name} -> ${modsDir}"
     }
 }
+
+def registerZombiesCompatSuiteTask = { String taskName, String suiteClassName, String suiteLabel ->
+    tasks.register(taskName, JavaExec) {
+        group = 'verification'
+        description = "Run ${suiteLabel} in the test runtime classpath."
+        dependsOn tasks.named('compileTestJava')
+        classpath = sourceSets.test.runtimeClasspath
+        mainClass = suiteClassName
+    }
+}
+
+registerZombiesCompatSuiteTask(
+        'runZombiesMvp2CompatSuite',
+        'com.cdp.codpattern.app.zombies.service.ZombiesMvp2CompatTestSuite',
+        'Zombies MVP2 compat suite')
+
+registerZombiesCompatSuiteTask(
+        'runZombiesMvp123CompatSuite',
+        'com.cdp.codpattern.app.zombies.service.ZombiesMvp123CompatTestSuite',
+        'Zombies MVP1-MVP3 compat suite')

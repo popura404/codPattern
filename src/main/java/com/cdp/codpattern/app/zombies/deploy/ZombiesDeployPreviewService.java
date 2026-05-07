@@ -30,6 +30,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -44,6 +45,10 @@ public final class ZombiesDeployPreviewService {
     private static final int BARRIER_COLOR = 0xFFF1C94B;
     private static final int SHOP_COLOR = 0xFF3A7BFF;
     private static final int POWER_COLOR = 0xFFE05DB1;
+    private static final int SLOT_A_COLOR = 0xFF4EE0B5;
+    private static final int SLOT_B_COLOR = 0xFFFFAD5A;
+    private static final int SINGLETON_MISSING_COLOR = 0xFFFF5D73;
+    private static final int SINGLETON_DUPLICATE_COLOR = 0xFFFFD166;
 
     public static ZombiesDeployPreviewService instance() {
         return INSTANCE;
@@ -162,7 +167,9 @@ public final class ZombiesDeployPreviewService {
                 map.getMapArea()));
 
         sendCurrentObjectList(player, request, map.objects());
-        sendDraft(player, request.selectedObjectType(), draftPreview);
+        sendDraft(player, request, draftPreview);
+        sendSingletonStatusHint(player, map, request.selectedObjectType(), map.objects());
+        sendNearestObjectHint(player, request, map.objects());
 
         data.putString(HELD_PREVIEW_STATE_TAG, signature);
         return ZombiesDeployServiceResult.success(
@@ -248,7 +255,7 @@ public final class ZombiesDeployPreviewService {
             BlockPos interactionPos = optionalBlockPos(fields, "interaction");
             if (ZombiesDeployDraft.CAPTURE_BARRIER_INTERACTION.equals(
                     ZombiesDeployDraft.normalizeCapturePreset(capturePreset, type))) {
-                return DraftPreview.point(dimension, interactionPos, null, Float.NaN);
+                return DraftPreview.point(dimension, interactionPos, interactionPos, null, Float.NaN);
             }
             return DraftPreview.area(
                     dimension,
@@ -256,11 +263,12 @@ public final class ZombiesDeployPreviewService {
                     blockPos(fields, "areaTo"),
                     interactionPos);
         }
+        BlockPos lookAtPos = optionalBlockPos(fields, "lookAt");
         float yaw = switch (type) {
             case ZombiesDeployFieldSchema.INITIAL, ZombiesDeployFieldSchema.ZOMBIE_SPAWN -> floatField(fields, "yaw");
             default -> Float.NaN;
         };
-        return DraftPreview.point(dimension, blockPos(fields, "pos"), optionalBlockPos(fields, "interaction"), yaw);
+        return DraftPreview.point(dimension, blockPos(fields, "pos"), optionalBlockPos(fields, "interaction"), lookAtPos, yaw);
     }
 
     private void sendCurrentObjectList(
@@ -270,124 +278,155 @@ public final class ZombiesDeployPreviewService {
     ) {
         ZombiesMapObjects resolved = objects == null ? ZombiesMapObjects.EMPTY : objects;
         String type = request.selectedObjectType();
+        ZombiesDeployCaptureBinding binding = ZombiesDeployCaptureBinding.forObject(type, request.capturePreset());
         int selectedIndex = request.selectedIndex();
         switch (type) {
             case ZombiesDeployFieldSchema.INITIAL -> {
                 for (int i = 0; i < resolved.initialSpawns().size(); i++) {
                     ZombiesInitialSpawnData data = resolved.initialSpawns().get(i);
+                    String key = getHeldPreviewObjectKey(player, type, i);
+                    String label = "INITIAL #" + (i + 1);
                     sendPoint(
                             player,
-                            getHeldPreviewObjectKey(player, type, i),
-                            "INITIAL #" + (i + 1),
+                            key,
+                            label,
                             objectColor(type, selectedIndex == i),
                             data.dimension(),
                             data.pos(),
                             data.yaw());
+                    sendSlotPointForField(player, key, label, binding, "pos", data.dimension(), data.pos(), selectedIndex == i);
                 }
             }
             case ZombiesDeployFieldSchema.ZOMBIE_SPAWN -> {
                 for (int i = 0; i < resolved.zombieSpawns().size(); i++) {
                     ZombiesZombieSpawnData data = resolved.zombieSpawns().get(i);
+                    String key = getHeldPreviewObjectKey(player, type, i);
+                    String label = label(type, data.objectId(), i);
                     sendPoint(
                             player,
-                            getHeldPreviewObjectKey(player, type, i),
-                            label(type, data.objectId(), i),
+                            key,
+                            label,
                             objectColor(type, selectedIndex == i),
                             data.dimension(),
                             data.pos(),
                             data.yaw());
+                    sendSlotPointForField(player, key, label, binding, "pos", data.dimension(), data.pos(), selectedIndex == i);
                 }
             }
             case ZombiesDeployFieldSchema.BARRIER -> {
                 for (int i = 0; i < resolved.barriers().size(); i++) {
                     ZombiesBarrierData data = resolved.barriers().get(i);
+                    String key = getHeldPreviewObjectKey(player, type, i);
+                    String label = label(type, data.objectId(), i);
                     sendArea(
                             player,
-                            getHeldPreviewObjectKey(player, type, i),
-                            label(type, data.objectId(), i),
+                            key,
+                            label,
                             objectColor(type, selectedIndex == i),
                             data.dimension(),
                             data.areaFrom(),
                             data.areaTo());
-                    sendInteractionPoint(player, request, type, i, data.objectId(), data.dimension(), data.interactionPos());
+                    sendSlotPointForField(player, key, label, binding, "areaFrom", data.dimension(), data.areaFrom(), selectedIndex == i);
+                    sendSlotPointForField(player, key, label, binding, "areaTo", data.dimension(), data.areaTo(), selectedIndex == i);
+                    sendSlotPointForField(player, key, label, binding, "interaction", data.dimension(), data.interactionPos(), selectedIndex == i);
                 }
             }
             case ZombiesDeployFieldSchema.WEAPON_WALL -> {
                 for (int i = 0; i < resolved.weaponWalls().size(); i++) {
                     ZombiesWeaponWallData data = resolved.weaponWalls().get(i);
+                    String key = getHeldPreviewObjectKey(player, type, i);
+                    String label = label(type, data.objectId(), i);
                     sendPoint(
                             player,
-                            getHeldPreviewObjectKey(player, type, i),
-                            label(type, data.objectId(), i),
+                            key,
+                            label,
                             objectColor(type, selectedIndex == i),
                             data.dimension(),
                             data.pos(),
                             Float.NaN);
-                    sendInteractionPoint(player, request, type, i, data.objectId(), data.dimension(), data.interactionPos().orElse(null));
+                    sendSlotPointForField(player, key, label, binding, "pos", data.dimension(), data.pos(), selectedIndex == i);
+                    sendSlotPointForField(player, key, label, binding, "interaction", data.dimension(), data.interactionPos().orElse(null), selectedIndex == i);
                 }
             }
             case ZombiesDeployFieldSchema.AMMO_BOX -> {
                 for (int i = 0; i < resolved.ammoBoxes().size(); i++) {
                     ZombiesAmmoBoxData data = resolved.ammoBoxes().get(i);
+                    String key = getHeldPreviewObjectKey(player, type, i);
+                    String label = label(type, data.objectId(), i);
                     sendPoint(
                             player,
-                            getHeldPreviewObjectKey(player, type, i),
-                            label(type, data.objectId(), i),
+                            key,
+                            label,
                             objectColor(type, selectedIndex == i),
                             data.dimension(),
                             data.pos(),
                             Float.NaN);
-                    sendInteractionPoint(player, request, type, i, data.objectId(), data.dimension(), data.interactionPos().orElse(null));
+                    sendSlotPointForField(player, key, label, binding, "pos", data.dimension(), data.pos(), selectedIndex == i);
+                    sendSlotPointForField(player, key, label, binding, "interaction", data.dimension(), data.interactionPos().orElse(null), selectedIndex == i);
                 }
             }
             case ZombiesDeployFieldSchema.ARMOR_STATION -> {
                 for (int i = 0; i < resolved.armorStations().size(); i++) {
                     ZombiesArmorStationData data = resolved.armorStations().get(i);
+                    String key = getHeldPreviewObjectKey(player, type, i);
+                    String label = label(type, data.objectId(), i);
                     sendPoint(
                             player,
-                            getHeldPreviewObjectKey(player, type, i),
-                            label(type, data.objectId(), i),
+                            key,
+                            label,
                             objectColor(type, selectedIndex == i),
                             data.dimension(),
                             data.pos(),
                             Float.NaN);
-                    sendInteractionPoint(player, request, type, i, data.objectId(), data.dimension(), data.interactionPos().orElse(null));
+                    sendSlotPointForField(player, key, label, binding, "pos", data.dimension(), data.pos(), selectedIndex == i);
+                    sendSlotPointForField(player, key, label, binding, "interaction", data.dimension(), data.interactionPos().orElse(null), selectedIndex == i);
                 }
             }
-            case ZombiesDeployFieldSchema.POWER_SWITCH -> resolved.powerSwitch().ifPresent(data -> sendPoint(
-                    player,
-                    getHeldPreviewObjectKey(player, type, 0),
-                    label(type, data.objectId(), 0),
-                    objectColor(type, selectedIndex == 0),
-                    data.dimension(),
-                    data.pos(),
-                    Float.NaN));
+            case ZombiesDeployFieldSchema.POWER_SWITCH -> resolved.powerSwitch().ifPresent(data -> {
+                String key = getHeldPreviewObjectKey(player, type, 0);
+                String label = label(type, data.objectId(), 0);
+                sendPoint(
+                        player,
+                        key,
+                        label,
+                        objectColor(type, selectedIndex == 0),
+                        data.dimension(),
+                        data.pos(),
+                        Float.NaN);
+                sendSlotPointForField(player, key, label, binding, "pos", data.dimension(), data.pos(), selectedIndex == 0);
+            });
             case ZombiesDeployFieldSchema.SODA_MACHINE -> {
                 for (int i = 0; i < resolved.sodaMachines().size(); i++) {
                     ZombiesSodaMachineData data = resolved.sodaMachines().get(i);
+                    String key = getHeldPreviewObjectKey(player, type, i);
+                    String label = label(type, data.objectId(), i);
                     sendPoint(
                             player,
-                            getHeldPreviewObjectKey(player, type, i),
-                            label(type, data.objectId(), i),
+                            key,
+                            label,
                             objectColor(type, selectedIndex == i),
                             data.dimension(),
                             data.pos(),
                             Float.NaN);
-                    sendInteractionPoint(player, request, type, i, data.objectId(), data.dimension(), data.interactionPos().orElse(null));
+                    sendSlotPointForField(player, key, label, binding, "pos", data.dimension(), data.pos(), selectedIndex == i);
+                    sendSlotPointForField(player, key, label, binding, "interaction", data.dimension(), data.interactionPos().orElse(null), selectedIndex == i);
                 }
             }
             case ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> {
                 for (int i = 0; i < resolved.ultimateMachines().size(); i++) {
                     ZombiesUltimateMachineData data = resolved.ultimateMachines().get(i);
+                    String key = getHeldPreviewObjectKey(player, type, i);
+                    String label = label(type, data.objectId(), i);
                     sendPoint(
                             player,
-                            getHeldPreviewObjectKey(player, type, i),
-                            label(type, data.objectId(), i),
+                            key,
+                            label,
                             objectColor(type, selectedIndex == i),
                             data.dimension(),
                             data.pos(),
                             Float.NaN);
-                    sendInteractionPoint(player, request, type, i, data.objectId(), data.dimension(), data.interactionPos().orElse(null));
+                    sendSlotPointForField(player, key, label, binding, "pos", data.dimension(), data.pos(), selectedIndex == i);
+                    sendSlotPointForField(player, key, label, binding, "interaction", data.dimension(), data.interactionPos().orElse(null), selectedIndex == i);
                 }
             }
             default -> {
@@ -395,65 +434,36 @@ public final class ZombiesDeployPreviewService {
         }
     }
 
-    private void sendDraft(ServerPlayer player, String objectType, DraftPreview draftPreview) {
-        String type = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
+    private void sendDraft(ServerPlayer player, PreviewRequest request, DraftPreview draftPreview) {
+        String type = request.selectedObjectType();
+        ZombiesDeployCaptureBinding binding = ZombiesDeployCaptureBinding.forObject(type, request.capturePreset());
+        String key = getHeldPreviewDraftKey(player);
+        String label = type + " draft";
         if (draftPreview.area()) {
             sendArea(
                     player,
-                    getHeldPreviewDraftKey(player),
-                    type + " draft",
+                    key,
+                    label,
                     draftColor(type),
                     draftPreview.dimension(),
                     draftPreview.areaFrom(),
                     draftPreview.areaTo());
-            sendPoint(
-                    player,
-                    getHeldPreviewDraftKey(player) + ":interaction",
-                    type + " draft interaction",
-                    draftColor(type),
-                    draftPreview.dimension(),
-                    draftPreview.interactionPos(),
-                    Float.NaN);
+            sendSlotPointForField(player, key, label, binding, "areaFrom", draftPreview.dimension(), draftPreview.areaFrom(), true);
+            sendSlotPointForField(player, key, label, binding, "areaTo", draftPreview.dimension(), draftPreview.areaTo(), true);
+            sendSlotPointForField(player, key, label, binding, "interaction", draftPreview.dimension(), draftPreview.interactionPos(), true);
             return;
         }
         sendPoint(
                 player,
-                getHeldPreviewDraftKey(player),
-                type + " draft",
+                key,
+                label,
                 draftColor(type),
                 draftPreview.dimension(),
                 draftPreview.pos(),
                 draftPreview.yaw());
-        sendPoint(
-                player,
-                getHeldPreviewDraftKey(player) + ":interaction",
-                type + " draft interaction",
-                draftColor(type),
-                draftPreview.dimension(),
-                draftPreview.interactionPos(),
-                Float.NaN);
-    }
-
-    private void sendInteractionPoint(
-            ServerPlayer player,
-            PreviewRequest request,
-            String type,
-            int index,
-            String objectId,
-            ResourceKey<Level> dimension,
-            BlockPos interactionPos
-    ) {
-        if (interactionPos == null || ZombiesDeployCaptureBinding.forObject(type, request.capturePreset()).slotB().isBlank()) {
-            return;
-        }
-        sendPoint(
-                player,
-                getHeldPreviewObjectKey(player, type, index) + ":interaction",
-                label(type, objectId, index) + " interaction",
-                objectColor(type, request.selectedIndex() == index),
-                dimension,
-                interactionPos,
-                Float.NaN);
+        sendSlotPointForField(player, key, label, binding, "pos", draftPreview.dimension(), draftPreview.pos(), true);
+        sendSlotPointForField(player, key, label, binding, "interaction", draftPreview.dimension(), draftPreview.interactionPos(), true);
+        sendSlotPointForField(player, key, label, binding, "lookAt", draftPreview.dimension(), draftPreview.lookAtPos(), true);
     }
 
     private void sendPoint(
@@ -580,6 +590,244 @@ public final class ZombiesDeployPreviewService {
         return id.isEmpty() ? type + " #" + (index + 1) : id;
     }
 
+    private void sendSlotPointForField(
+            ServerPlayer player,
+            String keyBase,
+            String labelBase,
+            ZombiesDeployCaptureBinding binding,
+            String field,
+            ResourceKey<Level> dimension,
+            BlockPos pos,
+            boolean selected
+    ) {
+        if (pos == null || binding == null || field == null || field.isBlank()) {
+            return;
+        }
+        if (field.equals(binding.slotA())) {
+            sendPoint(
+                    player,
+                    keyBase + ":slotA:" + field,
+                    labelBase + " [A] " + field,
+                    slotColor(ZombiesDeployCaptureBinding.CaptureSlot.A, selected),
+                    dimension,
+                    pos,
+                    Float.NaN);
+        }
+        if (field.equals(binding.slotB())) {
+            sendPoint(
+                    player,
+                    keyBase + ":slotB:" + field,
+                    labelBase + " [B] " + field,
+                    slotColor(ZombiesDeployCaptureBinding.CaptureSlot.B, selected),
+                    dimension,
+                    pos,
+                    Float.NaN);
+        }
+    }
+
+    private int slotColor(ZombiesDeployCaptureBinding.CaptureSlot slot, boolean selected) {
+        int color = slot == ZombiesDeployCaptureBinding.CaptureSlot.A ? SLOT_A_COLOR : SLOT_B_COLOR;
+        return selected ? mix(color, 0xFFFFFFFF, 0.30F) : color;
+    }
+
+    private void sendNearestObjectHint(
+            ServerPlayer player,
+            PreviewRequest request,
+            ZombiesMapObjects objects
+    ) {
+        NearestObjectHint hint = nearestObjectHint(player, request, objects);
+        if (hint == null || hint.pos() == null) {
+            return;
+        }
+        String key = getHeldPreviewNearestKey(player, request.selectedObjectType());
+        String label = "nearest " + request.selectedObjectType()
+                + " " + hint.objectLabel()
+                + " "
+                + String.format(Locale.ROOT, "%.1fm", hint.distanceMeters());
+        sendPoint(
+                player,
+                key,
+                label,
+                mix(baseColor(request.selectedObjectType()), 0xFFFFFFFF, 0.80F),
+                player.serverLevel().dimension(),
+                hint.pos(),
+                Float.NaN);
+    }
+
+    private NearestObjectHint nearestObjectHint(
+            ServerPlayer player,
+            PreviewRequest request,
+            ZombiesMapObjects objects
+    ) {
+        if (player == null || request == null) {
+            return null;
+        }
+        ZombiesMapObjects resolved = objects == null ? ZombiesMapObjects.EMPTY : objects;
+        Vec3 playerPos = player.position();
+        String type = request.selectedObjectType();
+        String preset = request.capturePreset();
+        NearestObjectHint best = null;
+        switch (type) {
+            case ZombiesDeployFieldSchema.INITIAL -> {
+                for (int i = 0; i < resolved.initialSpawns().size(); i++) {
+                    ZombiesInitialSpawnData data = resolved.initialSpawns().get(i);
+                    best = nearest(best, playerPos, data.pos(), label(type, "INITIAL#" + (i + 1), i));
+                }
+            }
+            case ZombiesDeployFieldSchema.ZOMBIE_SPAWN -> {
+                for (int i = 0; i < resolved.zombieSpawns().size(); i++) {
+                    ZombiesZombieSpawnData data = resolved.zombieSpawns().get(i);
+                    best = nearest(best, playerPos, data.pos(), label(type, data.objectId(), i));
+                }
+            }
+            case ZombiesDeployFieldSchema.BARRIER -> {
+                boolean interactionMode = ZombiesDeployDraft.CAPTURE_BARRIER_INTERACTION.equals(
+                        ZombiesDeployDraft.normalizeCapturePreset(preset, type));
+                for (int i = 0; i < resolved.barriers().size(); i++) {
+                    ZombiesBarrierData data = resolved.barriers().get(i);
+                    BlockPos anchor = interactionMode
+                            ? optionalNonOrigin(data.interactionPos()).orElse(areaCenter(data.areaFrom(), data.areaTo()))
+                            : areaCenter(data.areaFrom(), data.areaTo());
+                    best = nearest(best, playerPos, anchor, label(type, data.objectId(), i));
+                }
+            }
+            case ZombiesDeployFieldSchema.WEAPON_WALL -> {
+                for (int i = 0; i < resolved.weaponWalls().size(); i++) {
+                    ZombiesWeaponWallData data = resolved.weaponWalls().get(i);
+                    best = nearest(best, playerPos, data.pos(), label(type, data.objectId(), i));
+                }
+            }
+            case ZombiesDeployFieldSchema.AMMO_BOX -> {
+                for (int i = 0; i < resolved.ammoBoxes().size(); i++) {
+                    ZombiesAmmoBoxData data = resolved.ammoBoxes().get(i);
+                    best = nearest(best, playerPos, data.pos(), label(type, data.objectId(), i));
+                }
+            }
+            case ZombiesDeployFieldSchema.ARMOR_STATION -> {
+                for (int i = 0; i < resolved.armorStations().size(); i++) {
+                    ZombiesArmorStationData data = resolved.armorStations().get(i);
+                    best = nearest(best, playerPos, data.pos(), label(type, data.objectId(), i));
+                }
+            }
+            case ZombiesDeployFieldSchema.POWER_SWITCH -> {
+                if (resolved.powerSwitch().isPresent()) {
+                    ZombiesPowerSwitchData data = resolved.powerSwitch().get();
+                    best = nearest(best, playerPos, data.pos(), label(type, data.objectId(), 0));
+                }
+            }
+            case ZombiesDeployFieldSchema.SODA_MACHINE -> {
+                for (int i = 0; i < resolved.sodaMachines().size(); i++) {
+                    ZombiesSodaMachineData data = resolved.sodaMachines().get(i);
+                    best = nearest(best, playerPos, data.pos(), label(type, data.objectId(), i));
+                }
+            }
+            case ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> {
+                for (int i = 0; i < resolved.ultimateMachines().size(); i++) {
+                    ZombiesUltimateMachineData data = resolved.ultimateMachines().get(i);
+                    best = nearest(best, playerPos, data.pos(), label(type, data.objectId(), i));
+                }
+            }
+            default -> {
+                return null;
+            }
+        }
+        return best;
+    }
+
+    private NearestObjectHint nearest(
+            NearestObjectHint current,
+            Vec3 playerPos,
+            BlockPos candidatePos,
+            String objectLabel
+    ) {
+        if (candidatePos == null) {
+            return current;
+        }
+        double distance = Math.sqrt(playerPos.distanceToSqr(Vec3.atCenterOf(candidatePos)));
+        NearestObjectHint candidate = new NearestObjectHint(candidatePos, objectLabel, distance);
+        if (current == null || candidate.distanceMeters() < current.distanceMeters()) {
+            return candidate;
+        }
+        return current;
+    }
+
+    private Optional<BlockPos> optionalNonOrigin(BlockPos pos) {
+        if (pos == null) {
+            return Optional.empty();
+        }
+        return pos.equals(BlockPos.ZERO) ? Optional.empty() : Optional.of(pos);
+    }
+
+    private BlockPos areaCenter(BlockPos from, BlockPos to) {
+        if (from == null || to == null) {
+            return null;
+        }
+        return new BlockPos(
+                (from.getX() + to.getX()) / 2,
+                (from.getY() + to.getY()) / 2,
+                (from.getZ() + to.getZ()) / 2);
+    }
+
+    private void sendSingletonStatusHint(
+            ServerPlayer player,
+            ZombiesMap map,
+            String objectType,
+            ZombiesMapObjects objects
+    ) {
+        String type = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
+        boolean singleton = ZombiesDeployFieldSchema.objectType(type)
+                .map(ZombiesDeployFieldSchema.ObjectTypeSchema::singleObject)
+                .orElse(false);
+        if (!singleton) {
+            return;
+        }
+        int count = countObjects(objects, type);
+        if (count == 1) {
+            return;
+        }
+        AreaData area = map.getMapArea();
+        BlockPos center = new BlockPos(
+                (area.pos1().getX() + area.pos2().getX()) / 2,
+                (area.pos1().getY() + area.pos2().getY()) / 2,
+                (area.pos1().getZ() + area.pos2().getZ()) / 2);
+        String key = getHeldPreviewSingletonKey(player, type);
+        if (count <= 0) {
+            sendPoint(
+                    player,
+                    key,
+                    type + " missing",
+                    SINGLETON_MISSING_COLOR,
+                    player.serverLevel().dimension(),
+                    center,
+                    Float.NaN);
+            return;
+        }
+        sendPoint(
+                player,
+                key,
+                type + " duplicated x" + count,
+                SINGLETON_DUPLICATE_COLOR,
+                player.serverLevel().dimension(),
+                center,
+                Float.NaN);
+    }
+
+    private int countObjects(ZombiesMapObjects objects, String objectType) {
+        ZombiesMapObjects resolved = objects == null ? ZombiesMapObjects.EMPTY : objects;
+        return switch (ZombiesDeployFieldSchema.normalizeObjectType(objectType)) {
+            case ZombiesDeployFieldSchema.INITIAL -> resolved.initialSpawns().size();
+            case ZombiesDeployFieldSchema.ZOMBIE_SPAWN -> resolved.zombieSpawns().size();
+            case ZombiesDeployFieldSchema.BARRIER -> resolved.barriers().size();
+            case ZombiesDeployFieldSchema.WEAPON_WALL -> resolved.weaponWalls().size();
+            case ZombiesDeployFieldSchema.AMMO_BOX -> resolved.ammoBoxes().size();
+            case ZombiesDeployFieldSchema.ARMOR_STATION -> resolved.armorStations().size();
+            case ZombiesDeployFieldSchema.POWER_SWITCH -> resolved.powerSwitch().isPresent() ? 1 : 0;
+            case ZombiesDeployFieldSchema.SODA_MACHINE -> resolved.sodaMachines().size();
+            case ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> resolved.ultimateMachines().size();
+            default -> 0;
+        };
+    }
+
     private int objectColor(String type, boolean selected) {
         int color = baseColor(type);
         return selected ? mix(color, 0xFFFFFFFF, 0.45F) : color;
@@ -630,8 +878,27 @@ public final class ZombiesDeployPreviewService {
         return getHeldPreviewPrefix(player) + "object:" + type + ":" + index;
     }
 
+    private static String getHeldPreviewSingletonKey(ServerPlayer player, String type) {
+        return getHeldPreviewPrefix(player) + "singleton:" + type;
+    }
+
+    private static String getHeldPreviewNearestKey(ServerPlayer player, String type) {
+        return getHeldPreviewPrefix(player) + "nearest:" + type;
+    }
+
     private static String getHeldPreviewDraftKey(ServerPlayer player) {
         return getHeldPreviewPrefix(player) + "draft";
+    }
+
+    private record NearestObjectHint(
+            BlockPos pos,
+            String objectLabel,
+            double distanceMeters
+    ) {
+        private NearestObjectHint {
+            objectLabel = Objects.requireNonNullElse(objectLabel, "").trim();
+            distanceMeters = Math.max(0.0D, distanceMeters);
+        }
     }
 
     private record PreviewRequest(
@@ -654,17 +921,18 @@ public final class ZombiesDeployPreviewService {
             ResourceKey<Level> dimension,
             BlockPos pos,
             BlockPos interactionPos,
+            BlockPos lookAtPos,
             BlockPos areaFrom,
             BlockPos areaTo,
             float yaw,
             boolean area
     ) {
-        static DraftPreview point(ResourceKey<Level> dimension, BlockPos pos, BlockPos interactionPos, float yaw) {
-            return new DraftPreview(dimension, pos, interactionPos, null, null, yaw, false);
+        static DraftPreview point(ResourceKey<Level> dimension, BlockPos pos, BlockPos interactionPos, BlockPos lookAtPos, float yaw) {
+            return new DraftPreview(dimension, pos, interactionPos, lookAtPos, null, null, yaw, false);
         }
 
         static DraftPreview area(ResourceKey<Level> dimension, BlockPos areaFrom, BlockPos areaTo, BlockPos interactionPos) {
-            return new DraftPreview(dimension, null, interactionPos, areaFrom, areaTo, Float.NaN, true);
+            return new DraftPreview(dimension, null, interactionPos, null, areaFrom, areaTo, Float.NaN, true);
         }
 
         String signature() {
@@ -677,6 +945,7 @@ public final class ZombiesDeployPreviewService {
             return "point@" + dimension.location()
                     + ":" + posSignature(pos)
                     + ":" + posSignature(interactionPos)
+                    + ":" + posSignature(lookAtPos)
                     + ":" + yaw;
         }
 

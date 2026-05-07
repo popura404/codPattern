@@ -34,6 +34,7 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
     private static final String SELECTED_INDEX_TAG = "SelectedZombiesObjectIndex";
     private static final String PROFILE_TAG = "SelectedZombiesValidationProfile";
     private static final String WORKSPACE_STAGE_TAG = "ZombiesDeployWorkspaceStage";
+    private static final String WORKFLOW_STEP_TAG = "ZombiesDeployWorkflowStep";
     private static final String DRAFT_MAP_NAME_TAG = "ZombiesDeployDraftMapName";
     private static final String MAP_POS_1_TAG = "ZombiesDeployMapPos1";
     private static final String MAP_POS_2_TAG = "ZombiesDeployMapPos2";
@@ -142,6 +143,7 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
     public static ZombiesDeployDraft getDraft(ItemStack stack) {
         return new ZombiesDeployDraft(
                 getWorkspaceStage(stack),
+                getWorkflowStep(stack),
                 getSelectedMap(stack),
                 getDraftMapName(stack),
                 getMapPos1(stack),
@@ -156,6 +158,7 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
     public static void saveDraft(ItemStack stack, ZombiesDeployDraft draft) {
         ZombiesDeployDraft resolved = draft == null ? ZombiesDeployDraft.empty() : draft;
         setWorkspaceStage(stack, resolved.workspaceStage());
+        setWorkflowStep(stack, resolved.workflowStep());
         setSelectedMap(stack, resolved.selectedMap());
         setDraftMapName(stack, resolved.draftMapName());
         setMapPos1(stack, resolved.mapPos1());
@@ -173,6 +176,14 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
 
     public static String getWorkspaceStage(ItemStack stack) {
         return ZombiesDeployDraft.normalizeStage(getStringTag(stack, WORKSPACE_STAGE_TAG));
+    }
+
+    public static void setWorkflowStep(ItemStack stack, String workflowStep) {
+        setStringTag(stack, WORKFLOW_STEP_TAG, ZombiesDeployDraft.normalizeWorkflowStep(workflowStep));
+    }
+
+    public static String getWorkflowStep(ItemStack stack) {
+        return ZombiesDeployDraft.normalizeWorkflowStep(getStringTag(stack, WORKFLOW_STEP_TAG));
     }
 
     public static void setDraftMapName(ItemStack stack, String mapName) {

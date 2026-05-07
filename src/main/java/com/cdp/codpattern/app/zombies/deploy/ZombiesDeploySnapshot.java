@@ -8,6 +8,11 @@ import java.util.Objects;
 public record ZombiesDeploySnapshot(
         List<String> availableMaps,
         String workspaceStage,
+        String currentWorkflowStep,
+        String nextWorkflowStep,
+        String blockingReason,
+        String nextActionLabel,
+        boolean nextActionEnabled,
         String selectedMap,
         String draftMapName,
         BlockPos mapPos1,
@@ -23,9 +28,12 @@ public record ZombiesDeploySnapshot(
         String profileKey,
         List<String> availableProfiles,
         List<ValidationLine> validationLines,
+        List<IssueTarget> issueTargets,
         List<ValidationSummary> validationSummaries,
         List<ObjectTypeCount> objectCounts,
         List<StepStatus> stepStatuses,
+        boolean dirty,
+        String nearestObjectHint,
         boolean activeMap,
         int revision,
         String statusKey,
@@ -35,6 +43,10 @@ public record ZombiesDeploySnapshot(
     public ZombiesDeploySnapshot {
         availableMaps = availableMaps == null ? List.of() : List.copyOf(availableMaps);
         workspaceStage = ZombiesDeployDraft.normalizeStage(workspaceStage);
+        currentWorkflowStep = ZombiesDeployDraft.normalizeWorkflowStep(currentWorkflowStep);
+        nextWorkflowStep = ZombiesDeployDraft.normalizeWorkflowStep(nextWorkflowStep);
+        blockingReason = Objects.requireNonNullElse(blockingReason, "").trim();
+        nextActionLabel = Objects.requireNonNullElse(nextActionLabel, "").trim();
         selectedMap = Objects.requireNonNullElse(selectedMap, "").trim();
         draftMapName = Objects.requireNonNullElse(draftMapName, "").trim();
         objectTypes = objectTypes == null ? List.of() : List.copyOf(objectTypes);
@@ -48,9 +60,11 @@ public record ZombiesDeploySnapshot(
         profileKey = ZombiesDeployFieldSchema.normalizeProfile(profileKey);
         availableProfiles = availableProfiles == null ? List.of() : List.copyOf(availableProfiles);
         validationLines = validationLines == null ? List.of() : List.copyOf(validationLines);
+        issueTargets = issueTargets == null ? List.of() : List.copyOf(issueTargets);
         validationSummaries = validationSummaries == null ? List.of() : List.copyOf(validationSummaries);
         objectCounts = objectCounts == null ? List.of() : List.copyOf(objectCounts);
         stepStatuses = stepStatuses == null ? List.of() : List.copyOf(stepStatuses);
+        nearestObjectHint = Objects.requireNonNullElse(nearestObjectHint, "").trim();
         revision = Math.max(0, revision);
         statusKey = Objects.requireNonNullElse(statusKey, "").trim();
         statusCode = Objects.requireNonNullElse(statusCode, "").trim();
@@ -106,6 +120,23 @@ public record ZombiesDeploySnapshot(
             code = Objects.requireNonNullElse(code, "").trim();
             subject = Objects.requireNonNullElse(subject, "").trim();
             message = Objects.requireNonNullElse(message, "").trim();
+        }
+    }
+
+    public record IssueTarget(
+            String issueCode,
+            String issueSubject,
+            String workflowStep,
+            String targetObjectType,
+            int targetIndex,
+            boolean mapStage
+    ) {
+        public IssueTarget {
+            issueCode = Objects.requireNonNullElse(issueCode, "").trim();
+            issueSubject = Objects.requireNonNullElse(issueSubject, "").trim();
+            workflowStep = ZombiesDeployDraft.normalizeWorkflowStep(workflowStep);
+            targetObjectType = ZombiesDeployFieldSchema.normalizeObjectType(targetObjectType);
+            targetIndex = Math.max(-1, targetIndex);
         }
     }
 

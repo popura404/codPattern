@@ -86,7 +86,9 @@ public class MapCreatorToolActionC2SPacket {
 
     private void createMap(ServerPlayer player, ItemStack stack) {
         FPSMCore core = FPSMCore.getInstance();
-        MapCreationService.Result result = MapCreationService.instance().createMap(player, selectedType, draftMapName, pos1, pos2);
+        MapCreationService.Result result = MapCreationService.instance().createMap(
+                player,
+                new MapCreationService.CreateRequest(selectedType, draftMapName, pos1, pos2));
         if (!result.success()) {
             player.displayClientMessage(Component.translatable(result.messageKey(), result.arguments().toArray()), false);
             return;
