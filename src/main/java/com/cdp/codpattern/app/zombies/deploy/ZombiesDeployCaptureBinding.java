@@ -43,7 +43,7 @@ public record ZombiesDeployCaptureBinding(
                  ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> new ZombiesDeployCaptureBinding("pos", "interaction");
             case ZombiesDeployFieldSchema.INITIAL,
                  ZombiesDeployFieldSchema.ZOMBIE_SPAWN,
-                 ZombiesDeployFieldSchema.POWER_SWITCH -> new ZombiesDeployCaptureBinding("pos", "lookAt");
+                 ZombiesDeployFieldSchema.POWER_SWITCH -> new ZombiesDeployCaptureBinding("pos", "");
             default -> new ZombiesDeployCaptureBinding("", "");
         };
     }

@@ -119,7 +119,8 @@ public class ZombiesDeployToolScreen extends Screen {
         int top = panelTop();
         this.objectTypeButtons.clear();
 
-        this.mapButton = this.addRenderableWidget(new Button.Builder(Component.empty(), button -> cycleMap())
+        this.mapButton = this.addRenderableWidget(new Button.Builder(Component.empty(), button -> {
+        })
                 .pos(left + 16, top + 30)
                 .size(148, 20)
                 .build());
@@ -131,21 +132,9 @@ public class ZombiesDeployToolScreen extends Screen {
                 .pos(left + 294, top + 30)
                 .size(156, 20)
                 .build());
-        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.refresh"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.REFRESH))
-                .pos(left + 464, top + 30)
-                .size(78, 20)
-                .build());
-        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.save_selections"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_SELECTIONS))
-                .pos(left + 548, top + 30)
-                .size(114, 20)
-                .build());
-        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.validate"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.VALIDATE_MAP))
-                .pos(left + 668, top + 30)
-                .size(88, 20)
-                .build());
-        this.nextStepButton = this.addRenderableWidget(new Button.Builder(Component.empty(), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.GO_NEXT_STEP))
-                .pos(left + 760, top + 30)
-                .size(48, 20)
+        this.nextStepButton = this.addRenderableWidget(new Button.Builder(Component.empty(), button -> goNextStep())
+                .pos(left + 468, top + 30)
+                .size(116, 20)
                 .build());
         this.mapNameBox = this.addRenderableWidget(new EditBox(this.font, left + 16, top + 56, 148, 18, Component.empty()));
         this.mapNameBox.setMaxLength(64);
@@ -169,7 +158,7 @@ public class ZombiesDeployToolScreen extends Screen {
                 .pos(left + RIGHT_X + 174, top + 302)
                 .size(96, 20)
                 .build());
-        this.saveValidateButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.save_validate_mvp1"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_AND_VALIDATE_MVP1))
+        this.saveValidateButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.codpattern.zombies.deploy.validate"), button -> sendAction(ZombiesDeployToolActionC2SPacket.Action.VALIDATE_MAP))
                 .pos(left + RIGHT_X, top + 326)
                 .size(270, 20)
                 .build());
@@ -337,6 +326,12 @@ public class ZombiesDeployToolScreen extends Screen {
             return true;
         }
 
+        int mapIndex = mapIndexAt(mouseX, mouseY, left + LEFT_COLUMN_X + 2, top + LEFT_COLUMN_Y + 18, LEFT_COLUMN_WIDTH - 10);
+        if (mapIndex >= 0) {
+            selectVisibleMap(mapIndex);
+            return true;
+        }
+
         int stepIndex = workflowStepIndexAt(mouseX, mouseY, left + LEFT_COLUMN_X + 2, top + LEFT_COLUMN_Y + 18, LEFT_COLUMN_WIDTH - 10);
         if (stepIndex >= 0) {
             selectWorkflowStep(stepIndex);
@@ -500,7 +495,7 @@ public class ZombiesDeployToolScreen extends Screen {
             return;
         }
         this.mapButton.setMessage(Component.literal(labelOrDash(this.selectedMap)));
-        this.mapButton.active = !snapshot.availableMaps().isEmpty();
+        this.mapButton.active = false;
 
         this.stageButton.setMessage(Component.literal(stageLabel(this.workspaceStage)));
         this.capturePresetButton.setMessage(Component.literal(capturePresetLabel(this.capturePreset)));
@@ -521,7 +516,7 @@ public class ZombiesDeployToolScreen extends Screen {
         String nextActionLabel = snapshot.nextActionLabel().isBlank()
                 ? tr("gui.codpattern.zombies.deploy.next_step")
                 : tr(snapshot.nextActionLabel());
-        this.nextStepButton.setMessage(Component.literal(trimButton(nextActionLabel, 44)));
+        this.nextStepButton.setMessage(Component.literal(trimButton(nextActionLabel, 110)));
         this.nextStepButton.active = snapshot.nextActionEnabled();
 
         if (this.mapNameBox != null && !this.mapNameBox.isFocused() && !Objects.equals(this.mapNameBox.getValue(), this.draftMapName)) {
@@ -631,7 +626,7 @@ public class ZombiesDeployToolScreen extends Screen {
         this.selectedObjectType = keys.get(next);
         this.selectedIndex = -1;
         this.selectedFieldIndex = 0;
-        sendAction(ZombiesDeployToolActionC2SPacket.Action.SELECT_OBJECT_TYPE);
+        sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_SELECTIONS);
     }
 
     private void selectObjectType(String objectType) {
@@ -642,7 +637,7 @@ public class ZombiesDeployToolScreen extends Screen {
         this.selectedObjectType = normalized;
         this.selectedIndex = -1;
         this.selectedFieldIndex = 0;
-        sendAction(ZombiesDeployToolActionC2SPacket.Action.SELECT_OBJECT_TYPE);
+        sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_SELECTIONS);
     }
 
     private void cycleWorkspaceStage() {
@@ -679,6 +674,10 @@ public class ZombiesDeployToolScreen extends Screen {
         sendAction(ZombiesDeployToolActionC2SPacket.Action.REFRESH);
     }
 
+    private void goNextStep() {
+        applyWorkflowStep(snapshot.nextWorkflowStep());
+    }
+
     private int nextIndex(List<String> values, String current) {
         int currentIndex = values.indexOf(current);
         return currentIndex < 0 ? 0 : (currentIndex + 1) % values.size();
@@ -693,7 +692,7 @@ public class ZombiesDeployToolScreen extends Screen {
         int listPosition = selectedObjectListPosition();
         int nextPosition = Math.max(0, Math.min(listPosition + offset, snapshot.objects().size() - 1));
         this.selectedIndex = snapshot.objects().get(nextPosition).index();
-        sendAction(ZombiesDeployToolActionC2SPacket.Action.SELECT_OBJECT);
+        sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_SELECTIONS);
     }
 
     private void stepField(int offset) {
@@ -879,6 +878,8 @@ public class ZombiesDeployToolScreen extends Screen {
         int y = top;
         guiGraphics.drawString(this.font, Component.literal(ta("gui.codpattern.zombies.deploy.stage_line", stageLabel(this.workspaceStage))), left, y, LABEL_TEXT, false);
         y += 13;
+        y = drawMapList(guiGraphics, left, y, width);
+        y += 4;
         for (ZombiesDeploySnapshot.StepStatus status : snapshot.stepStatuses()) {
             if (status != null && status.key().equals(this.workflowStep)) {
                 guiGraphics.fill(left - 3, y - 2, left + width, y + 9, HIGHLIGHT);
@@ -893,6 +894,32 @@ public class ZombiesDeployToolScreen extends Screen {
         }
         y += 6;
         guiGraphics.drawString(this.font, Component.translatable("gui.codpattern.zombies.deploy.object_types"), left, y, LABEL_TEXT, false);
+    }
+
+    private int drawMapList(GuiGraphics guiGraphics, int left, int y, int width) {
+        guiGraphics.drawString(this.font, Component.translatable("gui.codpattern.zombies.deploy.map"), left, y, LABEL_TEXT, false);
+        y += 11;
+        List<String> maps = snapshot.availableMaps();
+        if (maps.isEmpty()) {
+            guiGraphics.drawString(this.font, Component.literal("-"), left, y, MUTED_TEXT, false);
+            return y + 11;
+        }
+        int start = visibleMapStart();
+        int visible = visibleMapCount();
+        for (int i = 0; i < visible; i++) {
+            int mapIndex = start + i;
+            String mapName = maps.get(mapIndex);
+            if (mapName.equals(this.selectedMap)) {
+                guiGraphics.fill(left - 3, y - 2, left + width, y + 9, HIGHLIGHT);
+            }
+            guiGraphics.drawString(this.font, Component.literal(trimToWidth(mapName, width)), left, y, mapName.equals(this.selectedMap) ? INFO_TEXT : MUTED_TEXT, false);
+            y += 11;
+        }
+        if (maps.size() > visible) {
+            guiGraphics.drawString(this.font, Component.literal(ta("gui.codpattern.zombies.deploy.more", maps.size() - visible)), left, y, MUTED_TEXT, false);
+            y += 11;
+        }
+        return y;
     }
 
     private void drawObjectDraftSummary(GuiGraphics guiGraphics, int left, int top, int width) {
@@ -1557,6 +1584,36 @@ public class ZombiesDeployToolScreen extends Screen {
         return 3;
     }
 
+    private int visibleMapCount() {
+        return Math.min(3, snapshot.availableMaps().size());
+    }
+
+    private int visibleMapStart() {
+        List<String> maps = snapshot.availableMaps();
+        int count = maps.size();
+        int visible = visibleMapCount();
+        if (count <= visible) {
+            return 0;
+        }
+        int selectedPosition = maps.indexOf(this.selectedMap);
+        if (selectedPosition < 0) {
+            selectedPosition = 0;
+        }
+        return Math.max(0, Math.min(selectedPosition - visible / 2, count - visible));
+    }
+
+    private int workflowStepStartY(int top) {
+        int y = top + 13;
+        y += 11;
+        int visibleMaps = visibleMapCount();
+        y += (visibleMaps <= 0 ? 1 : visibleMaps) * 11;
+        if (snapshot.availableMaps().size() > visibleMaps) {
+            y += 11;
+        }
+        y += 4;
+        return y;
+    }
+
     private int visibleFieldCount() {
         return 4;
     }
@@ -1644,11 +1701,29 @@ public class ZombiesDeployToolScreen extends Screen {
         return row >= 0 && row < preview.rows().size() ? row : -1;
     }
 
+    private int mapIndexAt(double mouseX, double mouseY, int left, int top, int width) {
+        if (mouseX < left - 3 || mouseX > left + width) {
+            return -1;
+        }
+        List<String> maps = snapshot.availableMaps();
+        if (maps.isEmpty()) {
+            return -1;
+        }
+        int rowStartY = top + 24;
+        int visible = visibleMapCount();
+        if (mouseY < rowStartY || mouseY >= rowStartY + visible * 11) {
+            return -1;
+        }
+        int row = (int) ((mouseY - rowStartY) / 11);
+        int mapIndex = visibleMapStart() + row;
+        return row >= 0 && row < visible && mapIndex < maps.size() ? mapIndex : -1;
+    }
+
     private int workflowStepIndexAt(double mouseX, double mouseY, int left, int top, int width) {
         if (mouseX < left - 3 || mouseX > left + width) {
             return -1;
         }
-        int rowStartY = top + 13;
+        int rowStartY = workflowStepStartY(top);
         int rowCount = snapshot.stepStatuses().size();
         if (rowCount <= 0 || mouseY < rowStartY || mouseY >= rowStartY + rowCount * 11) {
             return -1;
@@ -1675,8 +1750,34 @@ public class ZombiesDeployToolScreen extends Screen {
         if (target.isBlank() || target.equals(this.workflowStep)) {
             return;
         }
+        applyWorkflowStep(target);
+    }
+
+    private void applyWorkflowStep(String targetStep) {
+        String target = ZombiesDeployDraft.normalizeWorkflowStep(targetStep);
+        if (target.isBlank()) {
+            return;
+        }
+        if (ZombiesDeployDraft.WORKFLOW_MAP.equals(target)) {
+            this.workspaceStage = ZombiesDeployDraft.STAGE_MAP_REGISTRATION;
+            this.workflowStep = ZombiesDeployDraft.WORKFLOW_MAP;
+            this.selectedIndex = -1;
+            sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_SELECTIONS);
+            return;
+        }
+        this.workspaceStage = ZombiesDeployDraft.STAGE_OBJECT_MARKING;
         this.workflowStep = target;
-        sendAction(ZombiesDeployToolActionC2SPacket.Action.SELECT_WORKFLOW_STEP);
+        this.selectedIndex = -1;
+        switch (target) {
+            case ZombiesDeployDraft.WORKFLOW_INITIAL -> this.selectedObjectType = ZombiesDeployFieldSchema.INITIAL;
+            case ZombiesDeployDraft.WORKFLOW_ZOMBIE_SPAWN -> this.selectedObjectType = ZombiesDeployFieldSchema.ZOMBIE_SPAWN;
+            case ZombiesDeployDraft.WORKFLOW_BARRIER -> this.selectedObjectType = ZombiesDeployFieldSchema.BARRIER;
+            case ZombiesDeployDraft.WORKFLOW_INTERACT -> this.selectedObjectType = ZombiesDeployFieldSchema.POWER_SWITCH;
+            default -> {
+            }
+        }
+        this.capturePreset = ZombiesDeployDraft.normalizeCapturePreset(this.capturePreset, this.selectedObjectType);
+        sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_SELECTIONS);
     }
 
     private int validationIssueIndexAt(double mouseX, double mouseY, int left, int top, int width, int maxLines) {
@@ -1705,27 +1806,28 @@ public class ZombiesDeployToolScreen extends Screen {
             return;
         }
         ZombiesDeploySnapshot.IssueTarget target = issueTargetAt(issueIndex);
-        if (target != null) {
-            FPSMatch.sendToServer(new ZombiesDeployToolActionC2SPacket(
-                    ZombiesDeployToolActionC2SPacket.Action.JUMP_TO_ISSUE_TARGET,
-                    draft(),
-                    target.issueCode(),
-                    target.issueSubject(),
-                    target.workflowStep(),
-                    target.targetObjectType(),
-                    target.targetIndex(),
-                    target.mapStage()));
+        if (target == null) {
             return;
         }
-        if (issueIndex >= snapshot.validationLines().size()) {
+        if (target.mapStage()) {
+            this.workspaceStage = ZombiesDeployDraft.STAGE_MAP_REGISTRATION;
+            this.workflowStep = ZombiesDeployDraft.WORKFLOW_MAP;
+            this.selectedIndex = -1;
+            sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_SELECTIONS);
             return;
         }
-        ZombiesDeploySnapshot.ValidationLine issue = snapshot.validationLines().get(issueIndex);
-        FPSMatch.sendToServer(new ZombiesDeployToolActionC2SPacket(
-                ZombiesDeployToolActionC2SPacket.Action.JUMP_TO_ISSUE,
-                draft(),
-                issue.code(),
-                issue.subject()));
+        String targetObjectType = ZombiesDeployFieldSchema.normalizeObjectType(target.targetObjectType());
+        if (!targetObjectType.isBlank()) {
+            this.selectedObjectType = targetObjectType;
+        }
+        this.workspaceStage = ZombiesDeployDraft.STAGE_OBJECT_MARKING;
+        String targetStep = ZombiesDeployDraft.normalizeWorkflowStep(target.workflowStep());
+        this.workflowStep = ZombiesDeployDraft.WORKFLOW_MAP.equals(targetStep)
+                ? ZombiesDeployDraft.workflowStepForObjectType(this.selectedObjectType)
+                : targetStep;
+        this.capturePreset = ZombiesDeployDraft.normalizeCapturePreset(this.capturePreset, this.selectedObjectType);
+        this.selectedIndex = Math.max(-1, target.targetIndex());
+        sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_SELECTIONS);
     }
 
     private ZombiesDeploySnapshot.IssueTarget issueTargetAt(int issueIndex) {
@@ -1735,13 +1837,27 @@ public class ZombiesDeployToolScreen extends Screen {
         return snapshot.issueTargets().get(issueIndex);
     }
 
+    private void selectVisibleMap(int mapIndex) {
+        List<String> maps = snapshot.availableMaps();
+        if (mapIndex < 0 || mapIndex >= maps.size()) {
+            return;
+        }
+        String nextMap = maps.get(mapIndex);
+        if (Objects.equals(nextMap, this.selectedMap)) {
+            return;
+        }
+        this.selectedMap = nextMap;
+        this.selectedIndex = -1;
+        sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_SELECTIONS);
+    }
+
     private void selectVisibleObject(int visibleRow) {
         int index = visibleObjectStart() + visibleRow;
         if (index < 0 || index >= snapshot.objects().size()) {
             return;
         }
         this.selectedIndex = snapshot.objects().get(index).index();
-        sendAction(ZombiesDeployToolActionC2SPacket.Action.SELECT_OBJECT);
+        sendAction(ZombiesDeployToolActionC2SPacket.Action.SAVE_SELECTIONS);
     }
 
     private void selectVisibleField(int visibleRow) {
