@@ -38,6 +38,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 
 public final class ZombiesDeployToolService {
     private static final ZombiesDeployToolService INSTANCE = new ZombiesDeployToolService();
@@ -252,7 +254,10 @@ public final class ZombiesDeployToolService {
             ZombiesDeployDraft request
     ) {
         ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
-        ZombiesDeployDraft updated = applyWorkflowStep(player, draft, draft.workflowStep());
+        ZombiesMapObjects objects = resolveMap(draft.selectedMap())
+                .map(ZombiesMap::objects)
+                .orElse(ZombiesMapObjects.EMPTY);
+        ZombiesDeployDraft updated = applyWorkflowStep(player, draft, draft.workflowStep(), objects);
         ZombiesDeployTool.saveDraft(stack, updated);
         return snapshot(player, stack, updated, "message.codpattern.zombies.deploy.refreshed", "ok", "");
     }
@@ -264,19 +269,12 @@ public final class ZombiesDeployToolService {
     ) {
         ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
         String next = nextWorkflowStep(draft.workflowStep());
-        ZombiesDeployDraft updated = applyWorkflowStep(player, draft, next);
+        ZombiesMapObjects objects = resolveMap(draft.selectedMap())
+                .map(ZombiesMap::objects)
+                .orElse(ZombiesMapObjects.EMPTY);
+        ZombiesDeployDraft updated = applyWorkflowStep(player, draft, next, objects);
         ZombiesDeployTool.saveDraft(stack, updated);
         return snapshot(player, stack, updated, "message.codpattern.zombies.deploy.refreshed", "ok.next_step", next);
-    }
-
-    public ZombiesDeployServiceResult<ZombiesDeploySnapshot> selectCapturePreset(
-            ServerPlayer player,
-            ItemStack stack,
-            ZombiesDeployDraft request
-    ) {
-        ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
-        ZombiesDeployTool.saveDraft(stack, draft);
-        return snapshot(player, stack, draft, "message.codpattern.zombies.deploy.refreshed", "ok", "");
     }
 
     public ZombiesDeployServiceResult<ZombiesDeploySnapshot> createMap(
@@ -315,45 +313,6 @@ public final class ZombiesDeployToolService {
                 defaultFields(player, ZombiesDeployFieldSchema.INITIAL));
         ZombiesDeployTool.saveDraft(stack, updated);
         return snapshot(player, stack, updated, created.messageKey(), "ok.map_created", created.mapName());
-    }
-
-    public ZombiesDeployServiceResult<ZombiesDeploySnapshot> updateMapArea(
-            ServerPlayer player,
-            ItemStack stack,
-            ZombiesDeployDraft request
-    ) {
-        ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
-        if (draft.mapPos1() == null || draft.mapPos2() == null) {
-            return failure(player, stack, draft, "map.invalid_area", "message.fpsm.map_creator_tool.invalid_area", "");
-        }
-        Optional<ZombiesMap> resolvedMap = resolveMap(draft.selectedMap());
-        if (resolvedMap.isEmpty()) {
-            return failure(player, stack, draft, "map.not_found", "message.codpattern.zombies.deploy.map_not_found", draft.selectedMap());
-        }
-        ZombiesMap oldMap = resolvedMap.get();
-        if (ZombiesMapOccupancyService.instance().isOccupied(BuiltInGameModes.ZOMBIES, oldMap.getMapName())) {
-            return failure(player, stack, draft, "map.active_area_update_deferred", "message.codpattern.zombies.deploy.saved_active_map", oldMap.getMapName());
-        }
-
-        FPSMCore core = FPSMCore.getInstance();
-        ZombiesMap replacement = new ZombiesMap(oldMap.getServerLevel(), oldMap.getMapName(), new AreaData(draft.mapPos1(), draft.mapPos2()));
-        replacement.applyObjects(oldMap.objects());
-        oldMap.matchEndTeleportPoint().ifPresent(replacement::setMatchEndTeleportPoint);
-        core.unregisterMap(oldMap);
-        core.registerMap(BuiltInGameModes.ZOMBIES, replacement);
-        try {
-            CodMapPersistence.saveMapOrRollback(replacement, () -> {
-                core.unregisterMap(replacement);
-                core.registerMap(BuiltInGameModes.ZOMBIES, oldMap);
-            });
-        } catch (RuntimeException e) {
-            ZombiesDeployTool.saveDraft(stack, draft);
-            ZombiesDeploySnapshot snapshot = buildSnapshot(player, draft, "message.codpattern.zombies.deploy.save_failed_rollback", "save_failed_rolled_back", oldMap.getMapName());
-            return ZombiesDeployServiceResult.failure("save_failed_rolled_back", "message.codpattern.zombies.deploy.save_failed_rollback", snapshot, oldMap.getMapName());
-        }
-        replacement.syncToClient();
-        ZombiesDeployTool.saveDraft(stack, draft);
-        return snapshot(player, stack, draft, "message.codpattern.zombies.deploy.object_saved", "ok.map_area_updated", oldMap.getMapName());
     }
 
     public ZombiesDeployServiceResult<ZombiesDeploySnapshot> captureWorldClick(
@@ -398,13 +357,17 @@ public final class ZombiesDeployToolService {
         if ("lookAt".equals(target)) {
             setPositionLoose(fields, "lookAt", clickedPos);
             BlockPos pos = readPositionIfPresent(fields, "pos");
-            applyLookAtYawPitch(fields, pos, clickedPos);
+            applyLookAtYawOnly(fields, pos, clickedPos);
+        } else if ("pos".equals(target)) {
+            setPosition(fields, "pos", clickedPos.above());
+            if (isYawCaptureType(draft.objectType())) {
+                applyHorizontalYawFromPlayer(fields, player);
+            } else {
+                BlockPos lookAt = readPositionIfPresent(fields, "lookAt");
+                applyLookAtYawOnly(fields, clickedPos, lookAt);
+            }
         } else {
             setPosition(fields, target, clickedPos);
-            if ("pos".equals(target)) {
-                BlockPos lookAt = readPositionIfPresent(fields, "lookAt");
-                applyLookAtYawPitch(fields, clickedPos, lookAt);
-            }
         }
         ZombiesDeployDraft updated = draft.withFields(fields);
         ZombiesDeployTool.saveDraft(stack, updated);
@@ -425,10 +388,6 @@ public final class ZombiesDeployToolService {
 
     public ZombiesDeployServiceResult<ZombiesDeploySnapshot> deleteObject(ServerPlayer player, ItemStack stack, ZombiesDeployDraft request) {
         return editObject(player, stack, request, ZombiesDeployObjectEditor.Operation.DELETE, "object.deleted");
-    }
-
-    public ZombiesDeployServiceResult<ZombiesDeploySnapshot> clearObjectType(ServerPlayer player, ItemStack stack, ZombiesDeployDraft request) {
-        return editObject(player, stack, request, ZombiesDeployObjectEditor.Operation.CLEAR, "object.cleared");
     }
 
     private ZombiesDeployServiceResult<ZombiesDeploySnapshot> editObject(
@@ -662,7 +621,12 @@ public final class ZombiesDeployToolService {
         return targets;
     }
 
-    private ZombiesDeployDraft applyWorkflowStep(ServerPlayer player, ZombiesDeployDraft draft, String step) {
+    private ZombiesDeployDraft applyWorkflowStep(
+            ServerPlayer player,
+            ZombiesDeployDraft draft,
+            String step,
+            ZombiesMapObjects objects
+    ) {
         String normalizedStep = ZombiesDeployDraft.normalizeWorkflowStep(step);
         if (ZombiesDeployDraft.WORKFLOW_MAP.equals(normalizedStep)) {
             return new ZombiesDeployDraft(
@@ -678,11 +642,12 @@ public final class ZombiesDeployToolService {
                     draft.validationView(),
                     draft.fields());
         }
+        ZombiesMapObjects resolved = objects == null ? ZombiesMapObjects.EMPTY : objects;
         String type = switch (normalizedStep) {
             case ZombiesDeployDraft.WORKFLOW_INITIAL -> ZombiesDeployFieldSchema.INITIAL;
             case ZombiesDeployDraft.WORKFLOW_ZOMBIE_SPAWN -> ZombiesDeployFieldSchema.ZOMBIE_SPAWN;
             case ZombiesDeployDraft.WORKFLOW_BARRIER -> ZombiesDeployFieldSchema.BARRIER;
-            case ZombiesDeployDraft.WORKFLOW_INTERACT -> ZombiesDeployFieldSchema.POWER_SWITCH;
+            case ZombiesDeployDraft.WORKFLOW_INTERACT -> preferredInteractObjectType(resolved);
             case ZombiesDeployDraft.WORKFLOW_VALIDATE -> draft.objectType();
             default -> ZombiesDeployFieldSchema.INITIAL;
         };
@@ -706,6 +671,29 @@ public final class ZombiesDeployToolService {
                 -1,
                 draft.validationView(),
                 fields);
+    }
+
+    private String preferredInteractObjectType(ZombiesMapObjects objects) {
+        ZombiesMapObjects resolved = objects == null ? ZombiesMapObjects.EMPTY : objects;
+        if (resolved.weaponWalls().isEmpty()) {
+            return ZombiesDeployFieldSchema.WEAPON_WALL;
+        }
+        if (resolved.ammoBoxes().isEmpty()) {
+            return ZombiesDeployFieldSchema.AMMO_BOX;
+        }
+        if (resolved.armorStations().isEmpty()) {
+            return ZombiesDeployFieldSchema.ARMOR_STATION;
+        }
+        if (resolved.sodaMachines().isEmpty()) {
+            return ZombiesDeployFieldSchema.SODA_MACHINE;
+        }
+        if (resolved.ultimateMachines().isEmpty()) {
+            return ZombiesDeployFieldSchema.ULTIMATE_MACHINE;
+        }
+        if (resolved.powerSwitch().isEmpty()) {
+            return ZombiesDeployFieldSchema.POWER_SWITCH;
+        }
+        return ZombiesDeployFieldSchema.WEAPON_WALL;
     }
 
     private List<String> availableMaps() {
@@ -740,12 +728,11 @@ public final class ZombiesDeployToolService {
         if (player != null) {
             fields.put("dimension", player.serverLevel().dimension().location().toString());
             BlockPos pos = player.blockPosition();
-            setPosition(fields, "pos", pos);
+            setPosition(fields, "pos", pos.above());
             setPosition(fields, "interaction", pos);
             setPosition(fields, "areaFrom", pos);
             setPosition(fields, "areaTo", pos);
             fields.computeIfPresent("yaw", (key, value) -> Float.toString(player.getYRot()));
-            fields.computeIfPresent("pitch", (key, value) -> Float.toString(player.getXRot()));
         }
         return fields;
     }
@@ -924,11 +911,32 @@ public final class ZombiesDeployToolService {
     }
 
     private boolean requiredObjectType(String objectType) {
+        return requiredForMvp1(objectType)
+                || requiredForMvp2(objectType)
+                || requiredForMvp3(objectType);
+    }
+
+    private boolean requiredForMvp1(String objectType) {
         return switch (ZombiesDeployFieldSchema.normalizeObjectType(objectType)) {
             case ZombiesDeployFieldSchema.INITIAL,
-                 ZombiesDeployFieldSchema.ZOMBIE_SPAWN,
-                 ZombiesDeployFieldSchema.BARRIER,
-                 ZombiesDeployFieldSchema.POWER_SWITCH,
+                 ZombiesDeployFieldSchema.ZOMBIE_SPAWN -> true;
+            default -> false;
+        };
+    }
+
+    private boolean requiredForMvp2(String objectType) {
+        return switch (ZombiesDeployFieldSchema.normalizeObjectType(objectType)) {
+            case ZombiesDeployFieldSchema.WEAPON_WALL,
+                 ZombiesDeployFieldSchema.AMMO_BOX,
+                 ZombiesDeployFieldSchema.ARMOR_STATION -> true;
+            default -> false;
+        };
+    }
+
+    private boolean requiredForMvp3(String objectType) {
+        return switch (ZombiesDeployFieldSchema.normalizeObjectType(objectType)) {
+            case ZombiesDeployFieldSchema.BARRIER,
+                 ZombiesDeployFieldSchema.SODA_MACHINE,
                  ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> true;
             default -> false;
         };
@@ -936,26 +944,68 @@ public final class ZombiesDeployToolService {
 
     private List<ZombiesDeploySnapshot.StepStatus> stepStatuses(boolean hasMap, ZombiesMapObjects objects) {
         ZombiesMapObjects resolved = objects == null ? ZombiesMapObjects.EMPTY : objects;
-        int interactionCount = resolved.weaponWalls().size()
-                + resolved.ammoBoxes().size()
-                + resolved.armorStations().size()
-                + resolved.sodaMachines().size()
-                + resolved.ultimateMachines().size()
-                + (resolved.powerSwitch().isPresent() ? 1 : 0);
+        Set<Integer> zombieSpawnGroups = new TreeSet<>();
+        for (ZombiesZombieSpawnData spawn : resolved.zombieSpawns()) {
+            zombieSpawnGroups.add(spawn.group());
+        }
+        Set<Integer> barrierGroups = new TreeSet<>();
+        for (ZombiesBarrierData barrier : resolved.barriers()) {
+            barrierGroups.add(barrier.group());
+        }
+        Set<Integer> unmatchedBarrierGroups = new TreeSet<>(barrierGroups);
+        unmatchedBarrierGroups.removeAll(zombieSpawnGroups);
+
+        boolean hasWeaponWall = !resolved.weaponWalls().isEmpty();
+        boolean hasAmmoBox = !resolved.ammoBoxes().isEmpty();
+        boolean hasArmorStation = !resolved.armorStations().isEmpty();
         boolean hasPowerSwitch = resolved.powerSwitch().isPresent();
         boolean hasUltimateMachine = !resolved.ultimateMachines().isEmpty();
-        String interactionDetail = "powerSwitch=" + (hasPowerSwitch ? "1" : "0")
+        boolean hasSodaMachine = !resolved.sodaMachines().isEmpty();
+        boolean interactionComplete = hasWeaponWall
+                && hasAmmoBox
+                && hasArmorStation
+                && hasUltimateMachine
+                && hasSodaMachine;
+        int interactionTotal = resolved.weaponWalls().size()
+                + resolved.ammoBoxes().size()
+                + resolved.armorStations().size()
+                + (hasPowerSwitch ? 1 : 0)
+                + resolved.ultimateMachines().size()
+                + resolved.sodaMachines().size();
+        String interactionDetail = "weaponWall=" + resolved.weaponWalls().size()
+                + ";ammoBox=" + resolved.ammoBoxes().size()
+                + ";armorStation=" + resolved.armorStations().size()
+                + ";powerSwitch=" + (hasPowerSwitch ? "1" : "0")
                 + ";ultimateMachine=" + (hasUltimateMachine ? "1" : "0")
-                + ";total=" + interactionCount;
-        boolean interactionComplete = hasPowerSwitch && hasUltimateMachine;
+                + ";sodaMachine=" + resolved.sodaMachines().size()
+                + ";total=" + interactionTotal;
+        boolean barrierComplete = !resolved.barriers().isEmpty();
+        String barrierDetail = "barrier=" + resolved.barriers().size()
+                + ";barrierGroups=" + formatGroupSet(barrierGroups)
+                + ";spawnGroups=" + formatGroupSet(zombieSpawnGroups)
+                + ";unmatchedGroups=" + formatGroupSet(unmatchedBarrierGroups);
         return List.of(
                 new ZombiesDeploySnapshot.StepStatus("map", "", hasMap ? "1" : "0", hasMap),
                 new ZombiesDeploySnapshot.StepStatus("initial", "", Integer.toString(resolved.initialSpawns().size()), !resolved.initialSpawns().isEmpty()),
                 new ZombiesDeploySnapshot.StepStatus("zombie_spawn", "", Integer.toString(resolved.zombieSpawns().size()), !resolved.zombieSpawns().isEmpty()),
-                new ZombiesDeploySnapshot.StepStatus("barrier", "", Integer.toString(resolved.barriers().size()), !resolved.barriers().isEmpty()),
+                new ZombiesDeploySnapshot.StepStatus("barrier", "", barrierDetail, barrierComplete),
                 new ZombiesDeploySnapshot.StepStatus("interact", "", interactionDetail, interactionComplete),
                 new ZombiesDeploySnapshot.StepStatus("validate", "", hasMap ? "1" : "0", hasMap)
         );
+    }
+
+    private String formatGroupSet(Set<Integer> groups) {
+        if (groups == null || groups.isEmpty()) {
+            return "-";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (Integer group : groups) {
+            if (builder.length() > 0) {
+                builder.append(',');
+            }
+            builder.append(group);
+        }
+        return builder.toString();
     }
 
     private String resolveWorkflowStep(
@@ -998,16 +1048,29 @@ public final class ZombiesDeployToolService {
                     resolved.initialSpawns().isEmpty() ? "missing_initial" : "";
             case ZombiesDeployDraft.WORKFLOW_ZOMBIE_SPAWN ->
                     resolved.zombieSpawns().isEmpty() ? "missing_zombie_spawn" : "";
-            case ZombiesDeployDraft.WORKFLOW_BARRIER ->
-                    resolved.barriers().isEmpty() ? "missing_barrier" : "";
-            case ZombiesDeployDraft.WORKFLOW_INTERACT -> {
-                boolean hasPower = resolved.powerSwitch().isPresent();
-                boolean hasUltimate = !resolved.ultimateMachines().isEmpty();
-                if (!hasPower) {
-                    yield "missing_power_switch";
+            case ZombiesDeployDraft.WORKFLOW_BARRIER -> {
+                if (resolved.barriers().isEmpty()) {
+                    yield "missing_barrier";
                 }
+                yield "";
+            }
+            case ZombiesDeployDraft.WORKFLOW_INTERACT -> {
+                if (resolved.weaponWalls().isEmpty()) {
+                    yield "missing_weapon_wall";
+                }
+                if (resolved.ammoBoxes().isEmpty()) {
+                    yield "missing_ammo_box";
+                }
+                if (resolved.armorStations().isEmpty()) {
+                    yield "missing_armor_station";
+                }
+                boolean hasUltimate = !resolved.ultimateMachines().isEmpty();
+                boolean hasSoda = !resolved.sodaMachines().isEmpty();
                 if (!hasUltimate) {
                     yield "missing_ultimate_machine";
+                }
+                if (!hasSoda) {
+                    yield "missing_soda_machine";
                 }
                 yield "";
             }
@@ -1050,8 +1113,23 @@ public final class ZombiesDeployToolService {
         if (code.contains("missing_power_switch") || code.contains("multiple_power_switches") || code.contains("invalid_power_switch")) {
             return issueTargetForObject(false, ZombiesDeployDraft.WORKFLOW_INTERACT, ZombiesDeployFieldSchema.POWER_SWITCH, subjectObjectId, objects);
         }
+        if (code.contains("missing_soda_machine") || code.contains("invalid_soda_machine")) {
+            return issueTargetForObject(false, ZombiesDeployDraft.WORKFLOW_INTERACT, ZombiesDeployFieldSchema.SODA_MACHINE, subjectObjectId, objects);
+        }
         if (code.contains("missing_ultimate_machine") || code.contains("invalid_ultimate_machine")) {
             return issueTargetForObject(false, ZombiesDeployDraft.WORKFLOW_INTERACT, ZombiesDeployFieldSchema.ULTIMATE_MACHINE, subjectObjectId, objects);
+        }
+        if (code.contains("missing_weapon_wall") || code.contains("invalid_weapon_wall")) {
+            return issueTargetForObject(false, ZombiesDeployDraft.WORKFLOW_INTERACT, ZombiesDeployFieldSchema.WEAPON_WALL, subjectObjectId, objects);
+        }
+        if (code.contains("missing_ammo_box") || code.contains("invalid_ammo_box")) {
+            return issueTargetForObject(false, ZombiesDeployDraft.WORKFLOW_INTERACT, ZombiesDeployFieldSchema.AMMO_BOX, subjectObjectId, objects);
+        }
+        if (code.contains("missing_armor_station") || code.contains("invalid_armor_station")) {
+            return issueTargetForObject(false, ZombiesDeployDraft.WORKFLOW_INTERACT, ZombiesDeployFieldSchema.ARMOR_STATION, subjectObjectId, objects);
+        }
+        if (code.contains("barrier_group_without_zombie_spawn")) {
+            return issueTargetForObject(false, ZombiesDeployDraft.WORKFLOW_BARRIER, ZombiesDeployFieldSchema.BARRIER, subjectObjectId, objects);
         }
         if (code.contains("invalid_barrier")) {
             return issueTargetForObject(false, ZombiesDeployDraft.WORKFLOW_BARRIER, ZombiesDeployFieldSchema.BARRIER, subjectObjectId, objects);
@@ -1065,12 +1143,6 @@ public final class ZombiesDeployToolService {
             mappedObjectType = draft.objectType();
         }
         String workflowStep = ZombiesDeployDraft.workflowStepForObjectType(mappedObjectType);
-        if (ZombiesDeployFieldSchema.WEAPON_WALL.equals(mappedObjectType)
-                || ZombiesDeployFieldSchema.AMMO_BOX.equals(mappedObjectType)
-                || ZombiesDeployFieldSchema.ARMOR_STATION.equals(mappedObjectType)
-                || ZombiesDeployFieldSchema.SODA_MACHINE.equals(mappedObjectType)) {
-            workflowStep = ZombiesDeployDraft.WORKFLOW_VALIDATE;
-        }
         int index = findObjectIndexByObjectId(objects, mappedObjectType, subjectObjectId);
         return new IssueTarget(false, workflowStep, mappedObjectType, index);
     }
@@ -1441,27 +1513,34 @@ public final class ZombiesDeployToolService {
         }
     }
 
-    private void applyLookAtYawPitch(Map<String, String> fields, BlockPos fromPos, BlockPos lookAtPos) {
+    private boolean isYawCaptureType(String objectType) {
+        String normalized = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
+        return ZombiesDeployFieldSchema.INITIAL.equals(normalized)
+                || ZombiesDeployFieldSchema.ZOMBIE_SPAWN.equals(normalized);
+    }
+
+    private void applyHorizontalYawFromPlayer(Map<String, String> fields, ServerPlayer player) {
+        if (fields == null || player == null || !fields.containsKey("yaw")) {
+            return;
+        }
+        fields.put("yaw", Float.toString(player.getYRot()));
+    }
+
+    private void applyLookAtYawOnly(Map<String, String> fields, BlockPos fromPos, BlockPos lookAtPos) {
         if (fields == null || fromPos == null || lookAtPos == null) {
             return;
         }
-        if (!fields.containsKey("yaw") || !fields.containsKey("pitch")) {
+        if (!fields.containsKey("yaw")) {
             return;
         }
         double fromX = fromPos.getX() + 0.5D;
-        double fromY = fromPos.getY() + 1.62D;
         double fromZ = fromPos.getZ() + 0.5D;
         double toX = lookAtPos.getX() + 0.5D;
-        double toY = lookAtPos.getY() + 0.5D;
         double toZ = lookAtPos.getZ() + 0.5D;
         double dx = toX - fromX;
-        double dy = toY - fromY;
         double dz = toZ - fromZ;
-        double horizontal = Math.sqrt(dx * dx + dz * dz);
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
-        float pitch = (float) Math.toDegrees(Math.atan2(-dy, horizontal));
         fields.put("yaw", Float.toString(yaw));
-        fields.put("pitch", Float.toString(pitch));
     }
 
     private String detail(ResourceKey<Level> dimension, BlockPos pos) {

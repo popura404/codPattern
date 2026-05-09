@@ -20,10 +20,10 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
     public static void main(String[] args) {
         mvp2WeaponWallHighestRarityWithoutCandidateFails();
         mvp2WeaponWallNegativeMaxReserveAmmoFails();
-        mvp3RequiresPowerSodaWithoutPowerSwitchFails();
-        mvp3RequiresPowerUltimateWithoutPowerSwitchFails();
-        mvp3NoPowerSwitchFails();
-        mvp3MultiplePowerSwitchesFail();
+        mvp3RequiresPowerSodaWithoutPowerSwitchIgnoresRequiresPowerFlag();
+        mvp3RequiresPowerUltimateWithoutPowerSwitchIgnoresRequiresPowerFlag();
+        mvp3NoPowerSwitchPasses();
+        mvp3MultiplePowerSwitchesPass();
         mvp3MissingSodaMachineFails();
         mvp3MissingUltimateMachineFails();
         mvp3InvalidSodaBuffFails();
@@ -83,52 +83,40 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
         requireIssue(report, "map.invalid_weapon_wall");
     }
 
-    private static void mvp3RequiresPowerSodaWithoutPowerSwitchFails() {
-        ZombiesMapSnapshot.SodaMachineSnapshot soda = new ZombiesMapSnapshot.SodaMachineSnapshot(
-                "soda-1",
-                "sodaMachine",
-                "quick_revive",
-                1500,
-                true);
+    private static void mvp3RequiresPowerSodaWithoutPowerSwitchIgnoresRequiresPowerFlag() {
+        ZombiesMapSnapshot.SodaMachineSnapshot soda = validSoda();
 
         ZombiesMapValidationReport report = validate(
                 ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
-                snapshot(List.of(), List.of(), List.of(soda), List.of()));
+                snapshot(List.of(), List.of(), List.of(soda), List.of(validUltimate())));
 
-        require(report.hasErrors(), "MVP3 requiresPower soda without power switch should fail");
-        requireIssue(report, "map.requires_power_without_switch");
-        requireIssue(report, "map.missing_power_switch");
+        require(report.valid(), "MVP3 soda with requiresPower=true should pass without power switch: " + issueCodes(report));
+        requireNoIssue(report, "map.missing_power_switch");
+        requireNoIssue(report, "map.requires_power_without_switch");
     }
 
-    private static void mvp3RequiresPowerUltimateWithoutPowerSwitchFails() {
-        ZombiesMapSnapshot.UltimateMachineSnapshot ultimate = new ZombiesMapSnapshot.UltimateMachineSnapshot(
-                "ultimate-1",
-                "ultimateMachine",
-                2,
-                Map.of(
-                        "1", new ZombiesMapSnapshot.UltimateLevelSnapshot(2500, 1.25D),
-                        "2", new ZombiesMapSnapshot.UltimateLevelSnapshot(5000, 1.5D)),
-                true);
+    private static void mvp3RequiresPowerUltimateWithoutPowerSwitchIgnoresRequiresPowerFlag() {
+        ZombiesMapSnapshot.UltimateMachineSnapshot ultimate = validUltimate();
 
         ZombiesMapValidationReport report = validate(
                 ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
-                snapshot(List.of(), List.of(), List.of(), List.of(ultimate)));
+                snapshot(List.of(), List.of(), List.of(validSoda()), List.of(ultimate)));
 
-        require(report.hasErrors(), "MVP3 requiresPower ultimate without power switch should fail");
-        requireIssue(report, "map.requires_power_without_switch");
-        requireIssue(report, "map.missing_power_switch");
+        require(report.valid(), "MVP3 ultimate with requiresPower=true should pass without power switch: " + issueCodes(report));
+        requireNoIssue(report, "map.missing_power_switch");
+        requireNoIssue(report, "map.requires_power_without_switch");
     }
 
-    private static void mvp3NoPowerSwitchFails() {
+    private static void mvp3NoPowerSwitchPasses() {
         ZombiesMapValidationReport report = validate(
                 ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
                 snapshot(List.of(), List.of(), List.of(validSoda()), List.of(validUltimate())));
 
-        require(report.hasErrors(), "MVP3 map without power switch should fail");
-        requireIssue(report, "map.missing_power_switch");
+        require(report.valid(), "MVP3 map without power switch should pass: " + issueCodes(report));
+        requireNoIssue(report, "map.missing_power_switch");
     }
 
-    private static void mvp3MultiplePowerSwitchesFail() {
+    private static void mvp3MultiplePowerSwitchesPass() {
         ZombiesMapValidationReport report = validate(
                 ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
                 snapshot(
@@ -137,8 +125,8 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
                         List.of(validSoda()),
                         List.of(validUltimate())));
 
-        require(report.hasErrors(), "MVP3 map with multiple power switches should fail");
-        requireIssue(report, "map.multiple_power_switches");
+        require(report.valid(), "MVP3 map with multiple power switches should pass: " + issueCodes(report));
+        requireNoIssue(report, "map.multiple_power_switches");
     }
 
     private static void mvp3MissingSodaMachineFails() {
@@ -345,6 +333,9 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
             List<ZombiesMapSnapshot.SodaMachineSnapshot> sodaMachines,
             List<ZombiesMapSnapshot.UltimateMachineSnapshot> ultimateMachines
     ) {
+        List<ZombiesMapSnapshot.WeaponWallSnapshot> resolvedWeaponWalls = weaponWalls == null || weaponWalls.isEmpty()
+                ? List.of(validWeaponWall())
+                : weaponWalls;
         return ZombiesMapSnapshot.of(
                 ROOM_ID,
                 ROOM_ID.mapName(),
@@ -352,10 +343,10 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
                 MAP_DIMENSION,
                 MAP_BOUNDS,
                 spawns,
-                List.of(),
-                weaponWalls,
-                List.of(),
-                List.of(),
+                List.of(validBarrier()),
+                resolvedWeaponWalls,
+                List.of(validAmmoBox()),
+                List.of(validArmorStation()),
                 powerSwitches,
                 sodaMachines,
                 ultimateMachines,
@@ -400,6 +391,53 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
                 new BlockPos(3, 1, 3));
     }
 
+    private static ZombiesMapSnapshot.BarrierSnapshot validBarrier() {
+        return new ZombiesMapSnapshot.BarrierSnapshot(
+                "barrier-1",
+                "barrier",
+                1,
+                0,
+                MAP_DIMENSION,
+                new BlockPos(6, 1, 6));
+    }
+
+    private static ZombiesMapSnapshot.WeaponWallSnapshot validWeaponWall() {
+        return new ZombiesMapSnapshot.WeaponWallSnapshot(
+                "wall-1",
+                "weaponWall",
+                1,
+                1.0D,
+                500,
+                90,
+                List.of(1),
+                List.of(new ZombiesMapSnapshot.RarityPoolSnapshot("common", 1, 1.0D, 0.0D)),
+                List.of(new ZombiesMapSnapshot.WeaponCandidateSnapshot(
+                        "tacz:ak47",
+                        Map.of("common", 1.0D))),
+                MAP_DIMENSION,
+                new BlockPos(7, 1, 7));
+    }
+
+    private static ZombiesMapSnapshot.AmmoBoxSnapshot validAmmoBox() {
+        return new ZombiesMapSnapshot.AmmoBoxSnapshot(
+                "ammo-1",
+                "ammoBox",
+                Map.of("1", 0),
+                MAP_DIMENSION,
+                new BlockPos(8, 1, 8));
+    }
+
+    private static ZombiesMapSnapshot.ArmorStationSnapshot validArmorStation() {
+        return new ZombiesMapSnapshot.ArmorStationSnapshot(
+                "armor-1",
+                "armorStation",
+                1,
+                500,
+                0.9D,
+                MAP_DIMENSION,
+                new BlockPos(9, 1, 9));
+    }
+
     private static ZombiesMapSnapshot.SodaMachineSnapshot validSoda() {
         return new ZombiesMapSnapshot.SodaMachineSnapshot(
                 "soda-1",
@@ -428,6 +466,11 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
     private static void requireIssue(ZombiesMapValidationReport report, String code) {
         require(report.issues().stream().anyMatch(issue -> code.equals(issue.code().key())),
                 "expected issue " + code + ", got " + issueCodes(report));
+    }
+
+    private static void requireNoIssue(ZombiesMapValidationReport report, String code) {
+        require(report.issues().stream().noneMatch(issue -> code.equals(issue.code().key())),
+                "expected no issue " + code + ", got " + issueCodes(report));
     }
 
     private static String issueCodes(ZombiesMapValidationReport report) {

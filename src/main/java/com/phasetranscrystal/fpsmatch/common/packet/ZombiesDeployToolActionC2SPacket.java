@@ -32,12 +32,11 @@ public class ZombiesDeployToolActionC2SPacket {
         UPDATE_OBJECT,
         DUPLICATE_OBJECT,
         DELETE_OBJECT,
-        CLEAR_OBJECT_TYPE,
         VALIDATE_MAP,
         SELECT_WORKSPACE_STAGE,
         CREATE_MAP,
-        UPDATE_MAP_AREA,
-        SELECT_CAPTURE_PRESET
+        JUMP_TO_ISSUE,
+        JUMP_TO_ISSUE_TARGET
     }
 
     private final Action action;
@@ -197,12 +196,20 @@ public class ZombiesDeployToolActionC2SPacket {
             case UPDATE_OBJECT -> service.updateObject(player, stack, draft);
             case DUPLICATE_OBJECT -> service.duplicateObject(player, stack, draft);
             case DELETE_OBJECT -> service.deleteObject(player, stack, draft);
-            case CLEAR_OBJECT_TYPE -> service.clearObjectType(player, stack, draft);
             case VALIDATE_MAP -> service.validateMap(player, stack, draft);
             case SELECT_WORKSPACE_STAGE -> service.selectWorkspaceStage(player, stack, draft);
             case CREATE_MAP -> service.createMap(player, stack, draft);
-            case UPDATE_MAP_AREA -> service.updateMapArea(player, stack, draft);
-            case SELECT_CAPTURE_PRESET -> service.selectCapturePreset(player, stack, draft);
+            case JUMP_TO_ISSUE -> service.jumpToIssue(player, stack, draft, fieldKey, fieldValue);
+            case JUMP_TO_ISSUE_TARGET -> service.jumpToIssueTarget(
+                    player,
+                    stack,
+                    draft,
+                    fieldKey,
+                    fieldValue,
+                    issueWorkflowStep,
+                    issueObjectType,
+                    issueTargetIndex,
+                    issueMapStage);
         };
     }
 

@@ -128,9 +128,6 @@ public record ZombiesDeployDraft(
         String value = Objects.requireNonNullElse(preset, "").trim();
         String type = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
         if (ZombiesDeployFieldSchema.BARRIER.equals(type)) {
-            if (CAPTURE_BARRIER_INTERACTION.equals(value)) {
-                return CAPTURE_BARRIER_INTERACTION;
-            }
             return CAPTURE_BARRIER_AREA;
         }
         return CAPTURE_DEFAULT;
@@ -153,7 +150,11 @@ public record ZombiesDeployDraft(
             case ZombiesDeployFieldSchema.INITIAL -> WORKFLOW_INITIAL;
             case ZombiesDeployFieldSchema.ZOMBIE_SPAWN -> WORKFLOW_ZOMBIE_SPAWN;
             case ZombiesDeployFieldSchema.BARRIER -> WORKFLOW_BARRIER;
-            case ZombiesDeployFieldSchema.POWER_SWITCH,
+            case ZombiesDeployFieldSchema.WEAPON_WALL,
+                 ZombiesDeployFieldSchema.AMMO_BOX,
+                 ZombiesDeployFieldSchema.ARMOR_STATION,
+                 ZombiesDeployFieldSchema.POWER_SWITCH,
+                 ZombiesDeployFieldSchema.SODA_MACHINE,
                  ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> WORKFLOW_INTERACT;
             default -> WORKFLOW_VALIDATE;
         };

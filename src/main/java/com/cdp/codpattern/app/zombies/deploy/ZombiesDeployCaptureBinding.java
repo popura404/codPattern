@@ -29,10 +29,6 @@ public record ZombiesDeployCaptureBinding(
     public static ZombiesDeployCaptureBinding forObject(String objectType, String capturePreset) {
         String type = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
         if (ZombiesDeployFieldSchema.BARRIER.equals(type)) {
-            String preset = ZombiesDeployDraft.normalizeCapturePreset(capturePreset, type);
-            if (ZombiesDeployDraft.CAPTURE_BARRIER_INTERACTION.equals(preset)) {
-                return new ZombiesDeployCaptureBinding("interaction", "");
-            }
             return new ZombiesDeployCaptureBinding("areaFrom", "areaTo");
         }
         return switch (type) {

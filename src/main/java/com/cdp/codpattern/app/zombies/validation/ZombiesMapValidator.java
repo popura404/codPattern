@@ -38,14 +38,8 @@ public final class ZombiesMapValidator {
             ZombiesErrorCode.of("map.invalid_ammo_box");
     private static final ZombiesErrorCode MAP_INVALID_ARMOR_STATION =
             ZombiesErrorCode.of("map.invalid_armor_station");
-    private static final ZombiesErrorCode MAP_MISSING_POWER_SWITCH =
-            ZombiesErrorCode.of("map.missing_power_switch");
-    private static final ZombiesErrorCode MAP_MULTIPLE_POWER_SWITCHES =
-            ZombiesErrorCode.of("map.multiple_power_switches");
     private static final ZombiesErrorCode MAP_INVALID_POWER_SWITCH =
             ZombiesErrorCode.of("map.invalid_power_switch");
-    private static final ZombiesErrorCode MAP_REQUIRES_POWER_WITHOUT_SWITCH =
-            ZombiesErrorCode.of("map.requires_power_without_switch");
     private static final ZombiesErrorCode MAP_MISSING_SODA_MACHINE =
             ZombiesErrorCode.of("map.missing_soda_machine");
     private static final ZombiesErrorCode MAP_INVALID_SODA_MACHINE =
@@ -54,6 +48,18 @@ public final class ZombiesMapValidator {
             ZombiesErrorCode.of("map.missing_ultimate_machine");
     private static final ZombiesErrorCode MAP_INVALID_ULTIMATE_MACHINE =
             ZombiesErrorCode.of("map.invalid_ultimate_machine");
+    private static final ZombiesErrorCode MAP_MISSING_VALID_WAVES =
+            ZombiesErrorCode.of("map.missing_valid_waves");
+    private static final ZombiesErrorCode MAP_MISSING_WEAPON_WALL =
+            ZombiesErrorCode.of("map.missing_weapon_wall");
+    private static final ZombiesErrorCode MAP_MISSING_AMMO_BOX =
+            ZombiesErrorCode.of("map.missing_ammo_box");
+    private static final ZombiesErrorCode MAP_MISSING_ARMOR_STATION =
+            ZombiesErrorCode.of("map.missing_armor_station");
+    private static final ZombiesErrorCode MAP_MISSING_BARRIER =
+            ZombiesErrorCode.of("map.missing_barrier");
+    private static final ZombiesErrorCode MAP_BARRIER_GROUP_WITHOUT_ZOMBIE_SPAWN =
+            ZombiesErrorCode.of("map.barrier_group_without_zombie_spawn");
     private static final Set<String> POWER_SWITCH_FEATURE_KEYS = Set.of(
             "powerswitch",
             "power_switch",
@@ -132,6 +138,15 @@ public final class ZombiesMapValidator {
                     "zombie_spawn.group_1",
                     "Zombies map requires at least one group=1 zombie spawn with positive weight."));
         }
+        if (ZombiesMapValidationProfile.MVP1_MINIMAL_KEY.equals(profile.key())
+                && snapshot.weaponWalls().stream().noneMatch(wall ->
+                        !wall.refreshWaves().isEmpty()
+                                && wall.refreshWaves().stream().anyMatch(wave -> wave != null && wave > 0))) {
+            issues.add(ZombiesValidationIssue.warning(
+                    MAP_MISSING_VALID_WAVES,
+                    "weapon_wall",
+                    "Zombies map should have at least one weapon wall with valid refresh waves (non-empty with positive values)."));
+        }
         if (profile.rejectDynamicPlayerSpawns()) {
             snapshot.spawns().stream()
                     .filter(ZombiesMapSnapshot.SpawnSnapshot::dynamicPlayerSpawn)
@@ -195,15 +210,6 @@ public final class ZombiesMapValidator {
             ZombiesMapSnapshot snapshot,
             List<ZombiesValidationIssue> issues
     ) {
-        for (ZombiesMapSnapshot.BarrierSnapshot barrier : snapshot.barriers()) {
-            String subject = subject("barrier", barrier.objectId(), barrier.featureKey());
-            if (barrier.group() >= 2 && barrier.cost() < 0) {
-                issues.add(ZombiesValidationIssue.error(
-                        MAP_INVALID_BARRIER,
-                        subject,
-                        "Barrier groups unlocked by purchases require non-negative cost."));
-            }
-        }
         for (ZombiesMapSnapshot.WeaponWallSnapshot weaponWall : snapshot.weaponWalls()) {
             addWeaponWallIssues(weaponWall, issues);
         }
@@ -246,6 +252,24 @@ public final class ZombiesMapValidator {
                         subject,
                         "Armor station damageTakenMultiplier must be in (0, 1]."));
             }
+        }
+        if (snapshot.weaponWalls().isEmpty()) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_MISSING_WEAPON_WALL,
+                    "weapon_wall",
+                    "Zombies map requires at least one weapon wall."));
+        }
+        if (snapshot.ammoBoxes().isEmpty()) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_MISSING_AMMO_BOX,
+                    "ammo_box",
+                    "Zombies map requires at least one ammo box."));
+        }
+        if (snapshot.armorStations().isEmpty()) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_MISSING_ARMOR_STATION,
+                    "armor_station",
+                    "Zombies map requires at least one armor station."));
         }
     }
 
@@ -416,24 +440,40 @@ public final class ZombiesMapValidator {
     ) {
         addFullInitialLocationIssues(snapshot, issues);
 
-        int powerSwitchCount = snapshot.powerSwitches().size();
-        if (powerSwitchCount == 0) {
-            issues.add(ZombiesValidationIssue.error(
-                    MAP_MISSING_POWER_SWITCH,
-                    "power_switch",
-                    "MVP3 zombies maps require exactly one power switch."));
-        } else if (powerSwitchCount > 1) {
-            issues.add(ZombiesValidationIssue.error(
-                    MAP_MULTIPLE_POWER_SWITCHES,
-                    "power_switch",
-                    "MVP3 zombies maps allow exactly one power switch."));
-        }
-
         for (ZombiesMapSnapshot.PowerSwitchSnapshot powerSwitch : snapshot.powerSwitches()) {
             addPowerSwitchIssues(powerSwitch, issues);
         }
 
-        boolean hasPowerSwitch = powerSwitchCount > 0;
+        for (ZombiesMapSnapshot.BarrierSnapshot barrier : snapshot.barriers()) {
+            String subject = subject("barrier", barrier.objectId(), barrier.featureKey());
+            if (barrier.group() >= 2 && barrier.cost() < 0) {
+                issues.add(ZombiesValidationIssue.error(
+                        MAP_INVALID_BARRIER,
+                        subject,
+                        "Barrier groups unlocked by purchases require non-negative cost."));
+            }
+        }
+        if (snapshot.barriers().isEmpty()) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_MISSING_BARRIER,
+                    "barrier",
+                    "MVP3 zombies maps require at least one barrier."));
+        }
+        Set<Integer> zombieSpawnGroups = new HashSet<>();
+        for (ZombiesMapSnapshot.SpawnSnapshot spawn : snapshot.spawns()) {
+            if (spawn.zombieSpawn()) {
+                zombieSpawnGroups.add(spawn.group());
+            }
+        }
+        for (ZombiesMapSnapshot.BarrierSnapshot barrier : snapshot.barriers()) {
+            if (!zombieSpawnGroups.contains(barrier.group())) {
+                issues.add(ZombiesValidationIssue.warning(
+                        MAP_BARRIER_GROUP_WITHOUT_ZOMBIE_SPAWN,
+                        subject("barrier", barrier.objectId(), barrier.featureKey()),
+                        "Barrier group " + barrier.group() + " has no corresponding zombie spawn with matching group."));
+            }
+        }
+
         if (snapshot.sodaMachines().isEmpty()) {
             issues.add(ZombiesValidationIssue.error(
                     MAP_MISSING_SODA_MACHINE,
@@ -441,7 +481,7 @@ public final class ZombiesMapValidator {
                     "MVP3 zombies maps require at least one soda machine."));
         }
         for (ZombiesMapSnapshot.SodaMachineSnapshot sodaMachine : snapshot.sodaMachines()) {
-            addSodaMachineIssues(sodaMachine, hasPowerSwitch, issues);
+            addSodaMachineIssues(sodaMachine, issues);
         }
         if (snapshot.ultimateMachines().isEmpty()) {
             issues.add(ZombiesValidationIssue.error(
@@ -450,7 +490,7 @@ public final class ZombiesMapValidator {
                     "MVP3 zombies maps require at least one ultimate machine."));
         }
         for (ZombiesMapSnapshot.UltimateMachineSnapshot ultimateMachine : snapshot.ultimateMachines()) {
-            addUltimateMachineIssues(ultimateMachine, hasPowerSwitch, issues);
+            addUltimateMachineIssues(ultimateMachine, issues);
         }
     }
 
@@ -690,16 +730,9 @@ public final class ZombiesMapValidator {
 
     private static void addSodaMachineIssues(
             ZombiesMapSnapshot.SodaMachineSnapshot sodaMachine,
-            boolean hasPowerSwitch,
             List<ZombiesValidationIssue> issues
     ) {
         String subject = subject("soda_machine", sodaMachine.objectId(), sodaMachine.featureKey());
-        if (sodaMachine.requiresPower() && !hasPowerSwitch) {
-            issues.add(ZombiesValidationIssue.error(
-                    MAP_REQUIRES_POWER_WITHOUT_SWITCH,
-                    subject,
-                    "Soda machine requires power but the map has no power switch."));
-        }
         if (sodaMachine.buffId().isBlank()) {
             issues.add(ZombiesValidationIssue.error(
                     MAP_INVALID_SODA_MACHINE,
@@ -721,16 +754,9 @@ public final class ZombiesMapValidator {
 
     private static void addUltimateMachineIssues(
             ZombiesMapSnapshot.UltimateMachineSnapshot ultimateMachine,
-            boolean hasPowerSwitch,
             List<ZombiesValidationIssue> issues
     ) {
         String subject = subject("ultimate_machine", ultimateMachine.objectId(), ultimateMachine.featureKey());
-        if (ultimateMachine.requiresPower() && !hasPowerSwitch) {
-            issues.add(ZombiesValidationIssue.error(
-                    MAP_REQUIRES_POWER_WITHOUT_SWITCH,
-                    subject,
-                    "Ultimate machine requires power but the map has no power switch."));
-        }
         if (ultimateMachine.maxUpgradeLevel() <= 0) {
             issues.add(ZombiesValidationIssue.error(
                     MAP_INVALID_ULTIMATE_MACHINE,

@@ -78,7 +78,7 @@ public final class ZombiesMvp123CompatTestSuite {
             new CoverageItem(
                     "MVP1",
                     "ready/vote/preflight failure",
-                    "unanimous vote reaches preflight; missing endtp returns room to WAITING without player/wave runtime side effects"),
+                    "unanimous vote reaches preflight; invalid MVP1 map returns room to WAITING without player/wave runtime side effects"),
             new CoverageItem(
                     "MVP1",
                     "ready/vote/preflight/phase/reset",

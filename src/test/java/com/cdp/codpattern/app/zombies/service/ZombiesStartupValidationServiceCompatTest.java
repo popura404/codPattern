@@ -22,7 +22,7 @@ public final class ZombiesStartupValidationServiceCompatTest {
 
     public static void main(String[] args) throws IOException {
         validMapAndValidWavePreflightSucceeds();
-        missingEndTeleportPointFails();
+        missingEndTeleportPointAllowedForMvp1();
         missingInitialSpawnFails();
         missingGroupOneZombieSpawnFails();
         missingMobsFails();
@@ -45,15 +45,17 @@ public final class ZombiesStartupValidationServiceCompatTest {
         });
     }
 
-    private static void missingEndTeleportPointFails() throws IOException {
+    private static void missingEndTeleportPointAllowedForMvp1() throws IOException {
         withWaves("zombies-startup-missing-endtp-", wavesDirectory -> {
             writeWave(wavesDirectory, "wave_001.json", "{\"wave\":1,\"mobs\":[]}");
 
             ZombiesServiceResult<ZombiesStartupPreflightSnapshot> result = service(wavesDirectory)
                     .preflight(snapshot(false, List.of(initialSpawn(), zombieSpawn(1, 1.0D))));
 
-            require(!result.success(), "missing endtp should fail preflight");
-            requireIssue(result, "map.missing_endtp");
+            require(result.success(), "missing endtp should pass preflight under MVP1: " + firstIssue(result));
+            ZombiesStartupPreflightSnapshot snapshot = requireSnapshot(result);
+            require(snapshot.valid(), "missing endtp should still produce a valid MVP1 snapshot");
+            requireNoIssue(result, "map.missing_endtp");
         });
     }
 
@@ -132,7 +134,10 @@ public final class ZombiesStartupValidationServiceCompatTest {
             require(ZombiesMapValidationProfile.MVP3_FULL_INITIAL_KEY.equals(snapshot.mapReport().profileKey()),
                     "default Path constructor should use MVP3_FULL_INITIAL, got "
                             + snapshot.mapReport().profileKey());
-            requireIssue(result, "map.missing_power_switch");
+            requireIssue(result, "map.missing_weapon_wall");
+            requireIssue(result, "map.missing_ammo_box");
+            requireIssue(result, "map.missing_armor_station");
+            requireIssue(result, "map.missing_barrier");
             requireIssue(result, "map.missing_soda_machine");
             requireIssue(result, "map.missing_ultimate_machine");
         });
@@ -200,6 +205,15 @@ public final class ZombiesStartupValidationServiceCompatTest {
         ZombiesStartupPreflightSnapshot snapshot = requireSnapshot(result);
         require(snapshot.issues().stream().anyMatch(issue -> code.equals(issue.code().key())),
                 "expected issue " + code + ", got " + issueCodes(snapshot));
+    }
+
+    private static void requireNoIssue(
+            ZombiesServiceResult<ZombiesStartupPreflightSnapshot> result,
+            String code
+    ) {
+        ZombiesStartupPreflightSnapshot snapshot = requireSnapshot(result);
+        require(snapshot.issues().stream().noneMatch(issue -> code.equals(issue.code().key())),
+                "expected no issue " + code + ", got " + issueCodes(snapshot));
     }
 
     private static String issueCodes(ZombiesStartupPreflightSnapshot snapshot) {

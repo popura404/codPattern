@@ -49,7 +49,7 @@ public final class ZombiesMvp123AutomationCompatTest {
     private static void mvp1VotePreflightFailureLeavesRoundWaitingWithoutRuntimeSideEffects() throws IOException {
         withWaves("zombies-mvp123-m1-preflight-failure-", wavesDirectory -> {
             writeWave(wavesDirectory, "wave_001.json", "{\"wave\":1,\"mobs\":[]}");
-            RoundHarness harness = new RoundHarness(wavesDirectory, missingEndTeleportMap());
+            RoundHarness harness = new RoundHarness(wavesDirectory, missingInitialSpawnMap());
             harness.addMembers(PLAYER_ONE, PLAYER_TWO);
             harness.readyAll();
 
@@ -62,9 +62,9 @@ public final class ZombiesMvp123AutomationCompatTest {
                     "second unanimous vote response should pass");
 
             require(harness.preflightAttempts == 1, "passed vote should run exactly one startup preflight");
-            require(harness.preflightSuccesses == 0, "missing endtp preflight should not succeed");
-            require(harness.preflightFailures == 1, "missing endtp preflight should fail");
-            requireIssue(harness.lastPreflightResult.orElseThrow(), "map.missing_endtp");
+            require(harness.preflightSuccesses == 0, "invalid MVP1 map preflight should not succeed");
+            require(harness.preflightFailures == 1, "invalid MVP1 map preflight should fail");
+            requireIssue(harness.lastPreflightResult.orElseThrow(), "map.missing_initial_spawn");
             requirePhase(harness.state, ZombiesGamePhase.WAITING,
                     "preflight failure should return the room to WAITING");
             require(harness.state.waveState().maxWave() == 0,
@@ -315,12 +315,12 @@ public final class ZombiesMvp123AutomationCompatTest {
                 List.of());
     }
 
-    private static ZombiesMapSnapshot missingEndTeleportMap() {
+    private static ZombiesMapSnapshot missingInitialSpawnMap() {
         return ZombiesMapSnapshot.of(
                 ROOM_ID,
                 ROOM_ID.mapName(),
-                false,
-                List.of(initialSpawn("initial-1"), zombieSpawn("zombie-1", 1)),
+                true,
+                List.of(zombieSpawn("zombie-1", 1)),
                 List.of());
     }
 

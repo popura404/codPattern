@@ -50,8 +50,8 @@ public final class ZombiesMvp1DeepCoverageCompatTest {
             ZombiesServiceResult<ZombiesStartupPreflightSnapshot> result = validationService(wavesDirectory)
                     .preflight(snapshot(roomId, false, List.of(initialSpawn(), zombieSpawn(1, 1.0D))));
 
-            require(!result.success(), "missing endtp should fail before startup side effects");
-            requireIssue(result, "map.missing_endtp");
+            require(!result.success(), "MVP3-default preflight failure should happen before startup side effects");
+            requireIssue(result, "map.missing_barrier");
             require(!ZombiesMapOccupancyService.instance().isOccupied(roomId),
                     "preflight failure should not acquire map occupancy");
             require(ClientModeRuntimeState.snapshot(roomId.encode()).orElseThrow().revision() == 3L,

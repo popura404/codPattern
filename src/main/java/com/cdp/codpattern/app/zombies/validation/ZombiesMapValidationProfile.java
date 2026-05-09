@@ -21,7 +21,7 @@ public record ZombiesMapValidationProfile(
 
     public static final ZombiesMapValidationProfile MVP1_MINIMAL = new ZombiesMapValidationProfile(
             MVP1_MINIMAL_KEY,
-            true,
+            false,
             true,
             true,
             true,
