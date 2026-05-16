@@ -28,6 +28,7 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
         mvp3MissingUltimateMachineFails();
         mvp3InvalidSodaBuffFails();
         mvp3InvalidPowerSwitchIdentifierFails();
+        playerInitialSpawnsMoreThanFourFails();
         mvp3UltimateMissingLevelFails();
         mvp3UltimateInvalidDamageMultiplierFails();
         mvp3SpawnMissingLocationFails();
@@ -35,6 +36,7 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
         mvp3RequiredObjectCrossDimensionFails();
         mvp3RequiredObjectOutOfBoundsFails();
         mvp3SpawnOutOfBoundsFails();
+        mvp3BarrierAreaOutOfBoundsFails();
         mvp3FullInitialSnapshotSucceeds();
     }
 
@@ -176,6 +178,26 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
         requireIssue(report, "map.invalid_power_switch");
     }
 
+    private static void playerInitialSpawnsMoreThanFourFails() {
+        ZombiesMapValidationReport report = validate(
+                ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
+                snapshot(
+                        List.of(
+                                initialSpawn("initial-1", new BlockPos(1, 1, 1)),
+                                initialSpawn("initial-2", new BlockPos(1, 1, 2)),
+                                initialSpawn("initial-3", new BlockPos(1, 1, 3)),
+                                initialSpawn("initial-4", new BlockPos(1, 1, 4)),
+                                initialSpawn("initial-5", new BlockPos(1, 1, 5)),
+                                zombieSpawn()),
+                        List.of(),
+                        List.of(powerSwitch("power-1")),
+                        List.of(validSoda()),
+                        List.of(validUltimate())));
+
+        require(report.hasErrors(), "more than four INITIAL player spawns should fail");
+        requireIssue(report, "map.too_many_initial_player_spawns");
+    }
+
     private static void mvp3UltimateMissingLevelFails() {
         ZombiesMapSnapshot.UltimateMachineSnapshot ultimate = new ZombiesMapSnapshot.UltimateMachineSnapshot(
                 "ultimate-1",
@@ -293,6 +315,33 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
         requireIssue(report, "map.object_out_of_bounds");
     }
 
+    private static void mvp3BarrierAreaOutOfBoundsFails() {
+        ZombiesMapSnapshot.BarrierSnapshot barrier = new ZombiesMapSnapshot.BarrierSnapshot(
+                "barrier-1",
+                "barrier",
+                1,
+                0,
+                MAP_DIMENSION,
+                new BlockPos(6, 1, 6),
+                new BlockPos(6, 1, 6),
+                new BlockPos(99, 1, 6));
+
+        ZombiesMapValidationReport report = validate(
+                ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
+                snapshot(
+                        List.of(initialSpawn(), zombieSpawn()),
+                        List.of(barrier),
+                        List.of(validWeaponWall()),
+                        List.of(validAmmoBox()),
+                        List.of(validArmorStation()),
+                        List.of(powerSwitch("power-1")),
+                        List.of(validSoda()),
+                        List.of(validUltimate())));
+
+        require(report.hasErrors(), "MVP3 barrier area outside map bounds should fail");
+        requireIssue(report, "map.object_out_of_bounds");
+    }
+
     private static void mvp3FullInitialSnapshotSucceeds() {
         ZombiesMapValidationReport report = validate(
                 ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
@@ -328,6 +377,33 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
 
     private static ZombiesMapSnapshot snapshot(
             List<ZombiesMapSnapshot.SpawnSnapshot> spawns,
+            List<ZombiesMapSnapshot.BarrierSnapshot> barriers,
+            List<ZombiesMapSnapshot.WeaponWallSnapshot> weaponWalls,
+            List<ZombiesMapSnapshot.AmmoBoxSnapshot> ammoBoxes,
+            List<ZombiesMapSnapshot.ArmorStationSnapshot> armorStations,
+            List<ZombiesMapSnapshot.PowerSwitchSnapshot> powerSwitches,
+            List<ZombiesMapSnapshot.SodaMachineSnapshot> sodaMachines,
+            List<ZombiesMapSnapshot.UltimateMachineSnapshot> ultimateMachines
+    ) {
+        return ZombiesMapSnapshot.of(
+                ROOM_ID,
+                ROOM_ID.mapName(),
+                true,
+                MAP_DIMENSION,
+                MAP_BOUNDS,
+                spawns,
+                barriers,
+                weaponWalls,
+                ammoBoxes,
+                armorStations,
+                powerSwitches,
+                sodaMachines,
+                ultimateMachines,
+                List.of());
+    }
+
+    private static ZombiesMapSnapshot snapshot(
+            List<ZombiesMapSnapshot.SpawnSnapshot> spawns,
             List<ZombiesMapSnapshot.WeaponWallSnapshot> weaponWalls,
             List<ZombiesMapSnapshot.PowerSwitchSnapshot> powerSwitches,
             List<ZombiesMapSnapshot.SodaMachineSnapshot> sodaMachines,
@@ -354,15 +430,19 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
     }
 
     private static ZombiesMapSnapshot.SpawnSnapshot initialSpawn() {
+        return initialSpawn("initial-1", new BlockPos(1, 1, 1));
+    }
+
+    private static ZombiesMapSnapshot.SpawnSnapshot initialSpawn(String objectId, BlockPos pos) {
         return new ZombiesMapSnapshot.SpawnSnapshot(
-                "initial-1",
+                objectId,
                 "spawn",
                 "INITIAL",
                 0,
                 0.0D,
                 false,
                 MAP_DIMENSION,
-                new BlockPos(1, 1, 1));
+                pos);
     }
 
     private static ZombiesMapSnapshot.SpawnSnapshot zombieSpawn() {
@@ -398,7 +478,9 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
                 1,
                 0,
                 MAP_DIMENSION,
-                new BlockPos(6, 1, 6));
+                new BlockPos(6, 1, 6),
+                new BlockPos(6, 1, 6),
+                new BlockPos(6, 2, 6));
     }
 
     private static ZombiesMapSnapshot.WeaponWallSnapshot validWeaponWall() {

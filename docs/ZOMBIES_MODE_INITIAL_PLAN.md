@@ -37,7 +37,7 @@
 | MVP 3 | 电源开关、汽水机、终极机器、玩家/武器成长和波间复活 |
 | MVP 4+ | 窗口、倒地救援、神秘箱运行池、Boss 波、地图目标、撤离结局、配件和更细难度配置 |
 
-第一张测试地图按 MVP 3 的对象规模制作，但暂时不做窗口。地图应包含玩家 init 复活点、`1` 号及后续编号僵尸复活点组、至少一组编号屏障、武器墙、子弹补给箱、装甲购买点、唯一电源开关、汽水机和终极机器。
+第一张测试地图按 MVP 3 的对象规模制作，但暂时不做窗口。地图应包含玩家 init 复活点、`1` 号及后续编号僵尸复活点组、至少一组编号屏障、武器墙、子弹补给箱、装甲购买点、汽水机和终极机器；电源开关是可选对象，若部署则当前编辑器仍按单例处理并参与合法性校验。
 
 ### 1.3 核心循环
 
@@ -64,7 +64,7 @@
 - 初始手枪使用子弹补给箱时免费补弹。
 - 僵尸初始武器首版只允许 `pistol`，不开放近战初始武器。
 - 对局内饱食度固定锁定到最大值，生命回复机制复用现有通用战斗回复逻辑。
-- 初版完整地图只允许一个电源开关；第一张测试地图必须包含且只包含一个电源开关。
+- 电源开关不是开局必需项；若地图部署电源开关，当前实现只允许一个并校验其功能方块合法性。
 - 僵尸房间 roster 使用单队逻辑 key `survivors`，不使用 Kortac/Specgru 假队伍。
 
 ### 2.2 规则配置文件
@@ -420,7 +420,7 @@ fpsmatch/<world>/zombies/<mapName>.json
 | 武器墙 | 按枪等级部署；进入第 1 波、最大波和配置刷新波次的波间准备时抽取当前出售武器 | 地图对象绑定方块位置；装饰方块只用于视觉，不要求功能方块 |
 | 子弹补给箱 | 给当前僵尸模式武器补备弹；初始手枪免费，购买类主武器按枪等级取价 | 地图对象绑定方块位置；装饰方块只用于视觉，不要求功能方块 |
 | 装甲购买点 | 购买 1-3 级装甲，提供本局全局减伤，不做补充或耐久 | 地图对象绑定方块位置；装饰方块或展示实体只用于视觉，不要求功能方块 |
-| 电源开关 | 花费点数开启；初版完整地图只允许单个电源开关；只解锁 `requiresPower=true` 的汽水机和终极机器 | 独立功能方块 `codpattern:zombies_power_switch` |
+| 电源开关 | 可选对象；若部署则花费点数开启，当前实现只允许单个电源开关，只解锁 `requiresPower=true` 的汽水机和终极机器 | 独立功能方块 `codpattern:zombies_power_switch` |
 | 汽水机 | 默认需要电源，允许配置免电源；购买玩家 buff；死亡复活清空 | 地图对象绑定方块位置；装饰方块只用于视觉，不保存玩法状态 |
 | 终极机器 | 默认需要电源，允许配置免电源；强化当前手持武器实例；死亡复活保留 | 地图对象绑定方块位置；装饰方块只用于视觉，不保存玩法状态 |
 | 神秘箱 | 部署工具先保存位置和基础参数；运行时随机池放到 MVP 4 | 地图对象绑定方块位置；MVP 4 前不要求功能方块 |
@@ -431,23 +431,23 @@ fpsmatch/<world>/zombies/<mapName>.json
 只有两类强启用关系：
 
 - `barrier.group -> zombie_spawn.group`
-- `power_switch -> requiresPower=true 的 soda_machine / ultimate_machine`
+- 已部署的 `power_switch -> requiresPower=true 的 soda_machine / ultimate_machine`
 
 其它对象初版不做编号区域、房间前置、电源前置或波次前置限制；`requiredBarrierGroup` 和 `requiredWave` 不进入初版 schema。
 
 ### 7.3 地图对象校验
 
 1. 所有对象必须在地图范围内，维度必须和地图一致。
-2. 玩家 `INITIAL` init 复活点至少 1 个；该点位同时用于开局传送和波间复活。
+2. 玩家 `INITIAL` init 复活点 1 到 4 个；这些点位同时用于开局传送和波间复活。
 3. 僵尸地图不允许声明 `DYNAMIC_CANDIDATE` 玩家点位；部署工具不提供动态点合并入口。
 4. `group=1` 僵尸复活点至少 1 个，且必须合法、权重大于 0。
 5. 非 `group=1` 僵尸复活点也必须通过坐标、维度和权重校验。
 6. 屏障组没有同号僵尸复活点时只给管理员提示，不阻止保存或开局。
 7. 同一张地图内所有对象的 `objectId` 必须全局唯一。
-8. 电源开关最多 1 个；MVP 3 完整校验和第一张测试地图必须恰好 1 个。
-9. 电源开关位置必须是 `codpattern:zombies_power_switch` 或电源功能方块白名单内的方块；不匹配时是 error。
-10. 如果地图存在 `requiresPower=true` 的汽水机或终极机器，则必须存在该唯一电源开关。
-11. 屏障、武器墙、子弹补给箱、汽水机、终极机器、电源开关和装甲购买点的价格或参数必须完整合法。
+8. 电源开关可选；当前部署 schema/editor 最多允许 1 个，MVP 3 完整校验和第一张测试地图不要求电源存在。
+9. 若部署电源开关，其位置必须是 `codpattern:zombies_power_switch` 或电源功能方块白名单内的方块；不匹配时是 error。
+10. `requiresPower=true` 的汽水机或终极机器不再反向要求地图必须部署电源；无电源不作为 MVP 3 阻断条件。
+11. 屏障、武器墙、子弹补给箱、汽水机、终极机器、已部署的电源开关和装甲购买点的价格或参数必须完整合法。
 12. 装甲购买点 `armorLevel` 只能是 `1`、`2` 或 `3`，`damageTakenMultiplier` 必须 `> 0` 且 `<= 1`。
 13. 武器墙、子弹补给箱、装甲购买点、汽水机和终极机器的位置如果不是对应装饰方块，只给 warning，不阻止保存或开局。
 
@@ -455,7 +455,7 @@ fpsmatch/<world>/zombies/<mapName>.json
 
 - `MVP1_MINIMAL`：必须有地图范围、`endtp`、玩家 `INITIAL` init 复活点、`group=1` 僵尸复活点和有效波次表。
 - `MVP2_PURCHASES`：在 `MVP1_MINIMAL` 基础上校验编号屏障、武器墙、子弹补给箱和装甲购买点参数。
-- `MVP3_FULL_INITIAL`：在 `MVP2_PURCHASES` 基础上要求唯一电源开关、汽水机和终极机器完整可用；首版最终验收使用该 profile。
+- `MVP3_FULL_INITIAL`：在 `MVP2_PURCHASES` 基础上要求屏障、汽水机和终极机器完整可用；电源开关可选，若部署则校验其功能方块和参数合法性。首版最终验收使用该 profile。
 
 ### 7.4 部署工具
 
@@ -465,7 +465,7 @@ fpsmatch/<world>/zombies/<mapName>.json
 
 | 部署类型 | 保存形态 | 工具参数 |
 |---|---|---|
-| 玩家 init 复活点 | repeatable point layer `INITIAL` | 坐标、维度、yaw、pitch；开局和波间复活共用 |
+| 玩家 init 复活点 | repeatable point layer `INITIAL`，最多 4 个 | 坐标、维度、yaw、pitch；开局和波间复活共用 |
 | 僵尸复活点 | repeatable point/object `zombie_spawn` | `group`、`weight` |
 | 编号屏障 | repeatable area/object `barrier` | `group`、`cost`、`blocksPlayersOnly=true` |
 | 武器墙 | repeatable object `weapon_wall` | `weaponLevel`、`levelDamageMultiplier`、`price`、`refreshWaves[]`、`rarityPools[]`、`weapons[].weightsByRarity`、装饰方块 warning |
@@ -645,7 +645,7 @@ weaponEffectiveWeight = rarityEffectiveWeight * weapon.weightsByRarity[rarity.id
 
 ### 8.5 电源开关
 
-每局开始时电源默认关闭。初版完整地图只允许一个电源开关。任意存活玩家与该电源开关交互并支付费用后，本房间电源开启，解锁所有 `requiresPower=true` 的汽水机和终极机器。电源开启后不再关闭；重复交互只提示已开启，不重复扣费。
+每局开始时电源默认关闭。电源开关是可选对象；若地图部署电源开关，当前实现只允许一个。任意存活玩家与该电源开关交互并支付费用后，本房间电源开启，解锁所有 `requiresPower=true` 的汽水机和终极机器。电源开启后不再关闭；重复交互只提示已开启，不重复扣费。
 
 电源开关做成独立功能方块 `codpattern:zombies_power_switch`。开启后方块应能释放红石信号，方便地图机关或视觉反馈接入；初版玩法逻辑仍只把电源用于汽水机和终极机器。电源方块使用 BlockState 或 BlockEntity 处理表现和红石输出，但本局“是否已开启”的权威状态仍保存在房间运行态，结算时随房间对象状态清理。
 
@@ -993,7 +993,7 @@ HUD 数据通过僵尸模式自己的运行态快照同步，不复用 TDM 比�
 - 怪物卡住或寻路失败：卡住超过 20 秒，或离所有存活玩家实体/虚拟目标位置太远超过 15 秒，按 `RECYCLED_RETRY` 回收。
 - 区块未加载：不在未加载僵尸复活点刷怪，不消耗预算。
 - 地图对象缺失：缺少玩家 `INITIAL` init 复活点、`group=1` 僵尸复活点、合法 `endtp` 或必需对象参数时不能开局。
-- 电源开关：初版完整地图只允许一个电源开关。
+- 电源开关：不是完整地图必需项；若部署则当前实现只允许一个电源开关。
 - 商店重复交互：服务端扣费和发货必须原子化。
 - 僵尸背包隔离：僵尸开局只读取僵尸单槽 pistol 配置，不能读取或发放 TDM 完整背包；开局清空的普通背包战斗物品不暂存、不恢复。
 - 友伤：所有玩家来源伤害和受伤爆炸都拒绝友伤。
@@ -1015,8 +1015,8 @@ HUD 数据通过僵尸模式自己的运行态快照同步，不复用 TDM 比�
 - 断线玩家按 `offlineGraceSeconds` 保留，超时前存活断线玩家仍计入存活判定，超时后转死亡观战。
 - 怪物追踪只按 `life_state=存活` 判断目标资格；在线玩家用实体目标，离线未超时玩家用最后目标位置。
 - 电源需要个人付费开启，且只影响 `requiresPower=true` 的汽水机和终极机器。
-- 地图完整校验下电源开关恰好一个，roster 使用 `survivors` 单队 key，不出现 TDM 假队伍或假比分。
-- 僵尸部署工具 GUI 能选择 `zombies` 地图、编辑所有 MVP 3 必需对象、运行 `MVP3_FULL_INITIAL` 校验，并在保存失败时保留草稿且回滚内存改动。
+- 地图完整校验下电源开关可选，已部署电源必须合法；roster 使用 `survivors` 单队 key，不出现 TDM 假队伍或假比分。
+- 僵尸部署工具 GUI 能选择 `zombies` 地图、编辑所有 MVP 3 必需对象、运行 `MVP3_FULL_INITIAL` 校验；对象部署以世界左/右键即时保存为主，保存失败时回滚内存改动。
 - 武器购买、子弹补给箱、唯一主武器、备弹倍率、武器墙刷新和装甲等级/减伤规则按本局快照执行。
 - 屏障价格、墙枪刷新规则、子弹补给箱价格、汽水机和终极机器参数来自地图对象快照。
 - 地图对象状态可同步给客户端，玩家看到明确交互反馈。
@@ -1039,8 +1039,8 @@ HUD 数据通过僵尸模式自己的运行态快照同步，不复用 TDM 比�
 工具打开流程：
 
 1. 玩家手持僵尸部署工具右键打开 GUI。
-2. 服务端读取当前世界内所有 `zombies` 地图，返回地图列表、当前选择、对象类型列表、选中对象、地图校验摘要和工具草稿坐标。
-3. 客户端只展示和编辑草稿；所有新增、更新、删除、清空、校验、保存都发送动作包，由服务端重新读取权限和地图状态后执行。
+2. 服务端读取当前世界内所有 `zombies` 地图，返回地图列表、当前选择、对象类型列表、选中对象、地图校验摘要和工具选择态/字段回显。
+3. 客户端只展示选择态和已保存对象属性；新增、更新、删除、清空、校验、保存都发送动作包，由服务端重新读取权限和地图状态后执行。
 4. 服务端每次动作完成后回发完整 screen snapshot，不依赖客户端本地状态作为最终事实。
 
 ### A.2 屏幕布局
@@ -1050,9 +1050,9 @@ HUD 数据通过僵尸模式自己的运行态快照同步，不复用 TDM 比�
 | 区域 | 内容 | 要求 |
 |---|---|---|
 | 左栏 | 地图选择、校验 profile、对象类型列表 | 地图列表只显示 `zombies`；对象类型用固定顺序；不可用的 MVP 4 类型置灰 |
-| 中栏 | 当前类型对象列表和当前对象摘要 | 显示 `objectId`、坐标、关键参数；支持上一项/下一项、复制、删除、清空当前类型 |
-| 右栏 | 当前对象参数表单 | 按类型显示字段；数字字段用输入框和步进按钮；布尔字段用开关；枚举字段用循环按钮或下拉 |
-| 底栏 | 坐标采集、保存、校验、关闭 | 提供“使用脚下位置”“使用准星方块”“保存对象”“运行校验”“关闭” |
+| 中栏 | 当前类型对象列表和属性摘要 | 显示选中对象、坐标、组别、权重、价格等关键参数；原草稿空间并入属性区域；对象列表和属性字段支持悬停滚轮 |
+| 右栏 | 校验摘要和辅助信息 | 展示当前地图校验结果、最近操作状态和必要提示，避免重复显示对象草稿状态 |
+| 底栏 | 校验、删除、清空、关闭等辅助操作 | 不再提供“新草稿”“保存对象”“默认捕获”“设置字段”等对象部署主流程按钮 |
 
 显示规则：
 
@@ -1068,16 +1068,16 @@ HUD 数据通过僵尸模式自己的运行态快照同步，不复用 TDM 比�
 | 动作 | 用途 |
 |---|---|
 | `REFRESH` | 重新请求地图列表、对象列表和校验摘要 |
-| `SAVE_SELECTIONS` | 保存工具物品上的当前地图、对象类型、选中对象和草稿坐标 |
+| `SAVE_SELECTIONS` | 保存工具物品上的当前地图、对象类型和选中对象等轻量选择态；不保存地图对象 |
 | `SELECT_MAP` | 切换地图 |
 | `SELECT_OBJECT_TYPE` | 切换对象类型 |
 | `SELECT_OBJECT` | 切换当前对象 |
-| `SET_FIELD` | 更新当前草稿字段；服务端按字段 schema 解析 |
-| `CAPTURE_PLAYER_POS` | 用玩家当前位置和朝向填充点位 |
-| `CAPTURE_LOOK_BLOCK` | 用玩家准星方块填充对象位置或交互点 |
-| `SET_AREA_POS_1` / `SET_AREA_POS_2` | 设置区域对象的两个角 |
-| `ADD_OBJECT` | 用当前草稿创建对象 |
-| `UPDATE_OBJECT` | 保存当前对象参数 |
+| `SET_FIELD` | 未选中对象时暂存下一次新增对象字段；已选中对象时服务端按字段 schema 解析并即时保存 |
+| `CAPTURE_PLAYER_POS` | 兼容入口；当前主流程改为世界左键即时保存点位 |
+| `CAPTURE_LOOK_BLOCK` | 兼容入口；当前主流程改为世界左/右键即时保存对象坐标或交互点 |
+| `SET_AREA_POS_1` / `SET_AREA_POS_2` | 兼容入口；当前主流程改为 `barrier` 左/右键即时保存两个端点 |
+| `ADD_OBJECT` | 兼容入口；当前主流程通过世界左/右键即时创建对象 |
+| `UPDATE_OBJECT` | 兼容入口；当前主流程通过字段编辑或世界左/右键即时保存当前对象 |
 | `DUPLICATE_OBJECT` | 复制当前对象并生成新 `objectId` |
 | `DELETE_OBJECT` | 删除当前对象 |
 | `CLEAR_OBJECT_TYPE` | 清空当前类型对象 |
@@ -1093,12 +1093,12 @@ HUD 数据通过僵尸模式自己的运行态快照同步，不复用 TDM 比�
 
 ### A.4 坐标采集和世界预览
 
-工具需要同时支持 GUI 内按钮采集和世界左/右键采集：
+工具当前主流程只以世界左/右键采集并即时保存对象；旧 GUI 内按钮采集语义仅作为兼容入口或历史设计背景保留：
 
-- 点位对象：`CAPTURE_PLAYER_POS` 保存玩家脚下坐标、维度、yaw、pitch；`CAPTURE_LOOK_BLOCK` 保存准星方块中心点，yaw/pitch 仍取玩家朝向。
-- 方块对象：电源开关默认使用准星方块坐标，并保存 `block` 和 `emitsRedstoneWhenPowered`；该坐标必须是电源功能方块，否则服务端拒绝保存。
-- 区域对象：编号屏障使用 `SET_AREA_POS_1` / `SET_AREA_POS_2` 采集范围，再用 `CAPTURE_LOOK_BLOCK` 设置 `interactionPos`。
-- 普通交互对象：武器墙、补给箱、装甲点、汽水机、终极机器和神秘箱使用 `pos`，可选保存 yaw/pitch 供客户端提示朝向；这些对象不要求功能方块，方块类型只参与装饰方块 warning。
+- 点位对象：`INITIAL` 和 `zombie_spawn` 左键保存点击面外侧坐标、维度和玩家 yaw；`INITIAL` 最多 4 个，右键无副作用，本轮不处理 pitch。
+- 方块对象：`power_switch` 左键新增或更新唯一电源位置，并保存 `block` 和 `emitsRedstoneWhenPowered`；该坐标必须是电源功能方块，否则服务端拒绝保存，右键无副作用。
+- 区域对象：`barrier` 左键开始新增区域或设置第一端点，右键用已记录第一端点完成新增区域；选中已有屏障时右键可更新第二端点。
+- 普通交互对象：武器墙、补给箱、装甲点、汽水机和终极机器左键连续新增对象，`interaction` 默认同步到主点；右键无副作用。
 
 客户端预览：
 
@@ -1114,13 +1114,13 @@ HUD 数据通过僵尸模式自己的运行态快照同步，不复用 TDM 比�
 
 | 对象类型 | 必填字段 | 默认值和 GUI 行为 |
 |---|---|---|
-| `INITIAL` | `dimension`、`pos`、`yaw`、`pitch`，`kind=INITIAL` | 玩家 init 复活点；新增时用玩家当前位置；开局传送和波间复活共用；僵尸模式不显示 `DYNAMIC_CANDIDATE` 表单 |
-| `zombie_spawn` | `objectId`、`group`、`weight`、`dimension`、`pos`、`yaw`、`pitch` | `group` 默认 1，`weight` 默认 1.0；权重必须大于 0 |
+| `INITIAL` | `dimension`、`pos`、`yaw`，`kind=INITIAL` | 玩家 init 复活点；左键世界点击新增；开局传送和波间复活共用；僵尸模式不显示 `DYNAMIC_CANDIDATE` 表单 |
+| `zombie_spawn` | `objectId`、`group`、`weight`、`dimension`、`pos`、`yaw` | `group` 默认 1，`weight` 默认 1.0；左键世界点击连续新增，右键无副作用；权重必须大于 0 |
 | `barrier` | `objectId`、`group`、`cost`、`blocksPlayersOnly`、`dimension`、`area`、`interactionPos` | `blocksPlayersOnly` 初版固定 true 且置灰；区域两角和交互点必须在地图范围内 |
 | `weapon_wall` | `objectId`、`weaponLevel`、`levelDamageMultiplier`、`price`、`refreshWaves[]`、`rarityPools[]`、`weapons[]`、`dimension`、`pos` | 使用高级子面板编辑稀有度和武器池；第 1 波和最大波刷新不要求写入 `refreshWaves[]`；装饰方块 `codpattern:zombies_weapon_wall_panel` |
 | `ammo_box` | `objectId`、`pricesByWeaponLevel`、`dimension`、`pos` | 价格表按枪等级行编辑；缺少某等级价格时该等级购买类主武器不能补弹；装饰方块 `codpattern:zombies_ammo_box` |
 | `armor_station` | `objectId`、`armorLevel`、`buyCost`、`damageTakenMultiplier`、`dimension`、`pos` | `armorLevel` 只能 1-3；材质只展示硬编码结果，不允许编辑；装饰方块 `codpattern:zombies_armor_station` |
-| `power_switch` | `objectId`、`block`、`cost`、`emitsRedstoneWhenPowered`、`dimension`、`pos` | single object；已有电源开关时新增按钮置灰，只允许编辑或删除现有对象；必须是功能方块 `codpattern:zombies_power_switch` |
+| `power_switch` | `objectId`、`block`、`cost`、`emitsRedstoneWhenPowered`、`dimension`、`pos` | single object；左键世界点击新增或更新唯一电源对象；必须是功能方块 `codpattern:zombies_power_switch` |
 | `soda_machine` | `objectId`、`buffId`、`cost`、`requiresPower`、`dimension`、`pos` | `requiresPower` 默认 true；`buffId` 用内置 buff 下拉；装饰方块 `codpattern:zombies_soda_machine` |
 | `ultimate_machine` | `objectId`、`maxUpgradeLevel`、`levels`、`requiresPower`、`dimension`、`pos` | `levels` 以等级行编辑，必须连续覆盖 `1..maxUpgradeLevel`；装饰方块 `codpattern:zombies_ultimate_machine` |
 | `mystery_box` | `objectId`、`cost`、`dimension`、`pos`、可选武器池 | MVP 4 前只保存基础参数，运行池面板置灰 |
@@ -1147,7 +1147,7 @@ GUI 内校验分三层：
 - 字段级错误显示在字段下方或 tooltip，阻止保存当前对象。
 - 地图级错误显示在左栏校验摘要中，按严重级别分为 `error` 和 `warning`。
 - `warning` 不阻止保存，但 `MVP3_FULL_INITIAL` 下的必需对象缺失必须是 `error`。
-- 保存失败必须保留玩家当前草稿，不因为服务端拒绝而清空表单。
+- 保存失败必须回滚内存改动并保留当前选择态，不因为服务端拒绝而生成半对象。
 
 ### A.7 与命令和调试能力的关系
 

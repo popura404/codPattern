@@ -5,6 +5,7 @@ import com.cdp.codpattern.app.match.runtime.ModeEntityOwnershipRegistry;
 import com.cdp.codpattern.app.zombies.map.ZombiesMapObjects;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesZombieSpawnData;
 import com.cdp.codpattern.app.zombies.model.ZombiesWaveDefinition;
+import com.cdp.codpattern.app.zombies.model.ZombiesWaveMobEntry;
 import com.cdp.codpattern.app.zombies.runtime.ZombiesWaveRuntimeState;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
@@ -22,6 +23,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public final class ZombiesMobSpawnService {
     public static final int DEFAULT_GLOBAL_MAX_ALIVE_ZOMBIES = 64;
+    public static final String WAVE_MOB_ID_TAG = "codpattern_zombies_wave_mob_id";
+    public static final String WAVE_KILL_POINTS_TAG = "codpattern_zombies_wave_kill_points";
+    public static final String WAVE_ASSIST_POINTS_TAG = "codpattern_zombies_wave_assist_points";
 
     private static final AtomicInteger GLOBAL_ACTIVE_ZOMBIES = new AtomicInteger();
 
@@ -87,6 +91,7 @@ public final class ZombiesMobSpawnService {
                 spawn.yaw(),
                 spawn.pitch());
         applyWaveAttributes(mob, waveDefinition);
+        attachWaveRewardMetadata(mob, mobId.get(), waveDefinition);
 
         if (!level.addFreshEntity(mob)) {
             return SpawnResult.failure(SpawnFailureReason.ENTITY_ADD_FAILED);
@@ -171,6 +176,34 @@ public final class ZombiesMobSpawnService {
         multiplyAttribute(mob, Attributes.MOVEMENT_SPEED, waveDefinition.getSpeedMultiplier());
         multiplyAttribute(mob, Attributes.ATTACK_DAMAGE, waveDefinition.getDamageMultiplier());
         mob.setHealth(mob.getMaxHealth());
+    }
+
+    private static void attachWaveRewardMetadata(Mob mob, String rawMobId, ZombiesWaveDefinition waveDefinition) {
+        if (mob == null || waveDefinition == null) {
+            return;
+        }
+        String normalizedMobId = ZombiesWaveValidator.normalizedEntityId(rawMobId).orElse("");
+        if (normalizedMobId.isBlank()) {
+            return;
+        }
+        mob.getPersistentData().putString(WAVE_MOB_ID_TAG, normalizedMobId);
+        matchingMobEntry(waveDefinition, normalizedMobId).ifPresent(entry -> {
+            mob.getPersistentData().putDouble(WAVE_KILL_POINTS_TAG, entry.getKillPoints());
+            mob.getPersistentData().putDouble(WAVE_ASSIST_POINTS_TAG, entry.getAssistPoints());
+        });
+    }
+
+    private static Optional<ZombiesWaveMobEntry> matchingMobEntry(ZombiesWaveDefinition waveDefinition, String normalizedMobId) {
+        if (waveDefinition == null || normalizedMobId == null || normalizedMobId.isBlank()) {
+            return Optional.empty();
+        }
+        return waveDefinition.getMobs().stream()
+                .filter(Objects::nonNull)
+                .filter(entry -> entry.getCount() > 0)
+                .filter(entry -> ZombiesWaveValidator.normalizedEntityId(entry.getEntity())
+                        .map(normalizedMobId::equals)
+                        .orElse(false))
+                .findFirst();
     }
 
     private static void multiplyAttribute(Mob mob, net.minecraft.world.entity.ai.attributes.Attribute attribute, double multiplier) {

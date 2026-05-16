@@ -1,3 +1,23 @@
+### unreleased
+* 僵尸部署工具 GUI 本轮完成 `MVP1/MVP2/MVP3` 校验口径收口：`MVP3` 继续强制屏障、汽水机和强化机，但电源改为可选对象；仅在实际部署 `power_switch` 时校验其 feature/block 合法性。
+* 部署工作流已移除“缺电源”阻塞项；主流程只保留地图、出生点、僵尸刷新点、MVP2 交互对象和 MVP3 必需对象的门禁。
+* 部署 GUI 已继续瘦身：去掉更新范围、设置字段按钮、默认捕获/切换、新草稿和保存对象等冗余入口，地图改为左侧直选，中心区域合并为“对象列表 / 属性”，属性区按 yaw-only 展示并隐藏 `pitch`。
+* 部署 GUI 中心栏已扩大为滚动列表：对象实例列表默认显示 5 行，属性字段默认显示 8 行，鼠标悬停对象列表或字段列表时滚轮只滚动对应列表，不触发保存。
+* 僵尸对象部署主路径已改为世界左/右键即时落盘：点击成功后通过 `editObject -> CodMapPersistence.saveMapOrRollback` 保存，失败回滚；切换地图、对象类型、对象索引和字段焦点只保存工具选择态，不触发地图对象保存。
+* 部署工具物品 tooltip 与 GUI 左右键提示已同步为“世界点击部署/更新”语义，旧“捕获槽位 A/B”文案不再出现在对象部署主路径。
+* 僵尸部署工具设点入口已收口：只有 `Ctrl + 右键` 打开 GUI；普通左/右键设点不再回发 GUI；GUI 面板外点击不再发送设点包。
+* 工具世界交互包现在携带点击面，僵尸部署点位使用 `clickedBlockPos.relative(clickedFace)` 落在点击面外侧；单点对象右键改为 no-op，除电源外的可重复对象左键连续新增且 `interaction` 默认同步到主点。
+* 部署工具新增跨单点对象类型的同维度同位置重复主点拦截，重复新增或移动到其他单点位置会返回 `duplicate_position`，不落盘。
+* validation 区 issue 行已改为摘要式显示，并清理一批 deploy GUI 已无入口的旧语言 key，减少状态区与资源噪音。
+* 对象唯一性策略已收口到当前实现：除 `power_switch` 外，其余僵尸对象允许多实例；屏障与僵尸刷新点按 `group` 关联。
+* 僵尸部署工具左键部署现在对除电源外的可重复对象强制追加新对象；玩家 `INITIAL` 复活点上限收口为 4 个，第 5 个新增或复制会失败。
+* 僵尸部署工具属性区现在允许在未选中对象时预设下一次新增对象的字段；`zombie_spawn.group/weight` 和 `barrier.group/cost` 会随世界点击新增路径保存，选中已有对象时字段仍走即时 `UPDATE`。
+* 文档已同步修正为 `power optional / deployed power participates validation` 口径，测试矩阵不再把“无电源”记为 `MVP3` 失败条件；多电源仍按当前单例部署限制记录为未开放场景。
+* 已知限制：`power_switch` 在部署 schema/editor 侧仍保留单例新增/复制限制；当前主流程允许“无电源”通过，但不支持在部署工具里配置多个电源，是否继续放宽需主线确认。
+* 已知限制：旧 `gui.codpattern.zombies.deploy.blocking.missing_power_switch` 多语言键仍保留兼容旧 issue 路由和历史文案；当前主流程不会再返回该 blocker。
+* 已知限制：主路径步数对比已留档，但完整人工 GUI/E2E 复测仍应继续按 `docs/ZOMBIES_DEPLOY_GUI_CORRECTION_PLAN.md` 第 12/13/14 章执行。
+* 回滚关注点：若后续主线决定恢复电源单例或重新引入电源门禁，需要同步回滚 validator、deploy blocking、GUI 文案和测试矩阵，避免文档与行为再次分叉。
+
 ### v0.0.1
 * 摸鱼。
 

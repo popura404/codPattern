@@ -4,6 +4,7 @@ import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.tool.CreatorToolItem;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionAction;
+import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionHit;
 import com.phasetranscrystal.fpsmatch.common.item.tool.WorldToolItem;
 import com.phasetranscrystal.fpsmatch.common.packet.AddAreaDataS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenMapCreatorToolScreenS2CPacket;
@@ -36,20 +37,22 @@ public class MapCreatorTool extends CreatorToolItem implements WorldToolItem {
     }
 
     @Override
-    public void handleWorldInteraction(ServerPlayer player, ItemStack stack, ToolInteractionAction action, BlockPos clickedPos) {
+    public void handleWorldInteraction(ServerPlayer player, ItemStack stack, ToolInteractionAction action, ToolInteractionHit hit) {
         switch (action) {
             case LEFT_CLICK_BLOCK -> {
-                if (clickedPos == null) {
+                if (hit == null) {
                     return;
                 }
+                BlockPos clickedPos = hit.clickedBlockPos();
                 setBlockPos(stack, BLOCK_POS_TAG_1, clickedPos);
                 player.displayClientMessage(Component.translatable("message.fpsm.map_creator_tool.set_pos1", formatPos(clickedPos))
                         .withStyle(ChatFormatting.AQUA), true);
             }
             case RIGHT_CLICK_BLOCK -> {
-                if (clickedPos == null) {
+                if (hit == null) {
                     return;
                 }
+                BlockPos clickedPos = hit.clickedBlockPos();
                 setBlockPos(stack, BLOCK_POS_TAG_2, clickedPos);
                 player.displayClientMessage(Component.translatable("message.fpsm.map_creator_tool.set_pos2", formatPos(clickedPos))
                         .withStyle(ChatFormatting.AQUA), true);

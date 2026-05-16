@@ -2,6 +2,7 @@ package com.cdp.codpattern.app.zombies.service;
 
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.zombies.map.ZombiesMapSnapshot;
+import com.cdp.codpattern.app.zombies.runtime.ZombiesWaveRuntimeState;
 import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidationProfile;
 import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidator;
 import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
@@ -25,6 +26,7 @@ public final class ZombiesStartupValidationServiceCompatTest {
         missingEndTeleportPointAllowedForMvp1();
         missingInitialSpawnFails();
         missingGroupOneZombieSpawnFails();
+        missingWavesDirectoryGeneratesDefaultWaveAndPreflightSucceeds();
         missingMobsFails();
         filenameWaveConflictFails();
         waveThreeOnlyPreflightSucceedsWithMaxWaveThree();
@@ -80,6 +82,30 @@ public final class ZombiesStartupValidationServiceCompatTest {
 
             require(!result.success(), "missing group=1 zombie spawn should fail preflight");
             requireIssue(result, "map.missing_group_1_zombie_spawn");
+        });
+    }
+
+    private static void missingWavesDirectoryGeneratesDefaultWaveAndPreflightSucceeds() throws IOException {
+        withWaves("zombies-startup-default-wave-", wavesDirectory -> {
+            ZombiesServiceResult<ZombiesStartupPreflightSnapshot> result = service(wavesDirectory)
+                    .preflight(validMap());
+
+            require(result.success(), "missing waves directory should generate default wave and pass preflight: "
+                    + firstIssue(result));
+            ZombiesStartupPreflightSnapshot snapshot = requireSnapshot(result);
+            require(snapshot.valid(), "generated default wave should produce a valid snapshot");
+            require(snapshot.maxWave() == 1, "generated default wave should set maxWave to 1");
+            require(Files.isRegularFile(wavesDirectory.resolve("wave_001.json")),
+                    "preflight should create default wave_001.json");
+            require(snapshot.waveLoadResult().getWaves().size() == 1,
+                    "preflight should load generated default wave");
+            require(snapshot.waveLoadResult().getWaves().get(0).totalMobCount() == 22,
+                    "generated default wave should be usable by runtime budget initialization");
+            ZombiesWaveRuntimeState waveState = new ZombiesWaveRuntimeState();
+            new ZombiesWaveDirector(snapshot.waveLoadResult().getWaves()).enterTargetWave(waveState);
+            require(waveState.maxWave() == 1, "generated default wave should configure director maxWave");
+            require(waveState.currentWave() == 1, "generated default wave should enter wave 1");
+            require(waveState.remainingBudget() == 22, "generated default wave should initialize runtime budget");
         });
     }
 

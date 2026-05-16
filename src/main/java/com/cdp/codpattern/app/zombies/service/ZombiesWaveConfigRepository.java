@@ -112,8 +112,8 @@ public final class ZombiesWaveConfigRepository {
             return Optional.empty();
         }
 
-        int fileWave = Integer.parseInt(matcher.group(1));
         try (Reader reader = Files.newBufferedReader(file)) {
+            int fileWave = Integer.parseInt(matcher.group(1));
             JsonElement element = GSON.fromJson(reader, JsonElement.class);
             if (element == null || !element.isJsonObject()) {
                 return Optional.empty();

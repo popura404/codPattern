@@ -60,6 +60,7 @@ minecraft {
 
         gameTestServer {
             property 'forge.enabledGameTestNamespaces', mod_id
+            environment 'MOD_CLASSES', "${mod_id}%%${layout.buildDirectory.dir('gametestMod/main').get().asFile.absolutePath}"
         }
 
         data {
@@ -137,8 +138,22 @@ tasks.register('syncGameTestStructures', Copy) {
     include '**/*.snbt'
 }
 
+tasks.register('syncGameTestModClasses', Sync) {
+    group = 'verification'
+    description = 'Build a single exploded mod root for Forge GameTest. The GameTest launcher can lose classes from multi-root MOD_CLASSES entries.'
+    into layout.buildDirectory.dir('gametestMod/main')
+    from(sourceSets.main.output.resourcesDir) {
+        into '.'
+    }
+    from(sourceSets.main.output.classesDirs) {
+        into '.'
+    }
+    dependsOn tasks.named('classes')
+}
+
 tasks.matching { it.name == 'runGameTestServer' }.configureEach {
     dependsOn tasks.named('syncGameTestStructures')
+    dependsOn tasks.named('syncGameTestModClasses')
 }
 
 tasks.named('jar', Jar).configure {

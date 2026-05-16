@@ -231,7 +231,9 @@ public record ZombiesMapSnapshot(
                         barrier.group(),
                         barrier.cost(),
                         barrier.dimension(),
-                        barrier.interactionPos()))
+                        barrier.interactionPos(),
+                        barrier.areaFrom(),
+                        barrier.areaTo()))
                 .toList();
         List<WeaponWallSnapshot> weaponWalls = resolved.weaponWalls().stream()
                 .map(weaponWall -> new WeaponWallSnapshot(
@@ -538,13 +540,22 @@ public record ZombiesMapSnapshot(
         }
     }
 
-    public record BarrierSnapshot(String objectId, String featureKey, int group, int cost, String dimensionId, BlockPos pos) {
+    public record BarrierSnapshot(
+            String objectId,
+            String featureKey,
+            int group,
+            int cost,
+            String dimensionId,
+            BlockPos pos,
+            BlockPos areaFrom,
+            BlockPos areaTo
+    ) {
         public BarrierSnapshot(String objectId, String featureKey) {
             this(objectId, featureKey, 1, 0);
         }
 
         public BarrierSnapshot(String objectId, String featureKey, int group, int cost) {
-            this(objectId, featureKey, group, cost, "", null);
+            this(objectId, featureKey, group, cost, "", null, null, null);
         }
 
         public BarrierSnapshot(
@@ -555,7 +566,28 @@ public record ZombiesMapSnapshot(
                 ResourceKey<Level> dimension,
                 BlockPos pos
         ) {
-            this(objectId, featureKey, group, cost, ZombiesMapSnapshot.dimensionId(dimension), pos);
+            this(objectId, featureKey, group, cost, dimension, pos, pos, pos);
+        }
+
+        public BarrierSnapshot(
+                String objectId,
+                String featureKey,
+                int group,
+                int cost,
+                ResourceKey<Level> dimension,
+                BlockPos pos,
+                BlockPos areaFrom,
+                BlockPos areaTo
+        ) {
+            this(
+                    objectId,
+                    featureKey,
+                    group,
+                    cost,
+                    ZombiesMapSnapshot.dimensionId(dimension),
+                    pos,
+                    areaFrom,
+                    areaTo);
         }
 
         public BarrierSnapshot {

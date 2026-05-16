@@ -19,6 +19,7 @@ public final class ZombiesDeployToolServiceIssueTargetCompatTest {
         validStructuredTargetClipsIndex();
         invalidStructuredStepFallsBackToLegacyResolver();
         mapStageStructuredTargetUsesDraftTypeWhenBlank();
+        worldClickDeploymentDecisionContract();
     }
 
     private static void validStructuredTargetClipsIndex() throws Throwable {
@@ -106,6 +107,88 @@ public final class ZombiesDeployToolServiceIssueTargetCompatTest {
                 issueSubject,
                 draft,
                 objects);
+    }
+
+    private static void worldClickDeploymentDecisionContract() throws Throwable {
+        ZombiesMapObjects objects = objectsWithSingleBarrierAndPowerSwitch();
+
+        require(deployTargetIndex(ZombiesDeployFieldSchema.INITIAL, 3, true) == -1,
+                "INITIAL left click should append a new point even when another point is selected");
+        require(deployTargetIndex(ZombiesDeployFieldSchema.ZOMBIE_SPAWN, 3, true) == -1,
+                "zombie spawn left click should append a new point even when another point is selected");
+        require(deployTargetIndex(ZombiesDeployFieldSchema.ZOMBIE_SPAWN, -1, true) == -1,
+                "zombie spawn left click should add when no object is selected");
+        require(deployTargetIndex(ZombiesDeployFieldSchema.BARRIER, 3, true) == -1,
+                "barrier left click should start a new barrier even when another barrier is selected");
+        require(deployTargetIndex(ZombiesDeployFieldSchema.WEAPON_WALL, 3, true) == -1,
+                "weapon wall left click should append even when another wall is selected");
+        require(deployTargetIndex(ZombiesDeployFieldSchema.SODA_MACHINE, 3, true) == -1,
+                "soda machine left click should append even when another machine is selected");
+        require(deployTargetIndex(ZombiesDeployFieldSchema.ULTIMATE_MACHINE, 3, true) == -1,
+                "ultimate machine left click should append even when another machine is selected");
+        require(deployTargetIndex(ZombiesDeployFieldSchema.POWER_SWITCH, 0, true) == 0,
+                "power switch left click should keep updating the selected singleton");
+
+        require(isRightClickNoOp(ZombiesDeployFieldSchema.INITIAL),
+                "INITIAL right click should be no-op");
+        require(isRightClickNoOp(ZombiesDeployFieldSchema.ZOMBIE_SPAWN),
+                "zombie spawn right click should be no-op");
+        require(isRightClickNoOp(ZombiesDeployFieldSchema.WEAPON_WALL),
+                "weapon wall right click should be no-op");
+        require(isRightClickNoOp(ZombiesDeployFieldSchema.POWER_SWITCH),
+                "power switch right click should be no-op");
+        require(!isRightClickNoOp(ZombiesDeployFieldSchema.BARRIER),
+                "barrier right click should set areaTo");
+
+        require(!requiresSelectedObjectForRightClick(ZombiesDeployFieldSchema.WEAPON_WALL),
+                "weapon wall right click should not enter a selected-object update path");
+        require(!requiresSelectedObjectForRightClick(ZombiesDeployFieldSchema.ZOMBIE_SPAWN),
+                "zombie spawn right click should not enter a selected-object update path");
+        require(!requiresSelectedObjectForRightClick(ZombiesDeployFieldSchema.POWER_SWITCH),
+                "power switch right click should not enter a selected-object update path");
+        require(!requiresSelectedObjectForRightClick(ZombiesDeployFieldSchema.BARRIER),
+                "barrier right click may create from a stored first endpoint or update selected areaTo");
+
+        require(normalizeDeployTargetIndex(objects, ZombiesDeployFieldSchema.POWER_SWITCH, -1) == -1,
+                "existing power switch should not update unless it is selected");
+        require(normalizeDeployTargetIndex(objects, ZombiesDeployFieldSchema.BARRIER, 99) == 0,
+                "barrier target index should clamp to existing object");
+    }
+
+    private static int deployTargetIndex(String objectType, int selectedIndex, boolean leftClick) throws Throwable {
+        Method method = ZombiesDeployToolService.class.getDeclaredMethod(
+                "deployTargetIndex",
+                String.class,
+                int.class,
+                boolean.class);
+        method.setAccessible(true);
+        return ((Number) method.invoke(ZombiesDeployToolService.instance(), objectType, selectedIndex, leftClick)).intValue();
+    }
+
+    private static boolean isRightClickNoOp(String objectType) throws Throwable {
+        Method method = ZombiesDeployToolService.class.getDeclaredMethod(
+                "isRightClickNoOp",
+                String.class);
+        method.setAccessible(true);
+        return (Boolean) method.invoke(ZombiesDeployToolService.instance(), objectType);
+    }
+
+    private static boolean requiresSelectedObjectForRightClick(String objectType) throws Throwable {
+        Method method = ZombiesDeployToolService.class.getDeclaredMethod(
+                "requiresSelectedObjectForRightClick",
+                String.class);
+        method.setAccessible(true);
+        return (Boolean) method.invoke(ZombiesDeployToolService.instance(), objectType);
+    }
+
+    private static int normalizeDeployTargetIndex(ZombiesMapObjects objects, String objectType, int selectedIndex) throws Throwable {
+        Method method = ZombiesDeployToolService.class.getDeclaredMethod(
+                "normalizeDeployTargetIndex",
+                ZombiesMapObjects.class,
+                String.class,
+                int.class);
+        method.setAccessible(true);
+        return ((Number) method.invoke(ZombiesDeployToolService.instance(), objects, objectType, selectedIndex)).intValue();
     }
 
     private static ZombiesMapObjects objectsWithSingleBarrierAndPowerSwitch() {

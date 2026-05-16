@@ -50,10 +50,7 @@ public final class ZombiesPowerSwitchBlock extends Block {
             InteractionHand hand,
             BlockHitResult hit
     ) {
-        if (!level.isClientSide && !state.getValue(POWERED)) {
-            setPowered(level, pos, true);
-        }
-        return InteractionResult.sidedSuccess(level.isClientSide);
+        return InteractionResult.PASS;
     }
 
     @Override

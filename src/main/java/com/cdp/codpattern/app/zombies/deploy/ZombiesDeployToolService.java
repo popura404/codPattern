@@ -20,15 +20,20 @@ import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidator;
 import com.cdp.codpattern.app.zombies.validation.ZombiesValidationIssue;
 import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.cdp.codpattern.compat.fpsmatch.map.ZombiesMap;
+import com.cdp.codpattern.common.block.CodPatternBlockRegister;
 import com.phasetranscrystal.fpsmatch.common.service.MapCreationService;
 import com.phasetranscrystal.fpsmatch.common.item.ZombiesDeployTool;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -74,14 +79,36 @@ public final class ZombiesDeployToolService {
             ItemStack stack,
             ZombiesDeployDraft request
     ) {
-        ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
+        ZombiesDeployDraft draft = selectionStateDraft(player, stack, request);
         ZombiesDeployTool.saveDraft(stack, draft);
-        return snapshot(
-                player,
-                stack,
-                draft,
-                "message.codpattern.zombies.deploy.draft_saved",
-                "ok",
+        return ZombiesDeployServiceResult.success(
+                buildSnapshot(
+                        player,
+                        draft,
+                        "message.codpattern.zombies.deploy.selections_saved",
+                        "ok",
+                        ""),
+                "message.codpattern.zombies.deploy.selections_saved",
+                "");
+    }
+
+    public ZombiesDeployServiceResult<ZombiesDeploySnapshot> selectObjectType(
+            ServerPlayer player,
+            ItemStack stack,
+            ZombiesDeployDraft request
+    ) {
+        ZombiesDeployDraft draft = selectionStateDraft(player, stack, request);
+        ZombiesDeployTool.setAreaPos1(stack, null);
+        ZombiesDeployTool.setAreaPos2(stack, null);
+        ZombiesDeployTool.saveDraft(stack, draft);
+        return ZombiesDeployServiceResult.success(
+                buildSnapshot(
+                        player,
+                        draft,
+                        "message.codpattern.zombies.deploy.refreshed",
+                        "ok",
+                        ""),
+                "message.codpattern.zombies.deploy.refreshed",
                 "");
     }
 
@@ -93,11 +120,25 @@ public final class ZombiesDeployToolService {
             String fieldValue
     ) {
         ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
+        if (ZombiesDeployDraft.STAGE_MAP_REGISTRATION.equals(draft.workspaceStage())) {
+            return failure(player, stack, draft, "select_object_first", "message.codpattern.zombies.deploy.select_object_first", "");
+        }
         Map<String, String> fields = new LinkedHashMap<>(draft.fields());
         if (fieldKey != null && !fieldKey.isBlank()) {
             fields.put(fieldKey.trim(), fieldValue == null ? "" : fieldValue);
         }
-        return saveSelections(player, stack, draft.withFields(fields));
+        ZombiesDeployDraft updated = draft.withFields(fields);
+        if (draft.selectedIndex() < 0) {
+            ZombiesDeployTool.saveDraft(stack, updated);
+            return snapshot(
+                    player,
+                    stack,
+                    updated,
+                    "message.codpattern.zombies.deploy.selections_saved",
+                    "object.field_staged",
+                    fieldKey == null ? "" : fieldKey);
+        }
+        return editObject(player, stack, updated, ZombiesDeployObjectEditor.Operation.UPDATE, "object.field_updated");
     }
 
     public ZombiesDeployServiceResult<ZombiesDeploySnapshot> validateMap(
@@ -319,21 +360,21 @@ public final class ZombiesDeployToolService {
             ServerPlayer player,
             ItemStack stack,
             ZombiesDeployDraft request,
-            BlockPos clickedPos,
+            BlockPos placementPos,
             boolean leftClick
     ) {
-        if (clickedPos == null) {
+        if (placementPos == null) {
             return failure(player, stack, request, "capture.no_block", "message.codpattern.zombies.deploy.no_look_block", "");
         }
         ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
         if (ZombiesDeployDraft.STAGE_MAP_REGISTRATION.equals(draft.workspaceStage())) {
             ZombiesDeployDraft updated = leftClick
-                    ? draft.withMapDraft(draft.draftMapName(), clickedPos, draft.mapPos2())
-                    : draft.withMapDraft(draft.draftMapName(), draft.mapPos1(), clickedPos);
+                    ? draft.withMapDraft(draft.draftMapName(), placementPos, draft.mapPos2())
+                    : draft.withMapDraft(draft.draftMapName(), draft.mapPos1(), placementPos);
             if (leftClick) {
-                ZombiesDeployTool.setAreaPos1(stack, clickedPos);
+                ZombiesDeployTool.setAreaPos1(stack, placementPos);
             } else {
-                ZombiesDeployTool.setAreaPos2(stack, clickedPos);
+                ZombiesDeployTool.setAreaPos2(stack, placementPos);
             }
             ZombiesDeployTool.saveDraft(stack, updated);
             return snapshot(
@@ -342,36 +383,256 @@ public final class ZombiesDeployToolService {
                     updated,
                     leftClick ? "message.codpattern.zombies.deploy.area_pos1" : "message.codpattern.zombies.deploy.area_pos2",
                     leftClick ? "capture.map_pos1" : "capture.map_pos2",
-                    formatPos(clickedPos));
+                    formatPos(placementPos));
         }
 
-        String target = ZombiesDeployCaptureBinding.forDraft(draft).target(leftClick
-                ? ZombiesDeployCaptureBinding.CaptureSlot.A
-                : ZombiesDeployCaptureBinding.CaptureSlot.B);
-        if (target.isBlank()) {
-            ZombiesDeployTool.saveDraft(stack, draft);
-            return snapshot(player, stack, draft, "message.codpattern.zombies.deploy.refreshed", "capture.slot_empty", formatPos(clickedPos));
+        return deployWorldClick(player, stack, draft, placementPos, leftClick);
+    }
+
+    private ZombiesDeployServiceResult<ZombiesDeploySnapshot> deployWorldClick(
+            ServerPlayer player,
+            ItemStack stack,
+            ZombiesDeployDraft draft,
+            BlockPos placementPos,
+            boolean leftClick
+    ) {
+        Optional<ZombiesMap> resolvedMap = resolveMap(draft.selectedMap());
+        if (resolvedMap.isEmpty()) {
+            return failure(player, stack, draft, "map.not_found", "message.codpattern.zombies.deploy.map_not_found", draft.selectedMap());
         }
-        Map<String, String> fields = new LinkedHashMap<>(draft.fields());
+
+        ZombiesMapObjects objects = resolvedMap.get().objects();
+        String objectType = ZombiesDeployFieldSchema.normalizeObjectType(draft.objectType());
+        if (!leftClick && isRightClickNoOp(objectType)) {
+            ZombiesDeploySnapshot snapshot = buildSnapshot(
+                    player,
+                    draft,
+                    "message.codpattern.zombies.deploy.right_click_noop",
+                    "right_click_noop",
+                    formatPos(placementPos));
+            return ZombiesDeployServiceResult.failure(
+                    "right_click_noop",
+                    "message.codpattern.zombies.deploy.right_click_noop",
+                    snapshot,
+                    formatPos(placementPos));
+        }
+
+        int selectedIndex = deployTargetIndex(
+                objectType,
+                normalizeTargetIndex(objects, objectType, draft.selectedIndex()),
+                leftClick);
+        if (ZombiesDeployFieldSchema.BARRIER.equals(objectType)) {
+            return deployBarrierWorldClick(player, stack, draft, objects, selectedIndex, placementPos, leftClick);
+        }
+
+        Map<String, String> fields = fieldsForWorldClickBase(player, objects, objectType, selectedIndex, draft);
+        applyWorldClickFields(player, objectType, fields, placementPos, leftClick, selectedIndex < 0);
+
+        ZombiesDeployDraft updated = new ZombiesDeployDraft(
+                ZombiesDeployDraft.STAGE_OBJECT_MARKING,
+                ZombiesDeployDraft.workflowStepForObjectType(objectType),
+                draft.selectedMap(),
+                draft.draftMapName(),
+                draft.mapPos1(),
+                draft.mapPos2(),
+                objectType,
+                draft.capturePreset(),
+                selectedIndex,
+                draft.validationView(),
+                fields);
+        ZombiesDeployObjectEditor.Operation operation = selectedIndex >= 0
+                ? ZombiesDeployObjectEditor.Operation.UPDATE
+                : ZombiesDeployObjectEditor.Operation.ADD;
+        return editObject(player, stack, updated, operation, leftClick ? "object.left_click_deployed" : "object.right_click_deployed");
+    }
+
+    private ZombiesDeployServiceResult<ZombiesDeploySnapshot> deployBarrierWorldClick(
+            ServerPlayer player,
+            ItemStack stack,
+            ZombiesDeployDraft draft,
+            ZombiesMapObjects objects,
+            int selectedIndex,
+            BlockPos placementPos,
+            boolean leftClick
+    ) {
+        Map<String, String> fields = fieldsForWorldClickBase(player, objects, ZombiesDeployFieldSchema.BARRIER, selectedIndex, draft);
         fields.put("dimension", player.serverLevel().dimension().location().toString());
-        if ("lookAt".equals(target)) {
-            setPositionLoose(fields, "lookAt", clickedPos);
-            BlockPos pos = readPositionIfPresent(fields, "pos");
-            applyLookAtYawOnly(fields, pos, clickedPos);
-        } else if ("pos".equals(target)) {
-            setPosition(fields, "pos", clickedPos.above());
-            if (isYawCaptureType(draft.objectType())) {
-                applyHorizontalYawFromPlayer(fields, player);
-            } else {
-                BlockPos lookAt = readPositionIfPresent(fields, "lookAt");
-                applyLookAtYawOnly(fields, clickedPos, lookAt);
+        if (selectedIndex < 0) {
+            if (leftClick) {
+                ZombiesDeployTool.setAreaPos1(stack, placementPos);
+                ZombiesDeployTool.setAreaPos2(stack, null);
+                setPosition(fields, "areaFrom", placementPos);
+                setPosition(fields, "areaTo", placementPos);
+                setPosition(fields, "interaction", placementPos);
+                ZombiesDeployDraft updated = draftForWorldClick(draft, ZombiesDeployFieldSchema.BARRIER, -1, fields);
+                ZombiesDeployTool.saveDraft(stack, updated);
+                return snapshot(
+                        player,
+                        stack,
+                        updated,
+                        "message.codpattern.zombies.deploy.barrier_area_from",
+                        "capture.barrier_area_from",
+                        formatPos(placementPos));
             }
+            BlockPos first = ZombiesDeployTool.getAreaPos1(stack);
+            if (first == null) {
+                return failure(
+                        player,
+                        stack,
+                        draft,
+                        "barrier_area_first_required",
+                        "message.codpattern.zombies.deploy.barrier_area_first_required",
+                        formatPos(placementPos));
+            }
+            ZombiesDeployTool.setAreaPos2(stack, placementPos);
+            setPosition(fields, "areaFrom", first);
+            setPosition(fields, "areaTo", placementPos);
+            setPosition(fields, "interaction", first);
         } else {
-            setPosition(fields, target, clickedPos);
+            setPosition(fields, leftClick ? "areaFrom" : "areaTo", placementPos);
+            if (leftClick) {
+                ZombiesDeployTool.setAreaPos1(stack, placementPos);
+            } else {
+                ZombiesDeployTool.setAreaPos2(stack, placementPos);
+            }
         }
-        ZombiesDeployDraft updated = draft.withFields(fields);
-        ZombiesDeployTool.saveDraft(stack, updated);
-        return snapshot(player, stack, updated, "message.codpattern.zombies.deploy.captured_look_block", "capture." + target, formatPos(clickedPos));
+
+        ZombiesDeployDraft updated = draftForWorldClick(draft, ZombiesDeployFieldSchema.BARRIER, selectedIndex, fields);
+        ZombiesDeployObjectEditor.Operation operation = selectedIndex >= 0
+                ? ZombiesDeployObjectEditor.Operation.UPDATE
+                : ZombiesDeployObjectEditor.Operation.ADD;
+        ZombiesDeployServiceResult<ZombiesDeploySnapshot> result = editObject(
+                player,
+                stack,
+                updated,
+                operation,
+                leftClick ? "object.left_click_deployed" : "object.right_click_deployed");
+        if (result.success() && selectedIndex < 0) {
+            ZombiesDeployTool.setAreaPos1(stack, null);
+            ZombiesDeployTool.setAreaPos2(stack, null);
+        }
+        return result;
+    }
+
+    private ZombiesDeployDraft draftForWorldClick(
+            ZombiesDeployDraft draft,
+            String objectType,
+            int selectedIndex,
+            Map<String, String> fields
+    ) {
+        return new ZombiesDeployDraft(
+                ZombiesDeployDraft.STAGE_OBJECT_MARKING,
+                ZombiesDeployDraft.workflowStepForObjectType(objectType),
+                draft.selectedMap(),
+                draft.draftMapName(),
+                draft.mapPos1(),
+                draft.mapPos2(),
+                objectType,
+                draft.capturePreset(),
+                selectedIndex,
+                draft.validationView(),
+                fields);
+    }
+
+    private Map<String, String> fieldsForWorldClickBase(
+            ServerPlayer player,
+            ZombiesMapObjects objects,
+            String objectType,
+            int selectedIndex,
+            ZombiesDeployDraft draft
+    ) {
+        String type = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
+        if (selectedIndex >= 0) {
+            return ZombiesDeployObjectEditor.fieldsForSnapshotSelection(objects, type, selectedIndex);
+        }
+        Map<String, String> fields = draft.fields().isEmpty()
+                ? defaultFields(player, type)
+                : mergeDefaults(type, draft.fields());
+        if (normalizeTargetIndex(objects, type, draft.selectedIndex()) >= 0) {
+            fields.computeIfPresent("objectId", (key, ignored) -> "");
+        }
+        return fields;
+    }
+
+    private int deployTargetIndex(String objectType, int selectedIndex, boolean leftClick) {
+        if (leftClick && isAlwaysAddOnLeftClick(objectType)) {
+            return -1;
+        }
+        return selectedIndex;
+    }
+
+    private boolean isAlwaysAddOnLeftClick(String objectType) {
+        String type = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
+        return switch (type) {
+            case ZombiesDeployFieldSchema.INITIAL,
+                 ZombiesDeployFieldSchema.ZOMBIE_SPAWN,
+                 ZombiesDeployFieldSchema.BARRIER,
+                 ZombiesDeployFieldSchema.WEAPON_WALL,
+                 ZombiesDeployFieldSchema.AMMO_BOX,
+                 ZombiesDeployFieldSchema.ARMOR_STATION,
+                 ZombiesDeployFieldSchema.SODA_MACHINE,
+                 ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isRightClickNoOp(String objectType) {
+        String type = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
+        return isSinglePointObject(type);
+    }
+
+    private void applyWorldClickFields(
+            ServerPlayer player,
+            String objectType,
+            Map<String, String> fields,
+            BlockPos placementPos,
+            boolean leftClick,
+            boolean newObject
+    ) {
+        String dimension = player.serverLevel().dimension().location().toString();
+        fields.put("dimension", dimension);
+        String type = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
+        switch (type) {
+            case ZombiesDeployFieldSchema.INITIAL,
+                 ZombiesDeployFieldSchema.ZOMBIE_SPAWN -> {
+                setPosition(fields, "pos", placementPos);
+                applyHorizontalYawFromPlayer(fields, player);
+            }
+            case ZombiesDeployFieldSchema.BARRIER -> {
+                if (newObject) {
+                    setPosition(fields, "areaFrom", placementPos);
+                    setPosition(fields, "areaTo", placementPos);
+                    setPosition(fields, "interaction", placementPos);
+                } else {
+                    setPosition(fields, leftClick ? "areaFrom" : "areaTo", placementPos);
+                }
+            }
+            case ZombiesDeployFieldSchema.WEAPON_WALL,
+                 ZombiesDeployFieldSchema.AMMO_BOX,
+                 ZombiesDeployFieldSchema.ARMOR_STATION,
+                 ZombiesDeployFieldSchema.SODA_MACHINE,
+                 ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> {
+                if (leftClick) {
+                    setPosition(fields, "pos", placementPos);
+                    setPosition(fields, "interaction", placementPos);
+                }
+            }
+            case ZombiesDeployFieldSchema.POWER_SWITCH -> {
+                if (leftClick) {
+                    setPosition(fields, "pos", placementPos);
+                }
+            }
+            default -> {
+            }
+        }
+    }
+
+    private boolean requiresSelectedObjectForRightClick(String objectType) {
+        return false;
+    }
+
+    private int normalizeDeployTargetIndex(ZombiesMapObjects objects, String objectType, int selectedIndex) {
+        return normalizeTargetIndex(objects, objectType, selectedIndex);
     }
 
     public ZombiesDeployServiceResult<ZombiesDeploySnapshot> addObject(ServerPlayer player, ItemStack stack, ZombiesDeployDraft request) {
@@ -398,6 +659,9 @@ public final class ZombiesDeployToolService {
             String successCode
     ) {
         ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
+        ZombiesDeployObjectEditor.Operation resolvedOperation = operation == null
+                ? ZombiesDeployObjectEditor.Operation.ADD
+                : operation;
         Optional<ZombiesMap> resolvedMap = resolveMap(draft.selectedMap());
         if (resolvedMap.isEmpty()) {
             return failure(
@@ -413,7 +677,7 @@ public final class ZombiesDeployToolService {
         ZombiesMapObjects previousObjects = map.objects();
         ZombiesDeployObjectEditor.EditResult edit = ZombiesDeployObjectEditor.edit(
                 previousObjects,
-                operation,
+                resolvedOperation,
                 draft.objectType(),
                 draft.selectedIndex(),
                 draft.fields());
@@ -440,14 +704,50 @@ public final class ZombiesDeployToolService {
             return ZombiesDeployServiceResult.failure(
                     edit.code(),
                     "message.codpattern.zombies.deploy.object_invalid",
-                    snapshot,
-                    edit.detail());
+                snapshot,
+                edit.detail());
+        }
+
+        if (shouldRejectOccupiedPositionConflict(resolvedOperation)) {
+            Optional<DuplicatePosition> duplicate = findOccupiedPositionConflict(edit.objects());
+            if (duplicate.isPresent()) {
+                String detail = duplicate.get().detail();
+                ZombiesDeployTool.saveDraft(stack, resultDraft);
+                ZombiesDeploySnapshot snapshot = buildSnapshot(
+                        player,
+                        resultDraft,
+                        "message.codpattern.zombies.deploy.duplicate_position",
+                        "object.duplicate_position",
+                        detail);
+                return ZombiesDeployServiceResult.failure(
+                        "object.duplicate_position",
+                        "message.codpattern.zombies.deploy.duplicate_position",
+                        snapshot,
+                        detail);
+            }
         }
 
         map.applyObjects(edit.objects());
+        PowerSwitchPlacementRollback powerSwitchRollback = null;
         try {
-            CodMapPersistence.saveMapOrRollback(map, () -> map.applyObjects(previousObjects));
+            if (shouldSyncPowerSwitchBlock(player, resolvedOperation, draft, previousObjects, edit.objects())) {
+                powerSwitchRollback = removeStalePowerSwitchBlock(player.serverLevel(), previousObjects.powerSwitch(), edit.objects().powerSwitch());
+                if (shouldPlacePowerSwitchBlock(player, resolvedOperation, draft, successCode, previousObjects, edit.objects())) {
+                    powerSwitchRollback = appendPowerSwitchRollback(
+                            powerSwitchRollback,
+                            placePowerSwitchBlock(player.serverLevel(), edit.objects().powerSwitch().get().pos()));
+                }
+            }
+            PowerSwitchPlacementRollback rollback = powerSwitchRollback;
+            CodMapPersistence.saveMapOrRollback(map, () -> {
+                map.applyObjects(previousObjects);
+                restorePowerSwitchBlock(rollback);
+            });
         } catch (RuntimeException e) {
+            map.applyObjects(previousObjects);
+            if (powerSwitchRollback != null) {
+                restorePowerSwitchBlock(powerSwitchRollback);
+            }
             ZombiesDeployTool.saveDraft(stack, resultDraft);
             ZombiesDeploySnapshot snapshot = buildSnapshot(
                     player,
@@ -501,10 +801,16 @@ public final class ZombiesDeployToolService {
         } else if (ZombiesDeployDraft.WORKFLOW_MAP.equals(workflowStep)) {
             workflowStep = ZombiesDeployDraft.workflowStepForObjectType(objectType);
         }
-        int count = resolveMap(selectedMap).map(map -> objectSummaries(map.objects(), objectType).size()).orElse(0);
-        int selectedIndex = count <= 0 ? -1 : Math.max(0, Math.min(base.selectedIndex() < 0 ? 0 : base.selectedIndex(), count - 1));
+        Optional<ZombiesMap> selectedZombiesMap = resolveMap(selectedMap);
+        ZombiesMapObjects selectedObjects = selectedZombiesMap.map(ZombiesMap::objects).orElse(ZombiesMapObjects.EMPTY);
+        int count = objectSummaries(selectedObjects, objectType).size();
+        int selectedIndex = count <= 0 || base.selectedIndex() < 0
+                ? -1
+                : Math.min(base.selectedIndex(), count - 1);
         Map<String, String> fields = base.fields().isEmpty()
-                ? defaultFields(player, objectType)
+                ? (selectedIndex >= 0
+                        ? ZombiesDeployObjectEditor.fieldsForSnapshotSelection(selectedObjects, objectType, selectedIndex)
+                        : defaultFields(player, objectType))
                 : mergeDefaults(objectType, base.fields());
         return new ZombiesDeployDraft(
                 base.workspaceStage(),
@@ -518,6 +824,11 @@ public final class ZombiesDeployToolService {
                 selectedIndex,
                 ZombiesDeployFieldSchema.normalizeProfile(base.validationView()),
                 fields);
+    }
+
+    private ZombiesDeployDraft selectionStateDraft(ServerPlayer player, ItemStack stack, ZombiesDeployDraft request) {
+        ZombiesDeployDraft draft = normalizeDraft(player, stack, request);
+        return draft.selectedIndex() < 0 ? draft.withFields(Map.of()) : draft;
     }
 
     private ZombiesDeploySnapshot buildSnapshot(
@@ -697,7 +1008,11 @@ public final class ZombiesDeployToolService {
     }
 
     private List<String> availableMaps() {
-        return FPSMCore.getInstance().getMapNamesWithType(BuiltInGameModes.ZOMBIES);
+        return FPSMCore.getInstance()
+                .getMapNamesWithType(BuiltInGameModes.ZOMBIES)
+                .stream()
+                .filter(name -> resolveMap(name).isPresent())
+                .toList();
     }
 
     private Optional<ZombiesMap> resolveMap(String mapName) {
@@ -1475,6 +1790,397 @@ public final class ZombiesDeployToolService {
                 (from.getZ() + to.getZ()) / 2);
     }
 
+    private boolean shouldRejectOccupiedPositionConflict(
+            ZombiesDeployObjectEditor.Operation operation
+    ) {
+        ZombiesDeployObjectEditor.Operation resolvedOperation = operation == null
+                ? ZombiesDeployObjectEditor.Operation.ADD
+                : operation;
+        return switch (resolvedOperation) {
+            case ADD, UPDATE, DUPLICATE -> true;
+            case DELETE, CLEAR -> false;
+        };
+    }
+
+    private boolean isSinglePointObject(String objectType) {
+        return switch (ZombiesDeployFieldSchema.normalizeObjectType(objectType)) {
+            case ZombiesDeployFieldSchema.INITIAL,
+                 ZombiesDeployFieldSchema.ZOMBIE_SPAWN,
+                 ZombiesDeployFieldSchema.WEAPON_WALL,
+                 ZombiesDeployFieldSchema.AMMO_BOX,
+                 ZombiesDeployFieldSchema.ARMOR_STATION,
+                 ZombiesDeployFieldSchema.POWER_SWITCH,
+                 ZombiesDeployFieldSchema.SODA_MACHINE,
+                 ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> true;
+            default -> false;
+        };
+    }
+
+    private Optional<DuplicatePosition> findOccupiedPositionConflict(ZombiesMapObjects objects) {
+        ZombiesMapObjects resolved = objects == null ? ZombiesMapObjects.EMPTY : objects;
+        Map<String, PointRef> seen = new LinkedHashMap<>();
+        for (int i = 0; i < resolved.initialSpawns().size(); i++) {
+            Optional<DuplicatePosition> duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.INITIAL,
+                    i,
+                    "pos",
+                    dimensionId(resolved.initialSpawns().get(i).dimension()),
+                    resolved.initialSpawns().get(i).pos()));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+        }
+        for (int i = 0; i < resolved.zombieSpawns().size(); i++) {
+            Optional<DuplicatePosition> duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.ZOMBIE_SPAWN,
+                    i,
+                    "pos",
+                    dimensionId(resolved.zombieSpawns().get(i).dimension()),
+                    resolved.zombieSpawns().get(i).pos()));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+        }
+        for (int i = 0; i < resolved.barriers().size(); i++) {
+            ZombiesBarrierData barrier = resolved.barriers().get(i);
+            Optional<DuplicatePosition> duplicate = addAreaRefs(seen, ZombiesDeployFieldSchema.BARRIER, i,
+                    dimensionId(barrier.dimension()), barrier.areaFrom(), barrier.areaTo());
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+            duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.BARRIER,
+                    i,
+                    "interaction",
+                    dimensionId(barrier.dimension()),
+                    barrier.interactionPos()));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+        }
+        for (int i = 0; i < resolved.weaponWalls().size(); i++) {
+            ZombiesWeaponWallData weaponWall = resolved.weaponWalls().get(i);
+            Optional<DuplicatePosition> duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.WEAPON_WALL,
+                    i,
+                    "pos",
+                    dimensionId(weaponWall.dimension()),
+                    weaponWall.pos()));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+            duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.WEAPON_WALL,
+                    i,
+                    "interaction",
+                    dimensionId(weaponWall.dimension()),
+                    weaponWall.interactionPos().orElse(null)));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+        }
+        for (int i = 0; i < resolved.ammoBoxes().size(); i++) {
+            ZombiesAmmoBoxData ammoBox = resolved.ammoBoxes().get(i);
+            Optional<DuplicatePosition> duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.AMMO_BOX,
+                    i,
+                    "pos",
+                    dimensionId(ammoBox.dimension()),
+                    ammoBox.pos()));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+            duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.AMMO_BOX,
+                    i,
+                    "interaction",
+                    dimensionId(ammoBox.dimension()),
+                    ammoBox.interactionPos().orElse(null)));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+        }
+        for (int i = 0; i < resolved.armorStations().size(); i++) {
+            ZombiesArmorStationData armorStation = resolved.armorStations().get(i);
+            Optional<DuplicatePosition> duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.ARMOR_STATION,
+                    i,
+                    "pos",
+                    dimensionId(armorStation.dimension()),
+                    armorStation.pos()));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+            duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.ARMOR_STATION,
+                    i,
+                    "interaction",
+                    dimensionId(armorStation.dimension()),
+                    armorStation.interactionPos().orElse(null)));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+        }
+        if (resolved.powerSwitch().isPresent()) {
+            ZombiesPowerSwitchData powerSwitch = resolved.powerSwitch().get();
+            Optional<DuplicatePosition> duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.POWER_SWITCH,
+                    0,
+                    "pos",
+                    dimensionId(powerSwitch.dimension()),
+                    powerSwitch.pos()));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+            duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.POWER_SWITCH,
+                    0,
+                    "interaction",
+                    dimensionId(powerSwitch.dimension()),
+                    powerSwitch.interactionPos().orElse(null)));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+        }
+        for (int i = 0; i < resolved.sodaMachines().size(); i++) {
+            ZombiesSodaMachineData sodaMachine = resolved.sodaMachines().get(i);
+            Optional<DuplicatePosition> duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.SODA_MACHINE,
+                    i,
+                    "pos",
+                    dimensionId(sodaMachine.dimension()),
+                    sodaMachine.pos()));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+            duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.SODA_MACHINE,
+                    i,
+                    "interaction",
+                    dimensionId(sodaMachine.dimension()),
+                    sodaMachine.interactionPos().orElse(null)));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+        }
+        for (int i = 0; i < resolved.ultimateMachines().size(); i++) {
+            ZombiesUltimateMachineData ultimateMachine = resolved.ultimateMachines().get(i);
+            Optional<DuplicatePosition> duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.ULTIMATE_MACHINE,
+                    i,
+                    "pos",
+                    dimensionId(ultimateMachine.dimension()),
+                    ultimateMachine.pos()));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+            duplicate = addPointRef(seen, new PointRef(
+                    ZombiesDeployFieldSchema.ULTIMATE_MACHINE,
+                    i,
+                    "interaction",
+                    dimensionId(ultimateMachine.dimension()),
+                    ultimateMachine.interactionPos().orElse(null)));
+            if (duplicate.isPresent()) {
+                return duplicate;
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<DuplicatePosition> addAreaRefs(
+            Map<String, PointRef> seen,
+            String objectType,
+            int index,
+            String dimension,
+            BlockPos from,
+            BlockPos to
+    ) {
+        if (from == null || to == null) {
+            return Optional.empty();
+        }
+        int minX = Math.min(from.getX(), to.getX());
+        int maxX = Math.max(from.getX(), to.getX());
+        int minY = Math.min(from.getY(), to.getY());
+        int maxY = Math.max(from.getY(), to.getY());
+        int minZ = Math.min(from.getZ(), to.getZ());
+        int maxZ = Math.max(from.getZ(), to.getZ());
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    Optional<DuplicatePosition> duplicate = addPointRef(seen, new PointRef(
+                            objectType,
+                            index,
+                            "area",
+                            dimension,
+                            new BlockPos(x, y, z)));
+                    if (duplicate.isPresent()) {
+                        return duplicate;
+                    }
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<DuplicatePosition> addPointRef(Map<String, PointRef> seen, PointRef ref) {
+        if (ref == null || ref.dimension().isBlank() || ref.pos() == null) {
+            return Optional.empty();
+        }
+        String key = ref.dimension() + "|" + ref.pos().asLong();
+        PointRef previous = seen.putIfAbsent(key, ref);
+        if (previous == null || previous.sameObject(ref)) {
+            return Optional.empty();
+        }
+        return Optional.of(new DuplicatePosition(previous, ref));
+    }
+
+    private String dimensionId(ResourceKey<Level> dimension) {
+        return dimension == null || dimension.location() == null ? "" : dimension.location().toString();
+    }
+
+    private boolean shouldPlacePowerSwitchBlock(
+            ServerPlayer player,
+            ZombiesDeployObjectEditor.Operation operation,
+            ZombiesDeployDraft draft,
+            String successCode,
+            ZombiesMapObjects previousObjects,
+            ZombiesMapObjects objects
+    ) {
+        if (player == null || objects == null || objects.powerSwitch().isEmpty()) {
+            return false;
+        }
+        ZombiesDeployObjectEditor.Operation resolvedOperation = operation == null
+                ? ZombiesDeployObjectEditor.Operation.ADD
+                : operation;
+        if (resolvedOperation != ZombiesDeployObjectEditor.Operation.ADD
+                && resolvedOperation != ZombiesDeployObjectEditor.Operation.UPDATE) {
+            return false;
+        }
+        if (!ZombiesDeployFieldSchema.POWER_SWITCH.equals(ZombiesDeployFieldSchema.normalizeObjectType(draft.objectType()))) {
+            return false;
+        }
+        ZombiesPowerSwitchData powerSwitch = objects.powerSwitch().get();
+        if (!isCurrentLevelPowerSwitch(player.serverLevel(), powerSwitch)) {
+            return false;
+        }
+        return resolvedOperation == ZombiesDeployObjectEditor.Operation.ADD
+                || "object.left_click_deployed".equals(successCode)
+                || previousObjects == null
+                || previousObjects.powerSwitch().isEmpty()
+                || !samePowerSwitchPlacement(previousObjects.powerSwitch().get(), powerSwitch);
+    }
+
+    private boolean shouldSyncPowerSwitchBlock(
+            ServerPlayer player,
+            ZombiesDeployObjectEditor.Operation operation,
+            ZombiesDeployDraft draft,
+            ZombiesMapObjects previousObjects,
+            ZombiesMapObjects objects
+    ) {
+        if (player == null || !ZombiesDeployFieldSchema.POWER_SWITCH.equals(ZombiesDeployFieldSchema.normalizeObjectType(draft.objectType()))) {
+            return false;
+        }
+        ZombiesDeployObjectEditor.Operation resolvedOperation = operation == null
+                ? ZombiesDeployObjectEditor.Operation.ADD
+                : operation;
+        if (resolvedOperation != ZombiesDeployObjectEditor.Operation.ADD
+                && resolvedOperation != ZombiesDeployObjectEditor.Operation.UPDATE
+                && resolvedOperation != ZombiesDeployObjectEditor.Operation.DELETE
+                && resolvedOperation != ZombiesDeployObjectEditor.Operation.CLEAR) {
+            return false;
+        }
+        ZombiesMapObjects before = previousObjects == null ? ZombiesMapObjects.EMPTY : previousObjects;
+        ZombiesMapObjects after = objects == null ? ZombiesMapObjects.EMPTY : objects;
+        return before.powerSwitch().isPresent() || after.powerSwitch().isPresent();
+    }
+
+    private PowerSwitchPlacementRollback removeStalePowerSwitchBlock(
+            ServerLevel level,
+            Optional<ZombiesPowerSwitchData> previousPowerSwitch,
+            Optional<ZombiesPowerSwitchData> nextPowerSwitch
+    ) {
+        if (level == null || previousPowerSwitch == null || previousPowerSwitch.isEmpty()) {
+            return null;
+        }
+        ZombiesPowerSwitchData previous = previousPowerSwitch.get();
+        if (!isCurrentLevelPowerSwitch(level, previous)) {
+            return null;
+        }
+        if (nextPowerSwitch != null
+                && nextPowerSwitch.isPresent()
+                && samePowerSwitchPlacement(previous, nextPowerSwitch.get())) {
+            return null;
+        }
+        return removePowerSwitchBlock(level, previous.pos());
+    }
+
+    private boolean samePowerSwitchPlacement(ZombiesPowerSwitchData first, ZombiesPowerSwitchData second) {
+        return first != null
+                && second != null
+                && Objects.equals(first.dimension(), second.dimension())
+                && Objects.equals(first.pos(), second.pos())
+                && Objects.equals(normalizePowerSwitchBlock(first), normalizePowerSwitchBlock(second));
+    }
+
+    private boolean isCurrentLevelPowerSwitch(ServerLevel level, ZombiesPowerSwitchData powerSwitch) {
+        return level != null
+                && powerSwitch != null
+                && level.dimension().equals(powerSwitch.dimension())
+                && "codpattern:zombies_power_switch".equals(normalizePowerSwitchBlock(powerSwitch));
+    }
+
+    private String normalizePowerSwitchBlock(ZombiesPowerSwitchData powerSwitch) {
+        return powerSwitch == null ? "" : Objects.requireNonNullElse(powerSwitch.block(), "").trim();
+    }
+
+    private PowerSwitchPlacementRollback placePowerSwitchBlock(ServerLevel level, BlockPos pos) {
+        if (level == null || pos == null) {
+            return null;
+        }
+        BlockState previousState = level.getBlockState(pos);
+        boolean placed = level.setBlock(pos, CodPatternBlockRegister.ZOMBIES_POWER_SWITCH.get().defaultBlockState(), Block.UPDATE_ALL);
+        if (!placed) {
+            throw new RuntimeException("Failed to place zombies power switch block at " + formatPos(pos));
+        }
+        return new PowerSwitchPlacementRollback(level, pos, previousState);
+    }
+
+    private PowerSwitchPlacementRollback removePowerSwitchBlock(ServerLevel level, BlockPos pos) {
+        if (level == null || pos == null) {
+            return null;
+        }
+        BlockState previousState = level.getBlockState(pos);
+        if (previousState.getBlock() != CodPatternBlockRegister.ZOMBIES_POWER_SWITCH.get()) {
+            return null;
+        }
+        boolean removed = level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        if (!removed) {
+            throw new RuntimeException("Failed to remove stale zombies power switch block at " + formatPos(pos));
+        }
+        return new PowerSwitchPlacementRollback(level, pos, previousState);
+    }
+
+    private PowerSwitchPlacementRollback appendPowerSwitchRollback(
+            PowerSwitchPlacementRollback current,
+            PowerSwitchPlacementRollback next
+    ) {
+        if (next == null) {
+            return current;
+        }
+        if (current == null) {
+            return next;
+        }
+        return new PowerSwitchPlacementRollback(next.level(), next.pos(), next.previousState(), current);
+    }
+
+    private void restorePowerSwitchBlock(PowerSwitchPlacementRollback rollback) {
+        if (rollback == null || rollback.level() == null || rollback.pos() == null || rollback.previousState() == null) {
+            return;
+        }
+        rollback.level().setBlock(rollback.pos(), rollback.previousState(), Block.UPDATE_ALL);
+        restorePowerSwitchBlock(rollback.next());
+    }
+
     private void setPosition(Map<String, String> fields, String prefix, BlockPos pos) {
         if (!fields.containsKey(prefix + "X")) {
             return;
@@ -1544,8 +2250,7 @@ public final class ZombiesDeployToolService {
     }
 
     private String detail(ResourceKey<Level> dimension, BlockPos pos) {
-        String dimensionId = dimension == null || dimension.location() == null ? "" : dimension.location().toString();
-        return dimensionId + " " + formatPos(pos);
+        return dimensionId(dimension) + " " + formatPos(pos);
     }
 
     private String formatPos(BlockPos pos) {
@@ -1573,6 +2278,60 @@ public final class ZombiesDeployToolService {
         private NearestObject {
             label = Objects.requireNonNullElse(label, "").trim();
             distanceMeters = Math.max(0.0D, distanceMeters);
+        }
+    }
+
+    private record PointRef(
+            String objectType,
+            int index,
+            String role,
+            String dimension,
+            BlockPos pos
+    ) {
+        private PointRef {
+            objectType = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
+            index = Math.max(0, index);
+            role = Objects.requireNonNullElse(role, "").trim();
+            dimension = Objects.requireNonNullElse(dimension, "").trim();
+        }
+
+        private boolean sameObject(PointRef other) {
+            return other != null
+                    && objectType.equals(other.objectType())
+                    && index == other.index();
+        }
+
+        private String label() {
+            return role.isBlank() ? objectType + "[" + index + "]" : objectType + "[" + index + "]." + role;
+        }
+    }
+
+    private record PowerSwitchPlacementRollback(
+            ServerLevel level,
+            BlockPos pos,
+            BlockState previousState,
+            PowerSwitchPlacementRollback next
+    ) {
+        private PowerSwitchPlacementRollback(ServerLevel level, BlockPos pos, BlockState previousState) {
+            this(level, pos, previousState, null);
+        }
+    }
+
+    private record DuplicatePosition(
+            PointRef first,
+            PointRef second
+    ) {
+        private String detail() {
+            PointRef ref = second == null ? first : second;
+            String dimension = ref == null ? "" : ref.dimension();
+            BlockPos pos = ref == null ? null : ref.pos();
+            String firstLabel = first == null ? "unknown" : first.label();
+            String secondLabel = second == null ? "unknown" : second.label();
+            return dimension + " " + format(pos) + " " + firstLabel + " <-> " + secondLabel;
+        }
+
+        private static String format(BlockPos pos) {
+            return pos == null ? "-" : pos.getX() + ", " + pos.getY() + ", " + pos.getZ();
         }
     }
 }

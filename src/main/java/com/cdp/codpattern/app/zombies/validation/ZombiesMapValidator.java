@@ -20,6 +20,8 @@ public final class ZombiesMapValidator {
             ZombiesErrorCode.of("map.missing_group_1_zombie_spawn");
     private static final ZombiesErrorCode MAP_DYNAMIC_PLAYER_SPAWN_UNSUPPORTED =
             ZombiesErrorCode.of("map.dynamic_player_spawn_unsupported");
+    private static final ZombiesErrorCode MAP_TOO_MANY_INITIAL_PLAYER_SPAWNS =
+            ZombiesErrorCode.of("map.too_many_initial_player_spawns");
     private static final ZombiesErrorCode MAP_DUPLICATE_OBJECT_ID =
             ZombiesErrorCode.of("map.duplicate_object_id");
     private static final ZombiesErrorCode MAP_OBJECT_MISSING_LOCATION =
@@ -75,6 +77,7 @@ public final class ZombiesMapValidator {
             "headshot_damage");
     private static final int MIN_GENERATION_COORDINATE = -30_000_000;
     private static final int MAX_GENERATION_COORDINATE = 30_000_000;
+    private static final int MAX_INITIAL_PLAYER_SPAWNS = 4;
 
     private final ZombiesMapValidationProfile profile;
 
@@ -124,12 +127,18 @@ public final class ZombiesMapValidator {
                     "endtp",
                     "Zombies map requires a match end teleport point."));
         }
-        if (profile.requireInitialPlayerSpawn()
-                && snapshot.spawns().stream().noneMatch(ZombiesMapSnapshot.SpawnSnapshot::initialPlayerSpawn)) {
+        int initialPlayerSpawnCount = initialPlayerSpawnCount(snapshot);
+        if (profile.requireInitialPlayerSpawn() && initialPlayerSpawnCount <= 0) {
             issues.add(ZombiesValidationIssue.error(
                     ZombiesErrorCode.MAP_MISSING_INITIAL_SPAWN,
                     "spawn.INITIAL",
                     "Zombies map requires at least one INITIAL player spawn."));
+        }
+        if (initialPlayerSpawnCount > MAX_INITIAL_PLAYER_SPAWNS) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_TOO_MANY_INITIAL_PLAYER_SPAWNS,
+                    "spawn.INITIAL",
+                    "Zombies map supports at most " + MAX_INITIAL_PLAYER_SPAWNS + " INITIAL player spawns."));
         }
         if (profile.requireGroupOneZombieSpawn()
                 && snapshot.spawns().stream().noneMatch(ZombiesMapValidator::validGroupOneZombieSpawn)) {
@@ -170,6 +179,16 @@ public final class ZombiesMapValidator {
 
     private static boolean validGroupOneZombieSpawn(ZombiesMapSnapshot.SpawnSnapshot spawn) {
         return spawn.zombieSpawn() && spawn.group() == 1 && spawn.weight() > 0.0D;
+    }
+
+    private static int initialPlayerSpawnCount(ZombiesMapSnapshot snapshot) {
+        int count = 0;
+        for (ZombiesMapSnapshot.SpawnSnapshot spawn : snapshot.spawns()) {
+            if (spawn.initialPlayerSpawn()) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private static void addDuplicateObjectIdIssues(
@@ -511,10 +530,19 @@ public final class ZombiesMapValidator {
                     issues);
         }
         for (ZombiesMapSnapshot.BarrierSnapshot barrier : snapshot.barriers()) {
+            String barrierSubject = subject("barrier", barrier.objectId(), barrier.featureKey());
             addOptionalLocationIssues(
-                    subject("barrier", barrier.objectId(), barrier.featureKey()),
+                    barrierSubject,
                     barrier.dimensionId(),
                     barrier.pos(),
+                    expectedDimensionId,
+                    mapBounds,
+                    issues);
+            addBarrierAreaLocationIssues(
+                    barrierSubject,
+                    barrier.dimensionId(),
+                    barrier.areaFrom(),
+                    barrier.areaTo(),
                     expectedDimensionId,
                     mapBounds,
                     issues);
@@ -621,6 +649,36 @@ public final class ZombiesMapValidator {
                     "Located zombies map entries require both dimension and position."));
         }
         addLocationConsistencyIssues(subject, dimensionId, pos, expectedDimensionId, mapBounds, issues);
+    }
+
+    private static void addBarrierAreaLocationIssues(
+            String subject,
+            String dimensionId,
+            BlockPos areaFrom,
+            BlockPos areaTo,
+            String expectedDimensionId,
+            ZombiesMapSnapshot.BoundsSnapshot mapBounds,
+            List<ZombiesValidationIssue> issues
+    ) {
+        boolean hasFrom = areaFrom != null;
+        boolean hasTo = areaTo != null;
+        if (!hasFrom && !hasTo) {
+            return;
+        }
+        if (normalizeKey(dimensionId).isEmpty()) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_OBJECT_MISSING_LOCATION,
+                    subject,
+                    "Barrier area requires a non-empty dimension."));
+        }
+        if (!hasFrom || !hasTo) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_OBJECT_MISSING_LOCATION,
+                    subject,
+                    "Barrier area requires both areaFrom and areaTo."));
+        }
+        addLocationConsistencyIssues(subject + ".areaFrom", dimensionId, areaFrom, expectedDimensionId, mapBounds, issues);
+        addLocationConsistencyIssues(subject + ".areaTo", dimensionId, areaTo, expectedDimensionId, mapBounds, issues);
     }
 
     private static void addLocationConsistencyIssues(

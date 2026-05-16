@@ -4,6 +4,7 @@ import com.cdp.codpattern.app.zombies.map.ZombiesMapObjects;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesAmmoBoxData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesArmorStationData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesBarrierData;
+import com.cdp.codpattern.app.zombies.map.object.ZombiesInitialSpawnData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesPowerSwitchData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesSodaMachineData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesUltimateMachineData;
@@ -24,6 +25,7 @@ public final class ZombiesDeployObjectEditorCompatTest {
         if (!bootstrapMinecraft()) {
             return;
         }
+        initialSpawnsAllowFourAndRejectFifth();
         barrierAreaFieldsParseUpdateAndDuplicate();
         ammoBoxPricesByWeaponLevelParseAndUpdateFromListField();
         armorStationFieldsParseAndUpdate();
@@ -34,6 +36,49 @@ public final class ZombiesDeployObjectEditorCompatTest {
         failurePathsKeepOriginalObjects();
         weaponWallListFieldsParseAndUpdateFromListFields();
         weaponWallDuplicateCreatesNonConflictingObjectId();
+    }
+
+    private static void initialSpawnsAllowFourAndRejectFifth() {
+        ZombiesMapObjects objects = ZombiesMapObjects.EMPTY;
+        for (int i = 0; i < ZombiesDeployObjectEditor.MAX_INITIAL_PLAYER_SPAWNS; i++) {
+            ZombiesDeployObjectEditor.EditResult add = edit(
+                    objects,
+                    ZombiesDeployObjectEditor.Operation.ADD,
+                    ZombiesDeployFieldSchema.INITIAL,
+                    -1,
+                    fields(ZombiesDeployFieldSchema.INITIAL,
+                            "posX", Integer.toString(i + 1),
+                            "posY", "64",
+                            "posZ", "1"));
+            requireSuccess(add, "INITIAL add " + (i + 1) + " should succeed");
+            require(add.objects().initialSpawns().size() == i + 1,
+                    "INITIAL add should append through the fourth spawn");
+            require(add.selectedIndex() == i, "INITIAL add should select the inserted point");
+            ZombiesInitialSpawnData added = add.objects().initialSpawns().get(i);
+            require(added.pos().equals(new BlockPos(i + 1, 64, 1)), "INITIAL position should parse");
+            objects = add.objects();
+        }
+
+        ZombiesDeployObjectEditor.EditResult fifth = edit(
+                objects,
+                ZombiesDeployObjectEditor.Operation.ADD,
+                ZombiesDeployFieldSchema.INITIAL,
+                -1,
+                fields(ZombiesDeployFieldSchema.INITIAL,
+                        "posX", "5",
+                        "posY", "64",
+                        "posZ", "1"));
+        requireFailure(fifth, "object.max_initial_spawns", "fifth INITIAL add should fail");
+        require(fifth.objects() == objects, "fifth INITIAL add should keep original objects");
+
+        ZombiesDeployObjectEditor.EditResult duplicateAtLimit = edit(
+                objects,
+                ZombiesDeployObjectEditor.Operation.DUPLICATE,
+                ZombiesDeployFieldSchema.INITIAL,
+                0,
+                Map.of());
+        requireFailure(duplicateAtLimit, "object.max_initial_spawns", "INITIAL duplicate at limit should fail");
+        require(duplicateAtLimit.objects() == objects, "INITIAL duplicate failure should keep original objects");
     }
 
     private static boolean bootstrapMinecraft() {

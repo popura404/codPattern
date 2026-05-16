@@ -183,13 +183,14 @@ public class ZombiesDeployToolActionC2SPacket {
     private ZombiesDeployServiceResult<ZombiesDeploySnapshot> dispatch(ServerPlayer player, ItemStack stack) {
         ZombiesDeployToolService service = ZombiesDeployToolService.instance();
         return switch (action) {
-            case REFRESH, SELECT_MAP, SELECT_OBJECT_TYPE, SELECT_OBJECT -> service.snapshot(
+            case REFRESH, SELECT_MAP, SELECT_OBJECT -> service.snapshot(
                     player,
                     stack,
                     draft,
                     "message.codpattern.zombies.deploy.refreshed",
                     "ok",
                     "");
+            case SELECT_OBJECT_TYPE -> service.selectObjectType(player, stack, draft);
             case SAVE_SELECTIONS -> service.saveSelections(player, stack, draft);
             case SET_FIELD -> service.setField(player, stack, draft, fieldKey, fieldValue);
             case ADD_OBJECT -> service.addObject(player, stack, draft);

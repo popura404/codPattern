@@ -30,6 +30,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -49,6 +50,7 @@ public final class ZombiesDeployPreviewService {
     private static final int SLOT_B_COLOR = 0xFFFFAD5A;
     private static final int SINGLETON_MISSING_COLOR = 0xFFFF5D73;
     private static final int SINGLETON_DUPLICATE_COLOR = 0xFFFFD166;
+    private static final int MAP_REGISTRATION_DRAFT_COLOR = 0xFFFFFFFF;
 
     public static ZombiesDeployPreviewService instance() {
         return INSTANCE;
@@ -71,16 +73,23 @@ public final class ZombiesDeployPreviewService {
                     "message.codpattern.zombies.deploy.snapshot_missing",
                     null);
         }
+        if (ZombiesDeployDraft.STAGE_MAP_REGISTRATION.equals(draft.workspaceStage())) {
+            return refreshMapRegistrationPreview(player, draft);
+        }
         String type = ZombiesDeployFieldSchema.normalizeObjectType(draft.objectType());
-        Map<String, String> fields = draft.fields().isEmpty()
-                ? defaultFields(player, type)
-                : mergeDefaults(type, draft.fields());
+        boolean showDraft = draft.selectedIndex() >= 0 || !draft.fields().isEmpty();
+        Map<String, String> fields = showDraft
+                ? (draft.fields().isEmpty()
+                        ? defaultFields(player, type)
+                        : mergeDefaults(type, draft.fields()))
+                : Map.of();
         return refreshPreview(player, new PreviewRequest(
                 draft.selectedMap(),
                 type,
                 draft.capturePreset(),
                 draft.selectedIndex(),
-                fields));
+                fields,
+                showDraft));
     }
 
     public ZombiesDeployServiceResult<Void> refreshPreview(ServerPlayer player, ZombiesDeploySnapshot snapshot) {
@@ -102,7 +111,8 @@ public final class ZombiesDeployPreviewService {
                 snapshot.selectedObjectType(),
                 snapshot.capturePreset(),
                 snapshot.selectedIndex(),
-                fieldMap(snapshot)));
+                fieldMap(snapshot),
+                true));
     }
 
     private ZombiesDeployServiceResult<Void> refreshPreview(ServerPlayer player, PreviewRequest request) {
@@ -134,20 +144,22 @@ public final class ZombiesDeployPreviewService {
                     request.selectedMap());
         }
 
-        DraftPreview draftPreview;
-        try {
-            draftPreview = parseDraftPreview(
-                    request.selectedObjectType(),
-                    request.capturePreset(),
-                    request.fields(),
-                    player.serverLevel().dimension());
-        } catch (PreviewParseException e) {
-            clearHeldPreview(player);
-            return ZombiesDeployServiceResult.failure(
-                    e.code(),
-                    "message.codpattern.zombies.deploy.preview_field_invalid",
-                    null,
-                    e.getMessage());
+        DraftPreview draftPreview = null;
+        if (request.showDraft()) {
+            try {
+                draftPreview = parseDraftPreview(
+                        request.selectedObjectType(),
+                        request.capturePreset(),
+                        request.fields(),
+                        player.serverLevel().dimension());
+            } catch (PreviewParseException e) {
+                clearHeldPreview(player);
+                return ZombiesDeployServiceResult.failure(
+                        e.code(),
+                        "message.codpattern.zombies.deploy.preview_field_invalid",
+                        null,
+                        e.getMessage());
+            }
         }
 
         String signature = buildSignature(player, map, request, draftPreview);
@@ -167,7 +179,9 @@ public final class ZombiesDeployPreviewService {
                 map.getMapArea()));
 
         sendCurrentObjectList(player, request, map.objects());
-        sendDraft(player, request, draftPreview);
+        if (draftPreview != null) {
+            sendDraft(player, request, draftPreview);
+        }
         sendSingletonStatusHint(player, map, request.selectedObjectType(), map.objects());
         sendNearestObjectHint(player, request, map.objects());
 
@@ -194,6 +208,56 @@ public final class ZombiesDeployPreviewService {
                 .getMapByTypeWithName(BuiltInGameModes.ZOMBIES, selected)
                 .filter(ZombiesMap.class::isInstance)
                 .map(ZombiesMap.class::cast);
+    }
+
+    private List<ZombiesMap> availableZombiesMaps() {
+        return FPSMCore.getInstance()
+                .getMapNamesWithType(BuiltInGameModes.ZOMBIES)
+                .stream()
+                .map(this::resolveMap)
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
+    private ZombiesDeployServiceResult<Void> refreshMapRegistrationPreview(ServerPlayer player, ZombiesDeployDraft draft) {
+        List<ZombiesMap> maps = availableZombiesMaps();
+        String signature = buildMapRegistrationSignature(player, maps, draft);
+        CompoundTag data = player.getPersistentData();
+        String previousSignature = data.getString(HELD_PREVIEW_STATE_TAG);
+        if (signature.equals(previousSignature) && player.tickCount % HELD_PREVIEW_REFRESH_INTERVAL != 0) {
+            return ZombiesDeployServiceResult.success(
+                    null,
+                    "message.codpattern.zombies.deploy.preview_ready");
+        }
+
+        FPSMatch.sendToPlayer(player, new RemoveDebugDataByPrefixS2CPacket(getHeldPreviewPrefix(player)));
+        for (int i = 0; i < maps.size(); i++) {
+            ZombiesMap map = maps.get(i);
+            AreaData area = map.getMapArea();
+            sendArea(
+                    player,
+                    getHeldPreviewMapKey(player, i),
+                    map.getMapName(),
+                    PreviewColorUtil.getMapPreviewColor(BuiltInGameModes.ZOMBIES),
+                    map.getServerLevel().dimension(),
+                    area.pos1(),
+                    area.pos2());
+        }
+        if (draft.mapPos1() != null && draft.mapPos2() != null) {
+            sendArea(
+                    player,
+                    getHeldPreviewMapDraftKey(player),
+                    "new zombies map",
+                    MAP_REGISTRATION_DRAFT_COLOR,
+                    player.serverLevel().dimension(),
+                    draft.mapPos1(),
+                    draft.mapPos2());
+        }
+
+        data.putString(HELD_PREVIEW_STATE_TAG, signature);
+        return ZombiesDeployServiceResult.success(
+                null,
+                "message.codpattern.zombies.deploy.preview_ready");
     }
 
     private Map<String, String> fieldMap(ZombiesDeploySnapshot snapshot) {
@@ -523,8 +587,25 @@ public final class ZombiesDeployPreviewService {
                 .append('|').append(Objects.hash(map.objects()))
                 .append('|').append(map.getMapArea().pos1().asLong())
                 .append('|').append(map.getMapArea().pos2().asLong())
-                .append('|').append(draftPreview.signature());
+                .append('|').append(draftPreview == null ? "no_draft" : draftPreview.signature());
         request.fields().forEach((key, value) -> builder.append('|').append(key).append('=').append(value));
+        return builder.toString();
+    }
+
+    private String buildMapRegistrationSignature(ServerPlayer player, List<ZombiesMap> maps, ZombiesDeployDraft draft) {
+        StringBuilder builder = new StringBuilder()
+                .append(player.serverLevel().dimension().location())
+                .append("|map_registration")
+                .append('|').append(draft.mapPos1() == null ? "-" : draft.mapPos1().asLong())
+                .append('|').append(draft.mapPos2() == null ? "-" : draft.mapPos2().asLong());
+        for (ZombiesMap map : maps) {
+            AreaData area = map.getMapArea();
+            builder.append('|')
+                    .append(map.getMapName())
+                    .append('@').append(map.getServerLevel().dimension().location())
+                    .append(':').append(area.pos1().asLong())
+                    .append(':').append(area.pos2().asLong());
+        }
         return builder.toString();
     }
 
@@ -874,6 +955,10 @@ public final class ZombiesDeployPreviewService {
         return getHeldPreviewPrefix(player) + "map";
     }
 
+    private static String getHeldPreviewMapKey(ServerPlayer player, int index) {
+        return getHeldPreviewPrefix(player) + "map:" + index;
+    }
+
     private static String getHeldPreviewObjectKey(ServerPlayer player, String type, int index) {
         return getHeldPreviewPrefix(player) + "object:" + type + ":" + index;
     }
@@ -888,6 +973,10 @@ public final class ZombiesDeployPreviewService {
 
     private static String getHeldPreviewDraftKey(ServerPlayer player) {
         return getHeldPreviewPrefix(player) + "draft";
+    }
+
+    private static String getHeldPreviewMapDraftKey(ServerPlayer player) {
+        return getHeldPreviewPrefix(player) + "map:draft";
     }
 
     private record NearestObjectHint(
@@ -906,7 +995,8 @@ public final class ZombiesDeployPreviewService {
             String selectedObjectType,
             String capturePreset,
             int selectedIndex,
-            Map<String, String> fields
+            Map<String, String> fields,
+            boolean showDraft
     ) {
         private PreviewRequest {
             selectedMap = Objects.requireNonNullElse(selectedMap, "").trim();

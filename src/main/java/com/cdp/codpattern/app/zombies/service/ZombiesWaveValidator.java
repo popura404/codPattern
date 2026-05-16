@@ -6,7 +6,9 @@ import com.cdp.codpattern.app.zombies.model.ZombiesWaveMobEntry;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.StringJoiner;
 
@@ -30,6 +32,7 @@ public final class ZombiesWaveValidator {
 
     public ValidationReport validate(List<ZombiesWaveDefinition> waves) {
         List<ValidationIssue> issues = new ArrayList<>();
+        Map<Integer, Path> firstSourceByWave = new HashMap<>();
         int validWaves = 0;
 
         for (ZombiesWaveDefinition wave : waves == null ? Collections.<ZombiesWaveDefinition>emptyList() : waves) {
@@ -47,6 +50,17 @@ public final class ZombiesWaveValidator {
                         wave.getSourcePath(),
                         "Wave file number " + wave.getFileWave() + " conflicts with wave field " + wave.getConfiguredWave()));
                 valid = false;
+            }
+            if (wave.getWave() >= 1 && !wave.hasWaveConflict()) {
+                Path firstSource = firstSourceByWave.putIfAbsent(wave.getWave(), wave.getSourcePath());
+                if (firstSource != null) {
+                    issues.add(new ValidationIssue(
+                            WAVE_CONFLICT,
+                            wave.getSourcePath(),
+                            "Wave " + wave.getWave() + " is defined more than once; first definition was "
+                                    + firstSource));
+                    valid = false;
+                }
             }
             if (!wave.hasMobsField()) {
                 issues.add(new ValidationIssue(

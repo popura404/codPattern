@@ -11,6 +11,7 @@ import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.tool.CreatorToolItem;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionAction;
+import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionHit;
 import com.phasetranscrystal.fpsmatch.common.item.tool.WorldToolItem;
 import com.phasetranscrystal.fpsmatch.common.packet.AddAreaDataS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.AddPointDataS2CPacket;
@@ -54,15 +55,15 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
     }
 
     @Override
-    public void handleWorldInteraction(ServerPlayer player, ItemStack stack, ToolInteractionAction action, BlockPos clickedPos) {
+    public void handleWorldInteraction(ServerPlayer player, ItemStack stack, ToolInteractionAction action, ToolInteractionHit hit) {
         if (isAreaMode(stack)) {
-            handleAreaWorldInteraction(player, stack, action, clickedPos);
+            handleAreaWorldInteraction(player, stack, action, hit);
             return;
         }
         switch (action) {
             case LEFT_CLICK_BLOCK -> {
-                if (clickedPos != null) {
-                    addSpawnPoint(player, stack, clickedPos);
+                if (hit != null) {
+                    addSpawnPoint(player, stack, hit.clickedBlockPos());
                 }
             }
             case CTRL_RIGHT_CLICK -> SpawnPointToolActionC2SPacket.sendScreen(
@@ -157,20 +158,22 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
         player.getPersistentData().remove(HELD_PREVIEW_STATE_TAG);
     }
 
-    private void handleAreaWorldInteraction(ServerPlayer player, ItemStack stack, ToolInteractionAction action, BlockPos clickedPos) {
+    private void handleAreaWorldInteraction(ServerPlayer player, ItemStack stack, ToolInteractionAction action, ToolInteractionHit hit) {
         switch (action) {
             case LEFT_CLICK_BLOCK -> {
-                if (clickedPos == null) {
+                if (hit == null) {
                     return;
                 }
+                BlockPos clickedPos = hit.clickedBlockPos();
                 setBlockPos(stack, AREA_POS_1_TAG, clickedPos);
                 player.displayClientMessage(Component.literal("Set area pos 1: " + MapCreatorTool.formatPos(clickedPos))
                         .withStyle(ChatFormatting.AQUA), true);
             }
             case RIGHT_CLICK_BLOCK -> {
-                if (clickedPos == null) {
+                if (hit == null) {
                     return;
                 }
+                BlockPos clickedPos = hit.clickedBlockPos();
                 setBlockPos(stack, AREA_POS_2_TAG, clickedPos);
                 player.displayClientMessage(Component.literal("Set area pos 2: " + MapCreatorTool.formatPos(clickedPos))
                         .withStyle(ChatFormatting.AQUA), true);

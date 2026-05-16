@@ -17,27 +17,51 @@ public final class ZombiesWaveConfigRepositoryCompatTest {
     }
 
     public static void main(String[] args) throws IOException {
-        emptyDirectoryGeneratesDefaultWave();
+        missingDirectoryGeneratesDefaultWave();
+        existingEmptyDirectoryGeneratesDefaultWave();
+        nonWaveFilesGenerateDefaultWave();
         existingValidWaveIsNotOverwritten();
+        oversizedWaveFileNumberIsReportedAsInvalid();
     }
 
-    private static void emptyDirectoryGeneratesDefaultWave() throws IOException {
-        Path tempRoot = Files.createTempDirectory("zombies-wave-repository-empty-");
+    private static void missingDirectoryGeneratesDefaultWave() throws IOException {
+        Path tempRoot = Files.createTempDirectory("zombies-wave-repository-missing-");
         try {
             Path wavesDirectory = tempRoot.resolve("waves");
 
             ZombiesWaveConfigRepository.LoadResult result = new ZombiesWaveConfigRepository(wavesDirectory, DEFAULTS).load();
-            Path generatedWave = wavesDirectory.resolve("wave_001.json");
 
-            require(Files.isRegularFile(generatedWave), "empty waves directory should create wave_001.json");
-            String generatedJson = Files.readString(generatedWave);
-            require(generatedJson.contains("\"description\""), "generated default wave should contain description");
-            require(generatedJson.contains("\"minecraft:zombie\""), "generated default wave should contain zombie");
-            require(generatedJson.contains("\"minecraft:husk\""), "generated default wave should contain husk");
-            require(result.isValid(), "generated default wave should load without issues: " + firstIssue(result));
-            require(result.getMaxWave() == 1, "generated default wave should set maxWave to 1");
-            require(result.getWaves().size() == 1, "generated default wave should load exactly one wave");
-            require(result.getWaves().get(0).getWave() == 1, "generated default wave should be wave 1");
+            requireDefaultWaveLoaded(wavesDirectory, result, "missing waves directory");
+        } finally {
+            deleteRecursively(tempRoot);
+        }
+    }
+
+    private static void existingEmptyDirectoryGeneratesDefaultWave() throws IOException {
+        Path tempRoot = Files.createTempDirectory("zombies-wave-repository-empty-");
+        try {
+            Path wavesDirectory = tempRoot.resolve("waves");
+            Files.createDirectories(wavesDirectory);
+
+            ZombiesWaveConfigRepository.LoadResult result = new ZombiesWaveConfigRepository(wavesDirectory, DEFAULTS).load();
+
+            requireDefaultWaveLoaded(wavesDirectory, result, "existing empty waves directory");
+        } finally {
+            deleteRecursively(tempRoot);
+        }
+    }
+
+    private static void nonWaveFilesGenerateDefaultWave() throws IOException {
+        Path tempRoot = Files.createTempDirectory("zombies-wave-repository-non-wave-");
+        try {
+            Path wavesDirectory = tempRoot.resolve("waves");
+            Files.createDirectories(wavesDirectory);
+            Files.writeString(wavesDirectory.resolve("readme.txt"), "wave files must be named wave_*.json");
+
+            ZombiesWaveConfigRepository.LoadResult result = new ZombiesWaveConfigRepository(wavesDirectory, DEFAULTS).load();
+
+            requireDefaultWaveLoaded(wavesDirectory, result, "directory with only non-wave files");
+            require(Files.isRegularFile(wavesDirectory.resolve("readme.txt")), "non-wave helper file should be preserved");
         } finally {
             deleteRecursively(tempRoot);
         }
@@ -71,6 +95,42 @@ public final class ZombiesWaveConfigRepositoryCompatTest {
         } finally {
             deleteRecursively(tempRoot);
         }
+    }
+
+    private static void oversizedWaveFileNumberIsReportedAsInvalid() throws IOException {
+        Path tempRoot = Files.createTempDirectory("zombies-wave-repository-oversized-");
+        try {
+            Path wavesDirectory = tempRoot.resolve("waves");
+            Files.createDirectories(wavesDirectory);
+            Path oversizedWave = wavesDirectory.resolve("wave_999999999999999999999.json");
+            Files.writeString(oversizedWave, "{\"mobs\":[]}");
+
+            ZombiesWaveConfigRepository.LoadResult result = new ZombiesWaveConfigRepository(wavesDirectory, DEFAULTS).load();
+
+            require(!result.isValid(), "oversized wave file number should be reported invalid");
+            require(result.getIssues().stream().anyMatch(issue -> ZombiesWaveValidator.INVALID_WAVE.equals(issue.getCode())
+                            || "rules.wave_invalid".equals(issue.getCode())),
+                    "oversized wave file number should produce a wave invalid issue: " + firstIssue(result));
+        } finally {
+            deleteRecursively(tempRoot);
+        }
+    }
+
+    private static void requireDefaultWaveLoaded(
+            Path wavesDirectory,
+            ZombiesWaveConfigRepository.LoadResult result,
+            String context
+    ) throws IOException {
+        Path generatedWave = wavesDirectory.resolve("wave_001.json");
+        require(Files.isRegularFile(generatedWave), context + " should create wave_001.json");
+        String generatedJson = Files.readString(generatedWave);
+        require(generatedJson.contains("\"description\""), context + " default wave should contain description");
+        require(generatedJson.contains("\"minecraft:zombie\""), context + " default wave should contain zombie");
+        require(generatedJson.contains("\"minecraft:husk\""), context + " default wave should contain husk");
+        require(result.isValid(), context + " default wave should load without issues: " + firstIssue(result));
+        require(result.getMaxWave() == 1, context + " default wave should set maxWave to 1");
+        require(result.getWaves().size() == 1, context + " default wave should load exactly one wave");
+        require(result.getWaves().get(0).getWave() == 1, context + " default wave should be wave 1");
     }
 
     private static String firstIssue(ZombiesWaveConfigRepository.LoadResult result) {

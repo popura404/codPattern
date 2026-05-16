@@ -6,6 +6,7 @@ import com.phasetranscrystal.fpsmatch.common.packet.ToolInteractionC2SPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -27,6 +28,7 @@ public final class ToolInteractionClientHandler {
     private static long lastSentGameTime = Long.MIN_VALUE;
     private static ToolInteractionAction lastSentAction;
     private static BlockPos lastSentPos;
+    private static Direction lastSentFace;
 
     private ToolInteractionClientHandler() {
     }
@@ -58,11 +60,11 @@ public final class ToolInteractionClientHandler {
         }
 
         if (event.isAttack()) {
-            BlockPos target = targetedBlock(minecraft);
+            BlockHitResult target = targetedBlockHit(minecraft);
             if (target == null) {
                 return;
             }
-            sendToolInteraction(ToolInteractionAction.LEFT_CLICK_BLOCK, target);
+            sendToolInteraction(ToolInteractionAction.LEFT_CLICK_BLOCK, target.getBlockPos(), target.getDirection());
             event.setCanceled(true);
             event.setSwingHand(true);
             return;
@@ -73,17 +75,17 @@ public final class ToolInteractionClientHandler {
         }
 
         if (isControlDown()) {
-            sendToolInteraction(ToolInteractionAction.CTRL_RIGHT_CLICK, null);
+            sendToolInteraction(ToolInteractionAction.CTRL_RIGHT_CLICK, null, null);
             event.setCanceled(true);
             event.setSwingHand(false);
             return;
         }
 
-        BlockPos target = targetedBlock(minecraft);
+        BlockHitResult target = targetedBlockHit(minecraft);
         if (target == null) {
             return;
         }
-        sendToolInteraction(ToolInteractionAction.RIGHT_CLICK_BLOCK, target);
+        sendToolInteraction(ToolInteractionAction.RIGHT_CLICK_BLOCK, target.getBlockPos(), target.getDirection());
         event.setCanceled(true);
         event.setSwingHand(true);
     }
@@ -101,7 +103,11 @@ public final class ToolInteractionClientHandler {
             return;
         }
 
-        sendToolInteraction(ToolInteractionAction.LEFT_CLICK_BLOCK, event.getPos());
+        Direction face = event.getFace();
+        if (face == null) {
+            return;
+        }
+        sendToolInteraction(ToolInteractionAction.LEFT_CLICK_BLOCK, event.getPos(), face);
         event.setCanceled(true);
     }
 
@@ -121,7 +127,15 @@ public final class ToolInteractionClientHandler {
         ToolInteractionAction action = isControlDown()
                 ? ToolInteractionAction.CTRL_RIGHT_CLICK
                 : ToolInteractionAction.RIGHT_CLICK_BLOCK;
-        sendToolInteraction(action, action == ToolInteractionAction.CTRL_RIGHT_CLICK ? null : event.getPos());
+        if (action == ToolInteractionAction.CTRL_RIGHT_CLICK) {
+            sendToolInteraction(action, null, null);
+        } else {
+            Direction face = event.getFace();
+            if (face == null) {
+                return;
+            }
+            sendToolInteraction(action, event.getPos(), face);
+        }
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
     }
@@ -139,7 +153,7 @@ public final class ToolInteractionClientHandler {
             return;
         }
 
-        sendToolInteraction(ToolInteractionAction.CTRL_RIGHT_CLICK, null);
+        sendToolInteraction(ToolInteractionAction.CTRL_RIGHT_CLICK, null, null);
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
     }
@@ -155,28 +169,30 @@ public final class ToolInteractionClientHandler {
             return;
         }
 
-        sendToolInteraction(ToolInteractionAction.CTRL_RIGHT_CLICK, null);
+        sendToolInteraction(ToolInteractionAction.CTRL_RIGHT_CLICK, null, null);
     }
 
-    private static BlockPos targetedBlock(Minecraft minecraft) {
+    private static BlockHitResult targetedBlockHit(Minecraft minecraft) {
         if (minecraft.hitResult instanceof BlockHitResult hitResult
                 && hitResult.getType() == HitResult.Type.BLOCK) {
-            return hitResult.getBlockPos();
+            return hitResult;
         }
         return null;
     }
 
-    private static void sendToolInteraction(ToolInteractionAction action, BlockPos clickedPos) {
+    private static void sendToolInteraction(ToolInteractionAction action, BlockPos clickedPos, Direction clickedFace) {
         Minecraft minecraft = Minecraft.getInstance();
         long gameTime = minecraft.level == null ? Long.MIN_VALUE : minecraft.level.getGameTime();
         if (gameTime == lastSentGameTime
                 && action == lastSentAction
-                && Objects.equals(clickedPos, lastSentPos)) {
+                && Objects.equals(clickedPos, lastSentPos)
+                && clickedFace == lastSentFace) {
             return;
         }
         lastSentGameTime = gameTime;
         lastSentAction = action;
         lastSentPos = clickedPos;
-        FPSMatch.sendToServer(new ToolInteractionC2SPacket(action, clickedPos));
+        lastSentFace = clickedFace;
+        FPSMatch.sendToServer(new ToolInteractionC2SPacket(action, clickedPos, clickedFace));
     }
 }

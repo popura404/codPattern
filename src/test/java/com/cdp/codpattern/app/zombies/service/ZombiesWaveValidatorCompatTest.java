@@ -18,6 +18,7 @@ public final class ZombiesWaveValidatorCompatTest {
         missingMobsRemainsInvalid();
         explicitEmptyWaveIsValid();
         filenameWaveConflictIsInvalid();
+        duplicateWaveNumberIsInvalid();
         supportedDefaultEntitiesAreValid();
         invalidEntityIdIsRejected();
         unsupportedEntityIdIsRejected();
@@ -70,6 +71,22 @@ public final class ZombiesWaveValidatorCompatTest {
 
         ZombiesWaveValidator.ValidationReport report = VALIDATOR.validate(List.of(wave));
         require(report.hasIssue(ZombiesWaveValidator.WAVE_CONFLICT), "filename/wave conflict should be reported");
+    }
+
+    private static void duplicateWaveNumberIsInvalid() {
+        ZombiesWaveDefinition first = readWave(
+                "wave_001.json",
+                1,
+                "{\"wave\":1,\"description\":\"first\",\"mobs\":[]}");
+        ZombiesWaveDefinition duplicate = readWave(
+                "wave_001_copy.json",
+                1,
+                "{\"wave\":1,\"description\":\"duplicate\",\"mobs\":[]}");
+
+        ZombiesWaveValidator.ValidationReport report = VALIDATOR.validate(List.of(first, duplicate));
+        require(report.hasIssue(ZombiesWaveValidator.WAVE_CONFLICT), "duplicate wave number should be reported");
+        require(firstIssue(report).contains("defined more than once"),
+                "duplicate wave number message should identify duplication");
     }
 
     private static void supportedDefaultEntitiesAreValid() {

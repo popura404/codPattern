@@ -27,6 +27,7 @@ import java.util.Optional;
 
 final class ZombiesDeployObjectEditor {
     private static final ObjectRef NO_EXCLUSION = new ObjectRef("", -1);
+    static final int MAX_INITIAL_PLAYER_SPAWNS = 4;
 
     private ZombiesDeployObjectEditor() {
     }
@@ -66,6 +67,7 @@ final class ZombiesDeployObjectEditor {
     private static EditResult add(ZombiesMapObjects objects, String type, Map<String, String> fields) {
         return switch (type) {
             case ZombiesDeployFieldSchema.INITIAL -> {
+                requireInitialSpawnCapacity(objects.initialSpawns().size(), 1);
                 ZombiesInitialSpawnData data = parseInitial(fields);
                 List<ZombiesInitialSpawnData> next = mutable(objects.initialSpawns());
                 next.add(data);
@@ -202,6 +204,7 @@ final class ZombiesDeployObjectEditor {
         return switch (type) {
             case ZombiesDeployFieldSchema.INITIAL -> {
                 requireIndex(type, selectedIndex, objects.initialSpawns().size());
+                requireInitialSpawnCapacity(objects.initialSpawns().size(), 1);
                 ZombiesInitialSpawnData data = objects.initialSpawns().get(selectedIndex);
                 List<ZombiesInitialSpawnData> next = mutable(objects.initialSpawns());
                 next.add(data);
@@ -619,6 +622,14 @@ final class ZombiesDeployObjectEditor {
 
     private static int nextIndexAfterDelete(int deletedIndex, int newSize) {
         return newSize <= 0 ? -1 : Math.min(deletedIndex, newSize - 1);
+    }
+
+    private static void requireInitialSpawnCapacity(int currentSize, int addedCount) {
+        if (currentSize + addedCount > MAX_INITIAL_PLAYER_SPAWNS) {
+            throw failure(
+                    "object.max_initial_spawns",
+                    "INITIAL player spawn limit is " + MAX_INITIAL_PLAYER_SPAWNS);
+        }
     }
 
     private static Map<String, String> mergedFields(String objectType, Map<String, String> fields) {

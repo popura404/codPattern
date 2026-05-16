@@ -10,6 +10,7 @@ import com.cdp.codpattern.app.match.port.ModeEntityCombatEventPort;
 import com.cdp.codpattern.app.match.runtime.ModeEntityOwnershipRegistry;
 import com.cdp.codpattern.app.zombies.service.ZombiesBuffCombatService;
 import com.cdp.codpattern.app.zombies.service.ZombiesEconomyService;
+import com.cdp.codpattern.app.zombies.service.ZombiesMobSpawnService;
 import com.cdp.codpattern.app.zombies.service.ZombiesPlayerStateService;
 import com.cdp.codpattern.app.zombies.service.ZombiesWeaponItemStackService;
 import net.minecraft.server.level.ServerPlayer;
@@ -215,7 +216,30 @@ public class ZombiesEntityCombatEventAdapter implements ModeEntityCombatEventPor
 
         static RewardResolver defaults() {
             return new RewardResolver() {
+                @Override
+                public double killPoints(LivingEntity entity) {
+                    return persistentRewardOrDefault(
+                            entity,
+                            ZombiesMobSpawnService.WAVE_KILL_POINTS_TAG,
+                            ZombiesEconomyService.DEFAULT_KILL_POINTS);
+                }
+
+                @Override
+                public double assistPoints(LivingEntity entity) {
+                    return persistentRewardOrDefault(
+                            entity,
+                            ZombiesMobSpawnService.WAVE_ASSIST_POINTS_TAG,
+                            ZombiesEconomyService.DEFAULT_ASSIST_POINTS);
+                }
             };
+        }
+
+        private static double persistentRewardOrDefault(LivingEntity entity, String tag, double defaultValue) {
+            if (entity == null || tag == null || tag.isBlank() || !entity.getPersistentData().contains(tag)) {
+                return defaultValue;
+            }
+            double value = entity.getPersistentData().getDouble(tag);
+            return Double.isFinite(value) && value >= 0.0D ? value : defaultValue;
         }
     }
 
