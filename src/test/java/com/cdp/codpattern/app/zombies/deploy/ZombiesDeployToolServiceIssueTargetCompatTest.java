@@ -205,7 +205,6 @@ public final class ZombiesDeployToolServiceIssueTargetCompatTest {
                 "power-main",
                 "codpattern:zombies_power_switch",
                 1000,
-                true,
                 Level.OVERWORLD,
                 new BlockPos(5, 64, 5),
                 Optional.empty());

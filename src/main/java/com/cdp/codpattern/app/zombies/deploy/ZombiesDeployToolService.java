@@ -2138,6 +2138,10 @@ public final class ZombiesDeployToolService {
             return null;
         }
         BlockState previousState = level.getBlockState(pos);
+        if (!previousState.isAir() && previousState.getBlock() != CodPatternBlockRegister.ZOMBIES_POWER_SWITCH.get()) {
+            throw new RuntimeException("Cannot place zombies power switch over existing block "
+                    + blockId(previousState) + " at " + formatPos(pos));
+        }
         boolean placed = level.setBlock(pos, CodPatternBlockRegister.ZOMBIES_POWER_SWITCH.get().defaultBlockState(), Block.UPDATE_ALL);
         if (!placed) {
             throw new RuntimeException("Failed to place zombies power switch block at " + formatPos(pos));
@@ -2255,6 +2259,10 @@ public final class ZombiesDeployToolService {
 
     private String formatPos(BlockPos pos) {
         return pos == null ? "-" : pos.getX() + ", " + pos.getY() + ", " + pos.getZ();
+    }
+
+    private String blockId(BlockState state) {
+        return state == null ? "" : net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
     }
 
     private record IssueTarget(

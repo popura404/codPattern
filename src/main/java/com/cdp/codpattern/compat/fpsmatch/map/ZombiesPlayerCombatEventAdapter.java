@@ -15,6 +15,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 public class ZombiesPlayerCombatEventAdapter implements ModeCombatEventPort {
+    static final int ROOM_MONSTER_DAMAGE_INVULNERABILITY_TICKS = 10;
+
     private final RoomId roomId;
     private final String modeDisplayNameKey;
     private final ZombiesDeathService deathService;
@@ -93,9 +95,11 @@ public class ZombiesPlayerCombatEventAdapter implements ModeCombatEventPort {
             return DamageDecision.passThrough();
         }
         if (damageResult.amountChanged()) {
-            return DamageDecision.setAmount(damageResult.adjustedAmount());
+            return DamageDecision.setAmount(damageResult.adjustedAmount())
+                    .withInvulnerabilityTicks(ROOM_MONSTER_DAMAGE_INVULNERABILITY_TICKS);
         }
-        return DamageDecision.passThrough();
+        return DamageDecision.passThrough()
+                .withInvulnerabilityTicks(ROOM_MONSTER_DAMAGE_INVULNERABILITY_TICKS);
     }
 
     @Override

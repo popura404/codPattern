@@ -336,7 +336,6 @@ public final class ZombiesRuntimeGameTests {
                 "gametest-power-switch",
                 "codpattern:zombies_power_switch",
                 0,
-                true,
                 helper.getLevel().dimension(),
                 helper.absolutePos(relativePos),
                 Optional.empty());
@@ -501,7 +500,6 @@ public final class ZombiesRuntimeGameTests {
                     "gametest-object-power-switch",
                     "codpattern:zombies_power_switch",
                     300,
-                    true,
                     helper.getLevel().dimension(),
                     absolutePos,
                     Optional.empty());

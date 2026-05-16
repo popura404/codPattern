@@ -39,6 +39,9 @@ public final class ZombiesStartVoteService implements VoteControlPort {
         default void onVotePassed(VoteSnapshot snapshot) {
         }
 
+        default void onVoteStartRejected(UUID initiator, FailureReason reason) {
+        }
+
         default void onVoteFailed(VoteSnapshot snapshot, FailureReason reason) {
         }
 
@@ -119,25 +122,25 @@ public final class ZombiesStartVoteService implements VoteControlPort {
             return failToStart(null, FailureReason.INITIATOR_NOT_MEMBER);
         }
         if (activeVoteSession != null) {
-            return failToStart(snapshot(activeVoteSession), FailureReason.VOTE_IN_PROGRESS);
+            return failToStart(initiator, FailureReason.VOTE_IN_PROGRESS);
         }
         if (!hooks.isWaitingPhase()) {
-            return failToStart(null, FailureReason.NOT_WAITING);
+            return failToStart(initiator, FailureReason.NOT_WAITING);
         }
 
         Set<UUID> members = snapshotMembers(hooks.currentMembers());
         if (members.isEmpty()) {
-            return failToStart(null, FailureReason.EMPTY_SNAPSHOT);
+            return failToStart(initiator, FailureReason.EMPTY_SNAPSHOT);
         }
         if (!members.contains(initiator)) {
-            return failToStart(null, FailureReason.INITIATOR_NOT_MEMBER);
+            return failToStart(initiator, FailureReason.INITIATOR_NOT_MEMBER);
         }
         if (members.size() < hooks.minPlayersToStart()) {
-            return failToStart(null, FailureReason.MIN_PLAYERS);
+            return failToStart(initiator, FailureReason.MIN_PLAYERS);
         }
         for (UUID member : members) {
             if (!hooks.isPlayerReady(member)) {
-                return failToStart(null, FailureReason.PLAYERS_NOT_READY);
+                return failToStart(initiator, FailureReason.PLAYERS_NOT_READY);
             }
         }
 
@@ -261,9 +264,9 @@ public final class ZombiesStartVoteService implements VoteControlPort {
         return false;
     }
 
-    private boolean failToStart(VoteSnapshot snapshot, FailureReason reason) {
+    private boolean failToStart(UUID initiator, FailureReason reason) {
         lastFailureReason = reason;
-        hooks.onVoteFailed(snapshot, reason);
+        hooks.onVoteStartRejected(initiator, reason);
         hooks.markRoomListDirty();
         return false;
     }

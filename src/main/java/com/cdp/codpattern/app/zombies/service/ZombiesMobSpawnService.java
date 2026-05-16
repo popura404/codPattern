@@ -10,6 +10,8 @@ import com.cdp.codpattern.app.zombies.runtime.ZombiesWaveRuntimeState;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 
@@ -26,6 +28,7 @@ public final class ZombiesMobSpawnService {
     public static final String WAVE_MOB_ID_TAG = "codpattern_zombies_wave_mob_id";
     public static final String WAVE_KILL_POINTS_TAG = "codpattern_zombies_wave_kill_points";
     public static final String WAVE_ASSIST_POINTS_TAG = "codpattern_zombies_wave_assist_points";
+    static final int ROOM_MONSTER_MELEE_ATTACK_INTERVAL_TICKS = 10;
 
     private static final AtomicInteger GLOBAL_ACTIVE_ZOMBIES = new AtomicInteger();
 
@@ -91,6 +94,7 @@ public final class ZombiesMobSpawnService {
                 spawn.yaw(),
                 spawn.pitch());
         applyWaveAttributes(mob, waveDefinition);
+        applyRoomMonsterAttackCadence(mob);
         attachWaveRewardMetadata(mob, mobId.get(), waveDefinition);
 
         if (!level.addFreshEntity(mob)) {
@@ -178,6 +182,14 @@ public final class ZombiesMobSpawnService {
         mob.setHealth(mob.getMaxHealth());
     }
 
+    private static void applyRoomMonsterAttackCadence(Mob mob) {
+        if (mob instanceof PathfinderMob pathfinderMob) {
+            pathfinderMob.goalSelector.addGoal(
+                    1,
+                    new RoomMonsterMeleeAttackGoal(pathfinderMob, 1.0D, false));
+        }
+    }
+
     private static void attachWaveRewardMetadata(Mob mob, String rawMobId, ZombiesWaveDefinition waveDefinition) {
         if (mob == null || waveDefinition == null) {
             return;
@@ -213,6 +225,17 @@ public final class ZombiesMobSpawnService {
         AttributeInstance instance = mob.getAttribute(attribute);
         if (instance != null) {
             instance.setBaseValue(instance.getBaseValue() * multiplier);
+        }
+    }
+
+    private static final class RoomMonsterMeleeAttackGoal extends MeleeAttackGoal {
+        private RoomMonsterMeleeAttackGoal(PathfinderMob mob, double speedModifier, boolean followingTargetEvenIfNotSeen) {
+            super(mob, speedModifier, followingTargetEvenIfNotSeen);
+        }
+
+        @Override
+        protected int getAttackInterval() {
+            return ROOM_MONSTER_MELEE_ATTACK_INTERVAL_TICKS;
         }
     }
 

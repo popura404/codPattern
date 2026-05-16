@@ -230,6 +230,7 @@ public record ZombiesMapSnapshot(
                         "barrier",
                         barrier.group(),
                         barrier.cost(),
+                        barrier.blocksPlayersOnly(),
                         barrier.dimension(),
                         barrier.interactionPos(),
                         barrier.areaFrom(),
@@ -400,6 +401,7 @@ public record ZombiesMapSnapshot(
                         object.featureKey(),
                         firstPayloadInt(object.payload(), "group", "barrierGroup").orElse(1),
                         firstPayloadInt(object.payload(), "cost", "buyCost", "price").orElse(0),
+                        firstPayloadBoolean(object.payload(), "blocksPlayersOnly", "blocks_players_only").orElse(true),
                         object.dimension(),
                         object.position()));
             }
@@ -437,6 +439,15 @@ public record ZombiesMapSnapshot(
         for (String key : keys) {
             if (payload.contains(key)) {
                 return Optional.of(payload.getDouble(key));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<Boolean> firstPayloadBoolean(CompoundTag payload, String... keys) {
+        for (String key : keys) {
+            if (payload.contains(key)) {
+                return Optional.of(payload.getBoolean(key));
             }
         }
         return Optional.empty();
@@ -545,6 +556,7 @@ public record ZombiesMapSnapshot(
             String featureKey,
             int group,
             int cost,
+            boolean blocksPlayersOnly,
             String dimensionId,
             BlockPos pos,
             BlockPos areaFrom,
@@ -555,7 +567,20 @@ public record ZombiesMapSnapshot(
         }
 
         public BarrierSnapshot(String objectId, String featureKey, int group, int cost) {
-            this(objectId, featureKey, group, cost, "", null, null, null);
+            this(objectId, featureKey, group, cost, true, "", null, null, null);
+        }
+
+        public BarrierSnapshot(
+                String objectId,
+                String featureKey,
+                int group,
+                int cost,
+                String dimensionId,
+                BlockPos pos,
+                BlockPos areaFrom,
+                BlockPos areaTo
+        ) {
+            this(objectId, featureKey, group, cost, true, dimensionId, pos, areaFrom, areaTo);
         }
 
         public BarrierSnapshot(
@@ -566,7 +591,19 @@ public record ZombiesMapSnapshot(
                 ResourceKey<Level> dimension,
                 BlockPos pos
         ) {
-            this(objectId, featureKey, group, cost, dimension, pos, pos, pos);
+            this(objectId, featureKey, group, cost, true, dimension, pos, pos, pos);
+        }
+
+        public BarrierSnapshot(
+                String objectId,
+                String featureKey,
+                int group,
+                int cost,
+                boolean blocksPlayersOnly,
+                ResourceKey<Level> dimension,
+                BlockPos pos
+        ) {
+            this(objectId, featureKey, group, cost, blocksPlayersOnly, dimension, pos, pos, pos);
         }
 
         public BarrierSnapshot(
@@ -579,11 +616,26 @@ public record ZombiesMapSnapshot(
                 BlockPos areaFrom,
                 BlockPos areaTo
         ) {
+            this(objectId, featureKey, group, cost, true, dimension, pos, areaFrom, areaTo);
+        }
+
+        public BarrierSnapshot(
+                String objectId,
+                String featureKey,
+                int group,
+                int cost,
+                boolean blocksPlayersOnly,
+                ResourceKey<Level> dimension,
+                BlockPos pos,
+                BlockPos areaFrom,
+                BlockPos areaTo
+        ) {
             this(
                     objectId,
                     featureKey,
                     group,
                     cost,
+                    blocksPlayersOnly,
                     ZombiesMapSnapshot.dimensionId(dimension),
                     pos,
                     areaFrom,

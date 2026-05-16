@@ -26,6 +26,11 @@ public final class ZombiesServerLifecycleEventHandler {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onServerStarted(ServerStartedEvent event) {
         ZombiesCrashRecoveryService.instance().recoverServerStartup(event.getServer());
+        for (BaseMap map : FpsMatchMapRegistry.listMaps(BuiltInGameModes.ZOMBIES)) {
+            if (map instanceof ZombiesMap zombiesMap) {
+                zombiesMap.clearBarrierBlockResidue();
+            }
+        }
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
             PlayerLoggedInEventHandler.recoverZombiesLogin(player);
         }

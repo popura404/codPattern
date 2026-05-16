@@ -107,7 +107,6 @@ public final class ZombiesDeployFieldSchema {
                     field("objectId", FieldType.TEXT, "power_switch"),
                     field("block", FieldType.TEXT, "codpattern:zombies_power_switch"),
                     field("cost", FieldType.INTEGER, "1000"),
-                    field("emitsRedstoneWhenPowered", FieldType.BOOLEAN, "true"),
                     field("dimension", FieldType.TEXT, "minecraft:overworld"),
                     field("posX", FieldType.INTEGER, "0"),
                     field("posY", FieldType.INTEGER, "64"),

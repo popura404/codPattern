@@ -238,7 +238,6 @@ public final class ZombiesDeployObjectEditorCompatTest {
                         "objectId", "power-main",
                         "block", "codpattern:zombies_power_switch",
                         "cost", "1000",
-                        "emitsRedstoneWhenPowered", "true",
                         "posX", "8",
                         "posY", "64",
                         "posZ", "8"));
@@ -246,7 +245,7 @@ public final class ZombiesDeployObjectEditorCompatTest {
         requireSuccess(add, "power_switch add should succeed");
         ZombiesPowerSwitchData power = add.objects().powerSwitch()
                 .orElseThrow(() -> new AssertionError("power_switch should be present"));
-        requirePowerSwitch(power, "power-main", "codpattern:zombies_power_switch", 1000, true, new BlockPos(8, 64, 8));
+        requirePowerSwitch(power, "power-main", "codpattern:zombies_power_switch", 1000, new BlockPos(8, 64, 8));
 
         ZombiesDeployObjectEditor.EditResult duplicateAdd = edit(
                 add.objects(),
@@ -259,7 +258,6 @@ public final class ZombiesDeployObjectEditorCompatTest {
 
         Map<String, String> updateFields = new LinkedHashMap<>(add.fields());
         updateFields.put("cost", "1250");
-        updateFields.put("emitsRedstoneWhenPowered", "false");
         ZombiesDeployObjectEditor.EditResult update = edit(
                 add.objects(),
                 ZombiesDeployObjectEditor.Operation.UPDATE,
@@ -269,7 +267,7 @@ public final class ZombiesDeployObjectEditorCompatTest {
 
         requireSuccess(update, "power_switch update should succeed");
         requirePowerSwitch(update.objects().powerSwitch().orElseThrow(), "power-main",
-                "codpattern:zombies_power_switch", 1250, false, new BlockPos(8, 64, 8));
+                "codpattern:zombies_power_switch", 1250, new BlockPos(8, 64, 8));
 
         ZombiesDeployObjectEditor.EditResult duplicate = edit(
                 update.objects(),
@@ -628,14 +626,11 @@ public final class ZombiesDeployObjectEditorCompatTest {
             String objectId,
             String block,
             int cost,
-            boolean emitsRedstoneWhenPowered,
             BlockPos pos
     ) {
         require(objectId.equals(power.objectId()), "power_switch objectId should match");
         require(block.equals(power.block()), "power_switch block should match");
         require(power.cost() == cost, "power_switch cost should match");
-        require(power.emitsRedstoneWhenPowered() == emitsRedstoneWhenPowered,
-                "power_switch emitsRedstoneWhenPowered should match");
         require(pos.equals(power.pos()), "power_switch position should match");
     }
 

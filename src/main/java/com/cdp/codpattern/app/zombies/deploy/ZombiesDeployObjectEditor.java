@@ -562,7 +562,6 @@ final class ZombiesDeployObjectEditor {
                 objectId,
                 text(fields, "block"),
                 intField(fields, "cost"),
-                booleanField(fields, "emitsRedstoneWhenPowered"),
                 dimension(fields),
                 blockPos(fields, "pos"),
                 Optional.empty());
@@ -753,7 +752,6 @@ final class ZombiesDeployObjectEditor {
         fields.put("objectId", data.objectId());
         fields.put("block", data.block());
         fields.put("cost", Integer.toString(data.cost()));
-        fields.put("emitsRedstoneWhenPowered", Boolean.toString(data.emitsRedstoneWhenPowered()));
         return fields;
     }
 

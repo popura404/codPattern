@@ -91,7 +91,6 @@ public final class ZombiesPowerSwitchBlockSyncCompatTest {
                 "not-power",
                 "minecraft:lever",
                 0,
-                true,
                 dimension(),
                 new BlockPos(1, 64, 1),
                 Optional.empty());
@@ -105,7 +104,6 @@ public final class ZombiesPowerSwitchBlockSyncCompatTest {
                 "power",
                 "codpattern:zombies_power_switch",
                 0,
-                true,
                 dimension(),
                 new BlockPos(2, 64, 2),
                 Optional.empty());

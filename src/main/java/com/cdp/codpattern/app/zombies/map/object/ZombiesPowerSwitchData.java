@@ -12,7 +12,6 @@ public record ZombiesPowerSwitchData(
         String objectId,
         String block,
         int cost,
-        boolean emitsRedstoneWhenPowered,
         ResourceKey<Level> dimension,
         BlockPos pos,
         Optional<BlockPos> interactionPos
@@ -21,7 +20,6 @@ public record ZombiesPowerSwitchData(
             Codec.STRING.fieldOf("objectId").forGetter(ZombiesPowerSwitchData::objectId),
             Codec.STRING.optionalFieldOf("block", "codpattern:zombies_power_switch").forGetter(ZombiesPowerSwitchData::block),
             Codec.INT.optionalFieldOf("cost", 0).forGetter(ZombiesPowerSwitchData::cost),
-            Codec.BOOL.optionalFieldOf("emitsRedstoneWhenPowered", true).forGetter(ZombiesPowerSwitchData::emitsRedstoneWhenPowered),
             ZombiesObjectCodecs.DIMENSION_CODEC.fieldOf("dimension").forGetter(ZombiesPowerSwitchData::dimension),
             BlockPos.CODEC.optionalFieldOf("pos", BlockPos.ZERO).forGetter(ZombiesPowerSwitchData::pos),
             BlockPos.CODEC.optionalFieldOf("interactionPos").forGetter(ZombiesPowerSwitchData::interactionPos)

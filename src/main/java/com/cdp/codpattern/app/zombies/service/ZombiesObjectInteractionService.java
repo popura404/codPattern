@@ -81,6 +81,7 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
     private final ZombiesUltimateMachineService ultimateMachineService;
     private final ZombiesWeaponInventoryService weaponInventoryService;
     private final ZombiesObjectStateStore objectStateStore;
+    private final ZombiesBarrierBlockRuntimeService barrierBlockRuntimeService;
     private final ConcurrentMap<InteractionKey, Long> recentInteractions = new ConcurrentHashMap<>();
 
     public ZombiesObjectInteractionService(
@@ -118,7 +119,8 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
                 buffService,
                 ultimateMachineService,
                 new ZombiesWeaponInventoryService(),
-                objectStateStore);
+                objectStateStore,
+                ZombiesBarrierBlockRuntimeService.instance());
     }
 
     public ZombiesObjectInteractionService(
@@ -140,6 +142,47 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
             ZombiesWeaponInventoryService weaponInventoryService,
             ZombiesObjectStateStore objectStateStore
     ) {
+        this(
+                roomId,
+                barriersSupplier,
+                weaponWallsSupplier,
+                ammoBoxesSupplier,
+                armorStationsSupplier,
+                powerSwitchSupplier,
+                sodaMachinesSupplier,
+                ultimateMachinesSupplier,
+                barrierService,
+                weaponInstanceService,
+                ammoBoxService,
+                armorService,
+                powerService,
+                buffService,
+                ultimateMachineService,
+                weaponInventoryService,
+                objectStateStore,
+                ZombiesBarrierBlockRuntimeService.instance());
+    }
+
+    public ZombiesObjectInteractionService(
+            RoomId roomId,
+            Supplier<Collection<ZombiesBarrierData>> barriersSupplier,
+            Supplier<Collection<ZombiesWeaponWallData>> weaponWallsSupplier,
+            Supplier<Collection<ZombiesAmmoBoxData>> ammoBoxesSupplier,
+            Supplier<Collection<ZombiesArmorStationData>> armorStationsSupplier,
+            Supplier<Optional<ZombiesPowerSwitchData>> powerSwitchSupplier,
+            Supplier<Collection<ZombiesSodaMachineData>> sodaMachinesSupplier,
+            Supplier<Collection<ZombiesUltimateMachineData>> ultimateMachinesSupplier,
+            ZombiesBarrierService barrierService,
+            ZombiesWeaponInstanceService weaponInstanceService,
+            ZombiesAmmoBoxService ammoBoxService,
+            ZombiesArmorService armorService,
+            ZombiesPowerService powerService,
+            ZombiesBuffService buffService,
+            ZombiesUltimateMachineService ultimateMachineService,
+            ZombiesWeaponInventoryService weaponInventoryService,
+            ZombiesObjectStateStore objectStateStore,
+            ZombiesBarrierBlockRuntimeService barrierBlockRuntimeService
+    ) {
         this.roomId = Objects.requireNonNull(roomId, "roomId");
         this.barriersSupplier = Objects.requireNonNull(barriersSupplier, "barriersSupplier");
         this.weaponWallsSupplier = Objects.requireNonNull(weaponWallsSupplier, "weaponWallsSupplier");
@@ -157,6 +200,9 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         this.ultimateMachineService = Objects.requireNonNull(ultimateMachineService, "ultimateMachineService");
         this.weaponInventoryService = Objects.requireNonNull(weaponInventoryService, "weaponInventoryService");
         this.objectStateStore = Objects.requireNonNull(objectStateStore, "objectStateStore");
+        this.barrierBlockRuntimeService = barrierBlockRuntimeService == null
+                ? ZombiesBarrierBlockRuntimeService.instance()
+                : barrierBlockRuntimeService;
     }
 
     @Override
@@ -652,6 +698,20 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         Vec3 playerPos = player.position();
         if (clickedPos != null) {
             double maxDistanceSqr = MAX_INTERACTION_DISTANCE * MAX_INTERACTION_DISTANCE;
+            Optional<InteractionTarget> blockBarrierTarget = barrierBlockRuntimeService.cellAt(roomId, player.level(), clickedPos)
+                    .flatMap(cell -> barrierByObjectId(cell.objectId()))
+                    .map(barrier -> new InteractionTarget(
+                            InteractionType.BARRIER,
+                            ZombiesObjectStateStore.objectKey(barrier),
+                            clickedPos,
+                            barrier));
+            if (blockBarrierTarget.isPresent()) {
+                InteractionTarget target = blockBarrierTarget.orElseThrow();
+                if (distanceToInteractionSqr(playerPos, target) > maxDistanceSqr) {
+                    return TargetLookup.failure(ZombiesErrorCode.OBJECT_OUT_OF_RANGE, target.objectId(), target.position());
+                }
+                return TargetLookup.target(target);
+            }
             Optional<InteractionTarget> clickedTarget = candidates.stream()
                     .filter(candidate -> clickedPos.equals(candidate.position()))
                     .findFirst();
@@ -739,6 +799,17 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
             }
         }
         return candidates;
+    }
+
+    private Optional<ZombiesBarrierData> barrierByObjectId(String objectId) {
+        String normalizedObjectId = Objects.requireNonNullElse(objectId, "").trim();
+        if (normalizedObjectId.isEmpty()) {
+            return Optional.empty();
+        }
+        return safeCollection(barriersSupplier).stream()
+                .filter(Objects::nonNull)
+                .filter(barrier -> normalizedObjectId.equals(ZombiesObjectStateStore.objectKey(barrier)))
+                .findFirst();
     }
 
     private void sendTargetFailure(ServerPlayer player, TargetFailure failure) {

@@ -37,6 +37,11 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
         mvp3RequiredObjectOutOfBoundsFails();
         mvp3SpawnOutOfBoundsFails();
         mvp3BarrierAreaOutOfBoundsFails();
+        mvp3DiagonalBarrierAreaFails();
+        mvp3BarrierLengthHeightAndCellLimitsFail();
+        mvp3BarrierGroupCostMismatchFails();
+        mvp3BarrierOverlappingCellsFail();
+        mvp3BarrierBlocksPlayersOnlyFalseFails();
         mvp3FullInitialSnapshotSucceeds();
     }
 
@@ -342,6 +347,129 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
         requireIssue(report, "map.object_out_of_bounds");
     }
 
+    private static void mvp3DiagonalBarrierAreaFails() {
+        ZombiesMapSnapshot.BarrierSnapshot barrier = new ZombiesMapSnapshot.BarrierSnapshot(
+                "barrier-1",
+                "barrier",
+                1,
+                0,
+                MAP_DIMENSION,
+                new BlockPos(6, 1, 6),
+                new BlockPos(6, 1, 6),
+                new BlockPos(7, 2, 8));
+
+        ZombiesMapValidationReport report = validate(
+                ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
+                snapshotWithBarriers(List.of(barrier)));
+
+        require(report.hasErrors(), "MVP3 diagonal barrier area should fail");
+        requireIssue(report, "map.invalid_barrier");
+    }
+
+    private static void mvp3BarrierLengthHeightAndCellLimitsFail() {
+        ZombiesMapSnapshot.BarrierSnapshot tooLong = new ZombiesMapSnapshot.BarrierSnapshot(
+                "barrier-long",
+                "barrier",
+                1,
+                0,
+                MAP_DIMENSION,
+                new BlockPos(0, 1, 0),
+                new BlockPos(0, 1, 0),
+                new BlockPos(0, 2, 33));
+        ZombiesMapSnapshot.BarrierSnapshot tooTall = new ZombiesMapSnapshot.BarrierSnapshot(
+                "barrier-tall",
+                "barrier",
+                2,
+                100,
+                MAP_DIMENSION,
+                new BlockPos(1, 1, 0),
+                new BlockPos(1, 1, 0),
+                new BlockPos(1, 9, 0));
+
+        ZombiesMapValidationReport report = validate(
+                ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
+                snapshotWithBarriers(List.of(tooLong, tooTall)));
+
+        require(report.hasErrors(), "MVP3 over-limit barrier dimensions should fail");
+        requireIssue(report, "map.invalid_barrier");
+    }
+
+    private static void mvp3BarrierGroupCostMismatchFails() {
+        ZombiesMapSnapshot.BarrierSnapshot first = new ZombiesMapSnapshot.BarrierSnapshot(
+                "barrier-2-a",
+                "barrier",
+                2,
+                750,
+                MAP_DIMENSION,
+                new BlockPos(6, 1, 6),
+                new BlockPos(6, 1, 6),
+                new BlockPos(6, 2, 6));
+        ZombiesMapSnapshot.BarrierSnapshot second = new ZombiesMapSnapshot.BarrierSnapshot(
+                "barrier-2-b",
+                "barrier",
+                2,
+                1000,
+                MAP_DIMENSION,
+                new BlockPos(7, 1, 7),
+                new BlockPos(7, 1, 7),
+                new BlockPos(7, 2, 7));
+
+        ZombiesMapValidationReport report = validate(
+                ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
+                snapshotWithBarriers(List.of(first, second)));
+
+        require(report.hasErrors(), "MVP3 same-group barriers with different costs should fail");
+        requireIssue(report, "map.invalid_barrier");
+    }
+
+    private static void mvp3BarrierOverlappingCellsFail() {
+        ZombiesMapSnapshot.BarrierSnapshot first = new ZombiesMapSnapshot.BarrierSnapshot(
+                "barrier-overlap-a",
+                "barrier",
+                1,
+                0,
+                MAP_DIMENSION,
+                new BlockPos(6, 1, 6),
+                new BlockPos(6, 1, 6),
+                new BlockPos(6, 2, 6));
+        ZombiesMapSnapshot.BarrierSnapshot second = new ZombiesMapSnapshot.BarrierSnapshot(
+                "barrier-overlap-b",
+                "barrier",
+                2,
+                1000,
+                MAP_DIMENSION,
+                new BlockPos(6, 2, 6),
+                new BlockPos(6, 2, 6),
+                new BlockPos(6, 3, 6));
+
+        ZombiesMapValidationReport report = validate(
+                ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
+                snapshotWithBarriers(List.of(first, second)));
+
+        require(report.hasErrors(), "MVP3 overlapping barrier cells should fail");
+        requireIssue(report, "map.invalid_barrier");
+    }
+
+    private static void mvp3BarrierBlocksPlayersOnlyFalseFails() {
+        ZombiesMapSnapshot.BarrierSnapshot barrier = new ZombiesMapSnapshot.BarrierSnapshot(
+                "barrier-1",
+                "barrier",
+                1,
+                0,
+                false,
+                MAP_DIMENSION,
+                new BlockPos(6, 1, 6),
+                new BlockPos(6, 1, 6),
+                new BlockPos(6, 2, 6));
+
+        ZombiesMapValidationReport report = validate(
+                ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
+                snapshotWithBarriers(List.of(barrier)));
+
+        require(report.hasErrors(), "MVP3 barrier with blocksPlayersOnly=false should fail");
+        requireIssue(report, "map.invalid_barrier");
+    }
+
     private static void mvp3FullInitialSnapshotSucceeds() {
         ZombiesMapValidationReport report = validate(
                 ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
@@ -400,6 +528,18 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
                 sodaMachines,
                 ultimateMachines,
                 List.of());
+    }
+
+    private static ZombiesMapSnapshot snapshotWithBarriers(List<ZombiesMapSnapshot.BarrierSnapshot> barriers) {
+        return snapshot(
+                List.of(initialSpawn(), zombieSpawn()),
+                barriers,
+                List.of(validWeaponWall()),
+                List.of(validAmmoBox()),
+                List.of(validArmorStation()),
+                List.of(powerSwitch("power-1")),
+                List.of(validSoda()),
+                List.of(validUltimate()));
     }
 
     private static ZombiesMapSnapshot snapshot(

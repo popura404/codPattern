@@ -223,7 +223,6 @@ public final class ZombiesMvp3ObjectRuntimeCompatTest {
                 "power-1",
                 "codpattern:zombies_power_switch",
                 500,
-                true,
                 dimension(),
                 new BlockPos(1, 64, 1),
                 Optional.of(new BlockPos(2, 64, 1)));

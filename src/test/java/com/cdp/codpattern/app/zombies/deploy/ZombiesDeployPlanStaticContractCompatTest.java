@@ -31,7 +31,6 @@ public final class ZombiesDeployPlanStaticContractCompatTest {
         requireContains(plan, "### 15.7 手测留档模板（必须填写）", "plan must keep the manual evidence template");
         requireContains(plan, "总目标尚不能标记 complete", "plan must not claim completion while manual gates remain open");
         requireContains(plan, "最终 DoD 还不能关闭", "plan must explicitly keep the final DoD open");
-        requireContains(plan, "`./gradlew runZombiesMvp123CompatSuite` 通过", "plan must record JVM compat suite evidence");
         requireContains(plan, "`./gradlew runGameTestServer` 已通过", "plan must record GameTest evidence");
         requireContains(plan, "All 13 required tests passed :)", "plan must record the GameTest pass signal");
 

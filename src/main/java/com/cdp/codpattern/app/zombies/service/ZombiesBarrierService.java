@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -22,6 +23,7 @@ public final class ZombiesBarrierService {
     private final ZombiesActiveSpawnGroupService activeSpawnGroupService;
     private final Predicate<UUID> roomMemberPredicate;
     private final Supplier<ZombiesGamePhase> phaseSupplier;
+    private final Consumer<BarrierPurchaseResult> purchaseSuccessListener;
 
     public ZombiesBarrierService(
             RoomId roomId,
@@ -32,6 +34,28 @@ public final class ZombiesBarrierService {
             Predicate<UUID> roomMemberPredicate,
             Supplier<ZombiesGamePhase> phaseSupplier
     ) {
+        this(
+                roomId,
+                barriersSupplier,
+                economyService,
+                objectStateStore,
+                activeSpawnGroupService,
+                roomMemberPredicate,
+                phaseSupplier,
+                ignored -> {
+                });
+    }
+
+    public ZombiesBarrierService(
+            RoomId roomId,
+            Supplier<Collection<ZombiesBarrierData>> barriersSupplier,
+            ZombiesEconomyService economyService,
+            ZombiesObjectStateStore objectStateStore,
+            ZombiesActiveSpawnGroupService activeSpawnGroupService,
+            Predicate<UUID> roomMemberPredicate,
+            Supplier<ZombiesGamePhase> phaseSupplier,
+            Consumer<BarrierPurchaseResult> purchaseSuccessListener
+    ) {
         this.roomId = Objects.requireNonNull(roomId, "roomId");
         this.barriersSupplier = Objects.requireNonNull(barriersSupplier, "barriersSupplier");
         this.economyService = Objects.requireNonNull(economyService, "economyService");
@@ -39,6 +63,8 @@ public final class ZombiesBarrierService {
         this.activeSpawnGroupService = Objects.requireNonNull(activeSpawnGroupService, "activeSpawnGroupService");
         this.roomMemberPredicate = roomMemberPredicate == null ? ignored -> false : roomMemberPredicate;
         this.phaseSupplier = phaseSupplier == null ? () -> ZombiesGamePhase.WAITING : phaseSupplier;
+        this.purchaseSuccessListener = purchaseSuccessListener == null ? ignored -> {
+        } : purchaseSuccessListener;
     }
 
     public ZombiesServiceResult<BarrierPurchaseResult> purchase(ServerPlayer player, ZombiesBarrierData barrier) {
@@ -66,11 +92,13 @@ public final class ZombiesBarrierService {
 
             ZombiesObjectStateStore.BarrierGroupUpdate update = clearResult.value().orElseThrow();
             activeSpawnGroupService.activate(update.group());
-            return ZombiesServiceResult.success(new BarrierPurchaseResult(
+            BarrierPurchaseResult purchase = new BarrierPurchaseResult(
                     roomId,
                     update.group(),
                     update.objectIds(),
-                    update.revision()));
+                    update.revision());
+            purchaseSuccessListener.accept(purchase);
+            return ZombiesServiceResult.success(purchase);
         });
     }
 

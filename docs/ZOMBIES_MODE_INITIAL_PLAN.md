@@ -655,7 +655,6 @@ weaponEffectiveWeight = rarityEffectiveWeight * weapon.weightsByRarity[rarity.id
     "objectId": "power_switch_01",
     "block": "codpattern:zombies_power_switch",
     "cost": 1000,
-    "emitsRedstoneWhenPowered": true,
     "dimension": "minecraft:overworld",
     "pos": { "x": 134, "y": 65, "z": -44 }
   }
@@ -1096,7 +1095,7 @@ HUD 数据通过僵尸模式自己的运行态快照同步，不复用 TDM 比�
 工具当前主流程只以世界左/右键采集并即时保存对象；旧 GUI 内按钮采集语义仅作为兼容入口或历史设计背景保留：
 
 - 点位对象：`INITIAL` 和 `zombie_spawn` 左键保存点击面外侧坐标、维度和玩家 yaw；`INITIAL` 最多 4 个，右键无副作用，本轮不处理 pitch。
-- 方块对象：`power_switch` 左键新增或更新唯一电源位置，并保存 `block` 和 `emitsRedstoneWhenPowered`；该坐标必须是电源功能方块，否则服务端拒绝保存，右键无副作用。
+- 方块对象：`power_switch` 左键新增或更新唯一电源位置，并保存 `block`；电源方块通电后固定输出红石信号，不提供可配置开关；该坐标必须是电源功能方块，否则服务端拒绝保存，右键无副作用。
 - 区域对象：`barrier` 左键开始新增区域或设置第一端点，右键用已记录第一端点完成新增区域；选中已有屏障时右键可更新第二端点。
 - 普通交互对象：武器墙、补给箱、装甲点、汽水机和终极机器左键连续新增对象，`interaction` 默认同步到主点；右键无副作用。
 
@@ -1120,7 +1119,7 @@ HUD 数据通过僵尸模式自己的运行态快照同步，不复用 TDM 比�
 | `weapon_wall` | `objectId`、`weaponLevel`、`levelDamageMultiplier`、`price`、`refreshWaves[]`、`rarityPools[]`、`weapons[]`、`dimension`、`pos` | 使用高级子面板编辑稀有度和武器池；第 1 波和最大波刷新不要求写入 `refreshWaves[]`；装饰方块 `codpattern:zombies_weapon_wall_panel` |
 | `ammo_box` | `objectId`、`pricesByWeaponLevel`、`dimension`、`pos` | 价格表按枪等级行编辑；缺少某等级价格时该等级购买类主武器不能补弹；装饰方块 `codpattern:zombies_ammo_box` |
 | `armor_station` | `objectId`、`armorLevel`、`buyCost`、`damageTakenMultiplier`、`dimension`、`pos` | `armorLevel` 只能 1-3；材质只展示硬编码结果，不允许编辑；装饰方块 `codpattern:zombies_armor_station` |
-| `power_switch` | `objectId`、`block`、`cost`、`emitsRedstoneWhenPowered`、`dimension`、`pos` | single object；左键世界点击新增或更新唯一电源对象；必须是功能方块 `codpattern:zombies_power_switch` |
+| `power_switch` | `objectId`、`block`、`cost`、`dimension`、`pos` | single object；左键世界点击新增或更新唯一电源对象；必须是功能方块 `codpattern:zombies_power_switch`；通电后固定输出红石信号 |
 | `soda_machine` | `objectId`、`buffId`、`cost`、`requiresPower`、`dimension`、`pos` | `requiresPower` 默认 true；`buffId` 用内置 buff 下拉；装饰方块 `codpattern:zombies_soda_machine` |
 | `ultimate_machine` | `objectId`、`maxUpgradeLevel`、`levels`、`requiresPower`、`dimension`、`pos` | `levels` 以等级行编辑，必须连续覆盖 `1..maxUpgradeLevel`；装饰方块 `codpattern:zombies_ultimate_machine` |
 | `mystery_box` | `objectId`、`cost`、`dimension`、`pos`、可选武器池 | MVP 4 前只保存基础参数，运行池面板置灰 |

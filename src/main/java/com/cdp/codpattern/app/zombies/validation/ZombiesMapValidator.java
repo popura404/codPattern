@@ -2,6 +2,7 @@ package com.cdp.codpattern.app.zombies.validation;
 
 import com.cdp.codpattern.app.zombies.map.ZombiesMapSnapshot;
 import com.cdp.codpattern.app.zombies.map.ZombiesMatchSnapshot;
+import com.cdp.codpattern.app.zombies.service.ZombiesBarrierBlockRuntimeService;
 import com.cdp.codpattern.app.zombies.service.ZombiesErrorCode;
 import net.minecraft.core.BlockPos;
 
@@ -465,6 +466,7 @@ public final class ZombiesMapValidator {
 
         for (ZombiesMapSnapshot.BarrierSnapshot barrier : snapshot.barriers()) {
             String subject = subject("barrier", barrier.objectId(), barrier.featureKey());
+            addBarrierRulesIssues(barrier, subject, issues);
             if (barrier.group() >= 2 && barrier.cost() < 0) {
                 issues.add(ZombiesValidationIssue.error(
                         MAP_INVALID_BARRIER,
@@ -472,6 +474,9 @@ public final class ZombiesMapValidator {
                         "Barrier groups unlocked by purchases require non-negative cost."));
             }
         }
+        addBarrierGroupPriceIssues(snapshot, issues);
+        addBarrierOverlapIssues(snapshot, issues);
+        addBarrierRoomCellBudgetIssues(snapshot, issues);
         if (snapshot.barriers().isEmpty()) {
             issues.add(ZombiesValidationIssue.error(
                     MAP_MISSING_BARRIER,
@@ -679,6 +684,185 @@ public final class ZombiesMapValidator {
         }
         addLocationConsistencyIssues(subject + ".areaFrom", dimensionId, areaFrom, expectedDimensionId, mapBounds, issues);
         addLocationConsistencyIssues(subject + ".areaTo", dimensionId, areaTo, expectedDimensionId, mapBounds, issues);
+    }
+
+    private static void addBarrierRulesIssues(
+            ZombiesMapSnapshot.BarrierSnapshot barrier,
+            String subject,
+            List<ZombiesValidationIssue> issues
+    ) {
+        if (barrier == null) {
+            return;
+        }
+        if (barrier.group() < 1) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_BARRIER,
+                    subject,
+                    "Barrier group must be >= 1."));
+        }
+        if (barrier.cost() < 0) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_BARRIER,
+                    subject,
+                    "Barrier cost must be non-negative."));
+        }
+        if (!barrier.blocksPlayersOnly()) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_BARRIER,
+                    subject,
+                    "Barrier blocksPlayersOnly must stay true for player-only barrier blocks."));
+        }
+        if (barrier.areaFrom() == null || barrier.areaTo() == null) {
+            return;
+        }
+        ZombiesBarrierBlockRuntimeService.BarrierGeometry geometry = barrierGeometry(barrier);
+        if (!geometry.straightWall()) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_BARRIER,
+                    subject,
+                    "Barrier area endpoints must share X or Z coordinates."));
+        }
+        if (geometry.horizontalLength() > ZombiesBarrierBlockRuntimeService.MAX_HORIZONTAL_LENGTH) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_BARRIER,
+                    subject,
+                    "Barrier horizontal length " + geometry.horizontalLength()
+                            + " exceeds max " + ZombiesBarrierBlockRuntimeService.MAX_HORIZONTAL_LENGTH + "."));
+        }
+        if (geometry.height() > ZombiesBarrierBlockRuntimeService.MAX_HEIGHT) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_BARRIER,
+                    subject,
+                    "Barrier height " + geometry.height()
+                            + " exceeds max " + ZombiesBarrierBlockRuntimeService.MAX_HEIGHT + "."));
+        }
+        if (geometry.height() < ZombiesBarrierBlockRuntimeService.MIN_HEIGHT) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_BARRIER,
+                    subject,
+                    "Barrier height " + geometry.height()
+                            + " is below min " + ZombiesBarrierBlockRuntimeService.MIN_HEIGHT + "."));
+        }
+        if (geometry.cellCount() > ZombiesBarrierBlockRuntimeService.MAX_CELLS_PER_BARRIER) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_BARRIER,
+                    subject,
+                    "Barrier cell count " + geometry.cellCount()
+                            + " exceeds max " + ZombiesBarrierBlockRuntimeService.MAX_CELLS_PER_BARRIER + "."));
+        }
+    }
+
+    private static void addBarrierGroupPriceIssues(
+            ZombiesMapSnapshot snapshot,
+            List<ZombiesValidationIssue> issues
+    ) {
+        Map<Integer, Integer> costByGroup = new LinkedHashMap<>();
+        Map<Integer, String> subjectByGroup = new LinkedHashMap<>();
+        for (ZombiesMapSnapshot.BarrierSnapshot barrier : snapshot.barriers()) {
+            if (barrier == null || barrier.group() < 1) {
+                continue;
+            }
+            String subject = subject("barrier", barrier.objectId(), barrier.featureKey());
+            Integer previousCost = costByGroup.putIfAbsent(barrier.group(), barrier.cost());
+            subjectByGroup.putIfAbsent(barrier.group(), subject);
+            if (previousCost != null && previousCost != barrier.cost()) {
+                issues.add(ZombiesValidationIssue.error(
+                        MAP_INVALID_BARRIER,
+                        subject,
+                        "Barrier group " + barrier.group() + " cost " + barrier.cost()
+                                + " differs from " + previousCost + " at " + subjectByGroup.get(barrier.group()) + "."));
+            }
+        }
+    }
+
+    private static void addBarrierOverlapIssues(
+            ZombiesMapSnapshot snapshot,
+            List<ZombiesValidationIssue> issues
+    ) {
+        Map<BarrierCellRef, String> subjectByCell = new LinkedHashMap<>();
+        for (ZombiesMapSnapshot.BarrierSnapshot barrier : snapshot.barriers()) {
+            if (barrier == null || barrier.dimensionId() == null || barrier.areaFrom() == null || barrier.areaTo() == null) {
+                continue;
+            }
+            String subject = subject("barrier", barrier.objectId(), barrier.featureKey());
+            for (BlockPos pos : barrierCells(barrier)) {
+                BarrierCellRef cell = new BarrierCellRef(barrier.dimensionId(), pos);
+                String previousSubject = subjectByCell.putIfAbsent(cell, subject);
+                if (previousSubject != null && !previousSubject.equals(subject)) {
+                    issues.add(ZombiesValidationIssue.error(
+                            MAP_INVALID_BARRIER,
+                            subject,
+                            "Barrier overlaps " + previousSubject + " at "
+                                    + cell.dimensionId() + " " + formatPos(pos) + "."));
+                    break;
+                }
+            }
+        }
+    }
+
+    private static void addBarrierRoomCellBudgetIssues(
+            ZombiesMapSnapshot snapshot,
+            List<ZombiesValidationIssue> issues
+    ) {
+        int totalCells = 0;
+        for (ZombiesMapSnapshot.BarrierSnapshot barrier : snapshot.barriers()) {
+            if (barrier == null || barrier.areaFrom() == null || barrier.areaTo() == null) {
+                continue;
+            }
+            totalCells += barrierGeometry(barrier).cellCount();
+        }
+        if (totalCells > ZombiesBarrierBlockRuntimeService.MAX_CELLS_PER_ROOM) {
+            issues.add(ZombiesValidationIssue.error(
+                    MAP_INVALID_BARRIER,
+                    "barrier",
+                    "Total barrier cell count " + totalCells
+                            + " exceeds room max " + ZombiesBarrierBlockRuntimeService.MAX_CELLS_PER_ROOM + "."));
+        }
+    }
+
+    private static ZombiesBarrierBlockRuntimeService.BarrierGeometry barrierGeometry(
+            ZombiesMapSnapshot.BarrierSnapshot barrier
+    ) {
+        BlockPos from = barrier.areaFrom();
+        BlockPos to = barrier.areaTo();
+        int horizontalLength = Math.max(Math.abs(from.getX() - to.getX()), Math.abs(from.getZ() - to.getZ())) + 1;
+        int height = Math.abs(from.getY() - to.getY()) + 1;
+        return new ZombiesBarrierBlockRuntimeService.BarrierGeometry(
+                from.getX() == to.getX() || from.getZ() == to.getZ(),
+                horizontalLength,
+                height,
+                horizontalLength * height);
+    }
+
+    private static List<BlockPos> barrierCells(ZombiesMapSnapshot.BarrierSnapshot barrier) {
+        BlockPos from = barrier.areaFrom();
+        BlockPos to = barrier.areaTo();
+        int minX = Math.min(from.getX(), to.getX());
+        int maxX = Math.max(from.getX(), to.getX());
+        int minY = Math.min(from.getY(), to.getY());
+        int maxY = Math.max(from.getY(), to.getY());
+        int minZ = Math.min(from.getZ(), to.getZ());
+        int maxZ = Math.max(from.getZ(), to.getZ());
+        List<BlockPos> positions = new ArrayList<>();
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    positions.add(new BlockPos(x, y, z));
+                }
+            }
+        }
+        return positions;
+    }
+
+    private static String formatPos(BlockPos pos) {
+        return pos == null ? "" : pos.getX() + "," + pos.getY() + "," + pos.getZ();
+    }
+
+    private record BarrierCellRef(String dimensionId, BlockPos pos) {
+        private BarrierCellRef {
+            dimensionId = Objects.requireNonNullElse(dimensionId, "").trim();
+            Objects.requireNonNull(pos, "pos");
+        }
     }
 
     private static void addLocationConsistencyIssues(

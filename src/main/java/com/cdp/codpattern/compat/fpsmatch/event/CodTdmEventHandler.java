@@ -98,8 +98,11 @@ public class CodTdmEventHandler {
         }
         if (decision.cancelEvent()) {
             event.setCanceled(true);
+            return;
         }
         decision.replacementAmount().ifPresent(event::setAmount);
+        decision.invulnerabilityTicks().ifPresent(ticks ->
+                event.getEntity().invulnerableTime = Math.min(event.getEntity().invulnerableTime, ticks));
     }
 
     /**

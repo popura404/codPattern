@@ -21,6 +21,7 @@ public final class ZombiesReadyVoteServiceCompatTest {
         allReadyReturnsFalseForEmptyCollection();
         startVoteRequiresEverySnapshotMemberReady();
         requiredVotesCeilsAndClamps();
+        secondStartWhileVoteActiveDoesNotClearActiveVote();
         snapshotMemberLeavingFailsActiveVote();
         rejectVoteCanMakeVoteImpossibleToPass();
         allRespondedWithoutPassingFailsActiveVote();
@@ -74,6 +75,21 @@ public final class ZombiesReadyVoteServiceCompatTest {
         require(ZombiesStartVoteService.requiredVotes(3, 1) == 1, "positive percent should clamp to at least one");
         require(ZombiesStartVoteService.requiredVotes(3, 0) == 1, "zero percent should clamp to at least one");
         require(ZombiesStartVoteService.requiredVotes(3, 200) == 3, "over 100 percent should clamp to total members");
+    }
+
+    private static void secondStartWhileVoteActiveDoesNotClearActiveVote() {
+        VoteHooks hooks = readyVoteHooks(100, PLAYER_ONE, PLAYER_TWO);
+        ZombiesStartVoteService voteService = new ZombiesStartVoteService(hooks);
+
+        require(voteService.initiateStartVote(PLAYER_ONE), "ready members should be able to start vote");
+        long voteId = activeVoteId(voteService);
+
+        require(!voteService.initiateStartVote(PLAYER_TWO), "second start should be rejected while vote is active");
+        requireLastFailure(voteService, ZombiesStartVoteService.FailureReason.VOTE_IN_PROGRESS);
+        require(activeVoteId(voteService) == voteId, "rejected second start should keep active vote intact");
+        require(hooks.failedSnapshots.isEmpty(), "start rejection should not be treated as active vote failure");
+        require(hooks.failedReasons.equals(List.of(ZombiesStartVoteService.FailureReason.VOTE_IN_PROGRESS)),
+                "start rejection should report VOTE_IN_PROGRESS");
     }
 
     private static void snapshotMemberLeavingFailsActiveVote() {
@@ -257,6 +273,11 @@ public final class ZombiesReadyVoteServiceCompatTest {
         @Override
         public void onVotePassed(ZombiesStartVoteService.VoteSnapshot snapshot) {
             passedSnapshots.add(snapshot);
+        }
+
+        @Override
+        public void onVoteStartRejected(UUID initiator, ZombiesStartVoteService.FailureReason reason) {
+            failedReasons.add(reason);
         }
 
         @Override

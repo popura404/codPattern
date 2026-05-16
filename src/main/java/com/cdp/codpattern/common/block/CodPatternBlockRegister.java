@@ -25,6 +25,15 @@ public final class CodPatternBlockRegister {
                     .strength(2.0F, 6.0F)
                     .sound(SoundType.METAL))
     );
+    public static final RegistryObject<ZombiesPlayerBarrierBlock> ZOMBIES_PLAYER_BARRIER = BLOCKS.register(
+            "zombies_player_barrier",
+            () -> new ZombiesPlayerBarrierBlock(BlockBehaviour.Properties.copy(Blocks.GLASS)
+                    .strength(-1.0F, 3_600_000.0F)
+                    .sound(SoundType.GLASS)
+                    .noOcclusion()
+                    .isSuffocating((state, level, pos) -> false)
+                    .isViewBlocking((state, level, pos) -> false))
+    );
 
     public static final RegistryObject<Item> ZOMBIES_POWER_SWITCH_ITEM = ITEMS.register(
             "zombies_power_switch",

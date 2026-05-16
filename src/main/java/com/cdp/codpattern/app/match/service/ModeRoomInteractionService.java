@@ -89,9 +89,16 @@ public final class ModeRoomInteractionService {
     }
 
     public static void initiateStartVote(ServerPlayer player) {
+        if (player == null) {
+            return;
+        }
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
-        gateway.findPlayerVoteControlPort(player)
-                .ifPresent(port -> port.initiateStartVote(player.getUUID()));
+        Optional<VoteControlPort> votePort = gateway.findPlayerVoteControlPort(player);
+        if (votePort.isEmpty()) {
+            player.sendSystemMessage(Component.translatable("message.codpattern.room.not_in_room"));
+            return;
+        }
+        votePort.get().initiateStartVote(player.getUUID());
     }
 
     public static void initiateEndVote(ServerPlayer player) {
