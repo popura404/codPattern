@@ -251,6 +251,7 @@ final class ZombiesRoomHandleFactory {
                     ZombiesRuntimeStateKeys.PLAYER_POWER_ENABLED,
                     ModePlayerValue.ofBoolean(map.powerService().isPowerOn()));
             playerValues.putAll(map.playerStateService().survivorValues());
+            appendSurvivorHealthValues(map, playerValues);
             playerValues.put(
                     ZombiesRuntimeStateKeys.ACTIVE_ZOMBIE_ENTITY_IDS,
                     ModePlayerValue.ofString(activeZombieEntityIds(map.runtimeState().waveState())));
@@ -277,6 +278,21 @@ final class ZombiesRoomHandleFactory {
             ModNetworkChannel.sendToPlayer(
                     new TeamPlayerListPacket(roomId().encode(), rosterVersion, teamPlayers),
                     player);
+        }
+
+        private void appendSurvivorHealthValues(ZombiesMap map, Map<String, ModePlayerValue> playerValues) {
+            for (ServerPlayer player : map.survivorPlayers()) {
+                if (player == null) {
+                    continue;
+                }
+                String playerId = player.getUUID().toString();
+                playerValues.put(
+                        ZombiesRuntimeStateKeys.survivorHealth(playerId),
+                        ModePlayerValue.ofDouble(Math.max(0.0D, player.getHealth())));
+                playerValues.put(
+                        ZombiesRuntimeStateKeys.survivorMaxHealth(playerId),
+                        ModePlayerValue.ofDouble(Math.max(1.0D, player.getMaxHealth())));
+            }
         }
     }
 

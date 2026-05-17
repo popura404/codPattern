@@ -4,6 +4,7 @@ import com.cdp.codpattern.app.match.model.ModePlayerValue;
 import com.cdp.codpattern.app.zombies.model.ZombiesConnectionState;
 import com.cdp.codpattern.app.zombies.model.ZombiesLifeState;
 import com.cdp.codpattern.app.zombies.model.ZombiesPlayerRuntimeState;
+import com.cdp.codpattern.app.zombies.sync.ZombiesRuntimeStateKeys;
 import net.minecraft.core.BlockPos;
 
 import java.util.Collection;
@@ -118,11 +119,16 @@ public class ZombiesPlayerStateService {
     public Map<String, ModePlayerValue> survivorValues() {
         Map<String, ModePlayerValue> values = new LinkedHashMap<>();
         for (ZombiesPlayerRuntimeState state : states()) {
-            String prefix = "survivor." + state.playerId() + ".";
+            String playerId = state.playerId().toString();
             Map<String, ModePlayerValue> playerValues = state.toPlayerValues();
-            values.put(prefix + "life_state", playerValues.get("life_state"));
-            values.put(prefix + "connection_state", playerValues.get("connection_state"));
-            values.put(prefix + "points", playerValues.get("points"));
+            values.put(ZombiesRuntimeStateKeys.survivorLifeState(playerId),
+                    playerValues.get(ZombiesRuntimeStateKeys.PLAYER_LIFE_STATE));
+            values.put(ZombiesRuntimeStateKeys.survivorConnectionState(playerId),
+                    playerValues.get(ZombiesRuntimeStateKeys.PLAYER_CONNECTION_STATE));
+            values.put(ZombiesRuntimeStateKeys.survivorPoints(playerId),
+                    playerValues.get(ZombiesRuntimeStateKeys.PLAYER_POINTS));
+            values.put(ZombiesRuntimeStateKeys.survivorArmorLevel(playerId),
+                    playerValues.get(ZombiesRuntimeStateKeys.PLAYER_ARMOR_LEVEL));
         }
         return values;
     }

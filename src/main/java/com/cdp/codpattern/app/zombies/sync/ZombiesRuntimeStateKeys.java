@@ -38,6 +38,18 @@ public final class ZombiesRuntimeStateKeys {
         return survivorKey(playerId, "points");
     }
 
+    public static String survivorArmorLevel(String playerId) {
+        return survivorKey(playerId, PLAYER_ARMOR_LEVEL);
+    }
+
+    public static String survivorHealth(String playerId) {
+        return survivorKey(playerId, "health");
+    }
+
+    public static String survivorMaxHealth(String playerId) {
+        return survivorKey(playerId, "max_health");
+    }
+
     public static String prompt(String objectType, String reason) {
         return "prompt." + clean(objectType) + "." + clean(reason);
     }

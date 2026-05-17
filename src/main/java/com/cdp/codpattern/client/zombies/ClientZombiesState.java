@@ -184,30 +184,75 @@ public final class ClientZombiesState {
         if (snapshotOptional.isEmpty()) {
             return List.of();
         }
-        ModeRuntimeStateSnapshot snapshot = snapshotOptional.get();
-        Map<String, List<PlayerInfo>> rosters = ClientMatchState.teamPlayersSnapshot();
+        UUID localPlayerId = Minecraft.getInstance().player == null ? null : Minecraft.getInstance().player.getUUID();
+        return buildSurvivorStatuses(snapshotOptional.get(), ClientMatchState.teamPlayersSnapshot(), localPlayerId);
+    }
+
+    public static List<SurvivorStatus> roomTeammates() {
+        return filterRoomTeammates(survivors());
+    }
+
+    static List<SurvivorStatus> buildSurvivorStatuses(
+            ModeRuntimeStateSnapshot snapshot,
+            Map<String, List<PlayerInfo>> rosters,
+            UUID localPlayerId
+    ) {
+        if (snapshot == null || rosters == null) {
+            return List.of();
+        }
         List<PlayerInfo> survivorRoster = rosters.getOrDefault(ZombiesTeamNames.SURVIVORS, List.of());
         if (survivorRoster.isEmpty()) {
             return List.of();
         }
 
-        UUID localPlayerId = Minecraft.getInstance().player == null ? null : Minecraft.getInstance().player.getUUID();
         List<SurvivorStatus> statuses = new ArrayList<>();
         for (PlayerInfo playerInfo : survivorRoster) {
+            if (playerInfo == null) {
+                continue;
+            }
             UUID playerId = playerInfo.uuid();
-            String prefix = "survivor." + playerId + ".";
-            String lifeState = stringValue(snapshot.playerValues().get(prefix + ZombiesRuntimeStateKeys.PLAYER_LIFE_STATE), playerInfo.isAlive() ? "ALIVE" : "DEAD_SPECTATING");
-            String connectionState = stringValue(snapshot.playerValues().get(prefix + ZombiesRuntimeStateKeys.PLAYER_CONNECTION_STATE), "");
-            int points = intValue(snapshot.playerValues().get(prefix + ZombiesRuntimeStateKeys.PLAYER_POINTS), 0);
+            String playerIdText = playerId == null ? "" : playerId.toString();
+            String lifeState = stringValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorLifeState(playerIdText)),
+                    playerInfo.isAlive() ? "ALIVE" : "DEAD_SPECTATING");
+            String connectionState = stringValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorConnectionState(playerIdText)),
+                    "");
+            int points = intValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorPoints(playerIdText)),
+                    0);
+            int armorLevel = intValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorArmorLevel(playerIdText)),
+                    0);
+            double fallbackHealth = defaultSurvivorHealth(lifeState, connectionState);
+            double health = doubleValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorHealth(playerIdText)),
+                    fallbackHealth);
+            double maxHealth = doubleValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorMaxHealth(playerIdText)),
+                    1.0D);
             statuses.add(new SurvivorStatus(
                     playerId,
                     playerInfo.name(),
                     lifeState,
                     connectionState,
                     points,
+                    armorLevel,
+                    health,
+                    maxHealth,
                     playerId != null && playerId.equals(localPlayerId)));
         }
         return List.copyOf(statuses);
+    }
+
+    static List<SurvivorStatus> filterRoomTeammates(List<SurvivorStatus> survivors) {
+        if (survivors == null || survivors.isEmpty()) {
+            return List.of();
+        }
+        return survivors.stream()
+                .filter(survivor -> survivor != null && !survivor.self())
+                .filter(survivor -> !"LEFT".equals(survivor.connectionState()))
+                .toList();
     }
 
     private static int metric(ModeRuntimeStateSnapshot snapshot, String key) {
@@ -252,6 +297,18 @@ public final class ClientZombiesState {
         }
     }
 
+    private static double doubleValue(ModePlayerValue value, double fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            double parsed = Double.parseDouble(value.value());
+            return Double.isFinite(parsed) ? parsed : fallback;
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
+    }
+
     private static boolean booleanValue(ModePlayerValue value, boolean fallback) {
         if (value == null || value.value().isBlank()) {
             return fallback;
@@ -266,12 +323,22 @@ public final class ClientZombiesState {
         return value.value();
     }
 
+    private static double defaultSurvivorHealth(String lifeState, String connectionState) {
+        if ("DEAD_SPECTATING".equals(lifeState) || "OFFLINE".equals(connectionState) || "LEFT".equals(connectionState)) {
+            return 0.0D;
+        }
+        return 1.0D;
+    }
+
     public record SurvivorStatus(
             UUID playerId,
             String name,
             String lifeState,
             String connectionState,
             int points,
+            int armorLevel,
+            double health,
+            double maxHealth,
             boolean self
     ) {
     }

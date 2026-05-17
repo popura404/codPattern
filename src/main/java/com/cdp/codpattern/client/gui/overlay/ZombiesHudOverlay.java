@@ -1,10 +1,15 @@
 package com.cdp.codpattern.client.gui.overlay;
 
 import com.cdp.codpattern.client.zombies.ClientZombiesState;
+import com.mojang.authlib.GameProfile;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.PlayerFaceRenderer;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 
@@ -14,8 +19,6 @@ import java.util.Locale;
 public final class ZombiesHudOverlay implements IGuiOverlay {
     public static final ZombiesHudOverlay INSTANCE = new ZombiesHudOverlay();
 
-    private static final int PANEL_BG = 0x8C050607;
-    private static final int PANEL_BORDER = 0x55FFFFFF;
     private static final int TEXT_PRIMARY = 0xFFFFFFFF;
     private static final int TEXT_SECONDARY = 0xFFC9D1D9;
     private static final int TEXT_ACCENT = 0xFFFFD166;
@@ -23,7 +26,26 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
     private static final int TEXT_ZOMBIES_DARK_YELLOW = 0xFFC28B18;
     private static final int TEXT_DANGER = 0xFFFF6B6B;
     private static final int TEXT_OK = 0xFF86EFAC;
+    private static final int PLAYER_STATUS_HEALTH_COLOR = 0xFFE53935;
+    private static final int PLAYER_STATUS_ARMOR_COLOR = 0xFF4DA3FF;
     private static final float WAVE_NUMBER_SCALE = 7.5F;
+    private static final int PLAYER_STATUS_LEFT = 14;
+    private static final int PLAYER_STATUS_RIGHT_MARGIN = 8;
+    private static final int PLAYER_STATUS_BOTTOM_MARGIN = 28;
+    private static final int PLAYER_STATUS_AVATAR_SIZE = 28;
+    private static final int PLAYER_STATUS_AVATAR_GAP = 8;
+    private static final int PLAYER_STATUS_BAR_WIDTH = 210;
+    private static final int PLAYER_STATUS_BAR_MIN_WIDTH = 48;
+    private static final int PLAYER_STATUS_BAR_HEIGHT = 4;
+    private static final int PLAYER_STATUS_LINE_GAP = 1;
+    private static final int TEAMMATE_AVATAR_SIZE = 20;
+    private static final int TEAMMATE_AVATAR_GAP = 6;
+    private static final int TEAMMATE_BAR_WIDTH = 150;
+    private static final int TEAMMATE_BAR_HEIGHT = 2;
+    private static final int TEAMMATE_POINTS_GAP = 8;
+    private static final int TEAMMATE_ROW_GAP = 5;
+    private static final int TEAMMATE_STATUS_BOTTOM_GAP = 8;
+    private static final int TEAMMATE_MIN_RIGHT_MARGIN = 8;
 
     private ZombiesHudOverlay() {
     }
@@ -37,16 +59,9 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
         Font font = Minecraft.getInstance().font;
         TdmHudOverlay.INSTANCE.renderSharedPlayerScreenEffects(graphics, partialTick, screenWidth, screenHeight);
         renderTopStats(graphics, font, screenWidth);
-        renderPlayerStats(graphics, font, screenWidth, screenHeight);
-        renderSurvivors(graphics, font, screenWidth, screenHeight);
+        renderRoomTeammateStatus(graphics, font, screenWidth, screenHeight);
         renderPhaseNotice(graphics, font, screenWidth, screenHeight);
-        TdmHudOverlay.INSTANCE.renderSharedPlayerStatusHud(
-                graphics,
-                font,
-                screenWidth,
-                screenHeight,
-                Component.translatable("hud.codpattern.zombies.team.survivors_short").getString(),
-                TEXT_ACCENT);
+        renderPlayerStatus(graphics, font, screenWidth, screenHeight);
     }
 
     private static void renderTopStats(GuiGraphics graphics, Font font, int screenWidth) {
@@ -68,54 +83,103 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
         graphics.drawString(font, value, x + font.width(label), y, TEXT_ZOMBIES_DARK_YELLOW, true);
     }
 
-    private static void renderPlayerStats(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
-        int panelWidth = Math.max(150, Math.min(190, screenWidth - 16));
-        int panelHeight = 76;
-        int x = Math.max(8, screenWidth - panelWidth - 10);
-        int y = Math.max(54, screenHeight - panelHeight - 12);
-        fillPanel(graphics, x, y, panelWidth, panelHeight);
-
-        String points = Component.translatable("hud.codpattern.zombies.points", ClientZombiesState.points()).getString();
-        String combat = Component.translatable(
-                "hud.codpattern.zombies.combat",
-                ClientZombiesState.kills(),
-                ClientZombiesState.assists(),
-                ClientZombiesState.deaths()).getString();
-        String growth = "Armor " + Math.max(0, ClientZombiesState.armorLevel())
-                + " | Upg " + Math.max(0, ClientZombiesState.primaryUpgradeLevel());
-        String power = "Power " + (ClientZombiesState.powerEnabled() ? "ON" : "OFF");
-        String buffs = "Buffs " + shortBuffList(ClientZombiesState.ownedBuffIds());
-        int textWidth = panelWidth - 18;
-        graphics.drawString(font, fit(font, points, textWidth), x + 9, y + 8, TEXT_ACCENT, true);
-        graphics.drawString(font, fit(font, combat, textWidth), x + 9, y + 22, TEXT_SECONDARY, true);
-        graphics.drawString(font, fit(font, growth, textWidth), x + 9, y + 36, TEXT_PRIMARY, true);
-        graphics.drawString(font, fit(font, power, textWidth), x + 9, y + 50, ClientZombiesState.powerEnabled() ? TEXT_OK : TEXT_DANGER, true);
-        graphics.drawString(font, fit(font, buffs, textWidth), x + 9, y + 64, TEXT_SECONDARY, true);
-    }
-
-    private static void renderSurvivors(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
-        List<ClientZombiesState.SurvivorStatus> survivors = ClientZombiesState.survivors();
-        if (survivors.isEmpty()) {
+    private static void renderRoomTeammateStatus(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
+        List<ClientZombiesState.SurvivorStatus> teammates = ClientZombiesState.roomTeammates();
+        if (teammates.isEmpty()) {
             return;
         }
 
-        int rowHeight = 14;
-        int panelWidth = Math.min(190, Math.max(132, screenWidth / 3));
-        int panelHeight = 10 + survivors.size() * rowHeight;
-        int x = 10;
-        int y = Math.max(54, screenHeight - panelHeight - 42);
-        fillPanel(graphics, x, y, panelWidth, panelHeight);
+        int avatarX = PLAYER_STATUS_LEFT;
+        int barX = avatarX + TEAMMATE_AVATAR_SIZE + TEAMMATE_AVATAR_GAP;
+        int requiredWidth = barX + TEAMMATE_BAR_WIDTH + TEAMMATE_POINTS_GAP + 28 + TEAMMATE_MIN_RIGHT_MARGIN;
+        if (screenWidth < requiredWidth) {
+            return;
+        }
 
-        int rowY = y + 6;
-        for (ClientZombiesState.SurvivorStatus survivor : survivors) {
-            int color = survivorColor(survivor);
-            String marker = survivor.self() ? "> " : "";
-            String name = fit(font, marker + safeName(survivor.name()), panelWidth - 54);
-            String points = Integer.toString(Math.max(0, survivor.points()));
-            graphics.drawString(font, name, x + 8, rowY, color, true);
-            graphics.drawString(font, points, x + panelWidth - font.width(points) - 8, rowY, TEXT_SECONDARY, true);
+        int localAvatarY = screenHeight - PLAYER_STATUS_BOTTOM_MARGIN - PLAYER_STATUS_AVATAR_SIZE - 6;
+        int rowHeight = Math.max(TEAMMATE_AVATAR_SIZE, TEAMMATE_BAR_HEIGHT + 3 + font.lineHeight) + TEAMMATE_ROW_GAP;
+        int listBottomY = localAvatarY - TEAMMATE_STATUS_BOTTOM_GAP;
+        int rowY = listBottomY - teammates.size() * rowHeight;
+        if (rowY < 2) {
+            return;
+        }
+
+        for (ClientZombiesState.SurvivorStatus teammate : teammates) {
+            renderRoomTeammateRow(graphics, font, teammate, avatarX, barX, rowY);
             rowY += rowHeight;
         }
+    }
+
+    private static void renderRoomTeammateRow(
+            GuiGraphics graphics,
+            Font font,
+            ClientZombiesState.SurvivorStatus teammate,
+            int avatarX,
+            int barX,
+            int rowTop
+    ) {
+        int barY = rowTop;
+        int idY = barY + TEAMMATE_BAR_HEIGHT + 3;
+        int pointsX = barX + TEAMMATE_BAR_WIDTH + TEAMMATE_POINTS_GAP;
+        int pointsY = barY;
+
+        renderSurvivorAvatar(graphics, teammate.playerId(), teammate.name(), avatarX, rowTop, TEAMMATE_AVATAR_SIZE);
+
+        double maxHealth = Math.max(1.0D, teammate.maxHealth());
+        double health = Math.max(0.0D, teammate.health());
+        float ratio = Mth.clamp((float) (health / maxHealth), 0.0F, 1.0F);
+        int filledWidth = Math.round(TEAMMATE_BAR_WIDTH * ratio);
+        if (health > 0.0D && filledWidth <= 0) {
+            filledWidth = 1;
+        }
+
+        graphics.fill(barX - 1, barY - 1, barX + TEAMMATE_BAR_WIDTH + 1, barY + TEAMMATE_BAR_HEIGHT + 1, 0xDDFFFFFF);
+        graphics.fill(barX, barY, barX + TEAMMATE_BAR_WIDTH, barY + TEAMMATE_BAR_HEIGHT, 0xFF14171A);
+        if (filledWidth > 0) {
+            graphics.fill(barX, barY, barX + filledWidth, barY + TEAMMATE_BAR_HEIGHT, PLAYER_STATUS_HEALTH_COLOR);
+        }
+
+        String armor = Integer.toString(Math.max(0, teammate.armorLevel()));
+        int armorWidth = font.width(armor);
+        int idWidth = Math.max(0, TEAMMATE_BAR_WIDTH - armorWidth - 4);
+        String name = fit(font, safeName(teammate.name()), idWidth);
+        graphics.drawString(font, name, barX, idY, survivorColor(teammate), true);
+        graphics.drawString(font, armor, barX + TEAMMATE_BAR_WIDTH - armorWidth, idY, PLAYER_STATUS_ARMOR_COLOR, true);
+
+        String points = Integer.toString(Math.max(0, teammate.points()));
+        graphics.drawString(font, points, pointsX, pointsY, TEXT_SECONDARY, true);
+    }
+
+    private static void renderSurvivorAvatar(
+            GuiGraphics graphics,
+            java.util.UUID playerId,
+            String name,
+            int x,
+            int y,
+            int size
+    ) {
+        graphics.fill(x - 1, y - 1, x + size + 1, y + size + 1, 0xCC000000);
+        if (playerId == null || name == null || name.isBlank()) {
+            renderAvatarFallback(graphics, name, x, y, size);
+            return;
+        }
+        ResourceLocation skin = Minecraft.getInstance().getSkinManager()
+                .getInsecureSkinLocation(new GameProfile(playerId, name));
+        PlayerFaceRenderer.draw(graphics, skin, x, y, size);
+    }
+
+    private static void renderAvatarFallback(GuiGraphics graphics, String name, int x, int y, int size) {
+        graphics.fill(x, y, x + size, y + size, 0xFF33465A);
+        String text = (name == null || name.isBlank())
+                ? "?"
+                : name.substring(0, 1).toUpperCase(Locale.ROOT);
+        graphics.drawString(
+                Minecraft.getInstance().font,
+                text,
+                x + size / 2 - Minecraft.getInstance().font.width(text) / 2,
+                y + size / 2 - Minecraft.getInstance().font.lineHeight / 2,
+                TEXT_PRIMARY,
+                false);
     }
 
     private static void renderPhaseNotice(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
@@ -136,6 +200,72 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
         int y = Math.max(58, screenHeight / 3);
         graphics.fill(x - 8, y - 6, x + font.width(text) + 8, y + font.lineHeight + 6, 0x77000000);
         graphics.drawString(font, text, x, y, phaseColor(phase), true);
+    }
+
+    private static void renderPlayerStatus(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null) {
+            return;
+        }
+
+        int avatarX = PLAYER_STATUS_LEFT;
+        int avatarY = screenHeight - PLAYER_STATUS_BOTTOM_MARGIN - PLAYER_STATUS_AVATAR_SIZE - 6;
+        if (avatarY < 2) {
+            return;
+        }
+
+        int barX = avatarX + PLAYER_STATUS_AVATAR_SIZE + PLAYER_STATUS_AVATAR_GAP;
+        int maxBarWidth = screenWidth - barX - PLAYER_STATUS_RIGHT_MARGIN;
+        if (maxBarWidth < PLAYER_STATUS_BAR_MIN_WIDTH) {
+            return;
+        }
+        int barWidth = Math.min(PLAYER_STATUS_BAR_WIDTH, maxBarWidth);
+
+        int idY = avatarY - 1;
+        int pointsY = idY + font.lineHeight + PLAYER_STATUS_LINE_GAP;
+        int barY = pointsY + font.lineHeight + 3;
+        int armorY = barY + PLAYER_STATUS_BAR_HEIGHT + 3;
+
+        renderLocalAvatar(graphics, player, avatarX, avatarY, PLAYER_STATUS_AVATAR_SIZE);
+
+        String playerId = player.getGameProfile().getName();
+        String fittedPlayerId = fit(font, playerId, barWidth);
+        graphics.drawString(font, fittedPlayerId, barX, idY, TEXT_PRIMARY, true);
+
+        String points = Component.translatable("hud.codpattern.zombies.points", ClientZombiesState.points()).getString();
+        graphics.drawString(font, fit(font, points, barWidth), barX, pointsY, TEXT_ACCENT, true);
+
+        float maxHealth = Math.max(1.0F, player.getMaxHealth());
+        float healthRatio = Mth.clamp(player.getHealth() / maxHealth, 0.0F, 1.0F);
+        int filledWidth = Math.round(barWidth * healthRatio);
+        if (player.getHealth() > 0.0F && filledWidth <= 0) {
+            filledWidth = 1;
+        }
+        graphics.fill(barX - 1, barY - 1, barX + barWidth + 1, barY + PLAYER_STATUS_BAR_HEIGHT + 1, 0xDDFFFFFF);
+        graphics.fill(barX, barY, barX + barWidth, barY + PLAYER_STATUS_BAR_HEIGHT, 0xFF14171A);
+        if (filledWidth > 0) {
+            graphics.fill(barX, barY, barX + filledWidth, barY + PLAYER_STATUS_BAR_HEIGHT, PLAYER_STATUS_HEALTH_COLOR);
+        }
+
+        String armorDots = armorDots(ClientZombiesState.armorLevel());
+        if (!armorDots.isBlank()) {
+            graphics.drawString(font, armorDots, barX + barWidth - font.width(armorDots), armorY, PLAYER_STATUS_ARMOR_COLOR, true);
+        }
+    }
+
+    private static void renderLocalAvatar(GuiGraphics graphics, LocalPlayer player, int x, int y, int size) {
+        graphics.fill(x - 2, y - 2, x + size + 2, y + size + 2, 0xFFFFFFFF);
+        graphics.fill(x - 1, y - 1, x + size + 1, y + size + 1, 0xCC000000);
+        ResourceLocation skin = player.getSkinTextureLocation();
+        PlayerFaceRenderer.draw(graphics, skin, x, y, size);
+    }
+
+    private static String armorDots(int armorLevel) {
+        int count = Math.max(0, armorLevel) * 2;
+        if (count <= 0) {
+            return "";
+        }
+        return "●".repeat(count);
     }
 
     private static int secondsLeft() {
@@ -166,38 +296,6 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
         return name == null || name.isBlank() ? "Player" : name;
     }
 
-    private static String shortBuffList(List<String> buffIds) {
-        if (buffIds == null || buffIds.isEmpty()) {
-            return "none";
-        }
-        StringBuilder builder = new StringBuilder();
-        int count = Math.min(3, buffIds.size());
-        for (int i = 0; i < count; i++) {
-            if (i > 0) {
-                builder.append(", ");
-            }
-            builder.append(shortBuffName(buffIds.get(i)));
-        }
-        if (buffIds.size() > count) {
-            builder.append(" +").append(buffIds.size() - count);
-        }
-        return builder.toString();
-    }
-
-    private static String shortBuffName(String buffId) {
-        if (buffId == null || buffId.isBlank()) {
-            return "?";
-        }
-        String[] parts = buffId.trim().toLowerCase(Locale.ROOT).split("_");
-        StringBuilder builder = new StringBuilder();
-        for (String part : parts) {
-            if (!part.isBlank()) {
-                builder.append(part.charAt(0));
-            }
-        }
-        return builder.isEmpty() ? buffId.trim() : builder.toString();
-    }
-
     private static String fit(Font font, String text, int width) {
         String safe = text == null ? "" : text;
         if (font.width(safe) <= width) {
@@ -211,11 +309,4 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
         return safe + ellipsis;
     }
 
-    private static void fillPanel(GuiGraphics graphics, int x, int y, int width, int height) {
-        graphics.fill(x, y, x + width, y + height, PANEL_BG);
-        graphics.fill(x, y, x + width, y + 1, PANEL_BORDER);
-        graphics.fill(x, y + height - 1, x + width, y + height, PANEL_BORDER);
-        graphics.fill(x, y, x + 1, y + height, PANEL_BORDER);
-        graphics.fill(x + width - 1, y, x + width, y + height, PANEL_BORDER);
-    }
 }
