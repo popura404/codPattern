@@ -1,32 +1,31 @@
 package com.cdp.codpattern.event.client;
 
 import com.cdp.codpattern.CodPattern;
-import com.cdp.codpattern.client.ClientTdmState;
-import com.cdp.codpattern.client.TdmCombatMarkerTracker;
 import com.cdp.codpattern.client.render.CombatMarkerWorldRenderer;
+import com.cdp.codpattern.client.zombies.ClientZombiesState;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = CodPattern.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
-public final class TdmCombatMarkerWorldRenderer {
+public final class ZombiesCombatMarkerWorldRenderer {
     private static final double MIN_RENDER_DEPTH = 0.05D;
 
-    private TdmCombatMarkerWorldRenderer() {
+    private ZombiesCombatMarkerWorldRenderer() {
     }
 
     @SubscribeEvent
@@ -34,25 +33,19 @@ public final class TdmCombatMarkerWorldRenderer {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) {
             return;
         }
-        String phase = ClientTdmState.currentPhase();
-        boolean warmup = "WARMUP".equals(phase);
-        boolean playing = "PLAYING".equals(phase);
-        if (!warmup && !playing) {
+        if (!"WAVE_ACTIVE".equals(ClientZombiesState.phaseKey())) {
             return;
         }
 
         Minecraft minecraft = Minecraft.getInstance();
-        LocalPlayer localPlayer = minecraft.player;
         ClientLevel level = minecraft.level;
         Camera camera = event.getCamera();
-        if (localPlayer == null || level == null || camera == null || !camera.isInitialized() || minecraft.gameRenderer == null) {
+        if (minecraft.player == null || level == null || camera == null || !camera.isInitialized() || minecraft.gameRenderer == null) {
             return;
         }
 
-        TdmCombatMarkerTracker.TeamVisionSnapshot snapshot = TdmCombatMarkerTracker.INSTANCE.snapshot();
-        if (!snapshot.hasLocalTeam()
-                || snapshot.localPlayerId() == null
-                || !snapshot.localPlayerId().equals(localPlayer.getUUID())) {
+        Set<UUID> activeZombieIds = ClientZombiesState.activeZombieEntityIds();
+        if (activeZombieIds.isEmpty()) {
             return;
         }
 
@@ -69,36 +62,21 @@ public final class TdmCombatMarkerWorldRenderer {
         PoseStack poseStack = event.getPoseStack();
         Font font = minecraft.font;
         MultiBufferSource.BufferSource bufferSource = minecraft.renderBuffers().bufferSource();
-        TdmCombatMarkerTracker markerTracker = TdmCombatMarkerTracker.INSTANCE;
 
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableDepthTest();
         RenderSystem.disableCull();
         try {
-            for (Map.Entry<UUID, String> entry : snapshot.teamByPlayer().entrySet()) {
-                UUID playerId = entry.getKey();
-                if (playerId == null
-                        || playerId.equals(localPlayer.getUUID())
-                        || !snapshot.isLiving(playerId)) {
+            for (UUID entityId : activeZombieIds) {
+                Entity entity = findClientEntity(level, entityId);
+                if (!(entity instanceof LivingEntity livingEntity)
+                        || !livingEntity.isAlive()
+                        || livingEntity.isRemoved()) {
                     continue;
                 }
 
-                Player tracked = level.getPlayerByUUID(playerId);
-                if (tracked == null || !tracked.isAlive() || tracked.isRemoved()) {
-                    continue;
-                }
-                if (!event.getFrustum().isVisible(tracked.getBoundingBox().inflate(0.25D))) {
-                    continue;
-                }
-
-                boolean teammate = snapshot.isTeammate(playerId);
-                boolean enemy = snapshot.isEnemy(playerId);
-                if (!teammate && !(playing && enemy && markerTracker.shouldRenderEnemyHealthBar(playerId))) {
-                    continue;
-                }
-
-                Vec3 anchor = interpolatePlayerHeadPos(tracked, event.getPartialTick());
+                Vec3 anchor = CombatMarkerWorldRenderer.interpolateHeadPos(livingEntity, event.getPartialTick());
                 Vec3 relative = anchor.subtract(cameraPos);
                 double depth = relative.dot(cameraForward);
                 if (depth <= MIN_RENDER_DEPTH) {
@@ -110,18 +88,6 @@ public final class TdmCombatMarkerWorldRenderer {
                     continue;
                 }
 
-                if (teammate) {
-                    CombatMarkerWorldRenderer.renderTeammateMarker(
-                            poseStack,
-                            bufferSource,
-                            font,
-                            minecraft,
-                            relative,
-                            pixelScale,
-                            tracked.getScoreboardName());
-                    continue;
-                }
-
                 CombatMarkerWorldRenderer.renderEnemyMarker(
                         poseStack,
                         bufferSource,
@@ -129,9 +95,9 @@ public final class TdmCombatMarkerWorldRenderer {
                         minecraft,
                         relative,
                         pixelScale,
-                        tracked.getHealth(),
-                        Math.max(1.0f, tracked.getMaxHealth()),
-                        tracked.getScoreboardName());
+                        livingEntity.getHealth(),
+                        Math.max(1.0f, livingEntity.getMaxHealth()),
+                        livingEntity.getDisplayName().getString());
             }
             bufferSource.endBatch();
         } finally {
@@ -141,7 +107,15 @@ public final class TdmCombatMarkerWorldRenderer {
         }
     }
 
-    private static Vec3 interpolatePlayerHeadPos(Player player, float partialTick) {
-        return CombatMarkerWorldRenderer.interpolateHeadPos(player, partialTick);
+    private static Entity findClientEntity(ClientLevel level, UUID entityId) {
+        if (level == null || entityId == null) {
+            return null;
+        }
+        for (Entity entity : level.entitiesForRendering()) {
+            if (entity != null && entityId.equals(entity.getUUID())) {
+                return entity;
+            }
+        }
+        return null;
     }
 }

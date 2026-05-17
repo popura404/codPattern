@@ -53,6 +53,10 @@ public final class ClientZombiesState {
                 .orElse(false);
     }
 
+    public static boolean shouldReplaceVanillaPlayerHud() {
+        return hasCurrentZombiesRoomContext() && shouldRenderHud();
+    }
+
     public static String phaseKey() {
         return snapshot().map(ModeRuntimeStateSnapshot::phaseKey).orElse("");
     }
@@ -150,6 +154,31 @@ public final class ClientZombiesState {
         return List.copyOf(buffIds);
     }
 
+    public static Set<UUID> activeZombieEntityIds() {
+        Optional<ModeRuntimeStateSnapshot> snapshotOptional = snapshot();
+        if (snapshotOptional.isEmpty()) {
+            return Set.of();
+        }
+        ModePlayerValue value = snapshotOptional.get().playerValues().get(ZombiesRuntimeStateKeys.ACTIVE_ZOMBIE_ENTITY_IDS);
+        if (value == null || value.value().isBlank()) {
+            return Set.of();
+        }
+
+        Set<UUID> ids = new LinkedHashSet<>();
+        for (String rawId : value.value().split(",")) {
+            String cleaned = rawId == null ? "" : rawId.trim();
+            if (cleaned.isBlank()) {
+                continue;
+            }
+            try {
+                ids.add(UUID.fromString(cleaned));
+            } catch (IllegalArgumentException ignored) {
+                // Ignore malformed server values so one bad id does not disable the HUD.
+            }
+        }
+        return Set.copyOf(ids);
+    }
+
     public static List<SurvivorStatus> survivors() {
         Optional<ModeRuntimeStateSnapshot> snapshotOptional = snapshot();
         if (snapshotOptional.isEmpty()) {
@@ -200,6 +229,14 @@ public final class ClientZombiesState {
         try {
             return BuiltInGameModes.isZombies(RoomId.decode(roomKey).gameType());
         } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
+    private static boolean hasCurrentZombiesRoomContext() {
+        try {
+            return ClientMatchState.hasRoomContext() && isZombiesRoom(ClientMatchState.roomContextName());
+        } catch (ExceptionInInitializerError | NoClassDefFoundError ignored) {
             return false;
         }
     }

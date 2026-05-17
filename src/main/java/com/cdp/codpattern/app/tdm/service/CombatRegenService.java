@@ -17,11 +17,25 @@ public final class CombatRegenService {
         if (combatRegenCooldowns == null || player == null || config == null) {
             return;
         }
-        if (config.getCombatRegenHalfHeartsPerSecond() <= 0.0f) {
+        onPlayerDamaged(
+                combatRegenCooldowns,
+                player,
+                config.getCombatRegenDelayTicks(),
+                config.getCombatRegenHalfHeartsPerSecond());
+    }
+
+    public static void onPlayerDamaged(Map<UUID, Integer> combatRegenCooldowns,
+            ServerPlayer player,
+            int delayTicks,
+            float halfHeartsPerSecond) {
+        if (combatRegenCooldowns == null || player == null) {
+            return;
+        }
+        if (halfHeartsPerSecond <= 0.0f) {
             combatRegenCooldowns.remove(player.getUUID());
             return;
         }
-        combatRegenCooldowns.put(player.getUUID(), Math.max(0, config.getCombatRegenDelayTicks()));
+        combatRegenCooldowns.put(player.getUUID(), Math.max(0, delayTicks));
     }
 
     public static void clearPlayerCooldown(Map<UUID, Integer> combatRegenCooldowns, UUID playerId) {
@@ -40,7 +54,24 @@ public final class CombatRegenService {
             return;
         }
 
-        float healPerTick = Math.max(0.0f, config.getCombatRegenHalfHeartsPerSecond()) / 20.0f;
+        tick(
+                combatRegenCooldowns,
+                joinedPlayers,
+                respawningPlayers,
+                playingPhase,
+                config.getCombatRegenHalfHeartsPerSecond());
+    }
+
+    public static void tick(Map<UUID, Integer> combatRegenCooldowns,
+            Iterable<ServerPlayer> joinedPlayers,
+            Set<UUID> respawningPlayers,
+            boolean playingPhase,
+            float halfHeartsPerSecond) {
+        if (combatRegenCooldowns == null || joinedPlayers == null || !playingPhase) {
+            return;
+        }
+
+        float healPerTick = Math.max(0.0f, halfHeartsPerSecond) / 20.0f;
         if (healPerTick <= 0.0f) {
             combatRegenCooldowns.clear();
             return;

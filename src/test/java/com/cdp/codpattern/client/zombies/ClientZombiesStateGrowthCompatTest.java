@@ -10,6 +10,8 @@ import com.cdp.codpattern.client.ClientModeRuntimeState;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 public final class ClientZombiesStateGrowthCompatTest {
     private ClientZombiesStateGrowthCompatTest() {
@@ -18,6 +20,7 @@ public final class ClientZombiesStateGrowthCompatTest {
     public static void main(String[] args) {
         missingGrowthKeysUseDefaults();
         growthKeysReadFromPlayerValues();
+        activeZombieIdsReadFromPlayerValues();
     }
 
     private static void missingGrowthKeysUseDefaults() {
@@ -51,6 +54,19 @@ public final class ClientZombiesStateGrowthCompatTest {
                 ZombiesBuffType.DOUBLE_HEALTH.id(),
                 ZombiesBuffType.SCORE_MULTIPLIER.id()
         )), "owned buff ids should include enabled buffs in stable order");
+    }
+
+    private static void activeZombieIdsReadFromPlayerValues() {
+        ClientModeRuntimeState.clearAll();
+        UUID first = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID second = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        ClientModeRuntimeState.update(snapshot(Map.of(
+                ZombiesRuntimeStateKeys.ACTIVE_ZOMBIE_ENTITY_IDS,
+                ModePlayerValue.ofString(first + ",invalid," + second + ",")
+        )));
+
+        require(ClientZombiesState.activeZombieEntityIds().equals(Set.of(first, second)),
+                "active zombie ids should ignore malformed values and expose parsed UUIDs");
     }
 
     private static ModeRuntimeStateSnapshot snapshot(Map<String, ModePlayerValue> values) {

@@ -2,6 +2,7 @@ package com.cdp.codpattern.event.client;
 
 import com.cdp.codpattern.CodPattern;
 import com.cdp.codpattern.client.gui.overlay.TdmHudOverlay;
+import com.cdp.codpattern.client.zombies.ClientZombiesState;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
@@ -24,7 +25,8 @@ public final class TdmVanillaHudSuppressor {
 
     @SubscribeEvent
     public static void onRenderGuiOverlay(RenderGuiOverlayEvent.Pre event) {
-        if (!TdmHudOverlay.shouldReplaceVanillaPlayerHud()) {
+        if (!TdmHudOverlay.shouldReplaceVanillaPlayerHud()
+                && !ClientZombiesState.shouldReplaceVanillaPlayerHud()) {
             return;
         }
         if (SUPPRESSED_OVERLAY_IDS.contains(event.getOverlay().id())) {

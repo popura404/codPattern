@@ -75,7 +75,9 @@ final class ZombiesRoomHandleFactory {
                     public long currentTick() {
                         return map.runtimeState().roomTick();
                     }
-                });
+                },
+                null,
+                map::onPlayerDamaged);
         ZombiesEntityLifecyclePortAdapter entityLifecyclePort = new ZombiesEntityLifecyclePortAdapter(
                 map.roomId(),
                 null,
@@ -249,6 +251,9 @@ final class ZombiesRoomHandleFactory {
                     ZombiesRuntimeStateKeys.PLAYER_POWER_ENABLED,
                     ModePlayerValue.ofBoolean(map.powerService().isPowerOn()));
             playerValues.putAll(map.playerStateService().survivorValues());
+            playerValues.put(
+                    ZombiesRuntimeStateKeys.ACTIVE_ZOMBIE_ENTITY_IDS,
+                    ModePlayerValue.ofString(activeZombieEntityIds(map.runtimeState().waveState())));
 
             return new ModeRuntimeStateSnapshot(
                     roomId().encode(),
@@ -293,6 +298,16 @@ final class ZombiesRoomHandleFactory {
 
     private static RoomSummaryMetric metric(String key, int value, MetricDisplay display) {
         return new RoomSummaryMetric(key, "screen.codpattern.zombies_room.metric." + key, value, display);
+    }
+
+    private static String activeZombieEntityIds(ZombiesWaveRuntimeState waveState) {
+        if (waveState == null) {
+            return "";
+        }
+        return waveState.activeZombieEntityIdsSnapshot().stream()
+                .map(UUID::toString)
+                .sorted()
+                .collect(java.util.stream.Collectors.joining(","));
     }
 
     private static Map<String, List<PlayerInfo>> buildTeamPlayers(ZombiesMap map) {

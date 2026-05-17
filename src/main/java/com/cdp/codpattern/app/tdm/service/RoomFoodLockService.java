@@ -15,7 +15,7 @@ public final class RoomFoodLockService {
     }
 
     public static boolean isRoomPlayer(ServerPlayer player) {
-        return player != null && FpsMatchGatewayProvider.gateway().findPlayerRoomReadPort(player).isPresent();
+        return player != null && FpsMatchGatewayProvider.gateway().isInMatch(player.getUUID());
     }
 
     public static void enforce(ServerPlayer player) {

@@ -1,5 +1,6 @@
 package com.cdp.codpattern.client.gui.overlay;
 
+import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
@@ -128,13 +129,42 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     public static boolean shouldReplaceVanillaPlayerHud() {
-        if (!ClientTdmState.hasRoomContext()) {
+        if (!hasCurrentTdmRoomContext()) {
             return false;
         }
         if (ClientTdmState.isDead()) {
             return true;
         }
         return isMatchHudPhase(ClientTdmState.currentPhase());
+    }
+
+    private static boolean hasCurrentTdmRoomContext() {
+        try {
+            return ClientTdmState.hasRoomContext() && isTdmRoom(ClientTdmState.roomContextName());
+        } catch (ExceptionInInitializerError | NoClassDefFoundError ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isTdmRoom(String roomKey) {
+        if (roomKey == null || roomKey.isBlank()) {
+            return false;
+        }
+        try {
+            return BuiltInGameModes.isTeamDeathMatch(RoomId.decode(roomKey).gameType());
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
+    public void renderSharedPlayerScreenEffects(GuiGraphics graphics, float partialTick, int screenWidth, int screenHeight) {
+        renderLowHealthBreath(graphics, partialTick, screenWidth, screenHeight, true);
+        renderDamageVignette(graphics, partialTick, screenWidth, screenHeight, true);
+    }
+
+    public void renderSharedPlayerStatusHud(GuiGraphics graphics, Font font, int screenWidth, int screenHeight,
+            String statusLabel, int statusColor) {
+        renderPlayerStatusHud(graphics, font, screenWidth, screenHeight, true, statusLabel, statusColor);
     }
 
     @Override
@@ -177,6 +207,9 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private boolean shouldRenderHud() {
+        if (!hasCurrentTdmRoomContext()) {
+            return false;
+        }
         if (ClientTdmState.isDead() || ClientTdmState.isBlackoutActive()) {
             return true;
         }
@@ -379,7 +412,12 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private void renderLowHealthBreath(GuiGraphics graphics, float partialTick, int screenWidth, int screenHeight) {
-        if (!shouldReplaceVanillaPlayerHud()) {
+        renderLowHealthBreath(graphics, partialTick, screenWidth, screenHeight, shouldReplaceVanillaPlayerHud());
+    }
+
+    private void renderLowHealthBreath(GuiGraphics graphics, float partialTick, int screenWidth, int screenHeight,
+            boolean enabled) {
+        if (!enabled) {
             return;
         }
 
@@ -411,7 +449,12 @@ public class TdmHudOverlay implements IGuiOverlay {
     }
 
     private void renderDamageVignette(GuiGraphics graphics, float partialTick, int screenWidth, int screenHeight) {
-        if (!shouldReplaceVanillaPlayerHud()) {
+        renderDamageVignette(graphics, partialTick, screenWidth, screenHeight, shouldReplaceVanillaPlayerHud());
+    }
+
+    private void renderDamageVignette(GuiGraphics graphics, float partialTick, int screenWidth, int screenHeight,
+            boolean enabled) {
+        if (!enabled) {
             resetDamageVignetteState();
             return;
         }
@@ -535,7 +578,25 @@ public class TdmHudOverlay implements IGuiOverlay {
         if (player == null) {
             return;
         }
+        String teamName = resolveLocalTeamName(player);
+        renderPlayerStatusHud(graphics, font, screenWidth, screenHeight, player, teamNameLabel(teamName), teamAccent(teamName));
+    }
 
+    private void renderPlayerStatusHud(GuiGraphics graphics, Font font, int screenWidth, int screenHeight,
+            boolean enabled, String statusLabel, int statusColor) {
+        if (!enabled) {
+            return;
+        }
+
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null) {
+            return;
+        }
+        renderPlayerStatusHud(graphics, font, screenWidth, screenHeight, player, statusLabel, statusColor);
+    }
+
+    private void renderPlayerStatusHud(GuiGraphics graphics, Font font, int screenWidth, int screenHeight,
+            LocalPlayer player, String statusLabel, int statusColor) {
         int x = PLAYER_STATUS_MARGIN_LEFT;
         int maxWidth = screenWidth - x - PLAYER_STATUS_MARGIN_RIGHT;
         int barWidth = Math.min(PLAYER_STATUS_BAR_WIDTH, maxWidth);
@@ -562,9 +623,8 @@ public class TdmHudOverlay implements IGuiOverlay {
             graphics.fill(x, barY, x + filledWidth, barY + PLAYER_STATUS_BAR_HEIGHT, PLAYER_STATUS_HEALTH_COLOR);
         }
 
-        String teamName = resolveLocalTeamName(player);
-        String teamText = teamNameLabel(teamName);
-        int teamColor = teamAccent(teamName);
+        String teamText = normalizeStatusLabel(statusLabel);
+        int teamColor = statusColor;
         int teamMaxWidth = Math.min(font.width(teamText), Math.max(18, barWidth / 2));
         String fittedTeam = GuiTextHelper.ellipsize(font, teamText, teamMaxWidth);
         int teamWidth = font.width(fittedTeam);
@@ -575,6 +635,10 @@ public class TdmHudOverlay implements IGuiOverlay {
 
         graphics.drawString(font, fittedTeam, x, textY, teamColor, true);
         graphics.drawString(font, fittedPlayerId, x + teamWidth + 5, textY, 0xFFF4F4F4, true);
+    }
+
+    private String normalizeStatusLabel(String statusLabel) {
+        return statusLabel == null || statusLabel.isBlank() ? "-" : statusLabel;
     }
 
     private String resolveLocalTeamName(LocalPlayer player) {

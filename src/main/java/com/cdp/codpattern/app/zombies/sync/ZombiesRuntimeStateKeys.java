@@ -21,6 +21,7 @@ public final class ZombiesRuntimeStateKeys {
     public static final String PLAYER_WEAPON_PRIMARY_UPGRADE = "weapon.primary.upgrade";
     public static final String PLAYER_POWER_ENABLED = "power.enabled";
     public static final String PLAYER_BUFF_PREFIX = "buff.";
+    public static final String ACTIVE_ZOMBIE_ENTITY_IDS = "entities.active_zombie_ids";
 
     private ZombiesRuntimeStateKeys() {
     }

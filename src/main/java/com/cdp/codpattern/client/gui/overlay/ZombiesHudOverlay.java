@@ -19,8 +19,11 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
     private static final int TEXT_PRIMARY = 0xFFFFFFFF;
     private static final int TEXT_SECONDARY = 0xFFC9D1D9;
     private static final int TEXT_ACCENT = 0xFFFFD166;
+    private static final int TEXT_WAVE_DARK_RED = 0xFF7D1414;
+    private static final int TEXT_ZOMBIES_DARK_YELLOW = 0xFFC28B18;
     private static final int TEXT_DANGER = 0xFFFF6B6B;
     private static final int TEXT_OK = 0xFF86EFAC;
+    private static final float WAVE_NUMBER_SCALE = 7.5F;
 
     private ZombiesHudOverlay() {
     }
@@ -32,28 +35,37 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
         }
 
         Font font = Minecraft.getInstance().font;
+        TdmHudOverlay.INSTANCE.renderSharedPlayerScreenEffects(graphics, partialTick, screenWidth, screenHeight);
         renderTopStats(graphics, font, screenWidth);
         renderPlayerStats(graphics, font, screenWidth, screenHeight);
         renderSurvivors(graphics, font, screenWidth, screenHeight);
         renderPhaseNotice(graphics, font, screenWidth, screenHeight);
+        TdmHudOverlay.INSTANCE.renderSharedPlayerStatusHud(
+                graphics,
+                font,
+                screenWidth,
+                screenHeight,
+                Component.translatable("hud.codpattern.zombies.team.survivors_short").getString(),
+                TEXT_ACCENT);
     }
 
     private static void renderTopStats(GuiGraphics graphics, Font font, int screenWidth) {
-        int panelWidth = Math.min(260, Math.max(180, screenWidth - 24));
-        int x = (screenWidth - panelWidth) / 2;
-        int y = 10;
-        fillPanel(graphics, x, y, panelWidth, 34);
+        int right = screenWidth - 16;
+        int top = 12;
 
-        String wave = Component.translatable("hud.codpattern.zombies.wave", Math.max(0, ClientZombiesState.wave())).getString();
-        String zombies = Component.translatable("hud.codpattern.zombies.zombies_left", Math.max(0, ClientZombiesState.zombiesLeft())).getString();
-        String alive = Component.translatable(
-                "hud.codpattern.zombies.alive",
-                Math.max(0, ClientZombiesState.alivePlayers()),
-                Math.max(0, ClientZombiesState.maxPlayers())).getString();
+        String wave = Integer.toString(Math.max(0, ClientZombiesState.wave()));
+        graphics.pose().pushPose();
+        graphics.pose().translate(right, top, 0);
+        graphics.pose().scale(WAVE_NUMBER_SCALE, WAVE_NUMBER_SCALE, 1.0F);
+        graphics.drawString(font, wave, -font.width(wave), 0, TEXT_WAVE_DARK_RED, true);
+        graphics.pose().popPose();
 
-        graphics.drawString(font, wave, x + 10, y + 7, TEXT_ACCENT, true);
-        graphics.drawString(font, zombies, x + panelWidth / 2 - font.width(zombies) / 2, y + 7, TEXT_PRIMARY, true);
-        graphics.drawString(font, alive, x + panelWidth - font.width(alive) - 10, y + 7, TEXT_SECONDARY, true);
+        String label = "剩余";
+        String value = "：" + Math.max(0, ClientZombiesState.zombiesLeft());
+        int y = top + Math.round(font.lineHeight * WAVE_NUMBER_SCALE) + 4;
+        int x = right - font.width(label) - font.width(value);
+        graphics.drawString(font, label, x, y, TEXT_PRIMARY, true);
+        graphics.drawString(font, value, x + font.width(label), y, TEXT_ZOMBIES_DARK_YELLOW, true);
     }
 
     private static void renderPlayerStats(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
@@ -91,7 +103,7 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
         int panelWidth = Math.min(190, Math.max(132, screenWidth / 3));
         int panelHeight = 10 + survivors.size() * rowHeight;
         int x = 10;
-        int y = Math.max(54, screenHeight - panelHeight - 12);
+        int y = Math.max(54, screenHeight - panelHeight - 42);
         fillPanel(graphics, x, y, panelWidth, panelHeight);
 
         int rowY = y + 6;

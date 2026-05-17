@@ -13,6 +13,7 @@ import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 public class ZombiesPlayerCombatEventAdapter implements ModeCombatEventPort {
     static final int ROOM_MONSTER_DAMAGE_INVULNERABILITY_TICKS = 10;
@@ -22,9 +23,10 @@ public class ZombiesPlayerCombatEventAdapter implements ModeCombatEventPort {
     private final ZombiesDeathService deathService;
     private final RoundState roundState;
     private final ZombiesBuffCombatService buffCombatService;
+    private final Consumer<ServerPlayer> positiveDamageHook;
 
     public ZombiesPlayerCombatEventAdapter(RoomId roomId, String modeDisplayNameKey, ZombiesDeathService deathService, RoundState roundState) {
-        this(roomId, modeDisplayNameKey, deathService, roundState, null);
+        this(roomId, modeDisplayNameKey, deathService, roundState, null, null);
     }
 
     public ZombiesPlayerCombatEventAdapter(
@@ -34,6 +36,17 @@ public class ZombiesPlayerCombatEventAdapter implements ModeCombatEventPort {
             RoundState roundState,
             ZombiesBuffCombatService buffCombatService
     ) {
+        this(roomId, modeDisplayNameKey, deathService, roundState, buffCombatService, null);
+    }
+
+    public ZombiesPlayerCombatEventAdapter(
+            RoomId roomId,
+            String modeDisplayNameKey,
+            ZombiesDeathService deathService,
+            RoundState roundState,
+            ZombiesBuffCombatService buffCombatService,
+            Consumer<ServerPlayer> positiveDamageHook
+    ) {
         this.roomId = Objects.requireNonNull(roomId, "roomId");
         this.modeDisplayNameKey = modeDisplayNameKey == null || modeDisplayNameKey.isBlank()
                 ? GameModeRegistry.getOrDefault(roomId.gameType()).displayNameKey()
@@ -41,6 +54,7 @@ public class ZombiesPlayerCombatEventAdapter implements ModeCombatEventPort {
         this.deathService = Objects.requireNonNull(deathService, "deathService");
         this.roundState = roundState == null ? RoundState.started() : roundState;
         this.buffCombatService = buffCombatService;
+        this.positiveDamageHook = positiveDamageHook == null ? player -> { } : positiveDamageHook;
         if (buffCombatService != null) {
             ZombiesBuffCombatService.register(buffCombatService);
         }
@@ -82,6 +96,9 @@ public class ZombiesPlayerCombatEventAdapter implements ModeCombatEventPort {
         }
         if (context.attacker().isPresent() && isFriendlySurvivorDamage(victim, context.attacker().get())) {
             return DamageDecision.cancel();
+        }
+        if (context.amount() > 0.0F) {
+            positiveDamageHook.accept(victim);
         }
         Optional<ZombiesBuffCombatService> service = buffCombatService == null
                 ? ZombiesBuffCombatService.serviceFor(roomId)

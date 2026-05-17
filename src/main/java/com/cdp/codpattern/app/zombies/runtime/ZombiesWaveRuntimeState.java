@@ -80,6 +80,10 @@ public final class ZombiesWaveRuntimeState {
         return Map.copyOf(remainingBudgetByMobId);
     }
 
+    public Set<UUID> activeZombieEntityIdsSnapshot() {
+        return Set.copyOf(activeZombieEntityIds);
+    }
+
     public void prepareTargetWave(int targetWave) {
         this.targetWave = Math.max(1, targetWave);
         budgetInitialized = false;
