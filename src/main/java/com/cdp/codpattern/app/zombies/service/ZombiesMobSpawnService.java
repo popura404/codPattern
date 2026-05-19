@@ -8,20 +8,27 @@ import com.cdp.codpattern.app.zombies.model.ZombiesWaveDefinition;
 import com.cdp.codpattern.app.zombies.model.ZombiesWaveMobEntry;
 import com.cdp.codpattern.app.zombies.runtime.ZombiesWaveRuntimeState;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 public final class ZombiesMobSpawnService {
     public static final int DEFAULT_GLOBAL_MAX_ALIVE_ZOMBIES = 64;
@@ -29,19 +36,33 @@ public final class ZombiesMobSpawnService {
     public static final String WAVE_KILL_POINTS_TAG = "codpattern_zombies_wave_kill_points";
     public static final String WAVE_ASSIST_POINTS_TAG = "codpattern_zombies_wave_assist_points";
     static final int ROOM_MONSTER_MELEE_ATTACK_INTERVAL_TICKS = 10;
+    static final double ROOM_MONSTER_FOLLOW_RANGE = 128.0D;
+    static final int ROOM_MONSTER_TARGET_REFRESH_INTERVAL_TICKS = 20;
 
     private static final AtomicInteger GLOBAL_ACTIVE_ZOMBIES = new AtomicInteger();
 
     private final ModeEntityOwnershipRegistry ownershipRegistry;
     private final int globalMaxAliveZombies;
+    private final Supplier<List<ServerPlayer>> survivorTargetSupplier;
+    private final boolean roomTargetingEnabled;
 
     public ZombiesMobSpawnService() {
         this(ModeEntityOwnershipRegistry.instance(), DEFAULT_GLOBAL_MAX_ALIVE_ZOMBIES);
     }
 
     public ZombiesMobSpawnService(ModeEntityOwnershipRegistry ownershipRegistry, int globalMaxAliveZombies) {
+        this(ownershipRegistry, globalMaxAliveZombies, null);
+    }
+
+    public ZombiesMobSpawnService(
+            ModeEntityOwnershipRegistry ownershipRegistry,
+            int globalMaxAliveZombies,
+            Supplier<List<ServerPlayer>> survivorTargetSupplier
+    ) {
         this.ownershipRegistry = Objects.requireNonNull(ownershipRegistry, "ownershipRegistry");
         this.globalMaxAliveZombies = Math.max(1, globalMaxAliveZombies);
+        this.survivorTargetSupplier = survivorTargetSupplier == null ? List::of : survivorTargetSupplier;
+        this.roomTargetingEnabled = survivorTargetSupplier != null;
     }
 
     public SpawnResult spawnNext(
@@ -94,7 +115,9 @@ public final class ZombiesMobSpawnService {
                 spawn.yaw(),
                 spawn.pitch());
         applyWaveAttributes(mob, waveDefinition);
+        applyRoomMonsterRetention(mob);
         applyRoomMonsterAttackCadence(mob);
+        applyRoomMonsterTargeting(mob, survivorTargetSupplier, roomTargetingEnabled);
         attachWaveRewardMetadata(mob, mobId.get(), waveDefinition);
 
         if (!level.addFreshEntity(mob)) {
@@ -190,6 +213,30 @@ public final class ZombiesMobSpawnService {
         }
     }
 
+    private static void applyRoomMonsterRetention(Mob mob) {
+        if (mob == null) {
+            return;
+        }
+        AttributeInstance followRange = mob.getAttribute(Attributes.FOLLOW_RANGE);
+        if (followRange != null && followRange.getBaseValue() < ROOM_MONSTER_FOLLOW_RANGE) {
+            followRange.setBaseValue(ROOM_MONSTER_FOLLOW_RANGE);
+        }
+        mob.setPersistenceRequired();
+    }
+
+    private static void applyRoomMonsterTargeting(
+            Mob mob,
+            Supplier<List<ServerPlayer>> targetSupplier,
+            boolean enabled
+    ) {
+        if (!enabled || !(mob instanceof PathfinderMob pathfinderMob)) {
+            return;
+        }
+        pathfinderMob.targetSelector.addGoal(
+                0,
+                new RoomSurvivorTargetGoal(pathfinderMob, targetSupplier));
+    }
+
     private static void attachWaveRewardMetadata(Mob mob, String rawMobId, ZombiesWaveDefinition waveDefinition) {
         if (mob == null || waveDefinition == null) {
             return;
@@ -236,6 +283,120 @@ public final class ZombiesMobSpawnService {
         @Override
         protected int getAttackInterval() {
             return ROOM_MONSTER_MELEE_ATTACK_INTERVAL_TICKS;
+        }
+    }
+
+    private static final class RoomSurvivorTargetGoal extends Goal {
+        private final PathfinderMob mob;
+        private final Supplier<List<ServerPlayer>> targetSupplier;
+        private int nextScanDelay;
+        private UUID currentRoomTargetId;
+
+        private RoomSurvivorTargetGoal(PathfinderMob mob, Supplier<List<ServerPlayer>> targetSupplier) {
+            this.mob = Objects.requireNonNull(mob, "mob");
+            this.targetSupplier = targetSupplier == null ? List::of : targetSupplier;
+            this.nextScanDelay = staggeredInitialDelay(mob);
+            setFlags(EnumSet.of(Goal.Flag.TARGET));
+        }
+
+        @Override
+        public boolean canUse() {
+            return mob.isAlive();
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return mob.isAlive() && !mob.isRemoved();
+        }
+
+        @Override
+        public void start() {
+            refreshTarget();
+        }
+
+        @Override
+        public void tick() {
+            if (nextScanDelay > 0) {
+                nextScanDelay--;
+                if (!isCurrentRoomTarget(mob.getTarget())) {
+                    mob.setTarget(null);
+                }
+                return;
+            }
+            refreshTarget();
+            nextScanDelay = ROOM_MONSTER_TARGET_REFRESH_INTERVAL_TICKS;
+        }
+
+        @Override
+        public void stop() {
+            if (!isCurrentRoomTarget(mob.getTarget())) {
+                mob.setTarget(null);
+            }
+        }
+
+        private void refreshTarget() {
+            List<ServerPlayer> targets = safeTargets();
+            LivingEntity currentTarget = mob.getTarget();
+            if (isCurrentRoomTarget(currentTarget) && containsCurrentTarget(targets)) {
+                return;
+            }
+            Optional<ServerPlayer> nextTarget = nearestRoomSurvivor(targets);
+            currentRoomTargetId = nextTarget.map(ServerPlayer::getUUID).orElse(null);
+            mob.setTarget(nextTarget.orElse(null));
+        }
+
+        private Optional<ServerPlayer> nearestRoomSurvivor(List<ServerPlayer> targets) {
+            return targets.stream()
+                    .filter(this::isEligibleRoomSurvivor)
+                    .min(Comparator.comparingDouble(mob::distanceToSqr));
+        }
+
+        private boolean isCurrentRoomTarget(LivingEntity target) {
+            if (!(target instanceof ServerPlayer player)) {
+                return false;
+            }
+            return currentRoomTargetId != null
+                    && currentRoomTargetId.equals(player.getUUID())
+                    && isEligibleRoomSurvivor(player);
+        }
+
+        private boolean isEligibleRoomSurvivor(ServerPlayer player) {
+            if (player == null || !player.isAlive() || player.isSpectator()) {
+                return false;
+            }
+            if (!player.level().dimension().equals(mob.level().dimension())) {
+                return false;
+            }
+            double followRange = Math.max(ROOM_MONSTER_FOLLOW_RANGE, currentFollowRange(mob));
+            return mob.distanceToSqr(player) <= followRange * followRange;
+        }
+
+        private boolean containsCurrentTarget(List<ServerPlayer> targets) {
+            if (currentRoomTargetId == null) {
+                return false;
+            }
+            return targets.stream()
+                    .filter(Objects::nonNull)
+                    .anyMatch(candidate -> currentRoomTargetId.equals(candidate.getUUID()));
+        }
+
+        private List<ServerPlayer> safeTargets() {
+            try {
+                List<ServerPlayer> targets = targetSupplier.get();
+                return targets == null ? List.of() : targets;
+            } catch (RuntimeException ignored) {
+                return List.of();
+            }
+        }
+
+        private static double currentFollowRange(Mob mob) {
+            AttributeInstance followRange = mob == null ? null : mob.getAttribute(Attributes.FOLLOW_RANGE);
+            return followRange == null ? ROOM_MONSTER_FOLLOW_RANGE : followRange.getValue();
+        }
+
+        private static int staggeredInitialDelay(Mob mob) {
+            int entityId = mob == null ? 0 : mob.getId();
+            return Math.floorMod(entityId, ROOM_MONSTER_TARGET_REFRESH_INTERVAL_TICKS);
         }
     }
 

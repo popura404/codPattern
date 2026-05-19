@@ -141,7 +141,10 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         this.connectionStateService = new ZombiesConnectionStateService(playerStateService, configuredOfflineGraceTicks());
         this.economyService = new ZombiesEconomyService(playerStateService);
         this.readyService = new ZombiesReadyService(new ZombiesReadyHooks());
-        this.mobSpawnService = new ZombiesMobSpawnService();
+        this.mobSpawnService = new ZombiesMobSpawnService(
+                ModeEntityOwnershipRegistry.instance(),
+                ZombiesMobSpawnService.DEFAULT_GLOBAL_MAX_ALIVE_ZOMBIES,
+                this::aliveSurvivorPlayers);
         this.mobLifecycleService = new ZombiesMobLifecycleService(ModeEntityOwnershipRegistry.instance(), mobSpawnService);
         this.deathService = new ZombiesDeathService(
                 playerStateService,
@@ -384,6 +387,12 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         List<ServerPlayer> players = new ArrayList<>();
         getMapTeams().getJoinedPlayers().forEach(playerData -> playerData.getPlayer().ifPresent(players::add));
         return players;
+    }
+
+    private List<ServerPlayer> aliveSurvivorPlayers() {
+        return survivorPlayers().stream()
+                .filter(player -> playerStateService.canInteract(player.getUUID()))
+                .toList();
     }
 
     Set<UUID> survivorPlayerIds() {

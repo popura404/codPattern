@@ -45,6 +45,21 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
                 "attachWaveRewardMetadata(mob, mobId.get(), waveDefinition);",
                 "spawn path should attach wave reward metadata before entity ownership is used");
         requireContains(spawnService,
+                "static final double ROOM_MONSTER_FOLLOW_RANGE = 128.0D;",
+                "room monsters should use an extended zombies-mode follow range");
+        requireContains(spawnService,
+                "mob.setPersistenceRequired();",
+                "room monsters should not despawn just because they are far from players");
+        requireContains(spawnService,
+                "pathfinderMob.targetSelector.addGoal(\n                0,\n                new RoomSurvivorTargetGoal(pathfinderMob, targetSupplier));",
+                "spawned room monsters should get a room-scoped target selector");
+        requireContains(spawnService,
+                "if (!player.level().dimension().equals(mob.level().dimension()))",
+                "room target selection must stay dimension scoped");
+        requireAbsent(spawnService,
+                "hasLineOfSight",
+                "room target selection must not drop targets behind cover");
+        requireContains(spawnService,
                 "mob.getPersistentData().putDouble(WAVE_KILL_POINTS_TAG, entry.getKillPoints());",
                 "spawn path should persist per-entry kill reward");
         requireContains(spawnService,
@@ -86,6 +101,12 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
         requireContains(zombiesMap,
                 "playIntermissionBell();",
                 "bell sound must be triggered from the intermission enter hook");
+        requireContains(zombiesMap,
+                "this::aliveSurvivorPlayers",
+                "zombies map should provide room-scoped alive survivor targets to spawned mobs");
+        requireContains(zombiesMap,
+                "playerStateService.canInteract(player.getUUID())",
+                "room monster target source should exclude dead or disconnected survivors");
         requireContains(clientState,
                 "public static Set<UUID> activeZombieEntityIds()",
                 "client zombies state must parse active zombie entity ids");
