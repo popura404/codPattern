@@ -96,7 +96,9 @@ public final class ZombiesMvp12AdditionalClosureCompatTest {
     }
 
     private static void objectStoreResetDropsPreviousSnapshotRevisionAndOffer() {
-        ZombiesObjectStateStore store = new ZombiesObjectStateStore();
+        ZombiesObjectStateStore store = new ZombiesObjectStateStore(
+                () -> false,
+                fixedOfferService("tacz:rules"));
         ZombiesWeaponWallData oldWall = weaponWall("shared-wall", "tacz:old");
         ZombiesWeaponWallData newWall = weaponWall("shared-wall", "tacz:new");
         ZombiesBarrierData oldBarrier = barrier("barrier-old", 2);
@@ -119,8 +121,8 @@ public final class ZombiesMvp12AdditionalClosureCompatTest {
         require(barrierState.revision() > oldRoomRevision,
                 "reset should expose new object revisions above the previous round room revision");
         require(store.revision() > oldRoomRevision, "reset should advance room object revision monotonically");
-        require("tacz:new".equals(wallState.payload().getString("gunId")),
-                "reset should expose the new snapshot weapon offer");
+        require("tacz:rules".equals(wallState.payload().getString("gunId")),
+                "reset should expose the shared rules weapon offer");
         require(!barrierState.payload().getBoolean("cleared"), "reset should make new barrier uncleared");
         require(barrierState.payload().getInt("group") == 3, "reset should expose new barrier group");
         require(states.stream().noneMatch(value -> "barrier-old".equals(value.objectKey())),
@@ -131,7 +133,9 @@ public final class ZombiesMvp12AdditionalClosureCompatTest {
         String roomKey = "zombies:reset-object-revision";
         ClientModeObjectState.clear(roomKey);
         try {
-            ZombiesObjectStateStore store = new ZombiesObjectStateStore();
+            ZombiesObjectStateStore store = new ZombiesObjectStateStore(
+                    () -> false,
+                    fixedOfferService("tacz:rules"));
             ZombiesWeaponWallData oldWall = weaponWall("shared-wall", "tacz:old");
             ZombiesWeaponWallData newWall = weaponWall("shared-wall", "tacz:new");
 
@@ -152,7 +156,7 @@ public final class ZombiesMvp12AdditionalClosureCompatTest {
 
             ModeObjectState retained = ClientModeObjectState.roomStates(roomKey).get("shared-wall");
             require(retained != null, "client should retain next round object state");
-            require("tacz:new".equals(retained.payload().getString("gunId")),
+            require("tacz:rules".equals(retained.payload().getString("gunId")),
                     "client should accept next round object state instead of dropping it as stale");
             require(ClientModeObjectState.revision(roomKey).orElseThrow() == nextRoundSyncRevision,
                     "client room object revision should advance to next round revision");
@@ -164,16 +168,32 @@ public final class ZombiesMvp12AdditionalClosureCompatTest {
     private static ZombiesWeaponWallData weaponWall(String objectId, String gunId) {
         return new ZombiesWeaponWallData(
                 objectId,
-                2,
-                1.25D,
-                600,
-                210,
-                List.of(3),
-                List.of(new ZombiesWeaponWallData.RarityPoolData("common", 1, 100.0D, 0.0D)),
-                List.of(new ZombiesWeaponWallData.WeaponCandidateData(gunId, Map.of("common", 1.0D))),
                 dimension(),
                 new BlockPos(1, 64, 1),
                 Optional.empty());
+    }
+
+    private static ZombiesWeaponWallOfferService fixedOfferService(String gunId) {
+        com.cdp.codpattern.config.zombies.ZombiesRulesConfig config =
+                new com.cdp.codpattern.config.zombies.ZombiesRulesConfig();
+        return new ZombiesWeaponWallOfferService(
+                () -> config,
+                new java.util.Random(0L),
+                ignored -> net.minecraft.world.item.ItemStack.EMPTY) {
+            @Override
+            public ZombiesObjectStateStore.WeaponWallOffer createOffer(
+                    ZombiesWeaponWallData weaponWall,
+                    int currentWave
+            ) {
+                return new ZombiesObjectStateStore.WeaponWallOffer(
+                        weaponWall.objectId(),
+                        "common",
+                        gunId,
+                        500,
+                        90,
+                        1.0D);
+            }
+        };
     }
 
     private static ZombiesBarrierData barrier(String objectId, int group) {

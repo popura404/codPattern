@@ -1,10 +1,20 @@
 package com.cdp.codpattern.config.zombies;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+
 public class ZombiesRulesConfig {
     public static final String DEAD_PLAYER_POLICY_SPECTATE_UNTIL_INTERMISSION = "spectate_until_wave_intermission";
+    public static final String RARITY_COMMON = "common";
+    public static final String RARITY_RARE = "rare";
+    public static final String RARITY_EPIC = "epic";
 
     private Room room = new Room();
     private Defaults defaults = new Defaults();
+    private WeaponWall weaponWall = WeaponWall.defaults();
+    private WeaponRules weaponRules = new WeaponRules();
 
     public Room getRoom() {
         if (room == null) {
@@ -28,11 +38,37 @@ public class ZombiesRulesConfig {
         this.defaults = defaults == null ? new Defaults() : defaults;
     }
 
+    public WeaponWall getWeaponWall() {
+        if (weaponWall == null) {
+            weaponWall = WeaponWall.defaults();
+        }
+        return weaponWall;
+    }
+
+    public void setWeaponWall(WeaponWall weaponWall) {
+        this.weaponWall = weaponWall == null ? WeaponWall.defaults() : weaponWall;
+    }
+
+    public WeaponRules getWeaponRules() {
+        if (weaponRules == null) {
+            weaponRules = new WeaponRules();
+        }
+        return weaponRules;
+    }
+
+    public void setWeaponRules(WeaponRules weaponRules) {
+        this.weaponRules = weaponRules == null ? new WeaponRules() : weaponRules;
+    }
+
     public void normalize() {
         setRoom(room);
         setDefaults(defaults);
+        setWeaponWall(weaponWall);
+        setWeaponRules(weaponRules);
         room.normalize();
         defaults.normalize();
+        weaponWall.normalize();
+        weaponRules.normalize();
     }
 
     public static class Room {
@@ -179,6 +215,272 @@ public class ZombiesRulesConfig {
         }
     }
 
+    public static class WeaponWall {
+        private Integer refreshIntervalWaves = 5;
+        private List<Rarity> rarities = defaultRarities();
+
+        public static WeaponWall defaults() {
+            WeaponWall weaponWall = new WeaponWall();
+            weaponWall.normalize();
+            return weaponWall;
+        }
+
+        public Integer getRefreshIntervalWaves() {
+            return refreshIntervalWaves;
+        }
+
+        public void setRefreshIntervalWaves(Integer refreshIntervalWaves) {
+            this.refreshIntervalWaves = refreshIntervalWaves;
+        }
+
+        public List<Rarity> getRarities() {
+            if (rarities == null) {
+                rarities = defaultRarities();
+            }
+            return rarities;
+        }
+
+        public void setRarities(List<Rarity> rarities) {
+            this.rarities = rarities == null ? defaultRarities() : new ArrayList<>(rarities);
+        }
+
+        private void normalize() {
+            refreshIntervalWaves = positiveOrDefault(refreshIntervalWaves, 5);
+            List<Rarity> normalized = new ArrayList<>();
+            for (Rarity rarity : getRarities()) {
+                Rarity resolved = rarity == null ? new Rarity() : rarity;
+                resolved.normalize();
+                normalized.add(resolved);
+            }
+            if (normalized.isEmpty()) {
+                normalized.addAll(defaultRarities());
+            }
+            rarities = normalized;
+        }
+
+        private static List<Rarity> defaultRarities() {
+            return List.of(
+                    new Rarity(
+                            RARITY_COMMON,
+                            70.0D,
+                            -8.0D,
+                            10.0D,
+                            100.0D,
+                            500,
+                            1.0D,
+                            List.of(
+                                    new GunWeight("codpattern:pistol", 60.0D),
+                                    new GunWeight("codpattern:smg", 40.0D))),
+                    new Rarity(
+                            RARITY_RARE,
+                            25.0D,
+                            5.0D,
+                            0.0D,
+                            100.0D,
+                            900,
+                            1.25D,
+                            List.of(
+                                    new GunWeight("codpattern:rifle", 70.0D),
+                                    new GunWeight("codpattern:shotgun", 30.0D))),
+                    new Rarity(
+                            RARITY_EPIC,
+                            5.0D,
+                            3.0D,
+                            0.0D,
+                            100.0D,
+                            1500,
+                            1.6D,
+                            List.of(new GunWeight("codpattern:marksman_rifle", 100.0D))));
+        }
+    }
+
+    public static class Rarity {
+        private String id = RARITY_COMMON;
+        private Double initialWeight = 1.0D;
+        private Double weightDeltaPerRefresh = 0.0D;
+        private Double minWeight = 0.0D;
+        private Double maxWeight = 100.0D;
+        private Integer price = 500;
+        private Double damageMultiplier = 1.0D;
+        private List<GunWeight> guns = List.of(new GunWeight("codpattern:pistol", 1.0D));
+
+        public Rarity() {
+        }
+
+        public Rarity(
+                String id,
+                Double initialWeight,
+                Double weightDeltaPerRefresh,
+                Double minWeight,
+                Double maxWeight,
+                Integer price,
+                Double damageMultiplier,
+                List<GunWeight> guns
+        ) {
+            this.id = id;
+            this.initialWeight = initialWeight;
+            this.weightDeltaPerRefresh = weightDeltaPerRefresh;
+            this.minWeight = minWeight;
+            this.maxWeight = maxWeight;
+            this.price = price;
+            this.damageMultiplier = damageMultiplier;
+            this.guns = guns;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public Double getInitialWeight() {
+            return initialWeight;
+        }
+
+        public void setInitialWeight(Double initialWeight) {
+            this.initialWeight = initialWeight;
+        }
+
+        public Double getWeightDeltaPerRefresh() {
+            return weightDeltaPerRefresh;
+        }
+
+        public void setWeightDeltaPerRefresh(Double weightDeltaPerRefresh) {
+            this.weightDeltaPerRefresh = weightDeltaPerRefresh;
+        }
+
+        public Double getMinWeight() {
+            return minWeight;
+        }
+
+        public void setMinWeight(Double minWeight) {
+            this.minWeight = minWeight;
+        }
+
+        public Double getMaxWeight() {
+            return maxWeight;
+        }
+
+        public void setMaxWeight(Double maxWeight) {
+            this.maxWeight = maxWeight;
+        }
+
+        public Integer getPrice() {
+            return price;
+        }
+
+        public void setPrice(Integer price) {
+            this.price = price;
+        }
+
+        public Double getDamageMultiplier() {
+            return damageMultiplier;
+        }
+
+        public void setDamageMultiplier(Double damageMultiplier) {
+            this.damageMultiplier = damageMultiplier;
+        }
+
+        public List<GunWeight> getGuns() {
+            if (guns == null) {
+                guns = List.of();
+            }
+            return guns;
+        }
+
+        public void setGuns(List<GunWeight> guns) {
+            this.guns = guns == null ? List.of() : new ArrayList<>(guns);
+        }
+
+        private void normalize() {
+            id = Objects.requireNonNullElse(id, "").trim().toLowerCase(Locale.ROOT);
+            initialWeight = finiteOrDefault(initialWeight, 0.0D);
+            weightDeltaPerRefresh = finiteOrDefault(weightDeltaPerRefresh, 0.0D);
+            minWeight = finiteOrDefault(minWeight, 0.0D);
+            maxWeight = finiteOrDefault(maxWeight, Math.max(0.0D, minWeight));
+            if (maxWeight < minWeight) {
+                double temp = minWeight;
+                minWeight = maxWeight;
+                maxWeight = temp;
+            }
+            price = nonNegativeOrDefault(price, 0);
+            damageMultiplier = positiveFiniteOrDefault(damageMultiplier, 1.0D);
+            List<GunWeight> normalizedGuns = new ArrayList<>();
+            for (GunWeight gun : getGuns()) {
+                GunWeight resolved = gun == null ? new GunWeight() : gun;
+                resolved.normalize();
+                normalizedGuns.add(resolved);
+            }
+            guns = normalizedGuns;
+        }
+    }
+
+    public static class GunWeight {
+        private String gunId = "";
+        private Double weight = 1.0D;
+
+        public GunWeight() {
+        }
+
+        public GunWeight(String gunId, Double weight) {
+            this.gunId = gunId;
+            this.weight = weight;
+        }
+
+        public String getGunId() {
+            return gunId;
+        }
+
+        public void setGunId(String gunId) {
+            this.gunId = gunId;
+        }
+
+        public Double getWeight() {
+            return weight;
+        }
+
+        public void setWeight(Double weight) {
+            this.weight = weight;
+        }
+
+        private void normalize() {
+            gunId = Objects.requireNonNullElse(gunId, "").trim();
+            weight = finiteOrDefault(weight, 0.0D);
+        }
+    }
+
+    public static class WeaponRules {
+        private Integer starterWeaponAmmunitionPerMagazineMultiple = 7;
+        private Integer weaponPoolAmmunitionPerMagazineMultiple = 7;
+
+        public Integer getStarterWeaponAmmunitionPerMagazineMultiple() {
+            return starterWeaponAmmunitionPerMagazineMultiple;
+        }
+
+        public void setStarterWeaponAmmunitionPerMagazineMultiple(Integer starterWeaponAmmunitionPerMagazineMultiple) {
+            this.starterWeaponAmmunitionPerMagazineMultiple = starterWeaponAmmunitionPerMagazineMultiple;
+        }
+
+        public Integer getWeaponPoolAmmunitionPerMagazineMultiple() {
+            return weaponPoolAmmunitionPerMagazineMultiple;
+        }
+
+        public void setWeaponPoolAmmunitionPerMagazineMultiple(Integer weaponPoolAmmunitionPerMagazineMultiple) {
+            this.weaponPoolAmmunitionPerMagazineMultiple = weaponPoolAmmunitionPerMagazineMultiple;
+        }
+
+        private void normalize() {
+            starterWeaponAmmunitionPerMagazineMultiple = nonNegativeOrDefault(
+                    starterWeaponAmmunitionPerMagazineMultiple,
+                    7);
+            weaponPoolAmmunitionPerMagazineMultiple = nonNegativeOrDefault(
+                    weaponPoolAmmunitionPerMagazineMultiple,
+                    7);
+        }
+    }
+
     private static int positiveOrDefault(Integer value, int defaultValue) {
         return value == null || value <= 0 ? defaultValue : value;
     }
@@ -196,5 +498,9 @@ public class ZombiesRulesConfig {
 
     private static double positiveFiniteOrDefault(Double value, double defaultValue) {
         return value == null || !Double.isFinite(value) || value <= 0.0 ? defaultValue : value;
+    }
+
+    private static double finiteOrDefault(Double value, double defaultValue) {
+        return value == null || !Double.isFinite(value) ? defaultValue : value;
     }
 }

@@ -7,6 +7,7 @@ import java.util.List;
 
 public final class ZombiesDeployPlanStaticContractCompatTest {
     private static final Path PLAN = Path.of("docs/ZOMBIES_DEPLOY_GUI_CORRECTION_PLAN.md");
+    private static final Path INTERACTION_BLOCK_PLAN = Path.of("docs/僵尸交互方块部署与交互机制开发计划.md");
 
     private static final List<String> VALIDATION_CASES = List.of(
             "V-01", "V-02", "V-03", "V-04", "V-05", "V-06",
@@ -25,6 +26,11 @@ public final class ZombiesDeployPlanStaticContractCompatTest {
     }
 
     public static void main(String[] args) throws Exception {
+        if (!Files.exists(PLAN)) {
+            requireInteractionBlockPlan();
+            System.out.println("PASS zombies deploy plan static contract compat");
+            return;
+        }
         String plan = read(PLAN);
         requireContains(plan, "| 版本 | v3.10 |", "plan version should reflect the latest audit");
         requireContains(plan, "## 16. 完成定义（DoD）", "plan must keep explicit DoD section");
@@ -44,6 +50,17 @@ public final class ZombiesDeployPlanStaticContractCompatTest {
                 "manual template must block DoD closure on unresolved P0/P1 issues");
 
         System.out.println("PASS zombies deploy plan static contract compat");
+    }
+
+    private static void requireInteractionBlockPlan() throws IOException {
+        String plan = read(INTERACTION_BLOCK_PLAN);
+        requireContains(plan, "zombies_weapon_wall_box", "interaction block plan must define weapon wall block id");
+        requireContains(plan, "zombies_ammo_box", "interaction block plan must define ammo box block id");
+        requireContains(plan, "zombies_armor_station_box", "interaction block plan must define armor station block id");
+        requireContains(plan, "玩家侧真实进游戏手测不属于 agent 自动执行范围",
+                "interaction block plan must keep manual player testing out of agent scope");
+        requireContains(plan, "`compileJava`、`processResources`、`compileTestJava` 和僵尸兼容套件通过",
+                "interaction block plan must define automated closure commands");
     }
 
     private static void requireCaseDefinitions(String plan, List<String> cases) {

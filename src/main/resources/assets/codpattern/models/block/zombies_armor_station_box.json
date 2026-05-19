@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "codpattern:block/zombies_armor_station_box"
+  }
+}

@@ -246,13 +246,6 @@ final class ZombiesDeployObjectEditor {
                 ZombiesWeaponWallData source = objects.weaponWalls().get(selectedIndex);
                 ZombiesWeaponWallData data = new ZombiesWeaponWallData(
                         copyObjectId(objects, source.objectId(), type),
-                        source.weaponLevel(),
-                        source.levelDamageMultiplier(),
-                        source.price(),
-                        source.maxReserveAmmo(),
-                        source.refreshWaves(),
-                        source.rarityPools(),
-                        source.weapons(),
                         source.dimension(),
                         source.pos(),
                         source.interactionPos());
@@ -524,13 +517,6 @@ final class ZombiesDeployObjectEditor {
         String objectId = resolveObjectId(objects, excluded, text(fields, "objectId"), ZombiesDeployFieldSchema.WEAPON_WALL);
         return new ZombiesWeaponWallData(
                 objectId,
-                intField(fields, "weaponLevel"),
-                doubleField(fields, "levelDamageMultiplier"),
-                intField(fields, "price"),
-                intField(fields, "maxReserveAmmo"),
-                intList(fields, "refreshWaves"),
-                rarityPools(fields, "rarityPools"),
-                weaponCandidates(fields, "weapons"),
                 dimension(fields),
                 blockPos(fields, "pos"),
                 Optional.of(blockPos(fields, "interaction")));
@@ -726,13 +712,6 @@ final class ZombiesDeployObjectEditor {
     private static Map<String, String> fieldsFrom(ZombiesWeaponWallData data) {
         Map<String, String> fields = basePositionFields(ZombiesDeployFieldSchema.WEAPON_WALL, data.dimension(), data.pos());
         fields.put("objectId", data.objectId());
-        fields.put("weaponLevel", Integer.toString(data.weaponLevel()));
-        fields.put("levelDamageMultiplier", Double.toString(data.levelDamageMultiplier()));
-        fields.put("price", Integer.toString(data.price()));
-        fields.put("maxReserveAmmo", Integer.toString(data.maxReserveAmmo()));
-        fields.put("refreshWaves", serializeIntList(data.refreshWaves()));
-        fields.put("rarityPools", serializeRarityPools(data.rarityPools()));
-        fields.put("weapons", serializeWeaponCandidates(data.weapons()));
         putPosition(fields, "interaction", data.interactionPos().orElse(data.pos()));
         return fields;
     }
@@ -877,113 +856,6 @@ final class ZombiesDeployObjectEditor {
             } catch (NumberFormatException e) {
                 throw failure("field.invalid_integer", "field " + key + " value must be an integer: " + entryValue);
             }
-        }
-        return parsed;
-    }
-
-    private static List<Integer> intList(Map<String, String> fields, String key) {
-        String value = text(fields, key);
-        List<Integer> parsed = new ArrayList<>();
-        if (value.isEmpty()) {
-            return parsed;
-        }
-        for (String entry : value.split("[,;\\n\\r]")) {
-            String trimmed = entry.trim();
-            if (trimmed.isEmpty()) {
-                continue;
-            }
-            try {
-                parsed.add(Integer.parseInt(trimmed));
-            } catch (NumberFormatException e) {
-                throw failure("field.invalid_integer", "field " + key + " entry must be an integer: " + trimmed);
-            }
-        }
-        return parsed;
-    }
-
-    private static List<ZombiesWeaponWallData.RarityPoolData> rarityPools(Map<String, String> fields, String key) {
-        String value = text(fields, key);
-        List<ZombiesWeaponWallData.RarityPoolData> parsed = new ArrayList<>();
-        if (value.isEmpty()) {
-            return parsed;
-        }
-        for (String entry : value.split("[;\\n\\r]")) {
-            String trimmed = entry.trim();
-            if (trimmed.isEmpty()) {
-                continue;
-            }
-            int equals = trimmed.indexOf('=');
-            if (equals <= 0 || equals == trimmed.length() - 1) {
-                throw failure("field.invalid_list", "field " + key + " entry must be id=rank,baseWeight,waveFactor: " + trimmed);
-            }
-            String id = trimmed.substring(0, equals).trim();
-            String[] parts = trimmed.substring(equals + 1).split(",");
-            if (id.isEmpty() || parts.length != 3) {
-                throw failure("field.invalid_list", "field " + key + " entry must be id=rank,baseWeight,waveFactor: " + trimmed);
-            }
-            try {
-                double baseWeight = Double.parseDouble(parts[1].trim());
-                double waveFactor = Double.parseDouble(parts[2].trim());
-                if (!Double.isFinite(baseWeight) || !Double.isFinite(waveFactor)) {
-                    throw failure("field.invalid_decimal", "field " + key + " weights must be finite: " + trimmed);
-                }
-                parsed.add(new ZombiesWeaponWallData.RarityPoolData(
-                        id,
-                        Integer.parseInt(parts[0].trim()),
-                        baseWeight,
-                        waveFactor));
-            } catch (NumberFormatException e) {
-                throw failure("field.invalid_list", "field " + key + " entry has invalid numeric values: " + trimmed);
-            }
-        }
-        return parsed;
-    }
-
-    private static List<ZombiesWeaponWallData.WeaponCandidateData> weaponCandidates(Map<String, String> fields, String key) {
-        String value = text(fields, key);
-        List<ZombiesWeaponWallData.WeaponCandidateData> parsed = new ArrayList<>();
-        if (value.isEmpty()) {
-            return parsed;
-        }
-        for (String entry : value.split("[;\\n\\r]")) {
-            String trimmed = entry.trim();
-            if (trimmed.isEmpty()) {
-                continue;
-            }
-            int separator = trimmed.indexOf('|');
-            if (separator <= 0 || separator == trimmed.length() - 1) {
-                throw failure("field.invalid_list", "field " + key + " entry must be gunId|rarity=weight,...: " + trimmed);
-            }
-            String gunId = trimmed.substring(0, separator).trim();
-            if (gunId.isEmpty()) {
-                throw failure("field.invalid_list", "field " + key + " contains an empty gunId");
-            }
-            Map<String, Double> weights = new LinkedHashMap<>();
-            for (String weightEntry : trimmed.substring(separator + 1).split(",")) {
-                String weightText = weightEntry.trim();
-                if (weightText.isEmpty()) {
-                    continue;
-                }
-                int equals = weightText.indexOf('=');
-                if (equals <= 0 || equals == weightText.length() - 1) {
-                    throw failure("field.invalid_list", "field " + key + " weight must be rarity=weight: " + weightText);
-                }
-                String rarity = weightText.substring(0, equals).trim();
-                String weightValue = weightText.substring(equals + 1).trim();
-                if (rarity.isEmpty()) {
-                    throw failure("field.invalid_list", "field " + key + " contains an empty rarity id");
-                }
-                try {
-                    double weight = Double.parseDouble(weightValue);
-                    if (!Double.isFinite(weight)) {
-                        throw failure("field.invalid_decimal", "field " + key + " weight must be finite: " + weightValue);
-                    }
-                    weights.put(rarity, weight);
-                } catch (NumberFormatException e) {
-                    throw failure("field.invalid_decimal", "field " + key + " weight must be a decimal: " + weightValue);
-                }
-            }
-            parsed.add(new ZombiesWeaponWallData.WeaponCandidateData(gunId, weights));
         }
         return parsed;
     }
@@ -1141,53 +1013,6 @@ final class ZombiesDeployObjectEditor {
             return "";
         }
         return map.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .map(entry -> entry.getKey() + "=" + entry.getValue())
-                .reduce((left, right) -> left + "," + right)
-                .orElse("");
-    }
-
-    private static String serializeIntList(List<Integer> values) {
-        if (values == null || values.isEmpty()) {
-            return "";
-        }
-        return values.stream()
-                .map(String::valueOf)
-                .reduce((left, right) -> left + "," + right)
-                .orElse("");
-    }
-
-    private static String serializeRarityPools(List<ZombiesWeaponWallData.RarityPoolData> pools) {
-        if (pools == null || pools.isEmpty()) {
-            return "";
-        }
-        return pools.stream()
-                .map(pool -> pool.id()
-                        + "="
-                        + pool.rank()
-                        + ","
-                        + pool.baseWeight()
-                        + ","
-                        + pool.waveFactor())
-                .reduce((left, right) -> left + ";" + right)
-                .orElse("");
-    }
-
-    private static String serializeWeaponCandidates(List<ZombiesWeaponWallData.WeaponCandidateData> weapons) {
-        if (weapons == null || weapons.isEmpty()) {
-            return "";
-        }
-        return weapons.stream()
-                .map(candidate -> candidate.gunId() + "|" + serializeWeights(candidate.weightsByRarity()))
-                .reduce((left, right) -> left + ";" + right)
-                .orElse("");
-    }
-
-    private static String serializeWeights(Map<String, Double> weights) {
-        if (weights == null || weights.isEmpty()) {
-            return "";
-        }
-        return weights.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
                 .map(entry -> entry.getKey() + "=" + entry.getValue())
                 .reduce((left, right) -> left + "," + right)

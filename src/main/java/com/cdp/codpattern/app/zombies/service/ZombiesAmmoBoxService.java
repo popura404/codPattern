@@ -83,16 +83,53 @@ public final class ZombiesAmmoBoxService {
         });
     }
 
-    public ZombiesServiceResult<StarterAmmoRefillResult> refillStarterPistol(
+    public ZombiesServiceResult<AmmoRefillResult> refillHeldWeapon(
             UUID playerId,
-            String starterGunId,
-            int maxReserveAmmo
+            ZombiesWeaponInstanceState currentWeapon,
+            Map<?, Integer> pricesByWeaponLevel,
+            AmmoRefillCommitGuard commitGuard
     ) {
-        if (!ZombiesWeaponInstanceState.isValidGunId(starterGunId) || maxReserveAmmo < 0) {
+        if (currentWeapon == null || !ZombiesWeaponInstanceState.isValidGunId(currentWeapon.gunId())
+                || !ZombiesWeaponInstanceState.isValidWeaponLevel(currentWeapon.weaponLevel())) {
             return ZombiesServiceResult.failure(ZombiesErrorCode.WEAPON_INVALID_CURRENT_WEAPON);
         }
-        return economyService.spendAtomically(playerId, 0.0D, ignoredState ->
-                ZombiesServiceResult.success(new StarterAmmoRefillResult(starterGunId, maxReserveAmmo)));
+        if (currentWeapon.isReserveFull()) {
+            return ZombiesServiceResult.failure(AMMO_ALREADY_FULL, weaponParams(currentWeapon), "");
+        }
+
+        Integer cost = priceForWeaponLevel(pricesByWeaponLevel, currentWeapon.weaponLevel());
+        if (cost == null) {
+            return ZombiesServiceResult.failure(AMMO_MISSING_PRICE, weaponParams(currentWeapon), "");
+        }
+        if (!ZombiesPlayerRuntimeState.isValidCost(cost)) {
+            return ZombiesServiceResult.failure(ZombiesErrorCode.ECONOMY_INVALID_COST, weaponParams(currentWeapon), "");
+        }
+
+        return economyService.spendAtomically(playerId, cost, lockedState -> {
+            ZombiesWeaponInstanceState refilledWeapon = currentWeapon.refillReserveAmmo();
+            ZombiesServiceResult<?> guardResult = commitGuard == null
+                    ? ZombiesServiceResult.ok()
+                    : commitGuard.beforeCommit(currentWeapon, refilledWeapon);
+            if (guardResult == null || !guardResult.success()) {
+                return ZombiesServiceResult.failure(
+                        guardResult == null ? ZombiesErrorCode.WEAPON_INVALID_CURRENT_WEAPON : guardResult.code(),
+                        guardResult == null ? Map.of() : guardResult.params(),
+                        guardResult == null ? "" : guardResult.logMessage());
+            }
+            if (currentWeapon.rarityId().isBlank()) {
+                lockedState.starterWeapon()
+                        .filter(starter -> starter.sameGunAndLevel(currentWeapon.gunId(), currentWeapon.weaponLevel()))
+                        .ifPresent(ignored -> lockedState.setStarterWeapon(refilledWeapon));
+                lockedState.primaryWeapon()
+                        .filter(primary -> primary.sameGunAndLevel(currentWeapon.gunId(), currentWeapon.weaponLevel()))
+                        .ifPresent(ignored -> lockedState.setPrimaryWeapon(refilledWeapon));
+            } else {
+                lockedState.primaryWeapon()
+                        .filter(primary -> primary.sameGunAndRarity(currentWeapon.gunId(), currentWeapon.rarityId()))
+                        .ifPresent(ignored -> lockedState.setPrimaryWeapon(refilledWeapon));
+            }
+            return ZombiesServiceResult.success(new AmmoRefillResult(refilledWeapon, cost, false));
+        });
     }
 
     private static Integer priceForWeaponLevel(Map<?, Integer> pricesByWeaponLevel, int weaponLevel) {
@@ -106,6 +143,7 @@ public final class ZombiesAmmoBoxService {
     private static Map<String, ModePlayerValue> weaponParams(ZombiesWeaponInstanceState weapon) {
         Map<String, ModePlayerValue> params = new LinkedHashMap<>();
         params.put("gunId", ModePlayerValue.ofString(weapon == null ? "" : weapon.gunId()));
+        params.put("rarityId", ModePlayerValue.ofString(weapon == null ? "" : weapon.rarityId()));
         params.put("weaponLevel", ModePlayerValue.ofInt(weapon == null ? 0 : weapon.weaponLevel()));
         return params;
     }
@@ -126,20 +164,5 @@ public final class ZombiesAmmoBoxService {
         ZombiesServiceResult<?> beforeCommit(
                 ZombiesWeaponInstanceState currentWeapon,
                 ZombiesWeaponInstanceState refilledWeapon);
-    }
-
-    public record StarterAmmoRefillResult(
-            String gunId,
-            int reserveAmmo,
-            boolean starterWeapon
-    ) {
-        public StarterAmmoRefillResult(String gunId, int reserveAmmo) {
-            this(gunId, reserveAmmo, true);
-        }
-
-        public StarterAmmoRefillResult {
-            gunId = Objects.requireNonNullElse(gunId, "").trim();
-            reserveAmmo = Math.max(0, reserveAmmo);
-        }
     }
 }

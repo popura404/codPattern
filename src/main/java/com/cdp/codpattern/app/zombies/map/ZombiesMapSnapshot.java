@@ -240,23 +240,6 @@ public record ZombiesMapSnapshot(
                 .map(weaponWall -> new WeaponWallSnapshot(
                         weaponWall.objectId(),
                         "weaponWall",
-                        weaponWall.weaponLevel(),
-                        weaponWall.levelDamageMultiplier(),
-                        weaponWall.price(),
-                        weaponWall.maxReserveAmmo(),
-                        weaponWall.refreshWaves(),
-                        weaponWall.rarityPools().stream()
-                                .map(pool -> new RarityPoolSnapshot(
-                                        pool.id(),
-                                        pool.rank(),
-                                        pool.baseWeight(),
-                                        pool.waveFactor()))
-                                .toList(),
-                        weaponWall.weapons().stream()
-                                .map(candidate -> new WeaponCandidateSnapshot(
-                                        candidate.gunId(),
-                                        candidate.weightsByRarity()))
-                                .toList(),
                         weaponWall.dimension(),
                         weaponWall.pos()))
                 .toList();
@@ -652,86 +635,18 @@ public record ZombiesMapSnapshot(
     public record WeaponWallSnapshot(
             String objectId,
             String featureKey,
-            int weaponLevel,
-            double levelDamageMultiplier,
-            int price,
-            int maxReserveAmmo,
-            List<Integer> refreshWaves,
-            List<RarityPoolSnapshot> rarityPools,
-            List<WeaponCandidateSnapshot> weapons,
             String dimensionId,
             BlockPos pos
     ) {
         public WeaponWallSnapshot(
                 String objectId,
                 String featureKey,
-                int weaponLevel,
-                double levelDamageMultiplier,
-                int price,
-                List<Integer> refreshWaves,
-                List<RarityPoolSnapshot> rarityPools,
-                List<WeaponCandidateSnapshot> weapons
-        ) {
-            this(
-                    objectId,
-                    featureKey,
-                    weaponLevel,
-                    levelDamageMultiplier,
-                    price,
-                    0,
-                    refreshWaves,
-                    rarityPools,
-                    weapons);
-        }
-
-        public WeaponWallSnapshot(
-                String objectId,
-                String featureKey,
-                int weaponLevel,
-                double levelDamageMultiplier,
-                int price,
-                int maxReserveAmmo,
-                List<Integer> refreshWaves,
-                List<RarityPoolSnapshot> rarityPools,
-                List<WeaponCandidateSnapshot> weapons
-        ) {
-            this(
-                    objectId,
-                    featureKey,
-                    weaponLevel,
-                    levelDamageMultiplier,
-                    price,
-                    maxReserveAmmo,
-                    refreshWaves,
-                    rarityPools,
-                    weapons,
-                    "",
-                    null);
-        }
-
-        public WeaponWallSnapshot(
-                String objectId,
-                String featureKey,
-                int weaponLevel,
-                double levelDamageMultiplier,
-                int price,
-                int maxReserveAmmo,
-                List<Integer> refreshWaves,
-                List<RarityPoolSnapshot> rarityPools,
-                List<WeaponCandidateSnapshot> weapons,
                 ResourceKey<Level> dimension,
                 BlockPos pos
         ) {
             this(
                     objectId,
                     featureKey,
-                    weaponLevel,
-                    levelDamageMultiplier,
-                    price,
-                    maxReserveAmmo,
-                    refreshWaves,
-                    rarityPools,
-                    weapons,
                     ZombiesMapSnapshot.dimensionId(dimension),
                     pos);
         }
@@ -739,28 +654,7 @@ public record ZombiesMapSnapshot(
         public WeaponWallSnapshot {
             objectId = Objects.requireNonNullElse(objectId, "").trim();
             featureKey = Objects.requireNonNullElse(featureKey, "").trim();
-            refreshWaves = refreshWaves == null ? List.of() : List.copyOf(refreshWaves);
-            rarityPools = rarityPools == null ? List.of() : List.copyOf(rarityPools);
-            weapons = weapons == null ? List.of() : List.copyOf(weapons);
             dimensionId = normalizeDimensionId(dimensionId);
-        }
-    }
-
-    public record RarityPoolSnapshot(
-            String id,
-            int rank,
-            double baseWeight,
-            double waveFactor
-    ) {
-        public RarityPoolSnapshot {
-            id = Objects.requireNonNullElse(id, "").trim();
-        }
-    }
-
-    public record WeaponCandidateSnapshot(String gunId, Map<String, Double> weightsByRarity) {
-        public WeaponCandidateSnapshot {
-            gunId = Objects.requireNonNullElse(gunId, "").trim();
-            weightsByRarity = weightsByRarity == null ? Map.of() : Map.copyOf(weightsByRarity);
         }
     }
 

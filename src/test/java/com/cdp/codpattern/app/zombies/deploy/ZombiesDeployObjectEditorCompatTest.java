@@ -34,7 +34,7 @@ public final class ZombiesDeployObjectEditorCompatTest {
         ultimateMachineLevelsParseFromListField();
         duplicateDeleteAndClearKeepSelectionAndCountsStable();
         failurePathsKeepOriginalObjects();
-        weaponWallListFieldsParseAndUpdateFromListFields();
+        weaponWallDeprecatedFieldsIgnoredAndRemovedFromEditorFields();
         weaponWallDuplicateCreatesNonConflictingObjectId();
     }
 
@@ -448,7 +448,7 @@ public final class ZombiesDeployObjectEditorCompatTest {
                 "invalid LIST failure should not apply partially parsed entries");
     }
 
-    private static void weaponWallListFieldsParseAndUpdateFromListFields() {
+    private static void weaponWallDeprecatedFieldsIgnoredAndRemovedFromEditorFields() {
         ZombiesDeployObjectEditor.EditResult add = edit(
                 ZombiesMapObjects.EMPTY,
                 ZombiesDeployObjectEditor.Operation.ADD,
@@ -470,12 +470,8 @@ public final class ZombiesDeployObjectEditorCompatTest {
         requireSuccess(add, "weapon_wall add should succeed");
         require(add.selectedIndex() == 0, "weapon_wall add should select the inserted object");
         ZombiesWeaponWallData added = only(add.objects().weaponWalls(), "added weapon wall");
-        requireWeaponWallBase(added, "wall-1", 2, 1.25D, 650, 210);
-        require(List.of(1, 4, 7).equals(added.refreshWaves()), "weapon_wall refreshWaves should parse");
-        requireRarityPool(added.rarityPools().get(0), "common", 1, 10.0D, 0.0D);
-        requireRarityPool(added.rarityPools().get(1), "rare", 2, 1.5D, 0.25D);
-        requireWeaponCandidate(added.weapons().get(0), "codpattern:pistol", Map.of("common", 1.0D));
-        requireWeaponCandidate(added.weapons().get(1), "codpattern:rifle", Map.of("common", 0.5D, "rare", 2.0D));
+        requireWeaponWallBase(added, "wall-1", new BlockPos(5, 64, 6));
+        requireOldWeaponWallFieldsAbsent(add.fields());
 
         Map<String, String> updateFields = new LinkedHashMap<>(add.fields());
         updateFields.put("price", "725");
@@ -489,13 +485,8 @@ public final class ZombiesDeployObjectEditorCompatTest {
 
         requireSuccess(update, "weapon_wall update should succeed");
         ZombiesWeaponWallData updated = only(update.objects().weaponWalls(), "updated weapon wall");
-        requireWeaponWallBase(updated, "wall-1", 2, 1.25D, 725, 210);
-        require(List.of(1, 4, 7).equals(updated.refreshWaves()),
-                "weapon_wall update should preserve unchanged refreshWaves");
-        requireWeaponCandidate(updated.weapons().get(0), "codpattern:pistol", Map.of("common", 1.0D));
-        requireWeaponCandidate(updated.weapons().get(1), "codpattern:rifle", Map.of("common", 0.5D, "rare", 2.0D));
-        requireRarityPool(updated.rarityPools().get(0), "common", 1, 9.0D, 0.0D);
-        requireRarityPool(updated.rarityPools().get(1), "epic", 4, 0.0D, 3.5D);
+        requireWeaponWallBase(updated, "wall-1", new BlockPos(5, 64, 6));
+        requireOldWeaponWallFieldsAbsent(update.fields());
     }
 
     private static void weaponWallDuplicateCreatesNonConflictingObjectId() {
@@ -516,7 +507,7 @@ public final class ZombiesDeployObjectEditorCompatTest {
         ZombiesWeaponWallData copy = duplicate.objects().weaponWalls().get(2);
         require("wall-1_copy_2".equals(copy.objectId()),
                 "weapon_wall duplicate should generate a non-conflicting objectId");
-        requireWeaponWallBase(copy, "wall-1_copy_2", 1, 1.0D, 500, 90);
+        requireWeaponWallBase(copy, "wall-1_copy_2", new BlockPos(0, 0, 0));
     }
 
     private static ZombiesDeployObjectEditor.EditResult addAmmoBox(ZombiesMapObjects objects, String objectId) {
@@ -539,10 +530,7 @@ public final class ZombiesDeployObjectEditorCompatTest {
                 ZombiesDeployFieldSchema.WEAPON_WALL,
                 -1,
                 fields(ZombiesDeployFieldSchema.WEAPON_WALL,
-                        "objectId", objectId,
-                        "refreshWaves", "1",
-                        "rarityPools", "common=1,1.0,0.0",
-                        "weapons", "codpattern:pistol|common=1.0"));
+                        "objectId", objectId));
         requireSuccess(result, "setup weapon_wall should add " + objectId);
         return result;
     }
@@ -574,16 +562,24 @@ public final class ZombiesDeployObjectEditorCompatTest {
     private static void requireWeaponWallBase(
             ZombiesWeaponWallData wall,
             String objectId,
-            int weaponLevel,
-            double damageMultiplier,
-            int price,
-            int maxReserveAmmo
+            BlockPos pos
     ) {
         require(objectId.equals(wall.objectId()), "weapon_wall objectId should match");
-        require(wall.weaponLevel() == weaponLevel, "weapon_wall weaponLevel should match");
-        requireClose(wall.levelDamageMultiplier(), damageMultiplier, "weapon_wall damage multiplier should match");
-        require(wall.price() == price, "weapon_wall price should match");
-        require(wall.maxReserveAmmo() == maxReserveAmmo, "weapon_wall maxReserveAmmo should match");
+        require(pos.equals(wall.pos()), "weapon_wall pos should match");
+        require(wall.interactionPos().orElse(wall.pos()).equals(pos), "weapon_wall interaction should track pos");
+    }
+
+    private static void requireOldWeaponWallFieldsAbsent(Map<String, String> fields) {
+        for (String key : List.of(
+                "weaponLevel",
+                "levelDamageMultiplier",
+                "price",
+                "maxReserveAmmo",
+                "refreshWaves",
+                "rarityPools",
+                "weapons")) {
+            require(!fields.containsKey(key), "weapon_wall fields should not expose deprecated " + key);
+        }
     }
 
     private static void requireBarrier(
@@ -647,33 +643,6 @@ public final class ZombiesDeployObjectEditorCompatTest {
         require(soda.cost() == cost, "soda_machine cost should match");
         require(soda.requiresPower() == requiresPower, "soda_machine requiresPower should match");
         require(pos.equals(soda.pos()), "soda_machine position should match");
-    }
-
-    private static void requireRarityPool(
-            ZombiesWeaponWallData.RarityPoolData pool,
-            String id,
-            int rank,
-            double baseWeight,
-            double waveFactor
-    ) {
-        require(id.equals(pool.id()), "rarity pool id should match");
-        require(pool.rank() == rank, "rarity pool rank should match");
-        requireClose(pool.baseWeight(), baseWeight, "rarity pool baseWeight should match");
-        requireClose(pool.waveFactor(), waveFactor, "rarity pool waveFactor should match");
-    }
-
-    private static void requireWeaponCandidate(
-            ZombiesWeaponWallData.WeaponCandidateData candidate,
-            String gunId,
-            Map<String, Double> weightsByRarity
-    ) {
-        require(gunId.equals(candidate.gunId()), "weapon candidate gunId should match");
-        require(candidate.weightsByRarity().size() == weightsByRarity.size(),
-                "weapon candidate rarity weight count should match");
-        weightsByRarity.forEach((rarity, weight) -> requireClose(
-                candidate.weightsByRarity().getOrDefault(rarity, Double.NaN),
-                weight,
-                "weapon candidate " + rarity + " weight should match"));
     }
 
     private static void requireUltimateLevel(

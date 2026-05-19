@@ -2,6 +2,7 @@ package com.cdp.codpattern.compat.fpsmatch.event;
 
 import com.cdp.codpattern.CodPattern;
 import com.cdp.codpattern.app.match.model.ModeObjectInteractionContext;
+import com.cdp.codpattern.common.block.ZombiesBoxInteractionBlock;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGateway;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import net.minecraft.server.level.ServerPlayer;
@@ -18,6 +19,9 @@ public final class ModeObjectInteractionEventHandler {
 
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (isBlockHandledByOwnUse(event)) {
+            return;
+        }
         if (!(event.getEntity() instanceof ServerPlayer player) || player.level().isClientSide) {
             return;
         }
@@ -69,6 +73,10 @@ public final class ModeObjectInteractionEventHandler {
 
     private static ItemStack heldItem(ServerPlayer player, PlayerInteractEvent event) {
         return event.getHand() == null ? ItemStack.EMPTY : player.getItemInHand(event.getHand()).copy();
+    }
+
+    private static boolean isBlockHandledByOwnUse(PlayerInteractEvent.RightClickBlock event) {
+        return event.getLevel().getBlockState(event.getPos()).getBlock() instanceof ZombiesBoxInteractionBlock;
     }
 
     private static void applyResult(PlayerInteractEvent event, InteractionResult result) {

@@ -64,13 +64,6 @@ public final class ZombiesDeployFieldSchema {
             )),
             new ObjectTypeSchema(WEAPON_WALL, "gui.codpattern.zombies.deploy.type.weapon_wall", false, false, List.of(
                     field("objectId", FieldType.TEXT, ""),
-                    field("weaponLevel", FieldType.INTEGER, "1"),
-                    field("levelDamageMultiplier", FieldType.DECIMAL, "1.0"),
-                    field("price", FieldType.INTEGER, "500"),
-                    field("maxReserveAmmo", FieldType.INTEGER, "90"),
-                    field("refreshWaves", FieldType.LIST, "1"),
-                    field("rarityPools", FieldType.LIST, "common=1,1.0,0.0"),
-                    field("weapons", FieldType.LIST, "codpattern:pistol|common=1.0"),
                     field("dimension", FieldType.TEXT, "minecraft:overworld"),
                     field("posX", FieldType.INTEGER, "0"),
                     field("posY", FieldType.INTEGER, "64"),

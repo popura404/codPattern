@@ -20,6 +20,7 @@ public final class ZombiesWeaponItemStackService {
     public static final String TAG_INSTANCE_ID = "codpattern.zombies.instanceId";
     public static final String TAG_SLOT = "codpattern.zombies.slot";
     public static final String TAG_GUN_ID = "codpattern.zombies.gunId";
+    public static final String TAG_RARITY_ID = "codpattern.zombies.rarityId";
     public static final String TAG_WEAPON_LEVEL = "codpattern.zombies.weaponLevel";
     public static final String TAG_LEVEL_DAMAGE_MULTIPLIER = "codpattern.zombies.levelDamageMultiplier";
     public static final String TAG_UPGRADE_LEVEL = "codpattern.zombies.upgradeLevel";
@@ -91,6 +92,7 @@ public final class ZombiesWeaponItemStackService {
                 instanceId,
                 slot.get(),
                 gunId,
+                stringTag(tag, TAG_RARITY_ID),
                 positiveIntTag(tag, TAG_WEAPON_LEVEL),
                 positiveDoubleTag(tag, TAG_LEVEL_DAMAGE_MULTIPLIER, 1.0D),
                 positiveIntTag(tag, TAG_UPGRADE_LEVEL),
@@ -161,6 +163,7 @@ public final class ZombiesWeaponItemStackService {
         tag.remove(TAG_INSTANCE_ID);
         tag.remove(TAG_SLOT);
         tag.remove(TAG_GUN_ID);
+        tag.remove(TAG_RARITY_ID);
         tag.remove(TAG_WEAPON_LEVEL);
         tag.remove(TAG_LEVEL_DAMAGE_MULTIPLIER);
         tag.remove(TAG_UPGRADE_LEVEL);
@@ -176,6 +179,11 @@ public final class ZombiesWeaponItemStackService {
         tag.putString(TAG_INSTANCE_ID, data.instanceId());
         tag.putString(TAG_SLOT, data.slot().key());
         tag.putString(TAG_GUN_ID, data.gunId());
+        if (data.rarityId().isBlank()) {
+            tag.remove(TAG_RARITY_ID);
+        } else {
+            tag.putString(TAG_RARITY_ID, data.rarityId());
+        }
         tag.putInt(TAG_WEAPON_LEVEL, data.weaponLevel());
         tag.putFloat(TAG_LEVEL_DAMAGE_MULTIPLIER, (float) data.levelDamageMultiplier());
         tag.putInt(TAG_UPGRADE_LEVEL, data.upgradeLevel());
@@ -245,6 +253,7 @@ public final class ZombiesWeaponItemStackService {
             String instanceId,
             ZombiesEquipmentSlot slot,
             String gunId,
+            String rarityId,
             int weaponLevel,
             double levelDamageMultiplier,
             int upgradeLevel,
@@ -257,6 +266,7 @@ public final class ZombiesWeaponItemStackService {
             instanceId = normalizeInstanceId(instanceId);
             slot = Objects.requireNonNull(slot, "slot");
             gunId = Objects.requireNonNullElse(gunId, "").trim();
+            rarityId = Objects.requireNonNullElse(rarityId, "").trim();
             weaponLevel = Math.max(0, weaponLevel);
             levelDamageMultiplier = ZombiesWeaponInstanceState.isValidDamageMultiplier(levelDamageMultiplier)
                     ? levelDamageMultiplier
@@ -281,6 +291,7 @@ public final class ZombiesWeaponItemStackService {
                     instanceId,
                     slot,
                     weaponState.gunId(),
+                    weaponState.rarityId(),
                     weaponState.weaponLevel(),
                     weaponState.levelDamageMultiplier(),
                     weaponState.upgradeLevel(),
@@ -292,6 +303,7 @@ public final class ZombiesWeaponItemStackService {
         public ZombiesWeaponInstanceState toWeaponState() {
             return new ZombiesWeaponInstanceState(
                     gunId,
+                    rarityId,
                     weaponLevel,
                     upgradeLevel,
                     levelDamageMultiplier,

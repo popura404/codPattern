@@ -7,6 +7,7 @@ import java.util.Objects;
  */
 public record ZombiesWeaponInstanceState(
         String gunId,
+        String rarityId,
         int weaponLevel,
         int upgradeLevel,
         double levelDamageMultiplier,
@@ -16,6 +17,7 @@ public record ZombiesWeaponInstanceState(
 ) {
     public ZombiesWeaponInstanceState {
         gunId = Objects.requireNonNullElse(gunId, "").trim();
+        rarityId = Objects.requireNonNullElse(rarityId, "").trim();
         weaponLevel = Math.max(0, weaponLevel);
         upgradeLevel = Math.max(0, upgradeLevel);
         levelDamageMultiplier = sanitizePositive(levelDamageMultiplier, 1.0D);
@@ -34,10 +36,31 @@ public record ZombiesWeaponInstanceState(
     ) {
         this(
                 gunId,
+                "",
                 weaponLevel,
                 upgradeLevel,
                 upgradeLevel > 0 ? 1.0D : damageMultiplier,
                 upgradeLevel > 0 ? damageMultiplier : 1.0D,
+                reserveAmmo,
+                maxReserveAmmo);
+    }
+
+    public ZombiesWeaponInstanceState(
+            String gunId,
+            int weaponLevel,
+            int upgradeLevel,
+            double levelDamageMultiplier,
+            double upgradeDamageMultiplier,
+            int reserveAmmo,
+            int maxReserveAmmo
+    ) {
+        this(
+                gunId,
+                "",
+                weaponLevel,
+                upgradeLevel,
+                levelDamageMultiplier,
+                upgradeDamageMultiplier,
                 reserveAmmo,
                 maxReserveAmmo);
     }
@@ -50,6 +73,25 @@ public record ZombiesWeaponInstanceState(
     ) {
         return new ZombiesWeaponInstanceState(
                 gunId,
+                "",
+                weaponLevel,
+                0,
+                damageMultiplier,
+                1.0D,
+                maxReserveAmmo,
+                maxReserveAmmo);
+    }
+
+    public static ZombiesWeaponInstanceState wallPrimary(
+            String gunId,
+            String rarityId,
+            int weaponLevel,
+            double damageMultiplier,
+            int maxReserveAmmo
+    ) {
+        return new ZombiesWeaponInstanceState(
+                gunId,
+                rarityId,
                 weaponLevel,
                 0,
                 damageMultiplier,
@@ -63,6 +105,12 @@ public record ZombiesWeaponInstanceState(
         return this.gunId.equals(normalizedGunId) && this.weaponLevel == weaponLevel;
     }
 
+    public boolean sameGunAndRarity(String gunId, String rarityId) {
+        String normalizedGunId = Objects.requireNonNullElse(gunId, "").trim();
+        String normalizedRarityId = Objects.requireNonNullElse(rarityId, "").trim();
+        return this.gunId.equals(normalizedGunId) && this.rarityId.equals(normalizedRarityId);
+    }
+
     public boolean isReserveFull() {
         return reserveAmmo >= maxReserveAmmo;
     }
@@ -74,6 +122,7 @@ public record ZombiesWeaponInstanceState(
     public ZombiesWeaponInstanceState withReserveAmmo(int reserveAmmo) {
         return new ZombiesWeaponInstanceState(
                 gunId,
+                rarityId,
                 weaponLevel,
                 upgradeLevel,
                 levelDamageMultiplier,
@@ -87,6 +136,7 @@ public record ZombiesWeaponInstanceState(
         int nextReserveAmmo = refill ? sanitizedMaxReserveAmmo : Math.min(reserveAmmo, sanitizedMaxReserveAmmo);
         return new ZombiesWeaponInstanceState(
                 gunId,
+                rarityId,
                 weaponLevel,
                 upgradeLevel,
                 levelDamageMultiplier,
@@ -98,6 +148,7 @@ public record ZombiesWeaponInstanceState(
     public ZombiesWeaponInstanceState withUpgrade(int upgradeLevel, double upgradeDamageMultiplier) {
         return new ZombiesWeaponInstanceState(
                 gunId,
+                rarityId,
                 weaponLevel,
                 upgradeLevel,
                 levelDamageMultiplier,

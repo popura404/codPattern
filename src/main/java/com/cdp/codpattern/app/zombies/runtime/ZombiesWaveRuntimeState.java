@@ -20,6 +20,7 @@ public final class ZombiesWaveRuntimeState {
     private int activeZombies;
     private int remainingBudget;
     private int waveTimeTicks;
+    private int waveCompleteDelayTicks;
     private boolean waveComplete;
     private boolean budgetInitialized;
     private long lastSpawnAttemptTick = Long.MIN_VALUE;
@@ -50,6 +51,10 @@ public final class ZombiesWaveRuntimeState {
 
     public int waveTimeTicks() {
         return waveTimeTicks;
+    }
+
+    public int waveCompleteDelayTicks() {
+        return waveCompleteDelayTicks;
     }
 
     public boolean isWaveComplete() {
@@ -89,6 +94,7 @@ public final class ZombiesWaveRuntimeState {
         budgetInitialized = false;
         waveComplete = false;
         waveTimeTicks = 0;
+        waveCompleteDelayTicks = 0;
     }
 
     public void beginTargetWave() {
@@ -96,6 +102,7 @@ public final class ZombiesWaveRuntimeState {
         budgetInitialized = false;
         waveComplete = false;
         waveTimeTicks = 0;
+        waveCompleteDelayTicks = 0;
     }
 
     public void beginTargetWave(ZombiesWaveDefinition definition) {
@@ -108,6 +115,7 @@ public final class ZombiesWaveRuntimeState {
         activeZombieEntityIds.clear();
         activeZombies = 0;
         remainingBudget = 0;
+        waveCompleteDelayTicks = 0;
         recentSpawnFailureReason = "";
         recentLifecycleReason = "";
         lastSpawnAttemptTick = Long.MIN_VALUE;
@@ -133,10 +141,12 @@ public final class ZombiesWaveRuntimeState {
 
     public void setActiveZombies(int activeZombies) {
         this.activeZombies = Math.max(0, activeZombies);
+        resetWaveCompleteDelayIfIncomplete();
     }
 
     public void setRemainingBudget(int remainingBudget) {
         this.remainingBudget = Math.max(0, remainingBudget);
+        resetWaveCompleteDelayIfIncomplete();
     }
 
     public void recordSpawnAttempt(long roomTick) {
@@ -174,6 +184,7 @@ public final class ZombiesWaveRuntimeState {
         }
         remainingBudget = Math.max(0, remainingBudget - 1);
         waveComplete = remainingBudget <= 0 && activeZombies <= 0;
+        resetWaveCompleteDelayIfIncomplete();
         recentSpawnFailureReason = "";
         return true;
     }
@@ -184,6 +195,7 @@ public final class ZombiesWaveRuntimeState {
         }
         activeZombies = activeZombieEntityIds.size();
         waveComplete = remainingBudget <= 0 && activeZombies <= 0;
+        resetWaveCompleteDelayIfIncomplete();
         return true;
     }
 
@@ -194,6 +206,7 @@ public final class ZombiesWaveRuntimeState {
         activeZombies = activeZombieEntityIds.size();
         recordLifecycleReason(reason);
         waveComplete = remainingBudget <= 0 && activeZombies <= 0;
+        resetWaveCompleteDelayIfIncomplete();
         return true;
     }
 
@@ -201,8 +214,21 @@ public final class ZombiesWaveRuntimeState {
         this.waveComplete = true;
         this.remainingBudget = 0;
         this.activeZombies = 0;
+        this.waveCompleteDelayTicks = 0;
         activeZombieEntityIds.clear();
         remainingBudgetByMobId.clear();
+    }
+
+    public boolean tickWaveCompleteDelay(int requiredTicks) {
+        if (requiredTicks <= 0) {
+            return true;
+        }
+        waveCompleteDelayTicks++;
+        return waveCompleteDelayTicks >= requiredTicks;
+    }
+
+    public void resetWaveCompleteDelay() {
+        waveCompleteDelayTicks = 0;
     }
 
     public void tickWaveTime() {
@@ -216,6 +242,7 @@ public final class ZombiesWaveRuntimeState {
         activeZombies = 0;
         remainingBudget = 0;
         waveTimeTicks = 0;
+        waveCompleteDelayTicks = 0;
         waveComplete = false;
         budgetInitialized = false;
         lastSpawnAttemptTick = Long.MIN_VALUE;
@@ -223,5 +250,11 @@ public final class ZombiesWaveRuntimeState {
         recentLifecycleReason = "";
         remainingBudgetByMobId.clear();
         activeZombieEntityIds.clear();
+    }
+
+    private void resetWaveCompleteDelayIfIncomplete() {
+        if (!isWaveComplete()) {
+            resetWaveCompleteDelay();
+        }
     }
 }

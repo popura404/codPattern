@@ -43,8 +43,10 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
     private static final String AREA_POS_1_TAG = "ZombiesDeployAreaPos1";
     private static final String AREA_POS_2_TAG = "ZombiesDeployAreaPos2";
     private static final String HELD_AREA_PREVIEW_STATE_TAG = "HeldZombiesDeployAreaPreviewState";
+    private static final String BLOCK_PLACE_COOLDOWN_UNTIL_TICK_TAG = "ZombiesDeployBlockPlaceCooldownUntilTick";
     private static final int AREA_PREVIEW_COLOR = 0xFFFFFFFF;
     private static final int HELD_AREA_PREVIEW_REFRESH_INTERVAL = 10;
+    private static final int VANILLA_BLOCK_PLACE_INTERVAL_TICKS = 4;
 
     public ZombiesDeployTool(Properties properties) {
         super(properties);
@@ -55,13 +57,13 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
         switch (action) {
             case CTRL_RIGHT_CLICK -> ZombiesDeployToolActionC2SPacket.sendScreen(player, stack, getDraft(stack));
             case LEFT_CLICK_BLOCK -> {
-                if (hit == null) {
+                if (hit == null || !consumeBlockPlaceCooldown(player, stack)) {
                     return;
                 }
                 captureWorldClick(player, stack, hit.placementPos(), true);
             }
             case RIGHT_CLICK_BLOCK -> {
-                if (hit == null) {
+                if (hit == null || !consumeBlockPlaceCooldown(player, stack)) {
                     return;
                 }
                 captureWorldClick(player, stack, hit.placementPos(), false);
@@ -95,6 +97,25 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
                     result.messageKey(),
                     result.arguments().toArray()).withStyle(result.success() ? ChatFormatting.AQUA : ChatFormatting.RED), true);
         }
+    }
+
+    private static boolean consumeBlockPlaceCooldown(ServerPlayer player, ItemStack stack) {
+        if (player == null || stack == null) {
+            return false;
+        }
+        ZombiesDeployDraft draft = getDraft(stack);
+        if (ZombiesDeployDraft.STAGE_MAP_REGISTRATION.equals(draft.workspaceStage())) {
+            return true;
+        }
+
+        long gameTime = player.serverLevel().getGameTime();
+        CompoundTag data = player.getPersistentData();
+        long nextAllowedTick = data.getLong(BLOCK_PLACE_COOLDOWN_UNTIL_TICK_TAG);
+        if (gameTime < nextAllowedTick) {
+            return false;
+        }
+        data.putLong(BLOCK_PLACE_COOLDOWN_UNTIL_TICK_TAG, gameTime + VANILLA_BLOCK_PLACE_INTERVAL_TICKS);
+        return true;
     }
 
     private void syncStandaloneAreaPreview(ServerPlayer player, ItemStack stack) {

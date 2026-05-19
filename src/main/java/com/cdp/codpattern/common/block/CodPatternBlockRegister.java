@@ -34,10 +34,60 @@ public final class CodPatternBlockRegister {
                     .isSuffocating((state, level, pos) -> false)
                     .isViewBlocking((state, level, pos) -> false))
     );
+    public static final RegistryObject<ZombiesBoxInteractionBlock> ZOMBIES_WEAPON_WALL_BOX = BLOCKS.register(
+            "zombies_weapon_wall_box",
+            () -> new ZombiesBoxInteractionBlock(BlockBehaviour.Properties.copy(Blocks.RED_CONCRETE)
+                    .strength(2.0F, 6.0F)
+                    .sound(SoundType.WOOD))
+    );
+    public static final RegistryObject<ZombiesBoxInteractionBlock> ZOMBIES_AMMO_BOX = BLOCKS.register(
+            "zombies_ammo_box",
+            () -> new ZombiesBoxInteractionBlock(BlockBehaviour.Properties.copy(Blocks.GREEN_CONCRETE)
+                    .strength(2.0F, 6.0F)
+                    .sound(SoundType.WOOD))
+    );
+    public static final RegistryObject<ZombiesBoxInteractionBlock> ZOMBIES_ARMOR_STATION_BOX = BLOCKS.register(
+            "zombies_armor_station_box",
+            () -> new ZombiesBoxInteractionBlock(BlockBehaviour.Properties.copy(Blocks.BLUE_CONCRETE)
+                    .strength(2.0F, 6.0F)
+                    .sound(SoundType.WOOD))
+    );
+    public static final RegistryObject<ZombiesBoxInteractionBlock> ZOMBIES_SODA_MACHINE_BOX = BLOCKS.register(
+            "zombies_soda_machine_box",
+            () -> new ZombiesBoxInteractionBlock(BlockBehaviour.Properties.copy(Blocks.YELLOW_CONCRETE)
+                    .strength(2.0F, 6.0F)
+                    .sound(SoundType.WOOD))
+    );
+    public static final RegistryObject<ZombiesBoxInteractionBlock> ZOMBIES_ULTIMATE_MACHINE_BOX = BLOCKS.register(
+            "zombies_ultimate_machine_box",
+            () -> new ZombiesBoxInteractionBlock(BlockBehaviour.Properties.copy(Blocks.PURPLE_CONCRETE)
+                    .strength(2.0F, 6.0F)
+                    .sound(SoundType.WOOD))
+    );
 
     public static final RegistryObject<Item> ZOMBIES_POWER_SWITCH_ITEM = ITEMS.register(
             "zombies_power_switch",
             () -> new BlockItem(ZOMBIES_POWER_SWITCH.get(), new Item.Properties())
+    );
+    public static final RegistryObject<Item> ZOMBIES_WEAPON_WALL_BOX_ITEM = ITEMS.register(
+            "zombies_weapon_wall_box",
+            () -> new BlockItem(ZOMBIES_WEAPON_WALL_BOX.get(), new Item.Properties())
+    );
+    public static final RegistryObject<Item> ZOMBIES_AMMO_BOX_ITEM = ITEMS.register(
+            "zombies_ammo_box",
+            () -> new BlockItem(ZOMBIES_AMMO_BOX.get(), new Item.Properties())
+    );
+    public static final RegistryObject<Item> ZOMBIES_ARMOR_STATION_BOX_ITEM = ITEMS.register(
+            "zombies_armor_station_box",
+            () -> new BlockItem(ZOMBIES_ARMOR_STATION_BOX.get(), new Item.Properties())
+    );
+    public static final RegistryObject<Item> ZOMBIES_SODA_MACHINE_BOX_ITEM = ITEMS.register(
+            "zombies_soda_machine_box",
+            () -> new BlockItem(ZOMBIES_SODA_MACHINE_BOX.get(), new Item.Properties())
+    );
+    public static final RegistryObject<Item> ZOMBIES_ULTIMATE_MACHINE_BOX_ITEM = ITEMS.register(
+            "zombies_ultimate_machine_box",
+            () -> new BlockItem(ZOMBIES_ULTIMATE_MACHINE_BOX.get(), new Item.Properties())
     );
 
     private CodPatternBlockRegister() {
@@ -48,6 +98,11 @@ public final class CodPatternBlockRegister {
                 && (CreativeModeTabs.FUNCTIONAL_BLOCKS.equals(event.getTabKey())
                 || CreativeModeTabs.REDSTONE_BLOCKS.equals(event.getTabKey()))) {
             event.accept(ZOMBIES_POWER_SWITCH_ITEM);
+            event.accept(ZOMBIES_WEAPON_WALL_BOX_ITEM);
+            event.accept(ZOMBIES_AMMO_BOX_ITEM);
+            event.accept(ZOMBIES_ARMOR_STATION_BOX_ITEM);
+            event.accept(ZOMBIES_SODA_MACHINE_BOX_ITEM);
+            event.accept(ZOMBIES_ULTIMATE_MACHINE_BOX_ITEM);
         }
     }
 }

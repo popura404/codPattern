@@ -9,7 +9,6 @@ import net.minecraft.core.BlockPos;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -35,8 +34,6 @@ public final class ZombiesMapValidator {
             ZombiesErrorCode.of("map.invalid_barrier");
     private static final ZombiesErrorCode MAP_INVALID_WEAPON_WALL =
             ZombiesErrorCode.of("map.invalid_weapon_wall");
-    private static final ZombiesErrorCode MAP_WEAPON_WALL_MISSING_TOP_RARITY_CANDIDATE =
-            ZombiesErrorCode.of("map.weapon_wall_missing_top_rarity_candidate");
     private static final ZombiesErrorCode MAP_INVALID_AMMO_BOX =
             ZombiesErrorCode.of("map.invalid_ammo_box");
     private static final ZombiesErrorCode MAP_INVALID_ARMOR_STATION =
@@ -51,8 +48,6 @@ public final class ZombiesMapValidator {
             ZombiesErrorCode.of("map.missing_ultimate_machine");
     private static final ZombiesErrorCode MAP_INVALID_ULTIMATE_MACHINE =
             ZombiesErrorCode.of("map.invalid_ultimate_machine");
-    private static final ZombiesErrorCode MAP_MISSING_VALID_WAVES =
-            ZombiesErrorCode.of("map.missing_valid_waves");
     private static final ZombiesErrorCode MAP_MISSING_WEAPON_WALL =
             ZombiesErrorCode.of("map.missing_weapon_wall");
     private static final ZombiesErrorCode MAP_MISSING_AMMO_BOX =
@@ -147,15 +142,6 @@ public final class ZombiesMapValidator {
                     MAP_MISSING_GROUP_ONE_ZOMBIE_SPAWN,
                     "zombie_spawn.group_1",
                     "Zombies map requires at least one group=1 zombie spawn with positive weight."));
-        }
-        if (ZombiesMapValidationProfile.MVP1_MINIMAL_KEY.equals(profile.key())
-                && snapshot.weaponWalls().stream().noneMatch(wall ->
-                        !wall.refreshWaves().isEmpty()
-                                && wall.refreshWaves().stream().anyMatch(wave -> wave != null && wave > 0))) {
-            issues.add(ZombiesValidationIssue.warning(
-                    MAP_MISSING_VALID_WAVES,
-                    "weapon_wall",
-                    "Zombies map should have at least one weapon wall with valid refresh waves (non-empty with positive values)."));
         }
         if (profile.rejectDynamicPlayerSpawns()) {
             snapshot.spawns().stream()
@@ -298,159 +284,11 @@ public final class ZombiesMapValidator {
             List<ZombiesValidationIssue> issues
     ) {
         String subject = subject("weapon_wall", weaponWall.objectId(), weaponWall.featureKey());
-        if (weaponWall.weaponLevel() <= 0) {
+        if (weaponWall.pos() == null && weaponWall.dimensionId().isBlank()) {
             issues.add(ZombiesValidationIssue.error(
                     MAP_INVALID_WEAPON_WALL,
                     subject,
-                    "Weapon wall weaponLevel must be positive."));
-        }
-        if (!Double.isFinite(weaponWall.levelDamageMultiplier())
-                || weaponWall.levelDamageMultiplier() <= 0.0D) {
-            issues.add(ZombiesValidationIssue.error(
-                    MAP_INVALID_WEAPON_WALL,
-                    subject,
-                    "Weapon wall levelDamageMultiplier must be positive."));
-        }
-        if (weaponWall.price() < 0) {
-            issues.add(ZombiesValidationIssue.error(
-                    MAP_INVALID_WEAPON_WALL,
-                    subject,
-                    "Weapon wall price must be non-negative."));
-        }
-        if (weaponWall.maxReserveAmmo() < 0) {
-            issues.add(ZombiesValidationIssue.error(
-                    MAP_INVALID_WEAPON_WALL,
-                    subject,
-                    "Weapon wall maxReserveAmmo must be non-negative."));
-        }
-        for (Integer refreshWave : weaponWall.refreshWaves()) {
-            if (refreshWave == null || refreshWave <= 0) {
-                issues.add(ZombiesValidationIssue.error(
-                        MAP_INVALID_WEAPON_WALL,
-                        subject,
-                        "Weapon wall refresh waves must be positive."));
-            }
-        }
-
-        Map<String, Integer> rarityRanks = new LinkedHashMap<>();
-        Set<String> duplicateRarityIds = new HashSet<>();
-        if (weaponWall.rarityPools().isEmpty()) {
-            issues.add(ZombiesValidationIssue.error(
-                    MAP_INVALID_WEAPON_WALL,
-                    subject,
-                    "Weapon wall requires at least one rarity pool."));
-        }
-        for (ZombiesMapSnapshot.RarityPoolSnapshot pool : weaponWall.rarityPools()) {
-            if (pool.id().isBlank()) {
-                issues.add(ZombiesValidationIssue.error(
-                        MAP_INVALID_WEAPON_WALL,
-                        subject,
-                        "Weapon wall rarity pool id must be non-empty."));
-            } else if (rarityRanks.putIfAbsent(pool.id(), pool.rank()) != null) {
-                duplicateRarityIds.add(pool.id());
-            }
-            if (pool.rank() < 0) {
-                issues.add(ZombiesValidationIssue.error(
-                        MAP_INVALID_WEAPON_WALL,
-                        subject,
-                        "Weapon wall rarity rank must be non-negative."));
-            }
-            if (!Double.isFinite(pool.baseWeight()) || pool.baseWeight() < 0.0D) {
-                issues.add(ZombiesValidationIssue.error(
-                        MAP_INVALID_WEAPON_WALL,
-                        subject,
-                        "Weapon wall rarity baseWeight must be non-negative."));
-            }
-            if (!Double.isFinite(pool.waveFactor()) || pool.waveFactor() < 0.0D) {
-                issues.add(ZombiesValidationIssue.error(
-                        MAP_INVALID_WEAPON_WALL,
-                        subject,
-                        "Weapon wall rarity waveFactor must be non-negative."));
-            }
-        }
-        for (String rarityId : duplicateRarityIds) {
-            issues.add(ZombiesValidationIssue.error(
-                    MAP_INVALID_WEAPON_WALL,
-                    subject,
-                    "Weapon wall rarity pool id '" + rarityId + "' is duplicated."));
-        }
-
-        if (weaponWall.weapons().isEmpty()) {
-            issues.add(ZombiesValidationIssue.error(
-                    MAP_INVALID_WEAPON_WALL,
-                    subject,
-                    "Weapon wall requires at least one weapon candidate."));
-        }
-        for (ZombiesMapSnapshot.WeaponCandidateSnapshot candidate : weaponWall.weapons()) {
-            if (candidate.gunId().isBlank()) {
-                issues.add(ZombiesValidationIssue.error(
-                        MAP_INVALID_WEAPON_WALL,
-                        subject,
-                        "Weapon wall weapon candidate gunId must be non-empty."));
-            }
-            for (Map.Entry<String, Double> entry : candidate.weightsByRarity().entrySet()) {
-                String rarityId = Objects.requireNonNullElse(entry.getKey(), "").trim();
-                Double weight = entry.getValue();
-                if (rarityId.isEmpty()) {
-                    issues.add(ZombiesValidationIssue.error(
-                            MAP_INVALID_WEAPON_WALL,
-                            subject,
-                            "Weapon wall weapon candidate contains an empty rarity id."));
-                } else if (!rarityRanks.isEmpty() && !rarityRanks.containsKey(rarityId)) {
-                    issues.add(ZombiesValidationIssue.error(
-                            MAP_INVALID_WEAPON_WALL,
-                            subject,
-                            "Weapon wall weapon candidate references unknown rarity '" + rarityId + "'."));
-                }
-                if (weight == null || !Double.isFinite(weight) || weight < 0.0D) {
-                    issues.add(ZombiesValidationIssue.error(
-                            MAP_INVALID_WEAPON_WALL,
-                            subject,
-                            "Weapon wall candidate weights must be non-negative."));
-                }
-            }
-        }
-
-        addTopRarityCandidateIssue(weaponWall, rarityRanks, subject, issues);
-    }
-
-    private static void addTopRarityCandidateIssue(
-            ZombiesMapSnapshot.WeaponWallSnapshot weaponWall,
-            Map<String, Integer> rarityRanks,
-            String subject,
-            List<ZombiesValidationIssue> issues
-    ) {
-        if (rarityRanks.isEmpty() || weaponWall.weapons().isEmpty()) {
-            return;
-        }
-        int highestRank = Integer.MIN_VALUE;
-        for (Integer rank : rarityRanks.values()) {
-            highestRank = Math.max(highestRank, rank);
-        }
-        Set<String> highestRarityIds = new LinkedHashSet<>();
-        for (Map.Entry<String, Integer> entry : rarityRanks.entrySet()) {
-            if (entry.getValue() == highestRank) {
-                highestRarityIds.add(entry.getKey());
-            }
-        }
-        boolean hasCandidate = false;
-        for (ZombiesMapSnapshot.WeaponCandidateSnapshot candidate : weaponWall.weapons()) {
-            for (String rarityId : highestRarityIds) {
-                Double weight = candidate.weightsByRarity().get(rarityId);
-                if (weight != null && Double.isFinite(weight) && weight > 0.0D) {
-                    hasCandidate = true;
-                    break;
-                }
-            }
-            if (hasCandidate) {
-                break;
-            }
-        }
-        if (!hasCandidate) {
-            issues.add(ZombiesValidationIssue.error(
-                    MAP_WEAPON_WALL_MISSING_TOP_RARITY_CANDIDATE,
-                    subject,
-                    "Weapon wall highest-rank rarity must have at least one candidate with positive weight."));
+                    "Weapon wall requires a deployment position."));
         }
     }
 

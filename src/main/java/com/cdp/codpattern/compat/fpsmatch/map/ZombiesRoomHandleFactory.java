@@ -298,13 +298,16 @@ final class ZombiesRoomHandleFactory {
 
     private static List<RoomSummaryMetric> buildMetrics(ZombiesMap map) {
         ZombiesWaveRuntimeState waveState = map.runtimeState().waveState();
+        int displayWave = map.runtimeState().phase() == ZombiesGamePhase.INTERMISSION
+                ? waveState.targetWave()
+                : waveState.currentWave();
         int zombiesLeft = Math.max(0, waveState.remainingBudget() + waveState.activeZombies());
         int alivePlayers = map.playerStateService().aliveCount(
                 map.runtimeState().roomTick(),
                 map.connectionStateService().offlineGraceTicks());
 
         return List.of(
-                metric(ZombiesRuntimeStateKeys.METRIC_WAVE, waveState.currentWave(), MetricDisplay.NUMBER),
+                metric(ZombiesRuntimeStateKeys.METRIC_WAVE, displayWave, MetricDisplay.NUMBER),
                 metric(ZombiesRuntimeStateKeys.METRIC_ZOMBIES_LEFT, zombiesLeft, MetricDisplay.NUMBER),
                 metric(ZombiesRuntimeStateKeys.METRIC_ACTIVE_ZOMBIES, waveState.activeZombies(), MetricDisplay.NUMBER),
                 metric(ZombiesRuntimeStateKeys.METRIC_ALIVE_PLAYERS, alivePlayers, MetricDisplay.PLAYER_COUNT),

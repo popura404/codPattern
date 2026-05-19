@@ -7,6 +7,7 @@ import com.cdp.codpattern.app.zombies.map.ZombiesMapSnapshot;
 import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidationReport;
 import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidationProfile;
 import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidator;
+import com.cdp.codpattern.app.zombies.validation.ZombiesValidationIssue;
 import com.cdp.codpattern.config.zombies.ZombiesRulesRepository;
 
 import java.nio.file.Path;
@@ -133,6 +134,9 @@ public final class ZombiesStartupValidationService {
         mapReport.issues().stream()
                 .map(ZombiesStartupPreflightSnapshot.Issue::fromMapIssue)
                 .forEach(issues::add);
+        rulesIssues().stream()
+                .map(ZombiesStartupPreflightSnapshot.Issue::fromRulesIssue)
+                .forEach(issues::add);
         waveLoadResult.getIssues().stream()
                 .map(ZombiesStartupPreflightSnapshot.Issue::fromWaveIssue)
                 .forEach(issues::add);
@@ -160,6 +164,7 @@ public final class ZombiesStartupValidationService {
         params.put("maxWave", ModePlayerValue.ofInt(snapshot.maxWave()));
         params.put("mapIssueCount", ModePlayerValue.ofInt(snapshot.mapReport().errors().size()));
         params.put("waveIssueCount", ModePlayerValue.ofInt(snapshot.waveIssues().size()));
+        params.put("rulesIssueCount", ModePlayerValue.ofInt(snapshot.rulesIssues().size()));
         snapshot.firstError().ifPresent(issue -> {
             params.put("firstIssueSource", ModePlayerValue.ofString(issue.source()));
             params.put("firstIssueCode", ModePlayerValue.ofString(issue.code().key()));
@@ -175,7 +180,13 @@ public final class ZombiesStartupValidationService {
                 + " (maxWave=" + snapshot.maxWave()
                 + ", mapErrors=" + snapshot.mapReport().errors().size()
                 + ", waveIssues=" + snapshot.waveIssues().size()
+                + ", rulesIssues=" + snapshot.rulesIssues().size()
                 + ", firstIssue=" + firstIssue + ")";
+    }
+
+    private static List<ZombiesValidationIssue> rulesIssues() {
+        List<ZombiesValidationIssue> issues = ZombiesRulesRepository.getLastValidationIssues();
+        return issues == null ? List.of() : issues;
     }
 
     private static Supplier<ZombiesWaveConfigRepository> repositorySupplier(Path wavesDirectory) {

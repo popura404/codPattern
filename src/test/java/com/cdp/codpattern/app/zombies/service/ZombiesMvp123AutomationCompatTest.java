@@ -103,6 +103,11 @@ public final class ZombiesMvp123AutomationCompatTest {
             require(harness.state.waveState().currentWave() == 1, "wave active should begin target wave 1");
 
             harness.state.waveState().markWaveComplete();
+            for (int tick = 0; tick < ZombiesPhaseStateMachine.WAVE_COMPLETE_DELAY_TICKS - 1; tick++) {
+                tickAndApply(harness.state, config, ZombiesPhaseStateMachine.FailureCheckResult.none(), true);
+                requirePhase(harness.state, ZombiesGamePhase.WAVE_ACTIVE,
+                        "empty final wave should stay active during the hard wave-complete delay");
+            }
             tickAndApply(harness.state, config, ZombiesPhaseStateMachine.FailureCheckResult.none(), true);
             requirePhase(harness.state, ZombiesGamePhase.VICTORY,
                     "empty final wave should settle to victory");

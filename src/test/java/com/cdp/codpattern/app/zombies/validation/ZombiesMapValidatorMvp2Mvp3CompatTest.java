@@ -18,8 +18,7 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
     }
 
     public static void main(String[] args) {
-        mvp2WeaponWallHighestRarityWithoutCandidateFails();
-        mvp2WeaponWallNegativeMaxReserveAmmoFails();
+        mvp2WeaponWallOnlyRequiresLocation();
         mvp3RequiresPowerSodaWithoutPowerSwitchIgnoresRequiresPowerFlag();
         mvp3RequiresPowerUltimateWithoutPowerSwitchIgnoresRequiresPowerFlag();
         mvp3NoPowerSwitchPasses();
@@ -45,49 +44,20 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
         mvp3FullInitialSnapshotSucceeds();
     }
 
-    private static void mvp2WeaponWallHighestRarityWithoutCandidateFails() {
+    private static void mvp2WeaponWallOnlyRequiresLocation() {
         ZombiesMapSnapshot.WeaponWallSnapshot wall = new ZombiesMapSnapshot.WeaponWallSnapshot(
                 "wall-1",
                 "weaponWall",
-                1,
-                1.0D,
-                500,
-                List.of(),
-                List.of(
-                        new ZombiesMapSnapshot.RarityPoolSnapshot("common", 1, 1.0D, 0.0D),
-                        new ZombiesMapSnapshot.RarityPoolSnapshot("rare", 2, 1.0D, 0.0D)),
-                List.of(new ZombiesMapSnapshot.WeaponCandidateSnapshot(
-                        "tacz:ak47",
-                        Map.of("common", 1.0D))));
+                MAP_DIMENSION,
+                new BlockPos(7, 1, 7));
 
         ZombiesMapValidationReport report = validate(
                 ZombiesMapValidationProfile.MVP2_PURCHASES,
                 snapshot(List.of(wall), List.of(), List.of(), List.of()));
 
-        require(report.hasErrors(), "MVP2 weapon wall without top-rarity candidate should fail");
-        requireIssue(report, "map.weapon_wall_missing_top_rarity_candidate");
-    }
-
-    private static void mvp2WeaponWallNegativeMaxReserveAmmoFails() {
-        ZombiesMapSnapshot.WeaponWallSnapshot wall = new ZombiesMapSnapshot.WeaponWallSnapshot(
-                "wall-1",
-                "weaponWall",
-                1,
-                1.0D,
-                500,
-                -1,
-                List.of(),
-                List.of(new ZombiesMapSnapshot.RarityPoolSnapshot("common", 1, 1.0D, 0.0D)),
-                List.of(new ZombiesMapSnapshot.WeaponCandidateSnapshot(
-                        "tacz:ak47",
-                        Map.of("common", 1.0D))));
-
-        ZombiesMapValidationReport report = validate(
-                ZombiesMapValidationProfile.MVP2_PURCHASES,
-                snapshot(List.of(wall), List.of(), List.of(), List.of()));
-
-        require(report.hasErrors(), "MVP2 weapon wall with negative maxReserveAmmo should fail");
-        requireIssue(report, "map.invalid_weapon_wall");
+        require(report.valid(), "MVP2 weapon wall should no longer require embedded sale fields: " + issueCodes(report));
+        requireNoIssue(report, "map.invalid_weapon_wall");
+        requireNoIssue(report, "map.weapon_wall_missing_top_rarity_candidate");
     }
 
     private static void mvp3RequiresPowerSodaWithoutPowerSwitchIgnoresRequiresPowerFlag() {
@@ -627,15 +597,6 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
         return new ZombiesMapSnapshot.WeaponWallSnapshot(
                 "wall-1",
                 "weaponWall",
-                1,
-                1.0D,
-                500,
-                90,
-                List.of(1),
-                List.of(new ZombiesMapSnapshot.RarityPoolSnapshot("common", 1, 1.0D, 0.0D)),
-                List.of(new ZombiesMapSnapshot.WeaponCandidateSnapshot(
-                        "tacz:ak47",
-                        Map.of("common", 1.0D))),
                 MAP_DIMENSION,
                 new BlockPos(7, 1, 7));
     }

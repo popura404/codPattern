@@ -9,6 +9,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -38,9 +39,10 @@ public final class ZombiesCombatMarkerWorldRenderer {
         }
 
         Minecraft minecraft = Minecraft.getInstance();
+        LocalPlayer localPlayer = minecraft.player;
         ClientLevel level = minecraft.level;
         Camera camera = event.getCamera();
-        if (minecraft.player == null || level == null || camera == null || !camera.isInitialized() || minecraft.gameRenderer == null) {
+        if (localPlayer == null || level == null || camera == null || !camera.isInitialized() || minecraft.gameRenderer == null) {
             return;
         }
 
@@ -73,6 +75,10 @@ public final class ZombiesCombatMarkerWorldRenderer {
                 if (!(entity instanceof LivingEntity livingEntity)
                         || !livingEntity.isAlive()
                         || livingEntity.isRemoved()) {
+                    continue;
+                }
+                if (!event.getFrustum().isVisible(livingEntity.getBoundingBox().inflate(0.25D))
+                        || !localPlayer.hasLineOfSight(livingEntity)) {
                     continue;
                 }
 

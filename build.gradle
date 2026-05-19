@@ -189,6 +189,14 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+tasks.register('runZombiesMvp123CompatSuite', JavaExec) {
+    group = 'verification'
+    description = 'Run the pure JVM zombies MVP1-MVP3 compatibility suite.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.cdp.codpattern.app.zombies.service.ZombiesMvp123CompatTestSuite'
+    dependsOn tasks.named('testClasses')
+}
+
 // 提取依赖到 libs-extracted，便于 Agent 和 IDE 访问
 // 运行: gradlew extractDependencyLibs
 // 若需源码：用 CFR/JD-GUI 反编译 libs-extracted 中的 JAR 到 libs-src/

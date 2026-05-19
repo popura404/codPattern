@@ -26,7 +26,7 @@ public final class ZombiesPurchaseStateServicesCompatTest {
     public static void main(String[] args) {
         wallWeaponPurchaseSetsUniquePrimaryAndDuplicateFailsWithoutSpend();
         wallWeaponInteractionPurchaseUsesRuntimeCurrentOffer();
-        ammoBoxRefillsPrimaryByWeaponLevelAndStarterIsFree();
+        ammoBoxRefillsHeldWeaponsByWeaponLevelAndStarterIsCharged();
         armorUpgradeReplacesLowerLevelAndRepeatOrDowngradeFails();
     }
 
@@ -72,21 +72,12 @@ public final class ZombiesPurchaseStateServicesCompatTest {
 
     private static void wallWeaponInteractionPurchaseUsesRuntimeCurrentOffer() {
         Services services = services();
-        ZombiesObjectStateStore store = new ZombiesObjectStateStore();
+        ZombiesObjectStateStore store = new ZombiesObjectStateStore(
+                () -> false,
+                fixedOfferService("legendary", "tacz:runtime_offer", 900, 300, 1.75D, 5));
         ZombiesObjectInteractionService interactionService = interactionService(services, store);
         ZombiesWeaponWallData wall = new ZombiesWeaponWallData(
                 "wall-runtime-offer",
-                3,
-                1.75D,
-                900,
-                300,
-                List.of(),
-                List.of(
-                        new ZombiesWeaponWallData.RarityPoolData("common", 1, 100.0D, 0.0D),
-                        new ZombiesWeaponWallData.RarityPoolData("legendary", 5, 0.0D, 0.0D)),
-                List.of(
-                        new ZombiesWeaponWallData.WeaponCandidateData("tacz:first", Map.of("common", 8.0D)),
-                        new ZombiesWeaponWallData.WeaponCandidateData("tacz:runtime_offer", Map.of("legendary", 3.0D))),
                 dimension(),
                 new BlockPos(1, 64, 1),
                 Optional.empty());
@@ -101,9 +92,11 @@ public final class ZombiesPurchaseStateServicesCompatTest {
 
         requireSuccess(purchase, "wall interaction purchase should succeed");
         require("tacz:runtime_offer".equals(primary(services.players, playerId).gunId()),
-                "wall interaction purchase should use runtime current offer, not first gunId");
-        require(primary(services.players, playerId).weaponLevel() == 3,
-                "runtime offer purchase should use configured weapon level");
+                "wall interaction purchase should use runtime current offer from rules service");
+        require("legendary".equals(primary(services.players, playerId).rarityId()),
+                "runtime offer purchase should write rarity id");
+        require(primary(services.players, playerId).weaponLevel() == 1,
+                "runtime offer purchase should use internal compatibility weapon level");
         requireClose(primary(services.players, playerId).damageMultiplier(), 1.75D,
                 "runtime offer purchase should use configured damage multiplier");
         require(primary(services.players, playerId).reserveAmmo() == 300,
@@ -120,7 +113,7 @@ public final class ZombiesPurchaseStateServicesCompatTest {
                 "failed runtime offer purchase should not advance wall revision");
     }
 
-    private static void ammoBoxRefillsPrimaryByWeaponLevelAndStarterIsFree() {
+    private static void ammoBoxRefillsHeldWeaponsByWeaponLevelAndStarterIsCharged() {
         Services services = services();
         UUID playerId = playerId(2);
         services.economy.addPoints(playerId, 1_000.0D);
@@ -137,13 +130,20 @@ public final class ZombiesPurchaseStateServicesCompatTest {
         require(primary(services.players, playerId).reserveAmmo() == 210, "ammo box should refill reserve to max");
         requirePoints(services.players, playerId, 550.0D, "ammo box should deduct level 2 price");
 
-        ZombiesServiceResult<ZombiesAmmoBoxService.StarterAmmoRefillResult> starterRefill =
-                services.ammo.refillStarterPistol(playerId, "pistol", 84);
+        ZombiesWeaponInstanceState starterWeapon = ZombiesWeaponInstanceState.primary("tacz:starter", 1, 1.0D, 84)
+                .withReserveAmmo(12);
+        state.setStarterWeapon(starterWeapon);
+        ZombiesServiceResult<ZombiesAmmoBoxService.AmmoRefillResult> starterRefill =
+                services.ammo.refillHeldWeapon(
+                        playerId,
+                        starterWeapon,
+                        Map.of("1", 200, "2", 350, "3", 500),
+                        (currentWeapon, refilledWeapon) -> ZombiesServiceResult.ok());
 
-        requireSuccess(starterRefill, "starter pistol refill should succeed through explicit free method");
-        require(starterRefill.value().orElseThrow().reserveAmmo() == 84,
-                "starter pistol refill result should expose full reserve");
-        requirePoints(services.players, playerId, 550.0D, "starter pistol refill should be free");
+        requireSuccess(starterRefill, "starter weapon refill should use priced held-weapon path");
+        require(starterRefill.value().orElseThrow().weapon().reserveAmmo() == 84,
+                "starter weapon refill result should expose full reserve");
+        requirePoints(services.players, playerId, 350.0D, "starter weapon refill should deduct level 1 price");
     }
 
     private static void armorUpgradeReplacesLowerLevelAndRepeatOrDowngradeFails() {
@@ -229,6 +229,37 @@ public final class ZombiesPurchaseStateServicesCompatTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("missing wall state " + wall.objectId()))
                 .revision();
+    }
+
+    private static ZombiesWeaponWallOfferService fixedOfferService(
+            String rarityId,
+            String gunId,
+            int price,
+            int maxReserveAmmo,
+            double damageMultiplier,
+            int refreshIntervalWaves
+    ) {
+        com.cdp.codpattern.config.zombies.ZombiesRulesConfig config =
+                new com.cdp.codpattern.config.zombies.ZombiesRulesConfig();
+        config.getWeaponWall().setRefreshIntervalWaves(refreshIntervalWaves);
+        return new ZombiesWeaponWallOfferService(
+                () -> config,
+                new java.util.Random(0L),
+                ignored -> net.minecraft.world.item.ItemStack.EMPTY) {
+            @Override
+            public ZombiesObjectStateStore.WeaponWallOffer createOffer(
+                    ZombiesWeaponWallData weaponWall,
+                    int currentWave
+            ) {
+                return new ZombiesObjectStateStore.WeaponWallOffer(
+                        weaponWall.objectId(),
+                        rarityId,
+                        gunId,
+                        price,
+                        maxReserveAmmo,
+                        damageMultiplier);
+            }
+        };
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

@@ -32,10 +32,17 @@ public final class ZombiesObjectStateStore {
     private static final String PAYLOAD_OBJECT_ID = "objectId";
     private static final String PAYLOAD_GROUP = "group";
     private static final String PAYLOAD_CLEARED = "cleared";
+    private static final String PAYLOAD_AREA_FROM_X = "areaFromX";
+    private static final String PAYLOAD_AREA_FROM_Y = "areaFromY";
+    private static final String PAYLOAD_AREA_FROM_Z = "areaFromZ";
+    private static final String PAYLOAD_AREA_TO_X = "areaToX";
+    private static final String PAYLOAD_AREA_TO_Y = "areaToY";
+    private static final String PAYLOAD_AREA_TO_Z = "areaToZ";
+    private static final String PAYLOAD_RARITY_ID = "rarityId";
     private static final String PAYLOAD_GUN_ID = "gunId";
-    private static final String PAYLOAD_WEAPON_LEVEL = "weaponLevel";
     private static final String PAYLOAD_MAX_RESERVE_AMMO = "maxReserveAmmo";
-    private static final String PAYLOAD_LEVEL_DAMAGE_MULTIPLIER = "levelDamageMultiplier";
+    private static final String PAYLOAD_DAMAGE_MULTIPLIER = "damageMultiplier";
+    private static final String PAYLOAD_PRICES_BY_WEAPON_LEVEL = "pricesByWeaponLevel";
     private static final String PAYLOAD_ARMOR_LEVEL = "armorLevel";
     private static final String PAYLOAD_REQUIRES_POWER = "requiresPower";
     private static final String PAYLOAD_POWER_ON = "powerOn";
@@ -50,6 +57,7 @@ public final class ZombiesObjectStateStore {
     private final Map<String, Long> sodaMachineRevisionsByObjectId = new LinkedHashMap<>();
     private final Map<String, Long> ultimateMachineRevisionsByObjectId = new LinkedHashMap<>();
     private final BooleanSupplier powerOnSupplier;
+    private final ZombiesWeaponWallOfferService weaponWallOfferService;
     private long revision;
 
     public ZombiesObjectStateStore() {
@@ -57,7 +65,17 @@ public final class ZombiesObjectStateStore {
     }
 
     public ZombiesObjectStateStore(BooleanSupplier powerOnSupplier) {
+        this(powerOnSupplier, new ZombiesWeaponWallOfferService());
+    }
+
+    public ZombiesObjectStateStore(
+            BooleanSupplier powerOnSupplier,
+            ZombiesWeaponWallOfferService weaponWallOfferService
+    ) {
         this.powerOnSupplier = powerOnSupplier == null ? () -> false : powerOnSupplier;
+        this.weaponWallOfferService = weaponWallOfferService == null
+                ? new ZombiesWeaponWallOfferService()
+                : weaponWallOfferService;
     }
 
     public synchronized void resetBarriers(Collection<ZombiesBarrierData> barriers) {
@@ -247,7 +265,7 @@ public final class ZombiesObjectStateStore {
         for (ZombiesWeaponWallData weaponWall : safeWeaponWalls(weaponWalls)) {
             String objectId = objectKey(weaponWall);
             WeaponWallRuntimeState currentState = ensureWeaponWallState(weaponWall);
-            if (!shouldRefreshWeaponWall(weaponWall, targetWave, maxWave)) {
+            if (!shouldRefreshWeaponWall(targetWave)) {
                 continue;
             }
             if (currentState.lastRefreshWave() == targetWave) {
@@ -256,7 +274,7 @@ public final class ZombiesObjectStateStore {
             updateRevision = nextRevision();
             weaponWallsByObjectId.put(
                     objectId,
-                    new WeaponWallRuntimeState(selectOffer(weaponWall, targetWave, maxWave), updateRevision, targetWave));
+                    new WeaponWallRuntimeState(selectOffer(weaponWall, targetWave), updateRevision, targetWave));
         }
         return updateRevision;
     }
@@ -325,7 +343,7 @@ public final class ZombiesObjectStateStore {
         String objectId = objectKey(weaponWall);
         WeaponWallRuntimeState state = weaponWallsByObjectId.get(objectId);
         if (state == null) {
-            state = new WeaponWallRuntimeState(selectOffer(weaponWall, 1, 0), 0L, 0);
+            state = new WeaponWallRuntimeState(selectOffer(weaponWall, 1), 0L, 0);
             weaponWallsByObjectId.put(objectId, state);
         }
         return state;
@@ -343,12 +361,24 @@ public final class ZombiesObjectStateStore {
         payload.putInt(ZombiesObjectStateKeys.PAYLOAD_COST, Math.max(0, barrier.cost()));
         payload.putBoolean(PAYLOAD_CLEARED, state.cleared());
         payload.putBoolean(ZombiesObjectStateKeys.PAYLOAD_ENABLED, !state.cleared());
+        putBarrierAreaPayload(payload, barrier);
         return new ModeObjectState(
                 objectId,
                 ZombiesObjectStateKeys.STATUS,
                 barrier.interactionPos(),
                 payload,
                 state.revision());
+    }
+
+    private static void putBarrierAreaPayload(CompoundTag payload, ZombiesBarrierData barrier) {
+        BlockPos areaFrom = barrier == null || barrier.areaFrom() == null ? BlockPos.ZERO : barrier.areaFrom();
+        BlockPos areaTo = barrier == null || barrier.areaTo() == null ? BlockPos.ZERO : barrier.areaTo();
+        payload.putInt(PAYLOAD_AREA_FROM_X, areaFrom.getX());
+        payload.putInt(PAYLOAD_AREA_FROM_Y, areaFrom.getY());
+        payload.putInt(PAYLOAD_AREA_FROM_Z, areaFrom.getZ());
+        payload.putInt(PAYLOAD_AREA_TO_X, areaTo.getX());
+        payload.putInt(PAYLOAD_AREA_TO_Y, areaTo.getY());
+        payload.putInt(PAYLOAD_AREA_TO_Z, areaTo.getZ());
     }
 
     private ModeObjectState toModeObjectState(
@@ -362,10 +392,10 @@ public final class ZombiesObjectStateStore {
                 OBJECT_TYPE_WEAPON_WALL,
                 Math.max(0, offer.price()),
                 offer.purchasable());
+        payload.putString(PAYLOAD_RARITY_ID, offer.rarityId());
         payload.putString(PAYLOAD_GUN_ID, offer.gunId());
-        payload.putInt(PAYLOAD_WEAPON_LEVEL, Math.max(0, offer.weaponLevel()));
         payload.putInt(PAYLOAD_MAX_RESERVE_AMMO, Math.max(0, offer.maxReserveAmmo()));
-        payload.putDouble(PAYLOAD_LEVEL_DAMAGE_MULTIPLIER, offer.levelDamageMultiplier());
+        payload.putDouble(PAYLOAD_DAMAGE_MULTIPLIER, offer.damageMultiplier());
         return new ModeObjectState(
                 objectId,
                 ZombiesObjectStateKeys.STATUS,
@@ -384,6 +414,7 @@ public final class ZombiesObjectStateStore {
                 OBJECT_TYPE_AMMO_BOX,
                 displayAmmoCost(ammoBox),
                 !ammoBox.pricesByWeaponLevel().isEmpty());
+        payload.put(PAYLOAD_PRICES_BY_WEAPON_LEVEL, pricesByWeaponLevelPayload(ammoBox));
         return new ModeObjectState(
                 objectId,
                 ZombiesObjectStateKeys.STATUS,
@@ -529,7 +560,7 @@ public final class ZombiesObjectStateStore {
         for (ZombiesWeaponWallData weaponWall : weaponWalls) {
             next.put(
                     objectKey(weaponWall),
-                    new WeaponWallRuntimeState(selectOffer(weaponWall, offerWave, maxWave), nextRevision(), 0));
+                    new WeaponWallRuntimeState(selectOffer(weaponWall, offerWave), nextRevision(), offerWave));
         }
         weaponWallsByObjectId.clear();
         weaponWallsByObjectId.putAll(next);
@@ -602,125 +633,12 @@ public final class ZombiesObjectStateStore {
                 .toList();
     }
 
-    private static boolean shouldRefreshWeaponWall(ZombiesWeaponWallData weaponWall, int targetWave, int maxWave) {
-        if (weaponWall == null || targetWave < 1) {
-            return false;
-        }
-        if (targetWave == 1) {
-            return true;
-        }
-        if (maxWave > 0 && targetWave >= maxWave) {
-            return true;
-        }
-        for (Integer refreshWave : weaponWall.refreshWaves()) {
-            if (refreshWave != null && refreshWave == targetWave) {
-                return true;
-            }
-        }
-        return false;
+    private boolean shouldRefreshWeaponWall(int targetWave) {
+        return weaponWallOfferService.shouldRefreshForWave(targetWave);
     }
 
-    private static WeaponWallOffer selectOffer(ZombiesWeaponWallData weaponWall, int currentWave, int maxWave) {
-        if (weaponWall == null) {
-            return WeaponWallOffer.empty();
-        }
-        String selectedGunId = selectedGunId(weaponWall, Math.max(1, currentWave), Math.max(0, maxWave));
-        return new WeaponWallOffer(
-                selectedGunId,
-                weaponWall.weaponLevel(),
-                weaponWall.price(),
-                weaponWall.maxReserveAmmo(),
-                weaponWall.levelDamageMultiplier());
-    }
-
-    private static String selectedGunId(ZombiesWeaponWallData weaponWall, int currentWave, int maxWave) {
-        String fallback = firstValidGunId(weaponWall);
-        if (fallback.isBlank()) {
-            return "";
-        }
-        List<ZombiesWeaponWallData.RarityPoolData> pools = weaponWall.rarityPools().stream()
-                .filter(Objects::nonNull)
-                .filter(pool -> !pool.id().isBlank())
-                .toList();
-        if (pools.isEmpty()) {
-            return fallback;
-        }
-
-        if (maxWave > 0 && currentWave >= maxWave) {
-            int highestRank = pools.stream()
-                    .mapToInt(ZombiesWeaponWallData.RarityPoolData::rank)
-                    .max()
-                    .orElse(Integer.MIN_VALUE);
-            String topRankGunId = selectedGunIdForPools(
-                    weaponWall,
-                    pools.stream().filter(pool -> pool.rank() == highestRank).toList());
-            return topRankGunId.isBlank() ? fallback : topRankGunId;
-        }
-
-        ZombiesWeaponWallData.RarityPoolData selectedPool = null;
-        double selectedWeight = 0.0D;
-        for (ZombiesWeaponWallData.RarityPoolData pool : pools) {
-            double weight = poolWeight(pool, currentWave);
-            if (weight > selectedWeight && !selectedGunIdForPool(weaponWall, pool.id()).isBlank()) {
-                selectedPool = pool;
-                selectedWeight = weight;
-            }
-        }
-        if (selectedPool == null) {
-            return fallback;
-        }
-        String selected = selectedGunIdForPool(weaponWall, selectedPool.id());
-        return selected.isBlank() ? fallback : selected;
-    }
-
-    private static String selectedGunIdForPools(
-            ZombiesWeaponWallData weaponWall,
-            List<ZombiesWeaponWallData.RarityPoolData> pools
-    ) {
-        String selected = "";
-        double selectedWeight = 0.0D;
-        for (ZombiesWeaponWallData.RarityPoolData pool : pools) {
-            CandidateWeight candidate = selectedCandidateForRarity(weaponWall, pool.id());
-            if (candidate.weight() > selectedWeight) {
-                selected = candidate.gunId();
-                selectedWeight = candidate.weight();
-            }
-        }
-        return selected;
-    }
-
-    private static String selectedGunIdForPool(ZombiesWeaponWallData weaponWall, String rarityId) {
-        return selectedCandidateForRarity(weaponWall, rarityId).gunId();
-    }
-
-    private static CandidateWeight selectedCandidateForRarity(ZombiesWeaponWallData weaponWall, String rarityId) {
-        String selected = "";
-        double selectedWeight = 0.0D;
-        String cleanedRarity = Objects.requireNonNullElse(rarityId, "").trim();
-        if (cleanedRarity.isBlank()) {
-            return new CandidateWeight("", 0.0D);
-        }
-        for (ZombiesWeaponWallData.WeaponCandidateData weapon : weaponWall.weapons()) {
-            String gunId = weapon == null ? "" : Objects.requireNonNullElse(weapon.gunId(), "").trim();
-            if (gunId.isBlank()) {
-                continue;
-            }
-            Double configuredWeight = weapon.weightsByRarity().get(cleanedRarity);
-            double weight = configuredWeight == null || !Double.isFinite(configuredWeight)
-                    ? 0.0D
-                    : Math.max(0.0D, configuredWeight);
-            if (weight > selectedWeight) {
-                selected = gunId;
-                selectedWeight = weight;
-            }
-        }
-        return new CandidateWeight(selected, selectedWeight);
-    }
-
-    private static double poolWeight(ZombiesWeaponWallData.RarityPoolData pool, int currentWave) {
-        double baseWeight = Double.isFinite(pool.baseWeight()) ? pool.baseWeight() : 0.0D;
-        double waveFactor = Double.isFinite(pool.waveFactor()) ? pool.waveFactor() : 0.0D;
-        return Math.max(0.0D, baseWeight + waveFactor * Math.max(1, currentWave));
+    private WeaponWallOffer selectOffer(ZombiesWeaponWallData weaponWall, int currentWave) {
+        return weaponWallOfferService.createOffer(weaponWall, Math.max(1, currentWave));
     }
 
     static String objectKey(ZombiesBarrierData barrier) {
@@ -854,19 +772,6 @@ public final class ZombiesObjectStateStore {
         return ultimateMachine.interactionPos().orElse(ultimateMachine.pos());
     }
 
-    private static String firstValidGunId(ZombiesWeaponWallData weaponWall) {
-        if (weaponWall == null) {
-            return "";
-        }
-        for (ZombiesWeaponWallData.WeaponCandidateData weapon : weaponWall.weapons()) {
-            String gunId = weapon == null ? "" : Objects.requireNonNullElse(weapon.gunId(), "").trim();
-            if (!gunId.isBlank()) {
-                return gunId;
-            }
-        }
-        return "";
-    }
-
     private static int displayAmmoCost(ZombiesAmmoBoxData ammoBox) {
         if (ammoBox == null || ammoBox.pricesByWeaponLevel().isEmpty()) {
             return 0;
@@ -878,6 +783,20 @@ public final class ZombiesObjectStateStore {
             }
         }
         return cost == Integer.MAX_VALUE ? 0 : cost;
+    }
+
+    private static CompoundTag pricesByWeaponLevelPayload(ZombiesAmmoBoxData ammoBox) {
+        CompoundTag prices = new CompoundTag();
+        if (ammoBox == null || ammoBox.pricesByWeaponLevel().isEmpty()) {
+            return prices;
+        }
+        ammoBox.pricesByWeaponLevel().forEach((level, cost) -> {
+            String normalizedLevel = Objects.requireNonNullElse(level, "").trim();
+            if (!normalizedLevel.isBlank() && cost != null && cost >= 0) {
+                prices.putInt(normalizedLevel, cost);
+            }
+        });
+        return prices;
     }
 
     private static int displayUltimateCost(ZombiesUltimateMachineData ultimateMachine) {
@@ -920,33 +839,29 @@ public final class ZombiesObjectStateStore {
         }
     }
 
-    private record CandidateWeight(String gunId, double weight) {
-        private CandidateWeight {
-            gunId = Objects.requireNonNullElse(gunId, "").trim();
-            weight = Double.isFinite(weight) ? Math.max(0.0D, weight) : 0.0D;
-        }
-    }
-
     public record WeaponWallOffer(
+            String objectId,
+            String rarityId,
             String gunId,
-            int weaponLevel,
             int price,
             int maxReserveAmmo,
-            double levelDamageMultiplier
+            double damageMultiplier
     ) {
         public WeaponWallOffer {
+            objectId = Objects.requireNonNullElse(objectId, "").trim();
+            rarityId = Objects.requireNonNullElse(rarityId, "").trim();
             gunId = Objects.requireNonNullElse(gunId, "").trim();
         }
 
         public static WeaponWallOffer empty() {
-            return new WeaponWallOffer("", 0, 0, 0, 0.0D);
+            return new WeaponWallOffer("", "", "", 0, 0, 0.0D);
         }
 
         public boolean purchasable() {
-            return !gunId.isBlank()
-                    && weaponLevel > 0
-                    && Double.isFinite(levelDamageMultiplier)
-                    && levelDamageMultiplier > 0.0D
+            return !rarityId.isBlank()
+                    && !gunId.isBlank()
+                    && Double.isFinite(damageMultiplier)
+                    && damageMultiplier > 0.0D
                     && price >= 0
                     && maxReserveAmmo >= 0;
         }

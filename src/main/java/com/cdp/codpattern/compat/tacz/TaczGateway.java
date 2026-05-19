@@ -30,6 +30,8 @@ public interface TaczGateway {
 
     void configureGunAmmo(ItemStack stack, int ammoMultiple);
 
+    int resolveMagazineAmmo(ItemStack stack);
+
     int resolveReserveAmmo(ItemStack stack);
 
     int resolveMaxReserveAmmo(ItemStack stack);

@@ -166,17 +166,11 @@ public final class TaczCoreGateway implements TaczGateway {
         }
         IGun iGun = iGunOpt.get();
 
-        Optional<CommonGunIndex> gunIndex = resolveGunIndex(stack);
-        int currentAmmo = Math.max(0, iGun.getCurrentAmmoCount(stack));
-        int magazineAmmo = gunIndex
-                .map(index -> Math.max(0, AttachmentDataUtils.getAmmoCountWithAttachment(stack, index.getGunData())))
-                .orElse(currentAmmo);
-        if (magazineAmmo <= 0) {
-            magazineAmmo = currentAmmo;
-        }
+        int magazineAmmo = resolveMagazineAmmo(stack);
         int normalizedMagazineAmmo = Math.max(1, magazineAmmo);
         iGun.setCurrentAmmoCount(stack, normalizedMagazineAmmo);
 
+        Optional<CommonGunIndex> gunIndex = resolveGunIndex(stack);
         Bolt boltType = gunIndex.map(index -> index.getGunData().getBolt()).orElse(null);
         if (boltType == Bolt.OPEN_BOLT) {
             iGun.setBulletInBarrel(stack, false);
@@ -191,6 +185,24 @@ public final class TaczCoreGateway implements TaczGateway {
         }
         iGun.setMaxDummyAmmoAmount(stack, reserveAmmo);
         iGun.setDummyAmmoAmount(stack, reserveAmmo);
+    }
+
+    @Override
+    public int resolveMagazineAmmo(ItemStack stack) {
+        Optional<IGun> iGunOpt = resolveGun(stack);
+        if (iGunOpt.isEmpty()) {
+            return 0;
+        }
+        IGun iGun = iGunOpt.get();
+        Optional<CommonGunIndex> gunIndex = resolveGunIndex(stack);
+        int currentAmmo = Math.max(0, iGun.getCurrentAmmoCount(stack));
+        int magazineAmmo = gunIndex
+                .map(index -> Math.max(0, AttachmentDataUtils.getAmmoCountWithAttachment(stack, index.getGunData())))
+                .orElse(currentAmmo);
+        if (magazineAmmo <= 0) {
+            magazineAmmo = currentAmmo;
+        }
+        return Math.max(0, magazineAmmo);
     }
 
     @Override

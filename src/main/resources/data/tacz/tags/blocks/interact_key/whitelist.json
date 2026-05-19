@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "codpattern:zombies_weapon_wall_box",
+    "codpattern:zombies_ammo_box",
+    "codpattern:zombies_armor_station_box",
+    "codpattern:zombies_soda_machine_box",
+    "codpattern:zombies_ultimate_machine_box"
+  ]
+}

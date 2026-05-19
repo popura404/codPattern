@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "codpattern:block/zombies_ammo_box"
+    }
+  }
+}

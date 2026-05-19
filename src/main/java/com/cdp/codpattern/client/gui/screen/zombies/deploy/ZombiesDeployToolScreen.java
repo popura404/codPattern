@@ -1188,137 +1188,10 @@ public class ZombiesDeployToolScreen extends Screen {
 
     private ListFieldPreview listPreview(String fieldKey, String value) {
         return switch (fieldKey) {
-            case "refreshWaves" -> previewRefreshWaves(value);
-            case "rarityPools" -> previewRarityPools(value);
-            case "weapons" -> previewWeapons(value);
             case "pricesByWeaponLevel" -> previewIntegerMap(value, tr("gui.codpattern.zombies.deploy.hint.prices"), tr("gui.codpattern.zombies.deploy.level"), tr("gui.codpattern.zombies.deploy.cost"));
             case "levels" -> previewUltimateLevels(value);
             default -> previewGenericList(value);
         };
-    }
-
-    private ListFieldPreview previewRefreshWaves(String value) {
-        List<String> entries = splitLooseEntries(value);
-        List<String> rows = new ArrayList<>();
-        List<String> issues = new ArrayList<>();
-        Set<Integer> seen = new LinkedHashSet<>();
-        Set<Integer> duplicates = new LinkedHashSet<>();
-        for (int i = 0; i < entries.size(); i++) {
-            String entry = entries.get(i);
-            Integer wave = parseInteger(entry);
-            if (wave == null || wave < 1) {
-                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.wave_invalid", i + 1));
-                rows.add("#" + (i + 1) + "  " + entry);
-                continue;
-            }
-            if (!seen.add(wave)) {
-                duplicates.add(wave);
-            }
-            rows.add("#" + (i + 1) + "  wave " + wave);
-        }
-        if (!duplicates.isEmpty()) {
-            issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.duplicate_waves", joinIntegers(duplicates)));
-        }
-        return new ListFieldPreview(
-                tr("gui.codpattern.zombies.deploy.hint.refresh_waves"),
-                rows,
-                issues,
-                containsError(issues),
-                containsWarning(issues));
-    }
-
-    private ListFieldPreview previewRarityPools(String value) {
-        List<String> entries = splitRows(value);
-        List<String> rows = new ArrayList<>();
-        List<String> issues = new ArrayList<>();
-        Set<String> ids = new HashSet<>();
-        Set<Integer> ranks = new HashSet<>();
-        for (int i = 0; i < entries.size(); i++) {
-            String entry = entries.get(i);
-            int equals = entry.indexOf('=');
-            if (equals <= 0 || equals == entry.length() - 1) {
-                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.rarity_format", i + 1));
-                rows.add("#" + (i + 1) + "  " + entry);
-                continue;
-            }
-            String id = entry.substring(0, equals).trim();
-            String[] parts = entry.substring(equals + 1).split(",");
-            if (id.isEmpty() || parts.length != 3) {
-                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.rarity_format", i + 1));
-                rows.add("#" + (i + 1) + "  " + entry);
-                continue;
-            }
-            Integer rank = parseInteger(parts[0]);
-            Double baseWeight = parseFiniteDouble(parts[1]);
-            Double waveFactor = parseFiniteDouble(parts[2]);
-            if (rank == null || baseWeight == null || waveFactor == null) {
-                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.rarity_numeric", i + 1));
-            } else {
-                if (!ids.add(id)) {
-                    issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.duplicate_rarity", i + 1, id));
-                }
-                if (!ranks.add(rank)) {
-                    issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.duplicate_rank", i + 1, rank));
-                }
-                rows.add("#" + (i + 1) + "  " + id + "  rank " + rank + "  base " + baseWeight + "  wave " + waveFactor);
-                continue;
-            }
-            rows.add("#" + (i + 1) + "  " + entry);
-        }
-        return new ListFieldPreview(
-                tr("gui.codpattern.zombies.deploy.hint.rarity_pools"),
-                rows,
-                issues,
-                containsError(issues),
-                containsWarning(issues));
-    }
-
-    private ListFieldPreview previewWeapons(String value) {
-        List<String> entries = splitRows(value);
-        List<String> rows = new ArrayList<>();
-        List<String> issues = new ArrayList<>();
-        Set<String> rarityIds = rarityIdsFromDraft();
-        for (int i = 0; i < entries.size(); i++) {
-            String entry = entries.get(i);
-            int separator = entry.indexOf('|');
-            if (separator <= 0 || separator == entry.length() - 1) {
-                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.weapon_format", i + 1));
-                rows.add("#" + (i + 1) + "  " + entry);
-                continue;
-            }
-            String gunId = entry.substring(0, separator).trim();
-            List<String> weights = splitLooseEntries(entry.substring(separator + 1));
-            if (gunId.isEmpty() || weights.isEmpty()) {
-                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.weapon_required", i + 1));
-                rows.add("#" + (i + 1) + "  " + entry);
-                continue;
-            }
-            List<String> parsedWeights = new ArrayList<>();
-            for (String weightEntry : weights) {
-                int equals = weightEntry.indexOf('=');
-                if (equals <= 0 || equals == weightEntry.length() - 1) {
-                    issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.weight_format", i + 1));
-                    continue;
-                }
-                String rarity = weightEntry.substring(0, equals).trim();
-                Double weight = parseFiniteDouble(weightEntry.substring(equals + 1));
-                if (rarity.isEmpty() || weight == null || weight <= 0.0D) {
-                    issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.weight_format", i + 1));
-                    continue;
-                }
-                if (!rarityIds.isEmpty() && !rarityIds.contains(rarity)) {
-                    issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.unknown_rarity", i + 1, rarity));
-                }
-                parsedWeights.add(rarity + "=" + weight);
-            }
-            rows.add("#" + (i + 1) + "  " + gunId + "  " + String.join(", ", parsedWeights));
-        }
-        return new ListFieldPreview(
-                tr("gui.codpattern.zombies.deploy.hint.weapons"),
-                rows,
-                issues,
-                containsError(issues),
-                containsWarning(issues));
     }
 
     private ListFieldPreview previewIntegerMap(String value, String hint, String keyLabel, String valueLabel) {
@@ -1426,8 +1299,7 @@ public class ZombiesDeployToolScreen extends Screen {
     }
 
     private boolean usesLooseListRows(String fieldKey) {
-        return "refreshWaves".equals(fieldKey)
-                || "pricesByWeaponLevel".equals(fieldKey)
+        return "pricesByWeaponLevel".equals(fieldKey)
                 || "levels".equals(fieldKey);
     }
 
@@ -1469,20 +1341,6 @@ public class ZombiesDeployToolScreen extends Screen {
             }
         }
         return entries;
-    }
-
-    private Set<String> rarityIdsFromDraft() {
-        Set<String> ids = new HashSet<>();
-        for (String row : splitRows(this.draftFields.getOrDefault("rarityPools", ""))) {
-            int equals = row.indexOf('=');
-            if (equals > 0) {
-                String id = row.substring(0, equals).trim();
-                if (!id.isEmpty()) {
-                    ids.add(id);
-                }
-            }
-        }
-        return ids;
     }
 
     private Integer parseInteger(String value) {
@@ -1718,7 +1576,7 @@ public class ZombiesDeployToolScreen extends Screen {
             case "posX", "posY", "posZ" -> 1;
             case "interactionX", "interactionY", "interactionZ" -> 2;
             case "areaFromX", "areaFromY", "areaFromZ", "areaToX", "areaToY", "areaToZ" -> 3;
-            case "group", "weight", "cost", "price", "weaponLevel", "armorLevel", "buyCost", "buffId", "requiresPower", "maxUpgradeLevel" -> 4;
+            case "group", "weight", "cost", "armorLevel", "buyCost", "buffId", "requiresPower", "maxUpgradeLevel" -> 4;
             case "dimension", "yaw" -> 5;
             default -> 8;
         };

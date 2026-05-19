@@ -24,7 +24,7 @@ public record ZombiesStartupPreflightSnapshot(
     }
 
     public boolean valid() {
-        return mapValid() && wavesValid();
+        return mapValid() && wavesValid() && rulesValid();
     }
 
     public boolean mapValid() {
@@ -33,6 +33,10 @@ public record ZombiesStartupPreflightSnapshot(
 
     public boolean wavesValid() {
         return waveLoadResult.isValid() && maxWave > 0;
+    }
+
+    public boolean rulesValid() {
+        return rulesIssues().stream().noneMatch(Issue::error);
     }
 
     public boolean hasErrors() {
@@ -53,6 +57,12 @@ public record ZombiesStartupPreflightSnapshot(
         return waveLoadResult.getIssues();
     }
 
+    public List<Issue> rulesIssues() {
+        return issues.stream()
+                .filter(issue -> Issue.SOURCE_RULES.equals(issue.source()))
+                .toList();
+    }
+
     public record Issue(
             String source,
             boolean error,
@@ -62,6 +72,7 @@ public record ZombiesStartupPreflightSnapshot(
     ) {
         public static final String SOURCE_MAP = "map";
         public static final String SOURCE_WAVE = "wave";
+        public static final String SOURCE_RULES = "rules";
 
         public Issue {
             source = Objects.requireNonNullElse(source, "").trim();
@@ -73,6 +84,11 @@ public record ZombiesStartupPreflightSnapshot(
         public static Issue fromMapIssue(ZombiesValidationIssue issue) {
             Objects.requireNonNull(issue, "issue");
             return new Issue(SOURCE_MAP, issue.isError(), issue.code(), issue.subject(), issue.message());
+        }
+
+        public static Issue fromRulesIssue(ZombiesValidationIssue issue) {
+            Objects.requireNonNull(issue, "issue");
+            return new Issue(SOURCE_RULES, issue.isError(), issue.code(), issue.subject(), issue.message());
         }
 
         public static Issue fromWaveIssue(ZombiesWaveValidator.ValidationIssue issue) {

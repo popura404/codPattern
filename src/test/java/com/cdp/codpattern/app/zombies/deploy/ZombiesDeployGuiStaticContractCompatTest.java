@@ -65,6 +65,22 @@ public final class ZombiesDeployGuiStaticContractCompatTest {
         requireAbsent(screen, "CAPTURE_PLAYER_POS", "GUI capture-player-position action must stay removed from visible controls");
         requireAbsent(screen, "CAPTURE_LOOK_BLOCK", "GUI capture-look-block action must stay removed from visible controls");
         requireAbsent(screen, "SET_AREA_POS", "GUI set-area-position action must stay removed from visible controls");
+        requireAbsent(screen, "previewRefreshWaves", "weapon wall refresh-wave preview must stay removed from the deploy GUI");
+        requireAbsent(screen, "previewRarityPools", "weapon wall rarity-pool preview must stay removed from the deploy GUI");
+        requireAbsent(screen, "previewWeapons", "weapon wall gun-pool preview must stay removed from the deploy GUI");
+        for (String staleWeaponWallField : List.of(
+                "\"weaponLevel\"",
+                "\"levelDamageMultiplier\"",
+                "\"price\"",
+                "\"maxReserveAmmo\"",
+                "\"refreshWaves\"",
+                "\"rarityPools\"",
+                "\"weapons\"")) {
+            requireAbsent(screen, staleWeaponWallField,
+                    "weapon wall deploy GUI must stay free of deprecated field " + staleWeaponWallField);
+            requireAbsent(fieldSchema, staleWeaponWallField,
+                    "weapon wall field schema must stay free of deprecated field " + staleWeaponWallField);
+        }
 
         requireContains(screen, "section.objects_properties", "objects/properties merged section must be rendered");
         requireContains(screen, "private boolean canEditObjectFields()", "field editing must support selected and pending objects");
@@ -90,8 +106,8 @@ public final class ZombiesDeployGuiStaticContractCompatTest {
                 "interaction coordinates should stay near the top of the properties list");
         requireContains(screen, "case \"areaFromX\", \"areaFromY\", \"areaFromZ\", \"areaToX\", \"areaToY\", \"areaToZ\" -> 3;",
                 "barrier area coordinates should stay visible in the properties priority order");
-        requireContains(screen, "case \"group\", \"weight\", \"cost\", \"price\", \"weaponLevel\", \"armorLevel\", \"buyCost\", \"buffId\", \"requiresPower\", \"maxUpgradeLevel\" -> 4;",
-                "group, weight, price, and purchase fields should stay in the high-priority properties group");
+        requireContains(screen, "case \"group\", \"weight\", \"cost\", \"armorLevel\", \"buyCost\", \"buffId\", \"requiresPower\", \"maxUpgradeLevel\" -> 4;",
+                "group, weight, and purchase fields should stay in the high-priority properties group");
         requireContains(screen, "if (\"yaw\".equals(field.key())) {\n                first = first + \" (\" + tr(\"gui.codpattern.zombies.deploy.yaw_only_short\") + \")\";\n            }",
                 "yaw field should keep an explicit horizontal-only label");
         requireContains(screen, "return isSelectionOnlyAction(action)\n                ? selectionDraft()\n                : draft();",
@@ -193,8 +209,14 @@ public final class ZombiesDeployGuiStaticContractCompatTest {
         requireAbsent(onCloseBody, "FPSMatch.sendToServer", "closing deploy GUI must not send persistence packets");
 
         String toolWorldInteractionBody = methodBody(tool, "public void handleWorldInteraction");
+        requireContains(tool, "private static final int VANILLA_BLOCK_PLACE_INTERVAL_TICKS = 4;",
+                "deploy tool world placement interval should match vanilla block placement delay");
+        requireContains(tool, "BLOCK_PLACE_COOLDOWN_UNTIL_TICK_TAG",
+                "deploy tool must store an authoritative server-side placement cooldown");
         requireContains(toolWorldInteractionBody, "case LEFT_CLICK_BLOCK ->",
                 "deploy tool must handle world left click");
+        requireContains(toolWorldInteractionBody, "!consumeBlockPlaceCooldown(player, stack)",
+                "deploy tool world clicks must pass through server-side placement cooldown");
         requireContains(toolWorldInteractionBody, "captureWorldClick(player, stack, hit.placementPos(), true);",
                 "deploy tool left click must route placement position through service world-click handling");
         requireContains(toolWorldInteractionBody, "case RIGHT_CLICK_BLOCK ->",
@@ -208,6 +230,11 @@ public final class ZombiesDeployGuiStaticContractCompatTest {
                 "deploy world clicks must not open or refresh the deploy GUI");
         requireContains(toolCaptureBody, ".captureWorldClick(player, stack, getDraft(stack), pos, leftClick);",
                 "deploy world clicks should still call the service for persistence");
+        String toolCooldownBody = methodBody(tool, "private static boolean consumeBlockPlaceCooldown");
+        requireContains(toolCooldownBody, "ZombiesDeployDraft.STAGE_MAP_REGISTRATION.equals(draft.workspaceStage())",
+                "map registration point capture should not be throttled by the placement cooldown");
+        requireContains(toolCooldownBody, "gameTime + VANILLA_BLOCK_PLACE_INTERVAL_TICKS",
+                "deploy placement cooldown should advance by the vanilla placement interval");
 
         String packetDispatchBody = methodBody(packet, "private ZombiesDeployServiceResult<ZombiesDeploySnapshot> dispatch");
         requireContains(packetDispatchBody, "case REFRESH, SELECT_MAP, SELECT_OBJECT -> service.snapshot(",
@@ -387,14 +414,14 @@ public final class ZombiesDeployGuiStaticContractCompatTest {
                 "occupied-position conflicts must be detected from the edited object graph");
         requireContains(editObjectBody, "\"message.codpattern.zombies.deploy.duplicate_position\"",
                 "duplicate-position failures must use a dedicated message");
-        requireContains(editObjectBody, "PowerSwitchPlacementRollback powerSwitchRollback = null;",
-                "power switch deployment must track block-placement rollback state");
-        requireContains(editObjectBody, "placePowerSwitchBlock(player.serverLevel(), edit.objects().powerSwitch().get().pos())",
-                "power switch deployment must place the configured switch block at the saved position");
-        requireContains(editObjectBody, "restorePowerSwitchBlock(rollback);",
-                "persistence rollback must restore the previous power switch block state");
-        requireContains(editObjectBody, "restorePowerSwitchBlock(powerSwitchRollback);",
-                "save exceptions must restore the previous power switch block state");
+        requireContains(editObjectBody, "PlacementRollback placementRollback = null;",
+                "purchasable block deployment must track block-placement rollback state");
+        requireContains(editObjectBody, "syncPurchasableBlocks(",
+                "object edits must sync managed purchasable blocks before persistence");
+        requireContains(editObjectBody, "restorePlacement(rollback);",
+                "persistence rollback must restore previous purchasable block states");
+        requireContains(editObjectBody, "restorePlacement(placementRollback);",
+                "save exceptions must restore previous purchasable block states");
 
         String occupiedPositionConflictBody = firstExistingMethodBody(
                 service,
@@ -409,19 +436,41 @@ public final class ZombiesDeployGuiStaticContractCompatTest {
         requireContains(occupiedPositionConflictBody, "ZombiesDeployFieldSchema.BARRIER",
                 "occupied-position checks must include barrier area/interaction positions");
 
-        String powerSwitchPlacementBody = methodBody(service, "private PowerSwitchPlacementRollback placePowerSwitchBlock");
-        requireContains(powerSwitchPlacementBody, "BlockState previousState = level.getBlockState(pos);",
-                "power switch placement must snapshot the previous block state");
-        requireContains(powerSwitchPlacementBody, "CodPatternBlockRegister.ZOMBIES_POWER_SWITCH.get().defaultBlockState()",
-                "power switch placement must use the registered zombies power switch block");
-        requireContains(powerSwitchPlacementBody, "level.setBlock(pos,",
-                "power switch placement must write the block into the world");
+        String purchasableObjectsBody = methodBody(service, "private List<PurchasablePlacement> purchasableObjects");
+        requireContains(purchasableObjectsBody, "CodPatternBlockRegister.ZOMBIES_WEAPON_WALL_BOX.get()",
+                "weapon_wall deployment must use the registered red box block");
+        requireContains(purchasableObjectsBody, "CodPatternBlockRegister.ZOMBIES_AMMO_BOX.get()",
+                "ammo_box deployment must use the registered green box block");
+        requireContains(purchasableObjectsBody, "CodPatternBlockRegister.ZOMBIES_ARMOR_STATION_BOX.get()",
+                "armor_station deployment must use the registered blue box block");
+        requireContains(purchasableObjectsBody, "CodPatternBlockRegister.ZOMBIES_SODA_MACHINE_BOX.get()",
+                "soda_machine deployment must use the registered yellow box block");
+        requireContains(purchasableObjectsBody, "CodPatternBlockRegister.ZOMBIES_ULTIMATE_MACHINE_BOX.get()",
+                "ultimate_machine deployment must use the registered purple box block");
+        requireContains(purchasableObjectsBody, "CodPatternBlockRegister.ZOMBIES_POWER_SWITCH.get()",
+                "power_switch deployment must keep using the registered power switch block");
 
-        String restorePowerSwitchBlockBody = methodBody(service, "private void restorePowerSwitchBlock");
-        requireContains(restorePowerSwitchBlockBody, "rollback.previousState()",
-                "power switch rollback must restore the captured previous block state");
-        requireContains(restorePowerSwitchBlockBody, "setBlock(rollback.pos(), rollback.previousState()",
-                "power switch rollback must write the previous block back into the world");
+        String purchasablePlacementBody = methodBody(service, "private PlacementRollback placePurchasableBlock");
+        requireContains(purchasablePlacementBody, "BlockState previousState = level.getBlockState(placement.pos());",
+                "purchasable placement must snapshot the previous block state");
+        requireContains(purchasablePlacementBody, "sameObjectUpdate && previousState.getBlock() == placement.block()",
+                "same-object updates may replace their own managed block");
+        requireContains(purchasablePlacementBody, "placement.block().defaultBlockState()",
+                "purchasable placement must use the registered object block");
+        requireContains(purchasablePlacementBody, "level.setBlock(placement.pos(),",
+                "purchasable placement must write the block into the world");
+
+        String removePurchasableBlockBody = methodBody(service, "private PlacementRollback removeManagedPurchasableBlock");
+        requireContains(removePurchasableBlockBody, "previousState.getBlock() != expectedBlock",
+                "managed block cleanup must only remove the expected registered block");
+        requireContains(removePurchasableBlockBody, "Blocks.AIR.defaultBlockState()",
+                "managed block cleanup must remove stale managed blocks by setting air");
+
+        String restorePlacementBody = methodBody(service, "private void restorePlacement");
+        requireContains(restorePlacementBody, "rollback.previousState()",
+                "purchasable rollback must restore the captured previous block state");
+        requireContains(restorePlacementBody, "setBlock(rollback.pos(), rollback.previousState()",
+                "purchasable rollback must write the previous block back into the world");
 
         requireContains(worldToolItem, "ToolInteractionHit hit",
                 "world tool interface must receive the clicked-face hit context");
@@ -507,6 +556,13 @@ public final class ZombiesDeployGuiStaticContractCompatTest {
                     "gui.codpattern.zombies.deploy.advanced_on",
                     "gui.codpattern.zombies.deploy.advanced_off",
                     "gui.codpattern.zombies.deploy.parsed_rows",
+                    "gui.codpattern.zombies.deploy.field.weaponLevel",
+                    "gui.codpattern.zombies.deploy.field.levelDamageMultiplier",
+                    "gui.codpattern.zombies.deploy.field.price",
+                    "gui.codpattern.zombies.deploy.field.maxReserveAmmo",
+                    "gui.codpattern.zombies.deploy.field.refreshWaves",
+                    "gui.codpattern.zombies.deploy.field.rarityPools",
+                    "gui.codpattern.zombies.deploy.field.weapons",
                     "message.codpattern.zombies.deploy.captured_player_pos",
                     "message.codpattern.zombies.deploy.captured_look_block",
                     "message.codpattern.zombies.deploy.action_not_implemented",

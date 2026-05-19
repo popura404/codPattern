@@ -34,6 +34,9 @@ public final class ZombiesMvp123CompatTestSuite {
             new ZombiesCompatSuiteRunner.TestEntry("Zombies HUD overlay static contract compat",
                     "com.cdp.codpattern.client.gui.overlay.ZombiesHudOverlayStaticContractCompatTest",
                     false),
+            new ZombiesCompatSuiteRunner.TestEntry("Zombies box block entry static contract compat",
+                    "com.cdp.codpattern.app.zombies.service.ZombiesBoxBlockEntryStaticContractCompatTest",
+                    false),
             new ZombiesCompatSuiteRunner.TestEntry("Zombies client survivor status compat",
                     "com.cdp.codpattern.client.zombies.ClientZombiesStateGrowthCompatTest",
                     false),
@@ -136,6 +139,10 @@ public final class ZombiesMvp123CompatTestSuite {
                     "MVP2",
                     "object interaction closure",
                     "stale object packets, room-scoped object state, barrier concurrency, wall/ammo/armor failures, and idempotent revisions"),
+            new CoverageItem(
+                    "MVP2",
+                    "box block entry contract",
+                    "weapon wall, ammo box, armor station, soda machine, and ultimate machine block use routes through the existing service while RightClickBlock skips double dispatch"),
             new CoverageItem(
                     "MVP2",
                     "full-runtime cleanup/object reset compat",

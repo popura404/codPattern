@@ -57,6 +57,9 @@ public final class ZombiesMvp1LifecycleClosureCompatTest {
         driveToWaveActive(lifecycle, harness.state);
         harness.state.waveState().markWaveComplete();
 
+        tickStay(lifecycle, harness.state, ZombiesPhaseStateMachine.WAVE_COMPLETE_DELAY_TICKS - 1,
+                ZombiesGamePhase.WAVE_ACTIVE,
+                "completed final wave should remain active during the hard wave-complete delay");
         tickExpect(lifecycle, harness.state, ZombiesGamePhase.VICTORY, "completed final wave should enter VICTORY");
         tickExpect(lifecycle, harness.state, ZombiesGamePhase.ENDING, "victory delay should enter ENDING");
         tickExpect(lifecycle, harness.state, ZombiesGamePhase.WAITING, "ENDING should reset to WAITING");
@@ -135,6 +138,18 @@ public final class ZombiesMvp1LifecycleClosureCompatTest {
         ZombiesServiceResult<Void> result = lifecycle.tick();
         require(result.success(), message + ": tick hooks failed with " + result.code());
         requirePhase(state, expected, message);
+    }
+
+    private static void tickStay(
+            ZombiesLifecycleRuntime lifecycle,
+            ZombiesRoomRuntimeState state,
+            int ticks,
+            ZombiesGamePhase expected,
+            String message
+    ) {
+        for (int tick = 0; tick < ticks; tick++) {
+            tickExpect(lifecycle, state, expected, message + " at tick " + (tick + 1));
+        }
     }
 
     private static void requirePhase(ZombiesRoomRuntimeState state, ZombiesGamePhase expected, String message) {

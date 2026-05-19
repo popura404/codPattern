@@ -28,8 +28,8 @@ public final class ZombiesMvp2DeepCoverageCompatTest {
     public static void main(String[] args) {
         barrierGroupClearActivatesSpawnGroupAndRepeatFailsWithoutSpend();
         deploySaveFailureRollsBackEditedObjects();
-        weaponWallListFieldsRoundTripThroughDeployEditor();
-        invalidWeaponWallListUpdatePreservesOriginalObjects();
+        weaponWallDeprecatedFieldsIgnoredThroughDeployEditor();
+        invalidWeaponWallPointUpdatePreservesOriginalObjects();
     }
 
     private static void barrierGroupClearActivatesSpawnGroupAndRepeatFailsWithoutSpend() {
@@ -79,7 +79,7 @@ public final class ZombiesMvp2DeepCoverageCompatTest {
                 "ADD",
                 ZombiesDeployFieldSchema.WEAPON_WALL,
                 -1,
-                weaponWallFields("wall-rollback-original", "1", "codpattern:pistol|common=1.0"));
+                weaponWallFieldsWithDeprecatedEntries("wall-rollback-original"));
         requireSuccess(originalAdd, "setup weapon_wall add should succeed");
         ZombiesMapObjects original = originalAdd.objects();
 
@@ -88,7 +88,7 @@ public final class ZombiesMvp2DeepCoverageCompatTest {
                 "ADD",
                 ZombiesDeployFieldSchema.WEAPON_WALL,
                 -1,
-                weaponWallFields("wall-rollback-pending", "2,5", "codpattern:rifle|common=1.0"));
+                weaponWallFieldsWithDeprecatedEntries("wall-rollback-pending"));
         requireSuccess(pendingAdd, "pending weapon_wall add should succeed before persistence");
 
         ObjectHolder holder = new ObjectHolder(original);
@@ -109,27 +109,20 @@ public final class ZombiesMvp2DeepCoverageCompatTest {
                 "save failure rollback should keep the original weapon wall");
     }
 
-    private static void weaponWallListFieldsRoundTripThroughDeployEditor() {
+    private static void weaponWallDeprecatedFieldsIgnoredThroughDeployEditor() {
         DeployEditResult add = deployEdit(
                 ZombiesMapObjects.EMPTY,
                 "ADD",
                 ZombiesDeployFieldSchema.WEAPON_WALL,
                 -1,
-                weaponWallFields(
-                        "wall-list",
-                        "1;4\n7",
-                        "codpattern:pistol|common=1.0;codpattern:rifle|rare=2.0,common=0.5"));
+                weaponWallFieldsWithDeprecatedEntries("wall-list"));
 
-        requireSuccess(add, "weapon_wall add with LIST fields should succeed");
+        requireSuccess(add, "weapon_wall add with deprecated fields should succeed");
         require(add.selectedIndex() == 0, "weapon_wall add should select inserted object");
         ZombiesWeaponWallData added = only(add.objects().weaponWalls(), "added weapon wall");
-        require(List.of(1, 4, 7).equals(added.refreshWaves()),
-                "refreshWaves LIST should parse comma, semicolon, and newline delimiters");
-        requireWeaponCandidate(added.weapons().get(1), "codpattern:rifle", Map.of("common", 0.5D, "rare", 2.0D));
-        require("1,4,7".equals(add.fields().get("refreshWaves")),
-                "returned draft fields should serialize refreshWaves canonically");
-        require("codpattern:pistol|common=1.0;codpattern:rifle|common=0.5,rare=2.0".equals(add.fields().get("weapons")),
-                "returned draft fields should stay aligned with parsed weapon candidates");
+        require("wall-list".equals(added.objectId()), "weapon_wall objectId should parse");
+        require(new BlockPos(5, 64, 6).equals(added.pos()), "weapon_wall pos should parse");
+        requireOldWeaponWallFieldsAbsent(add.fields());
 
         Map<String, String> updateFields = new LinkedHashMap<>(add.fields());
         updateFields.put("price", "725");
@@ -143,32 +136,26 @@ public final class ZombiesMvp2DeepCoverageCompatTest {
                 0,
                 updateFields);
 
-        requireSuccess(update, "weapon_wall update with LIST fields should succeed");
+        requireSuccess(update, "weapon_wall update with deprecated fields should succeed");
         require(update.selectedIndex() == 0, "weapon_wall update should keep selected index");
         ZombiesWeaponWallData updated = only(update.objects().weaponWalls(), "updated weapon wall");
-        require(updated.price() == 725, "weapon_wall update should apply scalar field with LIST fields");
-        require(List.of(2, 5, 8).equals(updated.refreshWaves()),
-                "weapon_wall update should replace refreshWaves from LIST rows");
-        requireRarityPool(updated.rarityPools().get(1), "epic", 4, 0.0D, 3.5D);
-        requireWeaponCandidate(updated.weapons().get(1), "codpattern:rifle", Map.of("common", 0.25D, "epic", 1.5D));
-        require("2,5,8".equals(update.fields().get("refreshWaves")),
-                "updated draft fields should mirror the stored refreshWaves order");
-        require("codpattern:smg|epic=3.0;codpattern:rifle|common=0.25,epic=1.5".equals(update.fields().get("weapons")),
-                "updated draft fields should mirror the stored weapon candidates");
+        require("wall-list".equals(updated.objectId()), "weapon_wall update should keep objectId");
+        require(new BlockPos(5, 64, 6).equals(updated.pos()), "weapon_wall update should keep pos");
+        requireOldWeaponWallFieldsAbsent(update.fields());
     }
 
-    private static void invalidWeaponWallListUpdatePreservesOriginalObjects() {
+    private static void invalidWeaponWallPointUpdatePreservesOriginalObjects() {
         DeployEditResult add = deployEdit(
                 ZombiesMapObjects.EMPTY,
                 "ADD",
                 ZombiesDeployFieldSchema.WEAPON_WALL,
                 -1,
-                weaponWallFields("wall-invalid-list", "1,4", "codpattern:pistol|common=1.0"));
+                weaponWallFieldsWithDeprecatedEntries("wall-invalid-list"));
         requireSuccess(add, "setup weapon_wall add should succeed");
         ZombiesMapObjects original = add.objects();
 
         Map<String, String> badFields = new LinkedHashMap<>(add.fields());
-        badFields.put("weapons", "codpattern:bad_without_weights");
+        badFields.put("posX", "not_an_integer");
         DeployEditResult invalid = deployEdit(
                 original,
                 "UPDATE",
@@ -176,15 +163,14 @@ public final class ZombiesMvp2DeepCoverageCompatTest {
                 0,
                 badFields);
 
-        requireFailure(invalid, "field.invalid_list", "invalid weapon LIST row should fail");
+        requireFailure(invalid, "field.invalid_integer", "invalid weapon wall point field should fail");
         require(invalid.objects() == original,
-                "invalid weapon LIST update should return original objects for rollback");
+                "invalid weapon wall update should return original objects for rollback");
         ZombiesWeaponWallData retained = only(original.weaponWalls(), "retained weapon wall");
         require("wall-invalid-list".equals(retained.objectId()),
-                "invalid weapon LIST update should keep original object id");
-        require(List.of(1, 4).equals(retained.refreshWaves()),
-                "invalid weapon LIST update should not mutate previously parsed refresh waves");
-        requireWeaponCandidate(retained.weapons().get(0), "codpattern:pistol", Map.of("common", 1.0D));
+                "invalid weapon wall update should keep original object id");
+        require(new BlockPos(5, 64, 6).equals(retained.pos()),
+                "invalid weapon wall update should not mutate previously parsed position");
     }
 
     private static ZombiesServiceResult<ZombiesObjectStateStore.BarrierGroupUpdate> clearBarrierGroupPurchase(
@@ -267,16 +253,16 @@ public final class ZombiesMvp2DeepCoverageCompatTest {
         return (String) value(target, accessor);
     }
 
-    private static Map<String, String> weaponWallFields(String objectId, String refreshWaves, String weapons) {
+    private static Map<String, String> weaponWallFieldsWithDeprecatedEntries(String objectId) {
         Map<String, String> fields = new LinkedHashMap<>(ZombiesDeployFieldSchema.defaultFields(ZombiesDeployFieldSchema.WEAPON_WALL));
         fields.put("objectId", objectId);
         fields.put("weaponLevel", "2");
         fields.put("levelDamageMultiplier", "1.25");
         fields.put("price", "650");
         fields.put("maxReserveAmmo", "210");
-        fields.put("refreshWaves", refreshWaves);
+        fields.put("refreshWaves", "1;4\n7");
         fields.put("rarityPools", "common=1,10.0,0.0;rare=2,1.5,0.25");
-        fields.put("weapons", weapons);
+        fields.put("weapons", "codpattern:pistol|common=1.0;codpattern:rifle|rare=2.0,common=0.5");
         fields.put("posX", "5");
         fields.put("posY", "64");
         fields.put("posZ", "6");
@@ -322,31 +308,17 @@ public final class ZombiesMvp2DeepCoverageCompatTest {
         return values.get(0);
     }
 
-    private static void requireRarityPool(
-            ZombiesWeaponWallData.RarityPoolData pool,
-            String id,
-            int rank,
-            double baseWeight,
-            double waveFactor
-    ) {
-        require(id.equals(pool.id()), "rarity pool id should match");
-        require(pool.rank() == rank, "rarity pool rank should match");
-        requireClose(pool.baseWeight(), baseWeight, "rarity pool baseWeight should match");
-        requireClose(pool.waveFactor(), waveFactor, "rarity pool waveFactor should match");
-    }
-
-    private static void requireWeaponCandidate(
-            ZombiesWeaponWallData.WeaponCandidateData candidate,
-            String gunId,
-            Map<String, Double> weightsByRarity
-    ) {
-        require(gunId.equals(candidate.gunId()), "weapon candidate gunId should match");
-        require(candidate.weightsByRarity().size() == weightsByRarity.size(),
-                "weapon candidate rarity weight count should match");
-        weightsByRarity.forEach((rarity, weight) -> requireClose(
-                candidate.weightsByRarity().getOrDefault(rarity, Double.NaN),
-                weight,
-                "weapon candidate " + rarity + " weight should match"));
+    private static void requireOldWeaponWallFieldsAbsent(Map<String, String> fields) {
+        for (String key : List.of(
+                "weaponLevel",
+                "levelDamageMultiplier",
+                "price",
+                "maxReserveAmmo",
+                "refreshWaves",
+                "rarityPools",
+                "weapons")) {
+            require(!fields.containsKey(key), "weapon_wall fields should not expose deprecated " + key);
+        }
     }
 
     private static void requirePoints(ZombiesPlayerStateService players, UUID playerId, double expected, String message) {

@@ -184,10 +184,11 @@ public final class ZombiesMvp2ObjectInteractionClosureCompatTest {
         services.economy.addPoints(playerId, 2_000.0D);
         requireSuccess(interactionService.purchaseWeaponWall(playerId, wall),
                 "first wall weapon purchase should succeed");
+        double balanceAfterPurchase = services.players.getOrCreate(playerId).points();
         long purchaseRevision = stateRevision(store, List.of(wall), "wall-idempotent");
         requireFailure(interactionService.purchaseWeaponWall(playerId, wall), ZombiesErrorCode.WEAPON_ALREADY_OWNED,
                 "duplicate wall weapon purchase should fail");
-        requirePoints(services.players, playerId, 1_400.0D, "duplicate wall weapon purchase should not spend again");
+        requirePoints(services.players, playerId, balanceAfterPurchase, "duplicate wall weapon purchase should not spend again");
         require(stateRevision(store, List.of(wall), "wall-idempotent") == purchaseRevision,
                 "duplicate wall weapon purchase should not advance revision");
     }
@@ -433,13 +434,6 @@ public final class ZombiesMvp2ObjectInteractionClosureCompatTest {
     private static ZombiesWeaponWallData weaponWall(String objectId, String gunId) {
         return new ZombiesWeaponWallData(
                 objectId,
-                2,
-                1.25D,
-                600,
-                210,
-                List.of(3),
-                List.of(new ZombiesWeaponWallData.RarityPoolData("common", 1, 100.0D, 0.0D)),
-                List.of(new ZombiesWeaponWallData.WeaponCandidateData(gunId, Map.of("common", 1.0D))),
                 dimension(),
                 new BlockPos(1, 64, 1),
                 Optional.empty());

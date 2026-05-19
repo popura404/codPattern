@@ -32,6 +32,7 @@ public final class ZombiesMvp1DeepCoverageCompatTest {
     public static void main(String[] args) throws IOException {
         startupPreflightFailureLeavesRoomAndClientStateUntouched();
         fixedOpeningCountdownAndIntermissionDurationsUseHardMvp1Values();
+        completedNonFinalWaveWaitsThreeSecondsBeforeNextIntermission();
         singleWaveTimeoutFailsAtHardLimit();
         victoryCleanupClearsHudObjectStateAndReleasesOccupancyIdempotently();
         failureCleanupClearsHudObjectStateAndReleasesOccupancyIdempotently();
@@ -120,6 +121,29 @@ public final class ZombiesMvp1DeepCoverageCompatTest {
                 "wave timeout should be recorded as the failure reason");
     }
 
+    private static void completedNonFinalWaveWaitsThreeSecondsBeforeNextIntermission() {
+        ZombiesRoomRuntimeState state = new ZombiesRoomRuntimeState(
+                RoomId.of("zombies", "mvp1-deep-wave-complete-delay"));
+        ZombiesLifecycleRuntime lifecycle = new ZombiesLifecycleRuntime(
+                state,
+                FAST_CONFIG,
+                ignored -> ZombiesPhaseStateMachine.FailureCheckResult.none(),
+                ignored -> true,
+                List.of());
+
+        state.configureMaxWave(2);
+        state.transitionTo(ZombiesGamePhase.INTERMISSION);
+        state.transitionTo(ZombiesGamePhase.WAVE_ACTIVE);
+        state.waveState().markWaveComplete();
+
+        tickStay(lifecycle, state, ZombiesPhaseStateMachine.WAVE_COMPLETE_DELAY_TICKS - 1,
+                ZombiesGamePhase.WAVE_ACTIVE,
+                "completed non-final wave should stay active during the hard wave-complete delay");
+        tickExpect(lifecycle, state, ZombiesGamePhase.INTERMISSION,
+                "completed non-final wave should enter the next wave intermission after three seconds");
+        require(state.waveState().targetWave() == 2, "next intermission should prepare target wave 2");
+    }
+
     private static void victoryCleanupClearsHudObjectStateAndReleasesOccupancyIdempotently() {
         ClosureHarness harness = new ClosureHarness("mvp1-deep-victory");
         ZombiesLifecycleRuntime lifecycle = harness.lifecycle(
@@ -130,6 +154,9 @@ public final class ZombiesMvp1DeepCoverageCompatTest {
         driveToWaveActive(lifecycle, harness.state);
         harness.state.waveState().markWaveComplete();
 
+        tickStay(lifecycle, harness.state, ZombiesPhaseStateMachine.WAVE_COMPLETE_DELAY_TICKS - 1,
+                ZombiesGamePhase.WAVE_ACTIVE,
+                "final completed wave should stay active during the hard wave-complete delay");
         tickExpect(lifecycle, harness.state, ZombiesGamePhase.VICTORY,
                 "final completed wave should enter victory");
         tickExpect(lifecycle, harness.state, ZombiesGamePhase.ENDING,

@@ -29,12 +29,25 @@ public final class ZombiesWeaponInstanceService {
             int maxReserveAmmo,
             double cost
     ) {
-        return purchaseWallWeapon(playerId, gunId, weaponLevel, damageMultiplier, maxReserveAmmo, cost, null);
+        return purchaseWallWeapon(playerId, gunId, "", weaponLevel, damageMultiplier, maxReserveAmmo, cost, null);
     }
 
     public ZombiesServiceResult<WallWeaponPurchaseResult> purchaseWallWeapon(
             UUID playerId,
             String gunId,
+            String rarityId,
+            int weaponLevel,
+            double damageMultiplier,
+            int maxReserveAmmo,
+            double cost
+    ) {
+        return purchaseWallWeapon(playerId, gunId, rarityId, weaponLevel, damageMultiplier, maxReserveAmmo, cost, null);
+    }
+
+    public ZombiesServiceResult<WallWeaponPurchaseResult> purchaseWallWeapon(
+            UUID playerId,
+            String gunId,
+            String rarityId,
             int weaponLevel,
             double damageMultiplier,
             int maxReserveAmmo,
@@ -45,29 +58,30 @@ public final class ZombiesWeaponInstanceService {
                 || !ZombiesWeaponInstanceState.isValidWeaponLevel(weaponLevel)
                 || !ZombiesWeaponInstanceState.isValidDamageMultiplier(damageMultiplier)
                 || maxReserveAmmo < 0) {
-            return ZombiesServiceResult.failure(WEAPON_INVALID_PURCHASE, weaponParams(gunId, weaponLevel), "");
+            return ZombiesServiceResult.failure(WEAPON_INVALID_PURCHASE, weaponParams(gunId, rarityId, weaponLevel), "");
         }
         if (economyService.state(playerId)
                 .flatMap(ZombiesPlayerRuntimeState::primaryWeapon)
-                .filter(weapon -> weapon.sameGunAndLevel(gunId, weaponLevel))
+                .filter(weapon -> sameOwnedWallWeapon(weapon, gunId, rarityId, weaponLevel))
                 .isPresent()) {
             return ZombiesServiceResult.failure(
                     ZombiesErrorCode.WEAPON_ALREADY_OWNED,
-                    weaponParams(gunId, weaponLevel),
+                    weaponParams(gunId, rarityId, weaponLevel),
                     "");
         }
 
         return economyService.spendAtomically(playerId, cost, state -> {
             ZombiesWeaponInstanceState currentWeapon = state.primaryWeapon().orElse(null);
-            if (currentWeapon != null && currentWeapon.sameGunAndLevel(gunId, weaponLevel)) {
+            if (currentWeapon != null && sameOwnedWallWeapon(currentWeapon, gunId, rarityId, weaponLevel)) {
                 return ZombiesServiceResult.failure(
                         ZombiesErrorCode.WEAPON_ALREADY_OWNED,
-                        weaponParams(gunId, weaponLevel),
+                        weaponParams(gunId, rarityId, weaponLevel),
                         "");
             }
 
-            ZombiesWeaponInstanceState weapon = ZombiesWeaponInstanceState.primary(
+            ZombiesWeaponInstanceState weapon = ZombiesWeaponInstanceState.wallPrimary(
                     gunId,
+                    rarityId,
                     weaponLevel,
                     damageMultiplier,
                     maxReserveAmmo);
@@ -93,10 +107,28 @@ public final class ZombiesWeaponInstanceService {
     }
 
     private static Map<String, ModePlayerValue> weaponParams(String gunId, int weaponLevel) {
+        return weaponParams(gunId, "", weaponLevel);
+    }
+
+    private static Map<String, ModePlayerValue> weaponParams(String gunId, String rarityId, int weaponLevel) {
         Map<String, ModePlayerValue> params = new LinkedHashMap<>();
         params.put("gunId", ModePlayerValue.ofString(gunId));
+        params.put("rarityId", ModePlayerValue.ofString(rarityId));
         params.put("weaponLevel", ModePlayerValue.ofInt(weaponLevel));
         return params;
+    }
+
+    private static boolean sameOwnedWallWeapon(
+            ZombiesWeaponInstanceState weapon,
+            String gunId,
+            String rarityId,
+            int weaponLevel
+    ) {
+        String normalizedRarityId = Objects.requireNonNullElse(rarityId, "").trim();
+        if (!normalizedRarityId.isBlank()) {
+            return weapon.sameGunAndRarity(gunId, normalizedRarityId);
+        }
+        return weapon.sameGunAndLevel(gunId, weaponLevel);
     }
 
     public record WallWeaponPurchaseResult(

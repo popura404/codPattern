@@ -413,6 +413,10 @@ public final class ZombiesWeaponInventoryService {
         return stack;
     }
 
+    public static ItemStack createDefaultTaczGunStackForRules(String gunId) {
+        return createDefaultTaczGunStack(gunId);
+    }
+
     private static void syncInventory(ServerPlayer player) {
         if (player == null) {
             return;

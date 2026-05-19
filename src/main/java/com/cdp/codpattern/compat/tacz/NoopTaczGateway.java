@@ -61,6 +61,11 @@ public final class NoopTaczGateway implements TaczGateway {
     }
 
     @Override
+    public int resolveMagazineAmmo(ItemStack stack) {
+        return 0;
+    }
+
+    @Override
     public int resolveReserveAmmo(ItemStack stack) {
         return 0;
     }

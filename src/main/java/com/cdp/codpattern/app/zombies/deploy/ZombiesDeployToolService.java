@@ -728,25 +728,25 @@ public final class ZombiesDeployToolService {
         }
 
         map.applyObjects(edit.objects());
-        PowerSwitchPlacementRollback powerSwitchRollback = null;
+        PlacementRollback placementRollback = null;
         try {
-            if (shouldSyncPowerSwitchBlock(player, resolvedOperation, draft, previousObjects, edit.objects())) {
-                powerSwitchRollback = removeStalePowerSwitchBlock(player.serverLevel(), previousObjects.powerSwitch(), edit.objects().powerSwitch());
-                if (shouldPlacePowerSwitchBlock(player, resolvedOperation, draft, successCode, previousObjects, edit.objects())) {
-                    powerSwitchRollback = appendPowerSwitchRollback(
-                            powerSwitchRollback,
-                            placePowerSwitchBlock(player.serverLevel(), edit.objects().powerSwitch().get().pos()));
-                }
+            if (shouldSyncPurchasableBlock(player, resolvedOperation, draft, previousObjects, edit.objects())) {
+                placementRollback = syncPurchasableBlocks(
+                        player.serverLevel(),
+                        ZombiesDeployFieldSchema.normalizeObjectType(draft.objectType()),
+                        previousObjects,
+                        edit.objects(),
+                        resolvedOperation);
             }
-            PowerSwitchPlacementRollback rollback = powerSwitchRollback;
+            PlacementRollback rollback = placementRollback;
             CodMapPersistence.saveMapOrRollback(map, () -> {
                 map.applyObjects(previousObjects);
-                restorePowerSwitchBlock(rollback);
+                restorePlacement(rollback);
             });
         } catch (RuntimeException e) {
             map.applyObjects(previousObjects);
-            if (powerSwitchRollback != null) {
-                restorePowerSwitchBlock(powerSwitchRollback);
+            if (placementRollback != null) {
+                restorePlacement(placementRollback);
             }
             ZombiesDeployTool.saveDraft(stack, resultDraft);
             ZombiesDeploySnapshot snapshot = buildSnapshot(
@@ -1109,7 +1109,7 @@ public final class ZombiesDeployToolService {
             case ZombiesDeployFieldSchema.WEAPON_WALL -> {
                 for (int i = 0; i < resolved.weaponWalls().size(); i++) {
                     ZombiesWeaponWallData data = resolved.weaponWalls().get(i);
-                    summaries.add(summary(i, type, data.objectId(), "level " + data.weaponLevel(), detail(data.dimension(), data.pos())));
+                    summaries.add(summary(i, type, data.objectId(), "box", detail(data.dimension(), data.pos())));
                 }
             }
             case ZombiesDeployFieldSchema.AMMO_BOX -> {
@@ -2038,46 +2038,15 @@ public final class ZombiesDeployToolService {
         return dimension == null || dimension.location() == null ? "" : dimension.location().toString();
     }
 
-    private boolean shouldPlacePowerSwitchBlock(
-            ServerPlayer player,
-            ZombiesDeployObjectEditor.Operation operation,
-            ZombiesDeployDraft draft,
-            String successCode,
-            ZombiesMapObjects previousObjects,
-            ZombiesMapObjects objects
-    ) {
-        if (player == null || objects == null || objects.powerSwitch().isEmpty()) {
-            return false;
-        }
-        ZombiesDeployObjectEditor.Operation resolvedOperation = operation == null
-                ? ZombiesDeployObjectEditor.Operation.ADD
-                : operation;
-        if (resolvedOperation != ZombiesDeployObjectEditor.Operation.ADD
-                && resolvedOperation != ZombiesDeployObjectEditor.Operation.UPDATE) {
-            return false;
-        }
-        if (!ZombiesDeployFieldSchema.POWER_SWITCH.equals(ZombiesDeployFieldSchema.normalizeObjectType(draft.objectType()))) {
-            return false;
-        }
-        ZombiesPowerSwitchData powerSwitch = objects.powerSwitch().get();
-        if (!isCurrentLevelPowerSwitch(player.serverLevel(), powerSwitch)) {
-            return false;
-        }
-        return resolvedOperation == ZombiesDeployObjectEditor.Operation.ADD
-                || "object.left_click_deployed".equals(successCode)
-                || previousObjects == null
-                || previousObjects.powerSwitch().isEmpty()
-                || !samePowerSwitchPlacement(previousObjects.powerSwitch().get(), powerSwitch);
-    }
-
-    private boolean shouldSyncPowerSwitchBlock(
+    private boolean shouldSyncPurchasableBlock(
             ServerPlayer player,
             ZombiesDeployObjectEditor.Operation operation,
             ZombiesDeployDraft draft,
             ZombiesMapObjects previousObjects,
             ZombiesMapObjects objects
     ) {
-        if (player == null || !ZombiesDeployFieldSchema.POWER_SWITCH.equals(ZombiesDeployFieldSchema.normalizeObjectType(draft.objectType()))) {
+        String type = ZombiesDeployFieldSchema.normalizeObjectType(draft.objectType());
+        if (player == null || !isPurchasableBlockObject(type)) {
             return false;
         }
         ZombiesDeployObjectEditor.Operation resolvedOperation = operation == null
@@ -2091,82 +2060,205 @@ public final class ZombiesDeployToolService {
         }
         ZombiesMapObjects before = previousObjects == null ? ZombiesMapObjects.EMPTY : previousObjects;
         ZombiesMapObjects after = objects == null ? ZombiesMapObjects.EMPTY : objects;
-        return before.powerSwitch().isPresent() || after.powerSwitch().isPresent();
+        return !purchasableObjects(before, type).isEmpty() || !purchasableObjects(after, type).isEmpty();
     }
 
-    private PowerSwitchPlacementRollback removeStalePowerSwitchBlock(
+    private PlacementRollback syncPurchasableBlocks(
             ServerLevel level,
-            Optional<ZombiesPowerSwitchData> previousPowerSwitch,
-            Optional<ZombiesPowerSwitchData> nextPowerSwitch
+            String objectType,
+            ZombiesMapObjects previousObjects,
+            ZombiesMapObjects nextObjects,
+            ZombiesDeployObjectEditor.Operation operation
     ) {
-        if (level == null || previousPowerSwitch == null || previousPowerSwitch.isEmpty()) {
+        if (level == null || !isPurchasableBlockObject(objectType)) {
             return null;
         }
-        ZombiesPowerSwitchData previous = previousPowerSwitch.get();
-        if (!isCurrentLevelPowerSwitch(level, previous)) {
-            return null;
+        List<PurchasablePlacement> previous = purchasableObjects(previousObjects, objectType);
+        List<PurchasablePlacement> next = purchasableObjects(nextObjects, objectType);
+        PlacementRollback rollback = null;
+        for (PurchasablePlacement previousPlacement : previous) {
+            if (!isCurrentLevelPlacement(level, previousPlacement)) {
+                continue;
+            }
+            Optional<PurchasablePlacement> sameObjectNext = next.stream()
+                    .filter(candidate -> sameObject(previousPlacement, candidate))
+                    .findFirst();
+            if (sameObjectNext.isPresent() && samePlacement(previousPlacement, sameObjectNext.get())) {
+                continue;
+            }
+            if (isPositionStillUsedByOther(next, previousPlacement)) {
+                continue;
+            }
+            rollback = appendPlacementRollback(
+                    rollback,
+                    removeManagedPurchasableBlock(level, previousPlacement.pos(), previousPlacement.block()));
         }
-        if (nextPowerSwitch != null
-                && nextPowerSwitch.isPresent()
-                && samePowerSwitchPlacement(previous, nextPowerSwitch.get())) {
-            return null;
+        if (operation != ZombiesDeployObjectEditor.Operation.DELETE
+                && operation != ZombiesDeployObjectEditor.Operation.CLEAR) {
+            for (PurchasablePlacement nextPlacement : next) {
+                if (!isCurrentLevelPlacement(level, nextPlacement)) {
+                    continue;
+                }
+                Optional<PurchasablePlacement> sameObjectPrevious = previous.stream()
+                        .filter(candidate -> sameObject(candidate, nextPlacement))
+                        .findFirst();
+                boolean sameObjectUpdate = sameObjectPrevious.isPresent();
+                if (sameObjectPrevious.isPresent() && samePlacement(sameObjectPrevious.get(), nextPlacement)) {
+                    continue;
+                }
+                rollback = appendPlacementRollback(
+                        rollback,
+                        placePurchasableBlock(level, nextPlacement, sameObjectUpdate));
+            }
         }
-        return removePowerSwitchBlock(level, previous.pos());
+        return rollback;
     }
 
-    private boolean samePowerSwitchPlacement(ZombiesPowerSwitchData first, ZombiesPowerSwitchData second) {
+    private boolean isPurchasableBlockObject(String objectType) {
+        return switch (ZombiesDeployFieldSchema.normalizeObjectType(objectType)) {
+            case ZombiesDeployFieldSchema.WEAPON_WALL,
+                 ZombiesDeployFieldSchema.AMMO_BOX,
+                 ZombiesDeployFieldSchema.ARMOR_STATION,
+                 ZombiesDeployFieldSchema.SODA_MACHINE,
+                 ZombiesDeployFieldSchema.ULTIMATE_MACHINE,
+                 ZombiesDeployFieldSchema.POWER_SWITCH -> true;
+            default -> false;
+        };
+    }
+
+    private List<PurchasablePlacement> purchasableObjects(ZombiesMapObjects objects, String objectType) {
+        ZombiesMapObjects resolved = objects == null ? ZombiesMapObjects.EMPTY : objects;
+        return switch (ZombiesDeployFieldSchema.normalizeObjectType(objectType)) {
+            case ZombiesDeployFieldSchema.WEAPON_WALL -> resolved.weaponWalls().stream()
+                    .map(wall -> new PurchasablePlacement(
+                            ZombiesDeployFieldSchema.WEAPON_WALL,
+                            wall.objectId(),
+                            wall.dimension(),
+                            wall.pos(),
+                            CodPatternBlockRegister.ZOMBIES_WEAPON_WALL_BOX.get()))
+                    .toList();
+            case ZombiesDeployFieldSchema.AMMO_BOX -> resolved.ammoBoxes().stream()
+                    .map(ammoBox -> new PurchasablePlacement(
+                            ZombiesDeployFieldSchema.AMMO_BOX,
+                            ammoBox.objectId(),
+                            ammoBox.dimension(),
+                            ammoBox.pos(),
+                            CodPatternBlockRegister.ZOMBIES_AMMO_BOX.get()))
+                    .toList();
+            case ZombiesDeployFieldSchema.ARMOR_STATION -> resolved.armorStations().stream()
+                    .map(armorStation -> new PurchasablePlacement(
+                            ZombiesDeployFieldSchema.ARMOR_STATION,
+                            armorStation.objectId(),
+                            armorStation.dimension(),
+                            armorStation.pos(),
+                            CodPatternBlockRegister.ZOMBIES_ARMOR_STATION_BOX.get()))
+                    .toList();
+            case ZombiesDeployFieldSchema.SODA_MACHINE -> resolved.sodaMachines().stream()
+                    .map(sodaMachine -> new PurchasablePlacement(
+                            ZombiesDeployFieldSchema.SODA_MACHINE,
+                            sodaMachine.objectId(),
+                            sodaMachine.dimension(),
+                            sodaMachine.pos(),
+                            CodPatternBlockRegister.ZOMBIES_SODA_MACHINE_BOX.get()))
+                    .toList();
+            case ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> resolved.ultimateMachines().stream()
+                    .map(ultimateMachine -> new PurchasablePlacement(
+                            ZombiesDeployFieldSchema.ULTIMATE_MACHINE,
+                            ultimateMachine.objectId(),
+                            ultimateMachine.dimension(),
+                            ultimateMachine.pos(),
+                            CodPatternBlockRegister.ZOMBIES_ULTIMATE_MACHINE_BOX.get()))
+                    .toList();
+            case ZombiesDeployFieldSchema.POWER_SWITCH -> resolved.powerSwitch()
+                    .map(powerSwitch -> List.of(new PurchasablePlacement(
+                            ZombiesDeployFieldSchema.POWER_SWITCH,
+                            powerSwitch.objectId(),
+                            powerSwitch.dimension(),
+                            powerSwitch.pos(),
+                            CodPatternBlockRegister.ZOMBIES_POWER_SWITCH.get())))
+                    .orElseGet(List::of);
+            default -> List.of();
+        };
+    }
+
+    private boolean isCurrentLevelPlacement(ServerLevel level, PurchasablePlacement placement) {
+        return level != null
+                && placement != null
+                && placement.dimension() != null
+                && level.dimension().equals(placement.dimension());
+    }
+
+    private boolean sameObject(PurchasablePlacement first, PurchasablePlacement second) {
+        return first != null
+                && second != null
+                && Objects.equals(first.objectType(), second.objectType())
+                && Objects.equals(first.objectId(), second.objectId());
+    }
+
+    private boolean samePlacement(PurchasablePlacement first, PurchasablePlacement second) {
         return first != null
                 && second != null
                 && Objects.equals(first.dimension(), second.dimension())
                 && Objects.equals(first.pos(), second.pos())
-                && Objects.equals(normalizePowerSwitchBlock(first), normalizePowerSwitchBlock(second));
+                && first.block() == second.block();
     }
 
-    private boolean isCurrentLevelPowerSwitch(ServerLevel level, ZombiesPowerSwitchData powerSwitch) {
-        return level != null
-                && powerSwitch != null
-                && level.dimension().equals(powerSwitch.dimension())
-                && "codpattern:zombies_power_switch".equals(normalizePowerSwitchBlock(powerSwitch));
+    private boolean isPositionStillUsedByOther(List<PurchasablePlacement> placements, PurchasablePlacement removed) {
+        if (placements == null || removed == null) {
+            return false;
+        }
+        for (PurchasablePlacement placement : placements) {
+            if (placement == null || sameObject(removed, placement)) {
+                continue;
+            }
+            if (placement.block() == removed.block()
+                    && Objects.equals(placement.dimension(), removed.dimension())
+                    && Objects.equals(placement.pos(), removed.pos())) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private String normalizePowerSwitchBlock(ZombiesPowerSwitchData powerSwitch) {
-        return powerSwitch == null ? "" : Objects.requireNonNullElse(powerSwitch.block(), "").trim();
-    }
-
-    private PowerSwitchPlacementRollback placePowerSwitchBlock(ServerLevel level, BlockPos pos) {
-        if (level == null || pos == null) {
+    private PlacementRollback placePurchasableBlock(
+            ServerLevel level,
+            PurchasablePlacement placement,
+            boolean sameObjectUpdate
+    ) {
+        if (level == null || placement == null || placement.pos() == null || placement.block() == null) {
             return null;
         }
-        BlockState previousState = level.getBlockState(pos);
-        if (!previousState.isAir() && previousState.getBlock() != CodPatternBlockRegister.ZOMBIES_POWER_SWITCH.get()) {
-            throw new RuntimeException("Cannot place zombies power switch over existing block "
-                    + blockId(previousState) + " at " + formatPos(pos));
+        BlockState previousState = level.getBlockState(placement.pos());
+        if (!previousState.isAir()
+                && !(sameObjectUpdate && previousState.getBlock() == placement.block())) {
+            throw new RuntimeException("Cannot place zombies purchasable block over existing block "
+                    + blockId(previousState) + " at " + formatPos(placement.pos()));
         }
-        boolean placed = level.setBlock(pos, CodPatternBlockRegister.ZOMBIES_POWER_SWITCH.get().defaultBlockState(), Block.UPDATE_ALL);
+        boolean placed = level.setBlock(placement.pos(), placement.block().defaultBlockState(), Block.UPDATE_ALL);
         if (!placed) {
-            throw new RuntimeException("Failed to place zombies power switch block at " + formatPos(pos));
+            throw new RuntimeException("Failed to place zombies purchasable block at " + formatPos(placement.pos()));
         }
-        return new PowerSwitchPlacementRollback(level, pos, previousState);
+        return new PlacementRollback(level, placement.pos(), previousState);
     }
 
-    private PowerSwitchPlacementRollback removePowerSwitchBlock(ServerLevel level, BlockPos pos) {
-        if (level == null || pos == null) {
+    private PlacementRollback removeManagedPurchasableBlock(ServerLevel level, BlockPos pos, Block expectedBlock) {
+        if (level == null || pos == null || expectedBlock == null) {
             return null;
         }
         BlockState previousState = level.getBlockState(pos);
-        if (previousState.getBlock() != CodPatternBlockRegister.ZOMBIES_POWER_SWITCH.get()) {
+        if (previousState.getBlock() != expectedBlock) {
             return null;
         }
         boolean removed = level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
         if (!removed) {
-            throw new RuntimeException("Failed to remove stale zombies power switch block at " + formatPos(pos));
+            throw new RuntimeException("Failed to remove stale zombies purchasable block at " + formatPos(pos));
         }
-        return new PowerSwitchPlacementRollback(level, pos, previousState);
+        return new PlacementRollback(level, pos, previousState);
     }
 
-    private PowerSwitchPlacementRollback appendPowerSwitchRollback(
-            PowerSwitchPlacementRollback current,
-            PowerSwitchPlacementRollback next
+    private PlacementRollback appendPlacementRollback(
+            PlacementRollback current,
+            PlacementRollback next
     ) {
         if (next == null) {
             return current;
@@ -2174,15 +2266,15 @@ public final class ZombiesDeployToolService {
         if (current == null) {
             return next;
         }
-        return new PowerSwitchPlacementRollback(next.level(), next.pos(), next.previousState(), current);
+        return new PlacementRollback(next.level(), next.pos(), next.previousState(), current);
     }
 
-    private void restorePowerSwitchBlock(PowerSwitchPlacementRollback rollback) {
+    private void restorePlacement(PlacementRollback rollback) {
         if (rollback == null || rollback.level() == null || rollback.pos() == null || rollback.previousState() == null) {
             return;
         }
         rollback.level().setBlock(rollback.pos(), rollback.previousState(), Block.UPDATE_ALL);
-        restorePowerSwitchBlock(rollback.next());
+        restorePlacement(rollback.next());
     }
 
     private void setPosition(Map<String, String> fields, String prefix, BlockPos pos) {
@@ -2314,13 +2406,28 @@ public final class ZombiesDeployToolService {
         }
     }
 
-    private record PowerSwitchPlacementRollback(
+    private record PurchasablePlacement(
+            String objectType,
+            String objectId,
+            ResourceKey<Level> dimension,
+            BlockPos pos,
+            Block block
+    ) {
+        private PurchasablePlacement {
+            objectType = ZombiesDeployFieldSchema.normalizeObjectType(objectType);
+            objectId = Objects.requireNonNullElse(objectId, "").trim();
+            pos = pos == null ? BlockPos.ZERO : pos;
+            Objects.requireNonNull(block, "block");
+        }
+    }
+
+    private record PlacementRollback(
             ServerLevel level,
             BlockPos pos,
             BlockState previousState,
-            PowerSwitchPlacementRollback next
+            PlacementRollback next
     ) {
-        private PowerSwitchPlacementRollback(ServerLevel level, BlockPos pos, BlockState previousState) {
+        private PlacementRollback(ServerLevel level, BlockPos pos, BlockState previousState) {
             this(level, pos, previousState, null);
         }
     }

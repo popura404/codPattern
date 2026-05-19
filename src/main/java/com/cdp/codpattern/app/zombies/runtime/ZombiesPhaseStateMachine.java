@@ -11,7 +11,9 @@ public final class ZombiesPhaseStateMachine {
     public static final int DEFAULT_OPENING_COUNTDOWN_SECONDS = 20;
     public static final int DEFAULT_INTERMISSION_SECONDS = 5;
     public static final int DEFAULT_WAVE_TIMEOUT_SECONDS = 1200;
+    public static final int WAVE_COMPLETE_DELAY_SECONDS = 3;
     public static final int DEFAULT_WAVE_TIMEOUT_TICKS = secondsToTicks(DEFAULT_WAVE_TIMEOUT_SECONDS);
+    public static final int WAVE_COMPLETE_DELAY_TICKS = secondsToTicks(WAVE_COMPLETE_DELAY_SECONDS);
 
     public record Config(
             int openingCountdownTicks,
@@ -123,14 +125,18 @@ public final class ZombiesPhaseStateMachine {
     }
 
     private static TickResult tickWaveActive(ZombiesRoomRuntimeState state, WaveCompletion waveCompletion) {
-        if (state.waveState().waveTimeTicks() >= DEFAULT_WAVE_TIMEOUT_TICKS) {
-            state.markFailure(ZombiesErrorCode.WAVE_TIMEOUT);
-            return TickResult.next(ZombiesGamePhase.FAILED);
-        }
         boolean complete = waveCompletion != null
                 ? waveCompletion.isWaveComplete(state)
                 : state.waveState().isWaveComplete();
+        if (!complete && state.waveState().waveTimeTicks() >= DEFAULT_WAVE_TIMEOUT_TICKS) {
+            state.markFailure(ZombiesErrorCode.WAVE_TIMEOUT);
+            return TickResult.next(ZombiesGamePhase.FAILED);
+        }
         if (!complete) {
+            state.waveState().resetWaveCompleteDelay();
+            return TickResult.stay();
+        }
+        if (!state.waveState().tickWaveCompleteDelay(WAVE_COMPLETE_DELAY_TICKS)) {
             return TickResult.stay();
         }
         int nextWave = state.waveState().currentWave() + 1;

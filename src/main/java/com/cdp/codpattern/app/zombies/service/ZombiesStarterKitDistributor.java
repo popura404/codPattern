@@ -5,6 +5,7 @@ import com.cdp.codpattern.app.zombies.model.ZombiesEquipmentSlot;
 import com.cdp.codpattern.app.zombies.model.ZombiesWeaponInstanceState;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.zombies.ZombiesBackpackConfig;
+import com.cdp.codpattern.config.zombies.ZombiesRulesRepository;
 import com.cdp.codpattern.config.zombies.ZombiesWeaponFilterConfig;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
@@ -330,7 +331,11 @@ public final class ZombiesStarterKitDistributor {
                 return starterWeaponFailure("blocked_weapon");
             }
             if (TaczGatewayProvider.gateway().isGun(stack)) {
-                int ammoMultiple = Math.max(0, (int) Math.floor(resolvedFilter.getAmmunitionPerMagazineMultiple()));
+                int ammoMultiple = Math.max(
+                        0,
+                        ZombiesRulesRepository.getConfig()
+                                .getWeaponRules()
+                                .getStarterWeaponAmmunitionPerMagazineMultiple());
                 TaczGatewayProvider.gateway().configureGunAmmo(stack, ammoMultiple);
             }
             return ZombiesServiceResult.success(stack);
@@ -381,7 +386,7 @@ public final class ZombiesStarterKitDistributor {
         int maxReserveAmmo = Math.max(reserveAmmo, TaczGatewayProvider.gateway().resolveMaxReserveAmmo(stack));
         return new ZombiesWeaponInstanceState(
                 gunId,
-                0,
+                1,
                 0,
                 1.0D,
                 1.0D,
