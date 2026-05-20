@@ -104,13 +104,18 @@ public final class ZombiesWaveDirector {
             waveState.recordSpawnFailure("spawn.max_alive_reached");
             return TickResult.throttled("spawn.max_alive_reached");
         }
-        int interval = Math.max(1, definition.getSpawnIntervalTicks());
+        int interval = waveState.nextSpawnIntervalTicks();
+        if (interval <= 0) {
+            interval = definition.chooseSpawnIntervalTicks(level.random);
+            waveState.configureNextSpawnIntervalTicks(interval);
+        }
+        interval = Math.max(1, interval);
         long lastAttempt = waveState.lastSpawnAttemptTick();
         if (lastAttempt != Long.MIN_VALUE && roomTick - lastAttempt < interval) {
             return TickResult.waiting("spawn.interval_wait");
         }
 
-        waveState.recordSpawnAttempt(roomTick);
+        waveState.recordSpawnAttempt(roomTick, definition.chooseSpawnIntervalTicks(level.random));
         ZombiesMobSpawnService.SpawnResult spawnResult = spawnService.spawnNext(
                 roomId,
                 level,

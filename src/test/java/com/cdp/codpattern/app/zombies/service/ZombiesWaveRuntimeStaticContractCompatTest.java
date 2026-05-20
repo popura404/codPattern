@@ -11,12 +11,20 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
             Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/map/ZombiesEntityCombatEventAdapter.java");
     private static final Path WAVE_STATE =
             Path.of("src/main/java/com/cdp/codpattern/app/zombies/runtime/ZombiesWaveRuntimeState.java");
+    private static final Path RECYCLE_SERVICE =
+            Path.of("src/main/java/com/cdp/codpattern/app/zombies/service/ZombiesMobRecycleService.java");
+    private static final Path WAVE_DIRECTOR =
+            Path.of("src/main/java/com/cdp/codpattern/app/zombies/service/ZombiesWaveDirector.java");
+    private static final Path WAVE_DEFINITION =
+            Path.of("src/main/java/com/cdp/codpattern/app/zombies/model/ZombiesWaveDefinition.java");
     private static final Path PHASE_STATE_MACHINE =
             Path.of("src/main/java/com/cdp/codpattern/app/zombies/runtime/ZombiesPhaseStateMachine.java");
     private static final Path ROOM_HANDLE =
             Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/map/ZombiesRoomHandleFactory.java");
     private static final Path ZOMBIES_MAP =
             Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/map/ZombiesMap.java");
+    private static final Path COD_TDM_EVENT_HANDLER =
+            Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/event/CodTdmEventHandler.java");
     private static final Path CLIENT_STATE =
             Path.of("src/main/java/com/cdp/codpattern/client/zombies/ClientZombiesState.java");
     private static final Path ZOMBIES_MARKER_RENDERER =
@@ -29,9 +37,13 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
         String spawnService = read(SPAWN_SERVICE);
         String combatAdapter = read(COMBAT_ADAPTER);
         String waveState = read(WAVE_STATE);
+        String recycleService = read(RECYCLE_SERVICE);
+        String waveDirector = read(WAVE_DIRECTOR);
+        String waveDefinition = read(WAVE_DEFINITION);
         String phaseStateMachine = read(PHASE_STATE_MACHINE);
         String roomHandle = read(ROOM_HANDLE);
         String zombiesMap = read(ZOMBIES_MAP);
+        String codTdmEventHandler = read(COD_TDM_EVENT_HANDLER);
         String clientState = read(CLIENT_STATE);
         String zombiesMarkerRenderer = read(ZOMBIES_MARKER_RENDERER);
 
@@ -50,6 +62,30 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
         requireContains(spawnService,
                 "mob.setPersistenceRequired();",
                 "room monsters should not despawn just because they are far from players");
+        requireContains(spawnService,
+                "effectiveSpawnWeight(spawn.weight(), targetDistance, nearestDistance, weighting)",
+                "spawn-point selection should combine map weight with distance multiplier");
+        requireContains(spawnService,
+                "spawnPointWeightingSupplier",
+                "spawn-point selection should use an injectable map-scoped rules supplier");
+        requireContains(spawnService,
+                "case ZombiesWaveValidator.VANILLA_WITHER_SKELETON_ID -> EntityType.WITHER_SKELETON.create(level);",
+                "wither skeleton should be a supported zombies wave entity");
+        requireContains(spawnService,
+                "case ZombiesWaveValidator.VANILLA_CREEPER_ID -> EntityType.CREEPER.create(level);",
+                "creeper should be a supported zombies wave entity");
+        requireContains(spawnService,
+                "case ZombiesWaveValidator.VANILLA_WOLF_ID -> EntityType.WOLF.create(level);",
+                "wolf should be a supported zombies wave entity");
+        requireContains(spawnService,
+                "case ZombiesWaveValidator.VANILLA_SILVERFISH_ID -> EntityType.SILVERFISH.create(level);",
+                "silverfish should be a supported zombies wave entity");
+        requireContains(spawnService,
+                "wolf.setPersistentAngerTarget(target.getUUID());",
+                "zombies wolves should keep anger on their room target");
+        requireContains(spawnService,
+                "wolf.setRemainingPersistentAngerTime(ROOM_MONSTER_WOLF_ANGER_TICKS);",
+                "zombies wolves should be spawned and refreshed as angry wolves");
         requireContains(spawnService,
                 "pathfinderMob.targetSelector.addGoal(\n                0,\n                new RoomSurvivorTargetGoal(pathfinderMob, targetSupplier));",
                 "spawned room monsters should get a room-scoped target selector");
@@ -75,8 +111,59 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
                 "public Set<UUID> activeZombieEntityIdsSnapshot()",
                 "wave runtime must expose active zombie ids for client marker sync");
         requireContains(waveState,
+                "public boolean requeueBudget(String mobId, int recycleCount)",
+                "wave runtime must support retry recycling by returning budget with a recycle count");
+        requireContains(waveState,
+                "public int consumeRequeuedRecycleCount(String mobId)",
+                "spawned retry mobs must consume the recycle count attached to their returned budget");
+        requireContains(waveState,
                 "public boolean tickWaveCompleteDelay(int requiredTicks)",
                 "wave runtime must track the hard post-completion delay");
+        requireContains(recycleService,
+                "static final int SCAN_INTERVAL_TICKS = 80;",
+                "zombie recycle scanner must run on the hardcoded 80-tick cadence");
+        requireContains(recycleService,
+                "static final int NO_TARGET_RECYCLE_TICKS = 20 * 20;",
+                "zombie recycle scanner must use the hardcoded 20-second no-target timeout");
+        requireContains(recycleService,
+                "static final int STUCK_RECYCLE_TICKS = 16 * 20;",
+                "zombie recycle scanner must use the hardcoded 16-second stuck timeout");
+        requireContains(recycleService,
+                "static final double MIN_MOVED_DISTANCE = 0.5D;",
+                "zombie recycle scanner must treat movement below 0.5 blocks as stuck");
+        requireContains(recycleService,
+                "static final double STUCK_MIN_TARGET_DISTANCE = 8.0D;",
+                "zombie recycle scanner must only stuck-recycle mobs farther than 8 blocks from target");
+        requireContains(recycleService,
+                "static final int MAX_REQUEUE_RECYCLES_PER_ENTITY = 2;",
+                "zombie recycle scanner must only requeue the first two recycle attempts");
+        requireContains(recycleService,
+                "roomTick % SCAN_INTERVAL_TICKS != 0L",
+                "zombie recycle scanner must skip non-scan ticks");
+        requireContains(recycleService,
+                "waveState.requeueBudget(mobId, nextRecycleCount);",
+                "zombie recycle scanner must return budget only for retry-eligible recycles");
+        requireContains(recycleService,
+                "mob.discard();",
+                "zombie recycle scanner must discard recycled mobs instead of awarding kills");
+        requireContains(spawnService,
+                "public static final String WAVE_RECYCLE_COUNT_TAG",
+                "spawned zombies should carry retry recycle count metadata");
+        requireContains(spawnService,
+                "waveState.consumeRequeuedRecycleCount(mobId)",
+                "spawn path should restore the retry recycle count onto requeued mobs");
+        requireContains(waveState,
+                "nextSpawnIntervalTicks",
+                "wave runtime must remember the randomized interval chosen for the next spawn");
+        requireContains(waveDirector,
+                "definition.chooseSpawnIntervalTicks(level.random)",
+                "wave director should choose randomized spawn intervals from the wave range");
+        requireContains(waveDefinition,
+                "fastestSpawnIntervalTicks",
+                "wave definition should expose fastest spawn interval bound");
+        requireContains(waveDefinition,
+                "slowestSpawnIntervalTicks",
+                "wave definition should expose slowest spawn interval bound");
         requireContains(phaseStateMachine,
                 "public static final int WAVE_COMPLETE_DELAY_SECONDS = 3;",
                 "wave state machine must hardcode the three-second post-completion delay");
@@ -107,6 +194,51 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
         requireContains(zombiesMap,
                 "playerStateService.canInteract(player.getUUID())",
                 "room monster target source should exclude dead or disconnected survivors");
+        requireContains(zombiesMap,
+                "private final ZombiesMobRecycleService mobRecycleService;",
+                "zombies map should own the hardcoded no-target/stuck recycle service");
+        requireContains(zombiesMap,
+                "mobRecycleService.tick(\n                        roomId,\n                        getServerLevel(),\n                        runtimeState.waveState(),\n                        runtimeState.roomTick());",
+                "zombies map should scan active mobs for recycle before the wave director spawn tick");
+        requireContains(zombiesMap,
+                "mobRecycleService.reset();",
+                "zombies map should reset recycle monitor state during cleanup/runtime reset");
+        requireContains(codTdmEventHandler,
+                "public static void onExplosionDetonate(ExplosionEvent.Detonate event)",
+                "owned creeper explosions should be handled by the Forge explosion event");
+        requireContains(codTdmEventHandler,
+                "event.getAffectedBlocks().clear();",
+                "owned zombies creeper explosions should not damage terrain");
+        requireContains(codTdmEventHandler,
+                "port.onEntityDeath(creeper, new EntityDeathContext(",
+                "owned zombies creeper self-explosion should count as a killed room entity");
+        requireContains(codTdmEventHandler,
+                "public static void onLivingDrops(LivingDropsEvent event)",
+                "zombies rooms should clear death drops, including player drops");
+        requireContains(codTdmEventHandler,
+                "event.getDrops().clear();",
+                "zombies room death drops should be removed before entering the world");
+        requireContains(codTdmEventHandler,
+                "public static void onLivingExperienceDrop(LivingExperienceDropEvent event)",
+                "zombies rooms should clear death experience, including player experience");
+        requireContains(codTdmEventHandler,
+                "event.setDroppedExperience(0);",
+                "zombies room death experience should be zeroed");
+        requireContains(codTdmEventHandler,
+                "public static void onItemToss(ItemTossEvent event)",
+                "zombies room player tosses should not create item entities");
+        requireContains(codTdmEventHandler,
+                "public static void onEntityJoinLevel(EntityJoinLevelEvent event)",
+                "zombies rooms should reject any item or experience entity that reaches the world join path");
+        requireContains(codTdmEventHandler,
+                "entity instanceof ItemEntity || entity instanceof ExperienceOrb",
+                "zombies room drop suppression should include experience orbs");
+        requireContains(codTdmEventHandler,
+                "event.getEntity().discard();",
+                "zombies room drop entities should be discarded when blocked");
+        requireContains(codTdmEventHandler,
+                "FpsMatchMapRegistry.listMaps(BuiltInGameModes.ZOMBIES)",
+                "item-drop suppression should be scoped to zombies map areas");
         requireContains(clientState,
                 "public static Set<UUID> activeZombieEntityIds()",
                 "client zombies state must parse active zombie entity ids");

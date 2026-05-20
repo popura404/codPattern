@@ -7,6 +7,8 @@ import com.cdp.codpattern.app.zombies.map.object.ZombiesZombieSpawnData;
 import com.cdp.codpattern.app.zombies.model.ZombiesWaveDefinition;
 import com.cdp.codpattern.app.zombies.model.ZombiesWaveMobEntry;
 import com.cdp.codpattern.app.zombies.runtime.ZombiesWaveRuntimeState;
+import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
+import com.cdp.codpattern.config.zombies.ZombiesRulesRepository;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
@@ -17,6 +19,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.animal.Wolf;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -35,15 +38,18 @@ public final class ZombiesMobSpawnService {
     public static final String WAVE_MOB_ID_TAG = "codpattern_zombies_wave_mob_id";
     public static final String WAVE_KILL_POINTS_TAG = "codpattern_zombies_wave_kill_points";
     public static final String WAVE_ASSIST_POINTS_TAG = "codpattern_zombies_wave_assist_points";
+    public static final String WAVE_RECYCLE_COUNT_TAG = "codpattern_zombies_wave_recycle_count";
     static final int ROOM_MONSTER_MELEE_ATTACK_INTERVAL_TICKS = 10;
     static final double ROOM_MONSTER_FOLLOW_RANGE = 128.0D;
     static final int ROOM_MONSTER_TARGET_REFRESH_INTERVAL_TICKS = 20;
+    static final int ROOM_MONSTER_WOLF_ANGER_TICKS = 20 * 60 * 60;
 
     private static final AtomicInteger GLOBAL_ACTIVE_ZOMBIES = new AtomicInteger();
 
     private final ModeEntityOwnershipRegistry ownershipRegistry;
     private final int globalMaxAliveZombies;
     private final Supplier<List<ServerPlayer>> survivorTargetSupplier;
+    private final Supplier<ZombiesRulesConfig.SpawnPointWeighting> spawnPointWeightingSupplier;
     private final boolean roomTargetingEnabled;
 
     public ZombiesMobSpawnService() {
@@ -59,9 +65,25 @@ public final class ZombiesMobSpawnService {
             int globalMaxAliveZombies,
             Supplier<List<ServerPlayer>> survivorTargetSupplier
     ) {
+        this(
+                ownershipRegistry,
+                globalMaxAliveZombies,
+                survivorTargetSupplier,
+                () -> ZombiesRulesRepository.getConfig().getSpawnPointWeighting());
+    }
+
+    public ZombiesMobSpawnService(
+            ModeEntityOwnershipRegistry ownershipRegistry,
+            int globalMaxAliveZombies,
+            Supplier<List<ServerPlayer>> survivorTargetSupplier,
+            Supplier<ZombiesRulesConfig.SpawnPointWeighting> spawnPointWeightingSupplier
+    ) {
         this.ownershipRegistry = Objects.requireNonNull(ownershipRegistry, "ownershipRegistry");
         this.globalMaxAliveZombies = Math.max(1, globalMaxAliveZombies);
         this.survivorTargetSupplier = survivorTargetSupplier == null ? List::of : survivorTargetSupplier;
+        this.spawnPointWeightingSupplier = spawnPointWeightingSupplier == null
+                ? () -> ZombiesRulesRepository.getConfig().getSpawnPointWeighting()
+                : spawnPointWeightingSupplier;
         this.roomTargetingEnabled = survivorTargetSupplier != null;
     }
 
@@ -103,7 +125,11 @@ public final class ZombiesMobSpawnService {
             return SpawnResult.failure(SpawnFailureReason.CHUNK_UNAVAILABLE);
         }
 
-        ZombiesZombieSpawnData spawn = chooseSpawn(level, loadedCandidates);
+        ZombiesZombieSpawnData spawn = chooseSpawn(
+                level,
+                loadedCandidates,
+                survivorTargets(level),
+                spawnPointWeighting());
         Mob mob = createSupportedMob(level, mobId.get());
         if (mob == null) {
             return SpawnResult.failure(SpawnFailureReason.ENTITY_CREATE_FAILED);
@@ -114,11 +140,13 @@ public final class ZombiesMobSpawnService {
                 spawn.pos().getZ() + 0.5D,
                 spawn.yaw(),
                 spawn.pitch());
+        applySpawnedMobSpecialRules(mob);
         applyWaveAttributes(mob, waveDefinition);
         applyRoomMonsterRetention(mob);
         applyRoomMonsterAttackCadence(mob);
         applyRoomMonsterTargeting(mob, survivorTargetSupplier, roomTargetingEnabled);
         attachWaveRewardMetadata(mob, mobId.get(), waveDefinition);
+        attachRecycleCountMetadata(mob, mobId.get(), waveState);
 
         if (!level.addFreshEntity(mob)) {
             return SpawnResult.failure(SpawnFailureReason.ENTITY_ADD_FAILED);
@@ -131,6 +159,11 @@ public final class ZombiesMobSpawnService {
         waveState.registerActiveZombie(mob.getUUID());
         GLOBAL_ACTIVE_ZOMBIES.incrementAndGet();
         return SpawnResult.spawned(mob, mobId.get(), spawn.objectId());
+    }
+
+    private ZombiesRulesConfig.SpawnPointWeighting spawnPointWeighting() {
+        ZombiesRulesConfig.SpawnPointWeighting weighting = spawnPointWeightingSupplier.get();
+        return weighting == null ? new ZombiesRulesConfig.SpawnPointWeighting() : weighting;
     }
 
     public void recordMobEnded() {
@@ -177,9 +210,35 @@ public final class ZombiesMobSpawnService {
                 .findFirst();
     }
 
-    private static ZombiesZombieSpawnData chooseSpawn(ServerLevel level, List<ZombiesZombieSpawnData> candidates) {
+    private List<ServerPlayer> survivorTargets(ServerLevel level) {
+        if (level == null) {
+            return List.of();
+        }
+        try {
+            List<ServerPlayer> targets = survivorTargetSupplier.get();
+            if (targets == null || targets.isEmpty()) {
+                return List.of();
+            }
+            return targets.stream()
+                    .filter(Objects::nonNull)
+                    .filter(ServerPlayer::isAlive)
+                    .filter(player -> !player.isSpectator())
+                    .filter(player -> player.level().dimension().equals(level.dimension()))
+                    .toList();
+        } catch (RuntimeException ignored) {
+            return List.of();
+        }
+    }
+
+    private static ZombiesZombieSpawnData chooseSpawn(
+            ServerLevel level,
+            List<ZombiesZombieSpawnData> candidates,
+            List<ServerPlayer> survivorTargets,
+            ZombiesRulesConfig.SpawnPointWeighting weighting
+    ) {
+        ServerPlayer pressureTarget = choosePressureTarget(level, survivorTargets);
         double totalWeight = candidates.stream()
-                .mapToDouble(spawn -> Math.max(0.0D, spawn.weight()))
+                .mapToDouble(spawn -> effectiveSpawnWeight(spawn, pressureTarget, survivorTargets, weighting))
                 .sum();
         if (totalWeight <= 0.0D) {
             return candidates.get(0);
@@ -187,12 +246,174 @@ public final class ZombiesMobSpawnService {
         double selected = level.random.nextDouble() * totalWeight;
         double cursor = 0.0D;
         for (ZombiesZombieSpawnData candidate : candidates) {
-            cursor += Math.max(0.0D, candidate.weight());
+            cursor += effectiveSpawnWeight(candidate, pressureTarget, survivorTargets, weighting);
             if (selected <= cursor) {
                 return candidate;
             }
         }
         return candidates.get(candidates.size() - 1);
+    }
+
+    private static ServerPlayer choosePressureTarget(ServerLevel level, List<ServerPlayer> survivorTargets) {
+        if (level == null || survivorTargets == null || survivorTargets.isEmpty()) {
+            return null;
+        }
+        return survivorTargets.get(level.random.nextInt(survivorTargets.size()));
+    }
+
+    private static double effectiveSpawnWeight(
+            ZombiesZombieSpawnData spawn,
+            ServerPlayer pressureTarget,
+            List<ServerPlayer> survivorTargets,
+            ZombiesRulesConfig.SpawnPointWeighting weighting
+    ) {
+        if (spawn == null || spawn.weight() <= 0.0D) {
+            return 0.0D;
+        }
+        double targetDistance = pressureTarget == null ? Double.NaN : distanceToSpawn(spawn, pressureTarget);
+        double nearestDistance = nearestDistanceToSpawn(spawn, survivorTargets);
+        return effectiveSpawnWeight(spawn.weight(), targetDistance, nearestDistance, weighting);
+    }
+
+    static double effectiveSpawnWeight(
+            double baseWeight,
+            double targetDistance,
+            double nearestDistance,
+            ZombiesRulesConfig.SpawnPointWeighting weighting
+    ) {
+        if (!Double.isFinite(baseWeight) || baseWeight <= 0.0D) {
+            return 0.0D;
+        }
+        return baseWeight * distanceMultiplier(targetDistance, nearestDistance, weighting);
+    }
+
+    static double distanceMultiplier(
+            double targetDistance,
+            double nearestDistance,
+            ZombiesRulesConfig.SpawnPointWeighting weighting
+    ) {
+        if (weighting == null || !Boolean.TRUE.equals(weighting.getEnabled())) {
+            return 1.0D;
+        }
+        double tooCloseDistance = positiveFiniteOrDefault(weighting.getTooCloseDistance(), 8.0D);
+        double idealMinDistance = Math.max(
+                tooCloseDistance,
+                positiveFiniteOrDefault(weighting.getIdealMinDistance(), 24.0D));
+        double idealMaxDistance = Math.max(
+                idealMinDistance,
+                positiveFiniteOrDefault(weighting.getIdealMaxDistance(), 56.0D));
+        double farDistance = Math.max(
+                idealMaxDistance,
+                positiveFiniteOrDefault(weighting.getFarDistance(), 112.0D));
+        double minMultiplier = positiveFiniteOrDefault(weighting.getMinMultiplier(), 0.65D);
+        double maxMultiplier = positiveFiniteOrDefault(weighting.getMaxMultiplier(), 1.20D);
+        if (minMultiplier > maxMultiplier) {
+            double swappedMin = maxMultiplier;
+            maxMultiplier = minMultiplier;
+            minMultiplier = swappedMin;
+        }
+        double idealMultiplier = clamp(
+                positiveFiniteOrDefault(weighting.getIdealMultiplier(), 1.15D),
+                minMultiplier,
+                maxMultiplier);
+        double farMultiplier = clamp(
+                positiveFiniteOrDefault(weighting.getFarMultiplier(), 0.85D),
+                minMultiplier,
+                maxMultiplier);
+
+        double multiplier = targetDistanceMultiplier(
+                targetDistance,
+                tooCloseDistance,
+                idealMinDistance,
+                idealMaxDistance,
+                farDistance,
+                minMultiplier,
+                idealMultiplier,
+                farMultiplier);
+        if (Double.isFinite(nearestDistance) && nearestDistance < tooCloseDistance) {
+            multiplier = Math.min(multiplier, minMultiplier);
+        }
+        return clamp(multiplier, minMultiplier, maxMultiplier);
+    }
+
+    private static double targetDistanceMultiplier(
+            double targetDistance,
+            double tooCloseDistance,
+            double idealMinDistance,
+            double idealMaxDistance,
+            double farDistance,
+            double minMultiplier,
+            double idealMultiplier,
+            double farMultiplier
+    ) {
+        if (!Double.isFinite(targetDistance)) {
+            return 1.0D;
+        }
+        if (targetDistance < tooCloseDistance) {
+            return minMultiplier;
+        }
+        if (targetDistance < idealMinDistance) {
+            return lerp(
+                    minMultiplier,
+                    idealMultiplier,
+                    ratio(targetDistance, tooCloseDistance, idealMinDistance));
+        }
+        if (targetDistance <= idealMaxDistance) {
+            return idealMultiplier;
+        }
+        if (targetDistance < farDistance) {
+            return lerp(
+                    idealMultiplier,
+                    farMultiplier,
+                    ratio(targetDistance, idealMaxDistance, farDistance));
+        }
+        return farMultiplier;
+    }
+
+    private static double nearestDistanceToSpawn(
+            ZombiesZombieSpawnData spawn,
+            List<ServerPlayer> survivorTargets
+    ) {
+        if (spawn == null || survivorTargets == null || survivorTargets.isEmpty()) {
+            return Double.POSITIVE_INFINITY;
+        }
+        double nearest = Double.POSITIVE_INFINITY;
+        for (ServerPlayer target : survivorTargets) {
+            if (target == null) {
+                continue;
+            }
+            nearest = Math.min(nearest, distanceToSpawn(spawn, target));
+        }
+        return nearest;
+    }
+
+    private static double distanceToSpawn(ZombiesZombieSpawnData spawn, ServerPlayer target) {
+        if (spawn == null || target == null || spawn.pos() == null) {
+            return Double.NaN;
+        }
+        double dx = target.getX() - (spawn.pos().getX() + 0.5D);
+        double dy = target.getY() - spawn.pos().getY();
+        double dz = target.getZ() - (spawn.pos().getZ() + 0.5D);
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    private static double positiveFiniteOrDefault(Double value, double defaultValue) {
+        return value == null || !Double.isFinite(value) || value <= 0.0D ? defaultValue : value;
+    }
+
+    private static double ratio(double value, double min, double max) {
+        if (max <= min) {
+            return 1.0D;
+        }
+        return clamp((value - min) / (max - min), 0.0D, 1.0D);
+    }
+
+    private static double lerp(double from, double to, double ratio) {
+        return from + (to - from) * clamp(ratio, 0.0D, 1.0D);
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private static void applyWaveAttributes(Mob mob, ZombiesWaveDefinition waveDefinition) {
@@ -237,6 +458,23 @@ public final class ZombiesMobSpawnService {
                 new RoomSurvivorTargetGoal(pathfinderMob, targetSupplier));
     }
 
+    private static void applySpawnedMobSpecialRules(Mob mob) {
+        if (mob instanceof Wolf wolf) {
+            wolf.setTame(false);
+            wolf.setOrderedToSit(false);
+            wolf.setRemainingPersistentAngerTime(ROOM_MONSTER_WOLF_ANGER_TICKS);
+        }
+    }
+
+    private static void applyRoomTargetSpecialRules(PathfinderMob mob, ServerPlayer target) {
+        if (mob instanceof Wolf wolf && target != null) {
+            wolf.setTame(false);
+            wolf.setOrderedToSit(false);
+            wolf.setPersistentAngerTarget(target.getUUID());
+            wolf.setRemainingPersistentAngerTime(ROOM_MONSTER_WOLF_ANGER_TICKS);
+        }
+    }
+
     private static void attachWaveRewardMetadata(Mob mob, String rawMobId, ZombiesWaveDefinition waveDefinition) {
         if (mob == null || waveDefinition == null) {
             return;
@@ -263,6 +501,13 @@ public final class ZombiesMobSpawnService {
                         .map(normalizedMobId::equals)
                         .orElse(false))
                 .findFirst();
+    }
+
+    private static void attachRecycleCountMetadata(Mob mob, String mobId, ZombiesWaveRuntimeState waveState) {
+        if (mob == null || waveState == null || mobId == null || mobId.isBlank()) {
+            return;
+        }
+        mob.getPersistentData().putInt(WAVE_RECYCLE_COUNT_TAG, waveState.consumeRequeuedRecycleCount(mobId));
     }
 
     private static void multiplyAttribute(Mob mob, net.minecraft.world.entity.ai.attributes.Attribute attribute, double multiplier) {
@@ -342,6 +587,7 @@ public final class ZombiesMobSpawnService {
             }
             Optional<ServerPlayer> nextTarget = nearestRoomSurvivor(targets);
             currentRoomTargetId = nextTarget.map(ServerPlayer::getUUID).orElse(null);
+            nextTarget.ifPresent(target -> applyRoomTargetSpecialRules(mob, target));
             mob.setTarget(nextTarget.orElse(null));
         }
 
@@ -456,6 +702,10 @@ public final class ZombiesMobSpawnService {
         return switch (mobId) {
             case ZombiesWaveValidator.VANILLA_ZOMBIE_ID -> EntityType.ZOMBIE.create(level);
             case ZombiesWaveValidator.VANILLA_HUSK_ID -> EntityType.HUSK.create(level);
+            case ZombiesWaveValidator.VANILLA_WITHER_SKELETON_ID -> EntityType.WITHER_SKELETON.create(level);
+            case ZombiesWaveValidator.VANILLA_CREEPER_ID -> EntityType.CREEPER.create(level);
+            case ZombiesWaveValidator.VANILLA_WOLF_ID -> EntityType.WOLF.create(level);
+            case ZombiesWaveValidator.VANILLA_SILVERFISH_ID -> EntityType.SILVERFISH.create(level);
             default -> null;
         };
     }

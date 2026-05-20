@@ -5,6 +5,7 @@ import com.cdp.codpattern.app.zombies.model.ZombiesEquipmentSlot;
 import com.cdp.codpattern.app.zombies.model.ZombiesWeaponInstanceState;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.zombies.ZombiesBackpackConfig;
+import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 import com.cdp.codpattern.config.zombies.ZombiesRulesRepository;
 import com.cdp.codpattern.config.zombies.ZombiesWeaponFilterConfig;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
@@ -29,10 +30,30 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 public final class ZombiesStarterKitDistributor {
     private static final int STARTER_SLOT = 0;
-    private final ZombiesWeaponItemStackService weaponItemStackService = new ZombiesWeaponItemStackService();
+    private final ZombiesWeaponItemStackService weaponItemStackService;
+    private final Supplier<ZombiesRulesConfig> rulesSupplier;
+
+    public ZombiesStarterKitDistributor() {
+        this(ZombiesRulesRepository::getConfig);
+    }
+
+    public ZombiesStarterKitDistributor(Supplier<ZombiesRulesConfig> rulesSupplier) {
+        this(new ZombiesWeaponItemStackService(), rulesSupplier);
+    }
+
+    ZombiesStarterKitDistributor(
+            ZombiesWeaponItemStackService weaponItemStackService,
+            Supplier<ZombiesRulesConfig> rulesSupplier
+    ) {
+        this.weaponItemStackService = weaponItemStackService == null
+                ? new ZombiesWeaponItemStackService()
+                : weaponItemStackService;
+        this.rulesSupplier = rulesSupplier == null ? ZombiesRulesRepository::getConfig : rulesSupplier;
+    }
 
     public ZombiesServiceResult<PreparedStarterKits> prepareStarterWeapons(
             Collection<UUID> playerIds,
@@ -333,7 +354,7 @@ public final class ZombiesStarterKitDistributor {
             if (TaczGatewayProvider.gateway().isGun(stack)) {
                 int ammoMultiple = Math.max(
                         0,
-                        ZombiesRulesRepository.getConfig()
+                        rulesConfig()
                                 .getWeaponRules()
                                 .getStarterWeaponAmmunitionPerMagazineMultiple());
                 TaczGatewayProvider.gateway().configureGunAmmo(stack, ammoMultiple);
@@ -342,6 +363,11 @@ public final class ZombiesStarterKitDistributor {
         } catch (Exception exception) {
             return starterWeaponFailure("exception:" + exception.getClass().getSimpleName());
         }
+    }
+
+    private ZombiesRulesConfig rulesConfig() {
+        ZombiesRulesConfig rules = rulesSupplier.get();
+        return rules == null ? new ZombiesRulesConfig() : rules;
     }
 
     private static ZombiesServiceResult<ItemStack> starterWeaponFailure(String reason) {

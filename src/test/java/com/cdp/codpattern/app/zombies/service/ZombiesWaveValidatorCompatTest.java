@@ -17,6 +17,8 @@ public final class ZombiesWaveValidatorCompatTest {
         descriptionFieldsDoNotAffectValidation();
         missingMobsRemainsInvalid();
         explicitEmptyWaveIsValid();
+        fastestSlowestSpawnIntervalRangeIsValid();
+        reversedSpawnIntervalRangeIsInvalid();
         filenameWaveConflictIsInvalid();
         duplicateWaveNumberIsInvalid();
         supportedDefaultEntitiesAreValid();
@@ -63,6 +65,40 @@ public final class ZombiesWaveValidatorCompatTest {
         requireValid(wave, "explicit empty wave should be valid");
     }
 
+    private static void fastestSlowestSpawnIntervalRangeIsValid() {
+        ZombiesWaveDefinition wave = readWave(
+                "wave_001.json",
+                1,
+                "{"
+                        + "\"wave\":1,"
+                        + "\"fastestSpawnIntervalTicks\":20,"
+                        + "\"slowestSpawnIntervalTicks\":50,"
+                        + "\"mobs\":[{\"entity\":\"minecraft:zombie\",\"count\":1}]"
+                        + "}");
+
+        require(wave.getFastestSpawnIntervalTicks() == 20, "fastest interval should be retained");
+        require(wave.getSlowestSpawnIntervalTicks() == 50, "slowest interval should be retained");
+        requireValid(wave, "fastest/slowest spawn interval range should be valid");
+    }
+
+    private static void reversedSpawnIntervalRangeIsInvalid() {
+        ZombiesWaveDefinition wave = readWave(
+                "wave_001.json",
+                1,
+                "{"
+                        + "\"wave\":1,"
+                        + "\"fastestSpawnIntervalTicks\":50,"
+                        + "\"slowestSpawnIntervalTicks\":20,"
+                        + "\"mobs\":[{\"entity\":\"minecraft:zombie\",\"count\":1}]"
+                        + "}");
+
+        ZombiesWaveValidator.ValidationReport report = VALIDATOR.validate(List.of(wave));
+        require(report.hasIssue(ZombiesWaveValidator.INVALID_SPAWN_INTERVAL),
+                "reversed fastest/slowest interval should be rejected");
+        require(firstIssue(report).contains("fastestSpawnIntervalTicks"),
+                "reversed interval message should identify fastest/slowest fields");
+    }
+
     private static void filenameWaveConflictIsInvalid() {
         ZombiesWaveDefinition wave = readWave(
                 "wave_001.json",
@@ -97,11 +133,15 @@ public final class ZombiesWaveValidatorCompatTest {
                         + "\"wave\":1,"
                         + "\"mobs\":["
                         + "{\"entity\":\"minecraft:zombie\",\"count\":1},"
-                        + "{\"entity\":\"minecraft:husk\",\"count\":1}"
+                        + "{\"entity\":\"minecraft:husk\",\"count\":1},"
+                        + "{\"entity\":\"minecraft:wither_skeleton\",\"count\":1},"
+                        + "{\"entity\":\"minecraft:creeper\",\"count\":1},"
+                        + "{\"entity\":\"minecraft:wolf\",\"count\":1},"
+                        + "{\"entity\":\"minecraft:silverfish\",\"count\":1}"
                         + "]"
                         + "}");
 
-        requireValid(wave, "default zombie and husk entities should be valid");
+        requireValid(wave, "supported zombie-mode hostile entities should be valid");
     }
 
     private static void invalidEntityIdIsRejected() {

@@ -571,12 +571,21 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
         if (gunId.isBlank() || weaponLevel <= 0) {
             return Optional.empty();
         }
+        int reserveAmmo = positiveIntTag(tag, ZombiesWeaponItemStackService.TAG_RESERVE_AMMO);
+        int maxReserveAmmo = positiveIntTag(tag, ZombiesWeaponItemStackService.TAG_MAX_RESERVE_AMMO);
+        if (TaczClientApi.isGun(stack)) {
+            int liveMaxReserveAmmo = Math.max(0, TaczClientApi.resolveMaxReserveAmmo(stack));
+            if (liveMaxReserveAmmo > 0) {
+                reserveAmmo = Math.max(0, Math.min(TaczClientApi.resolveReserveAmmo(stack), liveMaxReserveAmmo));
+                maxReserveAmmo = liveMaxReserveAmmo;
+            }
+        }
         return Optional.of(new HeldWeaponPromptData(
                 gunId,
                 weaponLevel,
                 positiveIntTag(tag, ZombiesWeaponItemStackService.TAG_UPGRADE_LEVEL),
-                positiveIntTag(tag, ZombiesWeaponItemStackService.TAG_RESERVE_AMMO),
-                positiveIntTag(tag, ZombiesWeaponItemStackService.TAG_MAX_RESERVE_AMMO)));
+                reserveAmmo,
+                maxReserveAmmo));
     }
 
     private static int ammoCost(CompoundTag payload, int weaponLevel) {

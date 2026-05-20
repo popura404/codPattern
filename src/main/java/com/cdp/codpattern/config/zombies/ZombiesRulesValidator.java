@@ -15,6 +15,8 @@ public final class ZombiesRulesValidator {
             ZombiesErrorCode.of("rules.invalid_weapon_wall");
     public static final ZombiesErrorCode RULES_INVALID_WEAPON_RULES =
             ZombiesErrorCode.of("rules.invalid_weapon_rules");
+    public static final ZombiesErrorCode RULES_INVALID_SPAWN_POINT_WEIGHTING =
+            ZombiesErrorCode.of("rules.invalid_spawn_point_weighting");
 
     private static final Set<String> VALID_RARITIES = Set.of(
             ZombiesRulesConfig.RARITY_COMMON,
@@ -26,7 +28,94 @@ public final class ZombiesRulesValidator {
         List<ZombiesValidationIssue> issues = new ArrayList<>();
         validateWeaponRules(resolved.getWeaponRules(), issues);
         validateWeaponWall(resolved.getWeaponWall(), issues);
+        validateSpawnPointWeighting(resolved.getSpawnPointWeighting(), issues);
         return List.copyOf(issues);
+    }
+
+    private static void validateSpawnPointWeighting(
+            ZombiesRulesConfig.SpawnPointWeighting weighting,
+            List<ZombiesValidationIssue> issues
+    ) {
+        if (weighting == null) {
+            issues.add(ZombiesValidationIssue.error(
+                    RULES_INVALID_SPAWN_POINT_WEIGHTING,
+                    "spawnPointWeighting",
+                    "Zombies spawnPointWeighting config is missing."));
+            return;
+        }
+        validatePositiveFinite(
+                weighting.getTooCloseDistance(),
+                "spawnPointWeighting.tooCloseDistance",
+                "tooCloseDistance must be positive and finite.",
+                issues);
+        validatePositiveFinite(
+                weighting.getIdealMinDistance(),
+                "spawnPointWeighting.idealMinDistance",
+                "idealMinDistance must be positive and finite.",
+                issues);
+        validatePositiveFinite(
+                weighting.getIdealMaxDistance(),
+                "spawnPointWeighting.idealMaxDistance",
+                "idealMaxDistance must be positive and finite.",
+                issues);
+        validatePositiveFinite(
+                weighting.getFarDistance(),
+                "spawnPointWeighting.farDistance",
+                "farDistance must be positive and finite.",
+                issues);
+        if (positiveFinite(weighting.getTooCloseDistance())
+                && positiveFinite(weighting.getIdealMinDistance())
+                && weighting.getTooCloseDistance() > weighting.getIdealMinDistance()) {
+            issues.add(ZombiesValidationIssue.error(
+                    RULES_INVALID_SPAWN_POINT_WEIGHTING,
+                    "spawnPointWeighting.distanceOrder",
+                    "tooCloseDistance must be <= idealMinDistance."));
+        }
+        if (positiveFinite(weighting.getIdealMinDistance())
+                && positiveFinite(weighting.getIdealMaxDistance())
+                && weighting.getIdealMinDistance() > weighting.getIdealMaxDistance()) {
+            issues.add(ZombiesValidationIssue.error(
+                    RULES_INVALID_SPAWN_POINT_WEIGHTING,
+                    "spawnPointWeighting.distanceOrder",
+                    "idealMinDistance must be <= idealMaxDistance."));
+        }
+        if (positiveFinite(weighting.getIdealMaxDistance())
+                && positiveFinite(weighting.getFarDistance())
+                && weighting.getIdealMaxDistance() > weighting.getFarDistance()) {
+            issues.add(ZombiesValidationIssue.error(
+                    RULES_INVALID_SPAWN_POINT_WEIGHTING,
+                    "spawnPointWeighting.distanceOrder",
+                    "idealMaxDistance must be <= farDistance."));
+        }
+
+        validatePositiveFinite(
+                weighting.getMinMultiplier(),
+                "spawnPointWeighting.minMultiplier",
+                "minMultiplier must be positive and finite.",
+                issues);
+        validatePositiveFinite(
+                weighting.getIdealMultiplier(),
+                "spawnPointWeighting.idealMultiplier",
+                "idealMultiplier must be positive and finite.",
+                issues);
+        validatePositiveFinite(
+                weighting.getFarMultiplier(),
+                "spawnPointWeighting.farMultiplier",
+                "farMultiplier must be positive and finite.",
+                issues);
+        validatePositiveFinite(
+                weighting.getMaxMultiplier(),
+                "spawnPointWeighting.maxMultiplier",
+                "maxMultiplier must be positive and finite.",
+                issues);
+        if (positiveFinite(weighting.getMinMultiplier())
+                && positiveFinite(weighting.getMaxMultiplier())
+                && weighting.getMinMultiplier() > weighting.getMaxMultiplier()) {
+            issues.add(ZombiesValidationIssue.error(
+                    RULES_INVALID_SPAWN_POINT_WEIGHTING,
+                    "spawnPointWeighting.multiplierBounds",
+                    "minMultiplier must be <= maxMultiplier."));
+        }
     }
 
     private static void validateWeaponRules(
@@ -216,5 +305,23 @@ public final class ZombiesRulesValidator {
 
     private static boolean finite(Double value) {
         return value != null && Double.isFinite(value);
+    }
+
+    private static boolean positiveFinite(Double value) {
+        return value != null && Double.isFinite(value) && value > 0.0D;
+    }
+
+    private static void validatePositiveFinite(
+            Double value,
+            String subject,
+            String message,
+            List<ZombiesValidationIssue> issues
+    ) {
+        if (!positiveFinite(value)) {
+            issues.add(ZombiesValidationIssue.error(
+                    RULES_INVALID_SPAWN_POINT_WEIGHTING,
+                    subject,
+                    message));
+        }
     }
 }

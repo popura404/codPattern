@@ -33,21 +33,50 @@ public final class ZombiesWaveConfigRepository {
               "damageMultiplier": 1.10,
               "speedMultiplier": 1.08,
               "maxAlive": 10,
-              "spawnIntervalTicks": 35,
+              "fastestSpawnIntervalTicks": 20,
+              "slowestSpawnIntervalTicks": 50,
               "mobs": [
                 {
                   "entity": "minecraft:zombie",
                   "description": "Basic starter zombie example.",
-                  "count": 18,
-                  "killPoints": 10,
-                  "assistPoints": 3
+                  "count": 12,
+                  "killPoints": 30,
+                  "assistPoints": 9
                 },
                 {
                   "entity": "minecraft:husk",
                   "description": "Second vanilla mob example showing per-entry rewards.",
+                  "count": 3,
+                  "killPoints": 45,
+                  "assistPoints": 15
+                },
+                {
+                  "entity": "minecraft:wither_skeleton",
+                  "description": "Higher-threat melee mob example.",
+                  "count": 1,
+                  "killPoints": 75,
+                  "assistPoints": 24
+                },
+                {
+                  "entity": "minecraft:creeper",
+                  "description": "Special mob example; zombies-mode creeper explosions do not break terrain.",
+                  "count": 1,
+                  "killPoints": 60,
+                  "assistPoints": 18
+                },
+                {
+                  "entity": "minecraft:wolf",
+                  "description": "Angry wolf example; zombies mode keeps it hostile to room survivors.",
+                  "count": 2,
+                  "killPoints": 36,
+                  "assistPoints": 12
+                },
+                {
+                  "entity": "minecraft:silverfish",
+                  "description": "Small swarm mob example.",
                   "count": 4,
                   "killPoints": 15,
-                  "assistPoints": 5
+                  "assistPoints": 6
                 }
               ]
             }

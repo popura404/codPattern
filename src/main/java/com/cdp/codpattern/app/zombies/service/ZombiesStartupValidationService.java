@@ -8,6 +8,7 @@ import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidationReport;
 import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidationProfile;
 import com.cdp.codpattern.app.zombies.validation.ZombiesMapValidator;
 import com.cdp.codpattern.app.zombies.validation.ZombiesValidationIssue;
+import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 import com.cdp.codpattern.config.zombies.ZombiesRulesRepository;
 
 import java.nio.file.Path;
@@ -22,13 +23,22 @@ import java.util.function.Supplier;
 public final class ZombiesStartupValidationService {
     private final ZombiesMapValidator mapValidator;
     private final Supplier<ZombiesWaveConfigRepository> waveRepositorySupplier;
+    private final Supplier<List<ZombiesValidationIssue>> rulesIssuesSupplier;
 
     public ZombiesStartupValidationService(Path wavesDirectory) {
-        this(defaultMapValidator(), repositorySupplier(wavesDirectory));
+        this(defaultMapValidator(), repositorySupplier(wavesDirectory), ZombiesRulesRepository::getLastValidationIssues);
+    }
+
+    public ZombiesStartupValidationService(
+            Path wavesDirectory,
+            Supplier<ZombiesRulesConfig> rulesSupplier,
+            Supplier<List<ZombiesValidationIssue>> rulesIssuesSupplier
+    ) {
+        this(defaultMapValidator(), repositorySupplier(wavesDirectory, rulesSupplier), rulesIssuesSupplier);
     }
 
     public ZombiesStartupValidationService(ZombiesMapValidator mapValidator, Path wavesDirectory) {
-        this(mapValidator, repositorySupplier(wavesDirectory));
+        this(mapValidator, repositorySupplier(wavesDirectory), ZombiesRulesRepository::getLastValidationIssues);
     }
 
     public ZombiesStartupValidationService(ZombiesWaveConfigRepository waveRepository) {
@@ -39,15 +49,24 @@ public final class ZombiesStartupValidationService {
             ZombiesMapValidator mapValidator,
             ZombiesWaveConfigRepository waveRepository
     ) {
-        this(mapValidator, () -> Objects.requireNonNull(waveRepository, "waveRepository"));
+        this(mapValidator, () -> Objects.requireNonNull(waveRepository, "waveRepository"), ZombiesRulesRepository::getLastValidationIssues);
     }
 
     public ZombiesStartupValidationService(
             ZombiesMapValidator mapValidator,
             Supplier<ZombiesWaveConfigRepository> waveRepositorySupplier
     ) {
+        this(mapValidator, waveRepositorySupplier, ZombiesRulesRepository::getLastValidationIssues);
+    }
+
+    public ZombiesStartupValidationService(
+            ZombiesMapValidator mapValidator,
+            Supplier<ZombiesWaveConfigRepository> waveRepositorySupplier,
+            Supplier<List<ZombiesValidationIssue>> rulesIssuesSupplier
+    ) {
         this.mapValidator = mapValidator == null ? defaultMapValidator() : mapValidator;
         this.waveRepositorySupplier = Objects.requireNonNull(waveRepositorySupplier, "waveRepositorySupplier");
+        this.rulesIssuesSupplier = rulesIssuesSupplier == null ? List::of : rulesIssuesSupplier;
     }
 
     public ZombiesServiceResult<ZombiesStartupPreflightSnapshot> validate(
@@ -125,7 +144,7 @@ public final class ZombiesStartupValidationService {
                 failureLog(snapshot));
     }
 
-    private static List<ZombiesStartupPreflightSnapshot.Issue> collectIssues(
+    private List<ZombiesStartupPreflightSnapshot.Issue> collectIssues(
             ZombiesMapValidationReport mapReport,
             ZombiesWaveConfigRepository.LoadResult waveLoadResult,
             int maxWave
@@ -184,16 +203,28 @@ public final class ZombiesStartupValidationService {
                 + ", firstIssue=" + firstIssue + ")";
     }
 
-    private static List<ZombiesValidationIssue> rulesIssues() {
-        List<ZombiesValidationIssue> issues = ZombiesRulesRepository.getLastValidationIssues();
+    private List<ZombiesValidationIssue> rulesIssues() {
+        List<ZombiesValidationIssue> issues = rulesIssuesSupplier.get();
         return issues == null ? List.of() : issues;
     }
 
     private static Supplier<ZombiesWaveConfigRepository> repositorySupplier(Path wavesDirectory) {
+        return repositorySupplier(wavesDirectory, ZombiesRulesRepository::getConfig);
+    }
+
+    private static Supplier<ZombiesWaveConfigRepository> repositorySupplier(
+            Path wavesDirectory,
+            Supplier<ZombiesRulesConfig> rulesSupplier
+    ) {
         return () -> new ZombiesWaveConfigRepository(
                 wavesDirectory,
-                ZombiesRulesRepository.getConfig().getDefaults(),
+                rulesDefaults(rulesSupplier),
                 new ZombiesWaveValidator());
+    }
+
+    private static ZombiesRulesConfig.Defaults rulesDefaults(Supplier<ZombiesRulesConfig> rulesSupplier) {
+        ZombiesRulesConfig rules = rulesSupplier == null ? ZombiesRulesRepository.getConfig() : rulesSupplier.get();
+        return rules == null ? new ZombiesRulesConfig.Defaults() : rules.getDefaults();
     }
 
     private static ZombiesMapValidator defaultMapValidator() {

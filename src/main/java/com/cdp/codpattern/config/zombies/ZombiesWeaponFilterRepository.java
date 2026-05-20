@@ -22,8 +22,8 @@ public final class ZombiesWeaponFilterRepository {
     private ZombiesWeaponFilterRepository() {
     }
 
-    public static ZombiesWeaponFilterConfig loadOrCreate(MinecraftServer server) {
-        return loadOrCreate(ConfigPath.SERVER_ZOMBIES_FILTER.getPath(server));
+    public static ZombiesWeaponFilterConfig loadOrCreate(MinecraftServer server, String mapName) {
+        return loadOrCreate(ConfigPath.zombiesMapWeaponFilter(server, mapName));
     }
 
     public static ZombiesWeaponFilterConfig loadOrCreate(Path path) {

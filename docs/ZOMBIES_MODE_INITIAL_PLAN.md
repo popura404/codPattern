@@ -98,9 +98,21 @@ serverconfig/codpattern/zombies_rules/
     "damageMultiplier": 1.0,
     "speedMultiplier": 1.0,
     "maxAlive": 8,
-    "spawnIntervalTicks": 40,
+    "fastestSpawnIntervalTicks": 20,
+    "slowestSpawnIntervalTicks": 50,
     "killPoints": 10,
     "assistPoints": 3
+  },
+  "spawnPointWeighting": {
+    "enabled": true,
+    "tooCloseDistance": 8.0,
+    "idealMinDistance": 24.0,
+    "idealMaxDistance": 56.0,
+    "farDistance": 112.0,
+    "minMultiplier": 0.65,
+    "idealMultiplier": 1.15,
+    "farMultiplier": 0.85,
+    "maxMultiplier": 1.20
   }
 }
 ```
@@ -257,7 +269,7 @@ MVP 3 起，除单人对局外，已记录为本局成员的死亡观战玩家�
 
 ### 4.5 物品保护
 
-已进入本局的玩家死亡时拒绝掉落物品。局内玩家主动丢弃武器或装甲也应被拒绝，避免临时装备离开状态机。旁观者移动物品或容器转移初版暂不额外处理。
+僵尸模式房间区域内禁止任何掉落物实体，包括物品和经验球。玩家死亡、玩家主动丢弃、怪物死亡、方块或其它系统尝试生成 `ItemEntity` / `ExperienceOrb` 时都必须在服务端清空或取消，避免局内装备、怪物掉落、经验或环境掉落离开状态机。该规则按已注册 zombies map 区域判定，不只依赖玩家是否仍是本局成员。
 
 ## 5. 波次和怪物
 
@@ -272,19 +284,27 @@ MVP 3 起，除单人对局外，已记录为本局成员的死亡观战玩家�
   "damageMultiplier": 1.10,
   "speedMultiplier": 1.08,
   "maxAlive": 10,
-  "spawnIntervalTicks": 35,
+  "fastestSpawnIntervalTicks": 20,
+  "slowestSpawnIntervalTicks": 50,
   "mobs": [
-    { "entity": "minecraft:zombie", "count": 18, "killPoints": 10, "assistPoints": 3 },
-    { "entity": "minecraft:husk", "count": 4, "killPoints": 15, "assistPoints": 5 }
+    { "entity": "minecraft:zombie", "count": 12, "killPoints": 20, "assistPoints": 6 },
+    { "entity": "minecraft:husk", "count": 3, "killPoints": 30, "assistPoints": 10 },
+    { "entity": "minecraft:wither_skeleton", "count": 1, "killPoints": 50, "assistPoints": 16 },
+    { "entity": "minecraft:creeper", "count": 1, "killPoints": 40, "assistPoints": 12 },
+    { "entity": "minecraft:wolf", "count": 2, "killPoints": 24, "assistPoints": 8 },
+    { "entity": "minecraft:silverfish", "count": 4, "killPoints": 10, "assistPoints": 4 }
   ]
 }
 ```
 
 继承规则：
 
-- 没写的倍率、`maxAlive` 和 `spawnIntervalTicks` 从 `defaults` 继承。
+- 没写的倍率、`maxAlive`、`fastestSpawnIntervalTicks` 和 `slowestSpawnIntervalTicks` 从 `defaults` 继承。旧 `spawnIntervalTicks` 仍作为定长间隔兼容字段读取。
 - `mobs[].killPoints` 和 `mobs[].assistPoints` 缺失时从 `defaults` 继承。
 - 本波预算完全由 `mobs[].count` 决定，不按玩家人数缩放。
+- 当前支持的怪物实体：`minecraft:zombie`、`minecraft:husk`、`minecraft:wither_skeleton`、`minecraft:creeper`、`minecraft:wolf`、`minecraft:silverfish`。
+- 僵尸模式房间归属的苦力怕自爆不破坏方块，并按已击杀怪物处理本波存活计数。
+- 僵尸模式房间归属的狼按非驯服、持续仇恨狼处理，房间索敌刷新时同步仇恨目标。
 - 初版不发命中奖励。
 
 ### 5.2 最大波次和缺失波次
@@ -306,7 +326,7 @@ MVP 3 起，除单人对局外，已记录为本局成员的死亡观战玩家�
 | `wave` / 文件名编号 | 整数，`>= 1` |
 | `healthMultiplier` / `damageMultiplier` / `speedMultiplier` | 有限正数，`> 0`；超出 `0.01-100.0` 给 warning |
 | `maxAlive` | 整数，`>= 1`；本波怪物总数为 0 时可忽略 |
-| `spawnIntervalTicks` | 整数，`>= 1` |
+| `fastestSpawnIntervalTicks` / `slowestSpawnIntervalTicks` | 整数，`>= 1`，且最快值 `<=` 最慢值；旧 `spawnIntervalTicks` 仍兼容 |
 | `mobs[].count` | 整数，`>= 0` |
 | `killPoints` / `assistPoints` | 整数，`>= 0` |
 | 对象价格和扣费项 | 整数，`>= 0` |
@@ -329,8 +349,8 @@ MVP 3 起，除单人对局外，已记录为本局成员的死亡观战玩家�
 
 1. 开局默认激活 `group=1` 僵尸复活点组。
 2. 只从已激活的合法僵尸复活点刷怪。
-3. 当前存活怪物数低于本波 `maxAlive` 时，按 `spawnIntervalTicks` 间隔尝试刷怪。
-4. 每次刷怪从已激活、合法且区块可用的复活点中按 `weight` 加权随机选择位置。
+3. 当前存活怪物数低于本波 `maxAlive` 时，每次尝试刷怪都会在 `fastestSpawnIntervalTicks` 到 `slowestSpawnIntervalTicks` 之间随机抽取下一次间隔。
+4. 每次刷怪从已激活、合法且区块可用的复活点中按有效权重随机选择位置：`effectiveWeight = weight * distanceMultiplier`，距离倍率默认只在 `0.65-1.20` 小范围内微调。
 5. 每次生成后登记到当前房间，死亡、回收、异常离场或结算时按实体终止原因统计和清理。
 6. 开局倒计时结束后先进入目标波次 `1` 的波间准备；之后每波预算用尽且房间内归属怪物为 0 时，计算下一目标波次。
 7. 如果下一目标波次大于最大波次，立即进入胜利；否则进入该目标波次的波间准备。

@@ -15,6 +15,7 @@ public class ZombiesRulesConfig {
     private Defaults defaults = new Defaults();
     private WeaponWall weaponWall = WeaponWall.defaults();
     private WeaponRules weaponRules = new WeaponRules();
+    private SpawnPointWeighting spawnPointWeighting = new SpawnPointWeighting();
 
     public Room getRoom() {
         if (room == null) {
@@ -60,15 +61,28 @@ public class ZombiesRulesConfig {
         this.weaponRules = weaponRules == null ? new WeaponRules() : weaponRules;
     }
 
+    public SpawnPointWeighting getSpawnPointWeighting() {
+        if (spawnPointWeighting == null) {
+            spawnPointWeighting = new SpawnPointWeighting();
+        }
+        return spawnPointWeighting;
+    }
+
+    public void setSpawnPointWeighting(SpawnPointWeighting spawnPointWeighting) {
+        this.spawnPointWeighting = spawnPointWeighting == null ? new SpawnPointWeighting() : spawnPointWeighting;
+    }
+
     public void normalize() {
         setRoom(room);
         setDefaults(defaults);
         setWeaponWall(weaponWall);
         setWeaponRules(weaponRules);
+        setSpawnPointWeighting(spawnPointWeighting);
         room.normalize();
         defaults.normalize();
         weaponWall.normalize();
         weaponRules.normalize();
+        spawnPointWeighting.normalize();
     }
 
     public static class Room {
@@ -144,7 +158,9 @@ public class ZombiesRulesConfig {
         private Double damageMultiplier = 1.0;
         private Double speedMultiplier = 1.0;
         private Integer maxAlive = 8;
-        private Integer spawnIntervalTicks = 40;
+        private Integer fastestSpawnIntervalTicks;
+        private Integer slowestSpawnIntervalTicks;
+        private Integer spawnIntervalTicks;
         private Integer killPoints = 10;
         private Integer assistPoints = 3;
 
@@ -188,6 +204,22 @@ public class ZombiesRulesConfig {
             this.spawnIntervalTicks = spawnIntervalTicks;
         }
 
+        public Integer getFastestSpawnIntervalTicks() {
+            return fastestSpawnIntervalTicks;
+        }
+
+        public void setFastestSpawnIntervalTicks(Integer fastestSpawnIntervalTicks) {
+            this.fastestSpawnIntervalTicks = fastestSpawnIntervalTicks;
+        }
+
+        public Integer getSlowestSpawnIntervalTicks() {
+            return slowestSpawnIntervalTicks;
+        }
+
+        public void setSlowestSpawnIntervalTicks(Integer slowestSpawnIntervalTicks) {
+            this.slowestSpawnIntervalTicks = slowestSpawnIntervalTicks;
+        }
+
         public Integer getKillPoints() {
             return killPoints;
         }
@@ -209,7 +241,15 @@ public class ZombiesRulesConfig {
             damageMultiplier = positiveFiniteOrDefault(damageMultiplier, 1.0);
             speedMultiplier = positiveFiniteOrDefault(speedMultiplier, 1.0);
             maxAlive = positiveOrDefault(maxAlive, 8);
-            spawnIntervalTicks = positiveOrDefault(spawnIntervalTicks, 40);
+            int defaultFastestInterval = spawnIntervalTicks == null ? 20 : positiveOrDefault(spawnIntervalTicks, 20);
+            int defaultSlowestInterval = spawnIntervalTicks == null ? 50 : positiveOrDefault(spawnIntervalTicks, 50);
+            fastestSpawnIntervalTicks = positiveOrDefault(fastestSpawnIntervalTicks, defaultFastestInterval);
+            slowestSpawnIntervalTicks = positiveOrDefault(slowestSpawnIntervalTicks, defaultSlowestInterval);
+            if (fastestSpawnIntervalTicks > slowestSpawnIntervalTicks) {
+                int swappedFastest = slowestSpawnIntervalTicks;
+                slowestSpawnIntervalTicks = fastestSpawnIntervalTicks;
+                fastestSpawnIntervalTicks = swappedFastest;
+            }
             killPoints = nonNegativeOrDefault(killPoints, 10);
             assistPoints = nonNegativeOrDefault(assistPoints, 3);
         }
@@ -481,6 +521,118 @@ public class ZombiesRulesConfig {
         }
     }
 
+    public static class SpawnPointWeighting {
+        private Boolean enabled = true;
+        private Double tooCloseDistance = 8.0D;
+        private Double idealMinDistance = 24.0D;
+        private Double idealMaxDistance = 56.0D;
+        private Double farDistance = 112.0D;
+        private Double minMultiplier = 0.65D;
+        private Double idealMultiplier = 1.15D;
+        private Double farMultiplier = 0.85D;
+        private Double maxMultiplier = 1.20D;
+
+        public Boolean getEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(Boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public Double getTooCloseDistance() {
+            return tooCloseDistance;
+        }
+
+        public void setTooCloseDistance(Double tooCloseDistance) {
+            this.tooCloseDistance = tooCloseDistance;
+        }
+
+        public Double getIdealMinDistance() {
+            return idealMinDistance;
+        }
+
+        public void setIdealMinDistance(Double idealMinDistance) {
+            this.idealMinDistance = idealMinDistance;
+        }
+
+        public Double getIdealMaxDistance() {
+            return idealMaxDistance;
+        }
+
+        public void setIdealMaxDistance(Double idealMaxDistance) {
+            this.idealMaxDistance = idealMaxDistance;
+        }
+
+        public Double getFarDistance() {
+            return farDistance;
+        }
+
+        public void setFarDistance(Double farDistance) {
+            this.farDistance = farDistance;
+        }
+
+        public Double getMinMultiplier() {
+            return minMultiplier;
+        }
+
+        public void setMinMultiplier(Double minMultiplier) {
+            this.minMultiplier = minMultiplier;
+        }
+
+        public Double getIdealMultiplier() {
+            return idealMultiplier;
+        }
+
+        public void setIdealMultiplier(Double idealMultiplier) {
+            this.idealMultiplier = idealMultiplier;
+        }
+
+        public Double getFarMultiplier() {
+            return farMultiplier;
+        }
+
+        public void setFarMultiplier(Double farMultiplier) {
+            this.farMultiplier = farMultiplier;
+        }
+
+        public Double getMaxMultiplier() {
+            return maxMultiplier;
+        }
+
+        public void setMaxMultiplier(Double maxMultiplier) {
+            this.maxMultiplier = maxMultiplier;
+        }
+
+        private void normalize() {
+            enabled = enabled == null || enabled;
+            tooCloseDistance = positiveFiniteOrDefault(tooCloseDistance, 8.0D);
+            idealMinDistance = positiveFiniteOrDefault(idealMinDistance, 24.0D);
+            idealMaxDistance = positiveFiniteOrDefault(idealMaxDistance, 56.0D);
+            farDistance = positiveFiniteOrDefault(farDistance, 112.0D);
+            if (idealMinDistance < tooCloseDistance) {
+                idealMinDistance = tooCloseDistance;
+            }
+            if (idealMaxDistance < idealMinDistance) {
+                idealMaxDistance = idealMinDistance;
+            }
+            if (farDistance < idealMaxDistance) {
+                farDistance = idealMaxDistance;
+            }
+            minMultiplier = positiveFiniteOrDefault(minMultiplier, 0.65D);
+            idealMultiplier = positiveFiniteOrDefault(idealMultiplier, 1.15D);
+            farMultiplier = positiveFiniteOrDefault(farMultiplier, 0.85D);
+            maxMultiplier = positiveFiniteOrDefault(maxMultiplier, 1.20D);
+            if (minMultiplier > maxMultiplier) {
+                double swappedMin = maxMultiplier;
+                maxMultiplier = minMultiplier;
+                minMultiplier = swappedMin;
+            }
+            idealMultiplier = clampDouble(idealMultiplier, minMultiplier, maxMultiplier);
+            farMultiplier = clampDouble(farMultiplier, minMultiplier, maxMultiplier);
+        }
+    }
+
     private static int positiveOrDefault(Integer value, int defaultValue) {
         return value == null || value <= 0 ? defaultValue : value;
     }
@@ -502,5 +654,9 @@ public class ZombiesRulesConfig {
 
     private static double finiteOrDefault(Double value, double defaultValue) {
         return value == null || !Double.isFinite(value) ? defaultValue : value;
+    }
+
+    private static double clampDouble(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 }

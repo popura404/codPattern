@@ -69,7 +69,10 @@ public final class ZombiesWeaponItemStackService {
         if (stack == null || stack.isEmpty() || stack.getTag() == null) {
             return ZombiesServiceResult.failure(INVALID_WEAPON_TAG);
         }
-        return readWeaponTags(stack.getTag());
+        ZombiesServiceResult<ZombiesWeaponTagData> result = readWeaponTags(stack.getTag());
+        return result.value()
+                .map(data -> ZombiesServiceResult.success(withLiveTaczReserveAmmo(stack, data)))
+                .orElse(result);
     }
 
     public ZombiesServiceResult<ZombiesWeaponTagData> readWeaponTags(CompoundTag tag) {
@@ -197,6 +200,31 @@ public final class ZombiesWeaponItemStackService {
             return;
         }
         TaczGatewayProvider.gateway().setReserveAmmo(stack, data.reserveAmmo(), data.maxReserveAmmo());
+    }
+
+    private ZombiesWeaponTagData withLiveTaczReserveAmmo(ItemStack stack, ZombiesWeaponTagData data) {
+        if (stack == null || stack.isEmpty() || data == null || !TaczGatewayProvider.gateway().isGun(stack)) {
+            return data;
+        }
+        int liveMaxReserveAmmo = Math.max(0, TaczGatewayProvider.gateway().resolveMaxReserveAmmo(stack));
+        if (liveMaxReserveAmmo <= 0) {
+            return data;
+        }
+        int liveReserveAmmo = Math.max(
+                0,
+                Math.min(TaczGatewayProvider.gateway().resolveReserveAmmo(stack), liveMaxReserveAmmo));
+        return new ZombiesWeaponTagData(
+                data.roomId(),
+                data.instanceId(),
+                data.slot(),
+                data.gunId(),
+                data.rarityId(),
+                data.weaponLevel(),
+                data.levelDamageMultiplier(),
+                data.upgradeLevel(),
+                data.upgradeDamageMultiplier(),
+                liveReserveAmmo,
+                liveMaxReserveAmmo);
     }
 
     private static Map<String, ModePlayerValue> tagParams(

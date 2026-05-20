@@ -30,6 +30,7 @@ public final class ZombiesObjectStateStore {
     private static final String OBJECT_TYPE_SODA_MACHINE = "soda_machine";
     private static final String OBJECT_TYPE_ULTIMATE_MACHINE = "ultimate_machine";
     private static final String PAYLOAD_OBJECT_ID = "objectId";
+    private static final String PAYLOAD_NAME = "name";
     private static final String PAYLOAD_GROUP = "group";
     private static final String PAYLOAD_CLEARED = "cleared";
     private static final String PAYLOAD_AREA_FROM_X = "areaFromX";
@@ -358,6 +359,7 @@ public final class ZombiesObjectStateStore {
         payload.putString(PAYLOAD_OBJECT_ID, objectId);
         payload.putString(ZombiesObjectStateKeys.PAYLOAD_TYPE, OBJECT_TYPE_BARRIER);
         payload.putInt(PAYLOAD_GROUP, barrier.group());
+        payload.putString(PAYLOAD_NAME, barrier.displayName());
         payload.putInt(ZombiesObjectStateKeys.PAYLOAD_COST, Math.max(0, barrier.cost()));
         payload.putBoolean(PAYLOAD_CLEARED, state.cleared());
         payload.putBoolean(ZombiesObjectStateKeys.PAYLOAD_ENABLED, !state.cleared());

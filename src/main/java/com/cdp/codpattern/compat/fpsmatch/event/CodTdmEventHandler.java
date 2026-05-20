@@ -1,5 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.event;
 
+import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.model.DamageContext;
 import com.cdp.codpattern.app.match.model.DamageDecision;
@@ -14,15 +15,26 @@ import com.cdp.codpattern.app.match.runtime.ModeEntityOwnershipRegistry;
 import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGateway;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
+import com.cdp.codpattern.compat.fpsmatch.map.FpsMatchMapRegistry;
 import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMapEvent;
+import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.level.Level;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
+import net.minecraftforge.event.entity.living.LivingDropsEvent;
+import net.minecraftforge.event.entity.living.LivingExperienceDropEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.event.entity.item.ItemTossEvent;
+import net.minecraftforge.event.level.ExplosionEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -75,6 +87,45 @@ public class CodTdmEventHandler {
                 Optional.ofNullable(resolveAttacker(event)),
                 event.getAmount()));
         applyDamageDecision(event, decision);
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingDrops(LivingDropsEvent event) {
+        if (event == null || !isInZombiesRoomArea(event.getEntity())) {
+            return;
+        }
+        event.getDrops().clear();
+        event.setCanceled(true);
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingExperienceDrop(LivingExperienceDropEvent event) {
+        if (event == null || !isInZombiesRoomArea(event.getEntity())) {
+            return;
+        }
+        event.setDroppedExperience(0);
+        event.setCanceled(true);
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onItemToss(ItemTossEvent event) {
+        if (event == null || !isInZombiesRoomArea(event.getPlayer())) {
+            return;
+        }
+        event.getEntity().discard();
+        event.setCanceled(true);
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
+        if (event == null || !isBlockedZombiesDropEntity(event.getEntity())) {
+            return;
+        }
+        if (!isInZombiesRoomArea(event.getLevel(), event.getEntity())) {
+            return;
+        }
+        event.getEntity().discard();
+        event.setCanceled(true);
     }
 
     private static void handlePlayerHurt(LivingHurtEvent event, ServerPlayer player) {
@@ -181,6 +232,57 @@ public class CodTdmEventHandler {
         gateway.findRoomEntityLifecyclePort(roomId.get())
                 .ifPresent(port -> port.onRoomEntityRemoved(entity, new EntityLifecycleContext(roomId.get())));
         registry.unregister(entity);
+    }
+
+    @SubscribeEvent
+    public static void onExplosionDetonate(ExplosionEvent.Detonate event) {
+        if (event == null || event.getLevel().isClientSide()) {
+            return;
+        }
+        Entity source = event.getExplosion().getDirectSourceEntity();
+        if (!(source instanceof Creeper creeper)) {
+            return;
+        }
+
+        FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
+        Optional<RoomId> roomId = gateway.entityOwnershipRegistry().roomIdOf(creeper);
+        if (roomId.isEmpty()) {
+            return;
+        }
+
+        event.getAffectedBlocks().clear();
+        gateway.findRoomEntityCombatEventPort(roomId.get())
+                .ifPresent(port -> port.onEntityDeath(creeper, new EntityDeathContext(
+                        roomId.get(),
+                        event.getExplosion().getDamageSource(),
+                        creeper,
+                        Optional.empty())));
+    }
+
+    private static boolean isInZombiesRoomArea(Entity entity) {
+        return entity != null && isInZombiesRoomArea(entity.level(), entity);
+    }
+
+    private static boolean isBlockedZombiesDropEntity(Entity entity) {
+        return entity instanceof ItemEntity || entity instanceof ExperienceOrb;
+    }
+
+    private static boolean isInZombiesRoomArea(Level level, Entity entity) {
+        if (level == null || entity == null || level.isClientSide()) {
+            return false;
+        }
+        for (BaseMap map : FpsMatchMapRegistry.listMaps(BuiltInGameModes.ZOMBIES)) {
+            if (map == null || map.getMapArea() == null || map.getServerLevel() == null) {
+                continue;
+            }
+            if (!map.getServerLevel().dimension().equals(level.dimension())) {
+                continue;
+            }
+            if (map.getMapArea().isEntityInArea(entity)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static ServerPlayer resolveKiller(LivingDeathEvent event) {

@@ -26,9 +26,19 @@ public final class ZombiesWaveValidator {
 
     static final String VANILLA_ZOMBIE_ID = "minecraft:zombie";
     static final String VANILLA_HUSK_ID = "minecraft:husk";
+    static final String VANILLA_WITHER_SKELETON_ID = "minecraft:wither_skeleton";
+    static final String VANILLA_CREEPER_ID = "minecraft:creeper";
+    static final String VANILLA_WOLF_ID = "minecraft:wolf";
+    static final String VANILLA_SILVERFISH_ID = "minecraft:silverfish";
 
     private static final String DEFAULT_NAMESPACE = "minecraft";
-    private static final List<String> SUPPORTED_ENTITY_IDS = List.of(VANILLA_ZOMBIE_ID, VANILLA_HUSK_ID);
+    private static final List<String> SUPPORTED_ENTITY_IDS = List.of(
+            VANILLA_ZOMBIE_ID,
+            VANILLA_HUSK_ID,
+            VANILLA_WITHER_SKELETON_ID,
+            VANILLA_CREEPER_ID,
+            VANILLA_WOLF_ID,
+            VANILLA_SILVERFISH_ID);
 
     public ValidationReport validate(List<ZombiesWaveDefinition> waves) {
         List<ValidationIssue> issues = new ArrayList<>();
@@ -97,11 +107,22 @@ public final class ZombiesWaveValidator {
                         "Wave " + wave.getWave() + " maxAlive must be positive when configured"));
                 valid = false;
             }
-            if (!isPositiveIfPresent(wave.getConfiguredSpawnIntervalTicks())) {
+            if (!isPositiveIfPresent(wave.getConfiguredSpawnIntervalTicks())
+                    || !isPositiveIfPresent(wave.getConfiguredFastestSpawnIntervalTicks())
+                    || !isPositiveIfPresent(wave.getConfiguredSlowestSpawnIntervalTicks())) {
                 issues.add(new ValidationIssue(
                         INVALID_SPAWN_INTERVAL,
                         wave.getSourcePath(),
-                        "Wave " + wave.getWave() + " spawnIntervalTicks must be positive when configured"));
+                        "Wave " + wave.getWave() + " spawn interval ticks must be positive when configured"));
+                valid = false;
+            }
+            if (wave.getConfiguredFastestSpawnIntervalTicks() != null
+                    && wave.getConfiguredSlowestSpawnIntervalTicks() != null
+                    && wave.getConfiguredFastestSpawnIntervalTicks() > wave.getConfiguredSlowestSpawnIntervalTicks()) {
+                issues.add(new ValidationIssue(
+                        INVALID_SPAWN_INTERVAL,
+                        wave.getSourcePath(),
+                        "Wave " + wave.getWave() + " fastestSpawnIntervalTicks must be <= slowestSpawnIntervalTicks"));
                 valid = false;
             }
             for (ZombiesWaveMobEntry mob : wave.getMobs()) {

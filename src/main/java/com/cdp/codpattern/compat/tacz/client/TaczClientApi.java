@@ -27,6 +27,14 @@ public final class TaczClientApi {
         return TaczGatewayProvider.gateway().isGun(stack);
     }
 
+    public static int resolveReserveAmmo(ItemStack stack) {
+        return TaczGatewayProvider.gateway().resolveReserveAmmo(stack);
+    }
+
+    public static int resolveMaxReserveAmmo(ItemStack stack) {
+        return TaczGatewayProvider.gateway().resolveMaxReserveAmmo(stack);
+    }
+
     public static List<ItemStack> fillGunItemCategory(String tabName) {
         GunTabType tabType = switch (tabName) {
             case "pistol" -> GunTabType.PISTOL;

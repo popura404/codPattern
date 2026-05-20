@@ -48,6 +48,7 @@ public final class ZombiesDeployFieldSchema {
             )),
             new ObjectTypeSchema(BARRIER, "gui.codpattern.zombies.deploy.type.barrier", true, false, List.of(
                     field("objectId", FieldType.TEXT, ""),
+                    field("name", FieldType.TEXT, ""),
                     field("group", FieldType.INTEGER, "2"),
                     field("cost", FieldType.INTEGER, "750"),
                     field("blocksPlayersOnly", FieldType.BOOLEAN, "true"),

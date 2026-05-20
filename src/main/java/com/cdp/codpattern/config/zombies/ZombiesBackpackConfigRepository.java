@@ -22,8 +22,8 @@ public final class ZombiesBackpackConfigRepository {
     private ZombiesBackpackConfigRepository() {
     }
 
-    public static ZombiesBackpackConfig loadOrCreate(MinecraftServer server) {
-        return loadOrCreate(ConfigPath.SERVER_ZOMBIES_BACKPACK.getPath(server));
+    public static ZombiesBackpackConfig loadOrCreate(MinecraftServer server, String mapName) {
+        return loadOrCreate(ConfigPath.zombiesMapBackpackConfig(server, mapName));
     }
 
     public static ZombiesBackpackConfig loadOrCreate(Path path) {

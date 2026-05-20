@@ -230,6 +230,7 @@ final class ZombiesDeployObjectEditor {
                 ZombiesBarrierData source = objects.barriers().get(selectedIndex);
                 ZombiesBarrierData data = new ZombiesBarrierData(
                         copyObjectId(objects, source.objectId(), type),
+                        source.name(),
                         source.group(),
                         source.cost(),
                         source.blocksPlayersOnly(),
@@ -486,6 +487,7 @@ final class ZombiesDeployObjectEditor {
         String objectId = resolveObjectId(objects, excluded, text(fields, "objectId"), ZombiesDeployFieldSchema.BARRIER);
         return new ZombiesBarrierData(
                 objectId,
+                text(fields, "name"),
                 intField(fields, "group"),
                 intField(fields, "cost"),
                 booleanField(fields, "blocksPlayersOnly"),
@@ -691,6 +693,7 @@ final class ZombiesDeployObjectEditor {
     private static Map<String, String> fieldsFrom(ZombiesBarrierData data) {
         Map<String, String> fields = new LinkedHashMap<>(ZombiesDeployFieldSchema.defaultFields(ZombiesDeployFieldSchema.BARRIER));
         fields.put("objectId", data.objectId());
+        fields.put("name", data.name());
         fields.put("group", Integer.toString(data.group()));
         fields.put("cost", Integer.toString(data.cost()));
         fields.put("blocksPlayersOnly", Boolean.toString(data.blocksPlayersOnly()));

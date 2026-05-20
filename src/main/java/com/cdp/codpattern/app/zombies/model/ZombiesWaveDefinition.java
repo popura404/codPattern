@@ -1,6 +1,7 @@
 package com.cdp.codpattern.app.zombies.model;
 
 import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
+import net.minecraft.util.RandomSource;
 
 import java.nio.file.Path;
 import java.util.Collections;
@@ -14,6 +15,9 @@ public class ZombiesWaveDefinition {
     private Double damageMultiplier;
     private Double speedMultiplier;
     private Integer maxAlive;
+    private Integer fastestSpawnIntervalTicks;
+    private Integer slowestSpawnIntervalTicks;
+    // Legacy fixed interval. New files should use fastest/slowest spawn interval bounds.
     private Integer spawnIntervalTicks;
     private List<ZombiesWaveMobEntry> mobs;
 
@@ -51,7 +55,27 @@ public class ZombiesWaveDefinition {
     }
 
     public Integer getSpawnIntervalTicks() {
-        return spawnIntervalTicks != null ? spawnIntervalTicks : defaultSpawnIntervalTicks();
+        return getFastestSpawnIntervalTicks();
+    }
+
+    public Integer getFastestSpawnIntervalTicks() {
+        if (fastestSpawnIntervalTicks != null) {
+            return fastestSpawnIntervalTicks;
+        }
+        if (spawnIntervalTicks != null) {
+            return spawnIntervalTicks;
+        }
+        return defaultFastestSpawnIntervalTicks();
+    }
+
+    public Integer getSlowestSpawnIntervalTicks() {
+        if (slowestSpawnIntervalTicks != null) {
+            return slowestSpawnIntervalTicks;
+        }
+        if (spawnIntervalTicks != null) {
+            return spawnIntervalTicks;
+        }
+        return defaultSlowestSpawnIntervalTicks();
     }
 
     public Double getConfiguredHealthMultiplier() {
@@ -72,6 +96,29 @@ public class ZombiesWaveDefinition {
 
     public Integer getConfiguredSpawnIntervalTicks() {
         return spawnIntervalTicks;
+    }
+
+    public Integer getConfiguredFastestSpawnIntervalTicks() {
+        return fastestSpawnIntervalTicks;
+    }
+
+    public Integer getConfiguredSlowestSpawnIntervalTicks() {
+        return slowestSpawnIntervalTicks;
+    }
+
+    public int chooseSpawnIntervalTicks(RandomSource random) {
+        int fastest = Math.max(1, getFastestSpawnIntervalTicks());
+        int slowest = Math.max(1, getSlowestSpawnIntervalTicks());
+        if (slowest < fastest) {
+            int swappedFastest = slowest;
+            slowest = fastest;
+            fastest = swappedFastest;
+        }
+        if (slowest == fastest) {
+            return fastest;
+        }
+        RandomSource safeRandom = random == null ? RandomSource.create() : random;
+        return fastest + safeRandom.nextInt(slowest - fastest + 1);
     }
 
     public List<ZombiesWaveMobEntry> getMobs() {
@@ -139,8 +186,20 @@ public class ZombiesWaveDefinition {
         return positiveOrDefault(defaults == null ? null : defaults.getMaxAlive(), 8);
     }
 
-    private int defaultSpawnIntervalTicks() {
-        return positiveOrDefault(defaults == null ? null : defaults.getSpawnIntervalTicks(), 40);
+    private int defaultFastestSpawnIntervalTicks() {
+        if (defaults == null) {
+            return 20;
+        }
+        Integer fastestInterval = defaults.getFastestSpawnIntervalTicks();
+        return positiveOrDefault(fastestInterval != null ? fastestInterval : defaults.getSpawnIntervalTicks(), 20);
+    }
+
+    private int defaultSlowestSpawnIntervalTicks() {
+        if (defaults == null) {
+            return 50;
+        }
+        Integer slowestInterval = defaults.getSlowestSpawnIntervalTicks();
+        return positiveOrDefault(slowestInterval != null ? slowestInterval : defaults.getSpawnIntervalTicks(), 50);
     }
 
     private static int positiveOrDefault(Integer value, int defaultValue) {

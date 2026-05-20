@@ -8,6 +8,7 @@ import net.minecraft.world.level.Level;
 
 public record ZombiesBarrierData(
         String objectId,
+        String name,
         int group,
         int cost,
         boolean blocksPlayersOnly,
@@ -16,8 +17,31 @@ public record ZombiesBarrierData(
         BlockPos areaTo,
         BlockPos interactionPos
 ) {
+    public ZombiesBarrierData(
+            String objectId,
+            int group,
+            int cost,
+            boolean blocksPlayersOnly,
+            ResourceKey<Level> dimension,
+            BlockPos areaFrom,
+            BlockPos areaTo,
+            BlockPos interactionPos
+    ) {
+        this(objectId, "", group, cost, blocksPlayersOnly, dimension, areaFrom, areaTo, interactionPos);
+    }
+
+    public ZombiesBarrierData {
+        objectId = objectId == null ? "" : objectId.trim();
+        name = name == null ? "" : name.trim();
+    }
+
+    public String displayName() {
+        return name.isBlank() ? objectId : name;
+    }
+
     public static final Codec<ZombiesBarrierData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("objectId").forGetter(ZombiesBarrierData::objectId),
+            Codec.STRING.optionalFieldOf("name", "").forGetter(ZombiesBarrierData::name),
             Codec.INT.optionalFieldOf("group", 1).forGetter(ZombiesBarrierData::group),
             Codec.INT.optionalFieldOf("cost", 0).forGetter(ZombiesBarrierData::cost),
             Codec.BOOL.optionalFieldOf("blocksPlayersOnly", true).forGetter(ZombiesBarrierData::blocksPlayersOnly),

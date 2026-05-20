@@ -1,6 +1,7 @@
 package com.cdp.codpattern.app.zombies.service;
 
 import com.cdp.codpattern.app.zombies.model.ZombiesWaveDefinition;
+import com.cdp.codpattern.app.zombies.model.ZombiesWaveMobEntry;
 import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 
 import java.io.IOException;
@@ -125,12 +126,53 @@ public final class ZombiesWaveConfigRepositoryCompatTest {
         require(Files.isRegularFile(generatedWave), context + " should create wave_001.json");
         String generatedJson = Files.readString(generatedWave);
         require(generatedJson.contains("\"description\""), context + " default wave should contain description");
+        require(generatedJson.contains("\"fastestSpawnIntervalTicks\": 20"),
+                context + " default wave should contain fastest spawn interval");
+        require(generatedJson.contains("\"slowestSpawnIntervalTicks\": 50"),
+                context + " default wave should contain slowest spawn interval");
+        require(!generatedJson.contains("\"spawnIntervalTicks\""),
+                context + " default wave should use random interval bounds instead of legacy fixed interval");
         require(generatedJson.contains("\"minecraft:zombie\""), context + " default wave should contain zombie");
         require(generatedJson.contains("\"minecraft:husk\""), context + " default wave should contain husk");
+        require(generatedJson.contains("\"minecraft:wither_skeleton\""),
+                context + " default wave should contain wither skeleton");
+        require(generatedJson.contains("\"minecraft:creeper\""), context + " default wave should contain creeper");
+        require(generatedJson.contains("\"minecraft:wolf\""), context + " default wave should contain wolf");
+        require(generatedJson.contains("\"minecraft:silverfish\""), context + " default wave should contain silverfish");
         require(result.isValid(), context + " default wave should load without issues: " + firstIssue(result));
         require(result.getMaxWave() == 1, context + " default wave should set maxWave to 1");
         require(result.getWaves().size() == 1, context + " default wave should load exactly one wave");
-        require(result.getWaves().get(0).getWave() == 1, context + " default wave should be wave 1");
+        ZombiesWaveDefinition wave = result.getWaves().get(0);
+        require(wave.getWave() == 1, context + " default wave should be wave 1");
+        require(wave.getFastestSpawnIntervalTicks() == 20,
+                context + " default wave should load fastest interval 20");
+        require(wave.getSlowestSpawnIntervalTicks() == 50,
+                context + " default wave should load slowest interval 50");
+        requireReward(wave, "minecraft:zombie", 30, 9, context);
+        requireReward(wave, "minecraft:husk", 45, 15, context);
+        requireReward(wave, "minecraft:wither_skeleton", 75, 24, context);
+        requireReward(wave, "minecraft:creeper", 60, 18, context);
+        requireReward(wave, "minecraft:wolf", 36, 12, context);
+        requireReward(wave, "minecraft:silverfish", 15, 6, context);
+    }
+
+    private static void requireReward(
+            ZombiesWaveDefinition wave,
+            String entity,
+            int killPoints,
+            int assistPoints,
+            String context
+    ) {
+        for (ZombiesWaveMobEntry mob : wave.getMobs()) {
+            if (entity.equals(mob.getEntity())) {
+                require(mob.getKillPoints() == killPoints,
+                        context + " default reward for " + entity + " should set killPoints=" + killPoints);
+                require(mob.getAssistPoints() == assistPoints,
+                        context + " default reward for " + entity + " should set assistPoints=" + assistPoints);
+                return;
+            }
+        }
+        throw new AssertionError(context + " default wave should contain reward entry for " + entity);
     }
 
     private static String firstIssue(ZombiesWaveConfigRepository.LoadResult result) {

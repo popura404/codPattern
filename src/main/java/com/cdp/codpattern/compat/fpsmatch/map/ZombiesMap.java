@@ -36,6 +36,7 @@ import com.cdp.codpattern.app.zombies.service.ZombiesErrorCode;
 import com.cdp.codpattern.app.zombies.service.ZombiesIntermissionRespawnService;
 import com.cdp.codpattern.app.zombies.service.ZombiesMapOccupancyService;
 import com.cdp.codpattern.app.zombies.service.ZombiesMobLifecycleService;
+import com.cdp.codpattern.app.zombies.service.ZombiesMobRecycleService;
 import com.cdp.codpattern.app.zombies.service.ZombiesMobSpawnService;
 import com.cdp.codpattern.app.zombies.service.ZombiesObjectInteractionService;
 import com.cdp.codpattern.app.zombies.service.ZombiesObjectStateStore;
@@ -46,6 +47,7 @@ import com.cdp.codpattern.app.zombies.service.ZombiesPowerSwitchBlockStateServic
 import com.cdp.codpattern.app.zombies.service.ZombiesPostGameTeleportService;
 import com.cdp.codpattern.app.zombies.service.ZombiesReadyService;
 import com.cdp.codpattern.app.zombies.service.ZombiesReviveLoadoutService;
+import com.cdp.codpattern.app.zombies.service.ZombiesRoomAnnouncementService;
 import com.cdp.codpattern.app.zombies.service.ZombiesServiceResult;
 import com.cdp.codpattern.app.zombies.service.ZombiesSpawnAssignmentService;
 import com.cdp.codpattern.app.zombies.service.ZombiesStartVoteService;
@@ -54,14 +56,19 @@ import com.cdp.codpattern.app.zombies.service.ZombiesStartupFlow;
 import com.cdp.codpattern.app.zombies.service.ZombiesStartupPreflightSnapshot;
 import com.cdp.codpattern.app.zombies.service.ZombiesStartupValidationService;
 import com.cdp.codpattern.app.zombies.service.ZombiesUltimateMachineService;
+import com.cdp.codpattern.app.zombies.service.ZombiesWaveConfigRepository;
 import com.cdp.codpattern.app.zombies.service.ZombiesWaveDirector;
 import com.cdp.codpattern.app.zombies.service.ZombiesWeaponInstanceService;
+import com.cdp.codpattern.app.zombies.service.ZombiesWeaponWallOfferService;
+import com.cdp.codpattern.app.zombies.validation.ZombiesValidationIssue;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.cdp.codpattern.config.path.ConfigPath;
+import com.cdp.codpattern.config.zombies.ZombiesBackpackConfig;
 import com.cdp.codpattern.config.zombies.ZombiesBackpackConfigRepository;
 import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 import com.cdp.codpattern.config.zombies.ZombiesRulesRepository;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
+import com.cdp.codpattern.config.zombies.ZombiesWeaponFilterConfig;
 import com.cdp.codpattern.config.zombies.ZombiesWeaponFilterRepository;
 import com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager;
 import com.cdp.codpattern.network.match.VoteDialogPacket;
@@ -107,6 +114,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
     private final ZombiesStartVoteService startVoteService;
     private final ZombiesMobSpawnService mobSpawnService;
     private final ZombiesMobLifecycleService mobLifecycleService;
+    private final ZombiesMobRecycleService mobRecycleService;
     private final ZombiesDeathService deathService;
     private final ZombiesEquipmentSnapshotService equipmentSnapshotService;
     private final ZombiesReviveLoadoutService reviveLoadoutService;
@@ -128,6 +136,10 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
     private ZombiesMapObjects frozenObjects = ZombiesMapObjects.EMPTY;
     private boolean objectsFrozen;
     private ZombiesWaveDirector waveDirector;
+    private ZombiesRulesConfig rulesConfig;
+    private ZombiesBackpackConfig backpackConfig;
+    private ZombiesWeaponFilterConfig weaponFilterConfig;
+    private List<ZombiesValidationIssue> rulesValidationIssues = List.of();
     private final Map<UUID, Integer> combatRegenCooldowns = new LinkedHashMap<>();
     private int rosterVersion = 1;
     private boolean cleanupNeedsEndTeleportFallback;
@@ -136,6 +148,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         super(serverLevel, mapName, areaData);
         addTeam(ZombiesTeamNames.SURVIVORS, SURVIVOR_LIMIT);
         this.roomId = RoomId.of(BuiltInGameModes.ZOMBIES, mapName);
+        loadStartupConfigs(serverLevel == null ? null : serverLevel.getServer());
         this.runtimeState = new ZombiesRoomRuntimeState(roomId);
         this.playerStateService = new ZombiesPlayerStateService();
         this.connectionStateService = new ZombiesConnectionStateService(playerStateService, configuredOfflineGraceTicks());
@@ -144,8 +157,13 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         this.mobSpawnService = new ZombiesMobSpawnService(
                 ModeEntityOwnershipRegistry.instance(),
                 ZombiesMobSpawnService.DEFAULT_GLOBAL_MAX_ALIVE_ZOMBIES,
-                this::aliveSurvivorPlayers);
+                this::aliveSurvivorPlayers,
+                () -> rulesConfig().getSpawnPointWeighting());
         this.mobLifecycleService = new ZombiesMobLifecycleService(ModeEntityOwnershipRegistry.instance(), mobSpawnService);
+        this.mobRecycleService = new ZombiesMobRecycleService(
+                ModeEntityOwnershipRegistry.instance(),
+                mobLifecycleService,
+                this::aliveSurvivorPlayers);
         this.deathService = new ZombiesDeathService(
                 playerStateService,
                 connectionStateService.offlineGraceTicks(),
@@ -163,7 +181,9 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         this.buffService = new ZombiesBuffService(economyService, powerService);
         this.intermissionRespawnService = new ZombiesIntermissionRespawnService(playerStateService, buffService);
         this.ultimateMachineService = new ZombiesUltimateMachineService(economyService, powerService);
-        this.objectStateStore = new ZombiesObjectStateStore(powerService::isPowerOn);
+        this.objectStateStore = new ZombiesObjectStateStore(
+                powerService::isPowerOn,
+                new ZombiesWeaponWallOfferService(this::rulesConfig, null, null));
         this.barrierVisualService = ZombiesBarrierVisualService.instance();
         this.barrierBlockRuntimeService = ZombiesBarrierBlockRuntimeService.instance();
         ZombiesBarrierService barrierService = new ZombiesBarrierService(
@@ -197,7 +217,8 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
                 powerService,
                 buffService,
                 ultimateMachineService,
-                objectStateStore);
+                objectStateStore,
+                new ZombiesRoomAnnouncementService(this::survivorPlayers));
         this.cleanupService = new ZombiesCleanupService(
                 ModeEntityOwnershipRegistry.instance(),
                 ZombiesMapOccupancyService.instance(),
@@ -250,8 +271,11 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
 
         loadStartupConfigs(server);
         ZombiesStartupFlow startupFlow = new ZombiesStartupFlow(
-                new ZombiesStartupValidationService(ConfigPath.SERVER_ZOMBIES_WAVES.getPath(server)),
-                new ZombiesStarterKitDistributor(),
+                new ZombiesStartupValidationService(
+                        ConfigPath.zombiesMapWaves(server, getMapName()),
+                        this::rulesConfig,
+                        this::rulesValidationIssues),
+                new ZombiesStarterKitDistributor(this::rulesConfig),
                 ZombiesMapOccupancyService.instance(),
                 new ZombiesSpawnAssignmentService());
         ZombiesServiceResult<ZombiesStartupFlow.StartupResult> startupResult = startupFlow.start(
@@ -261,8 +285,8 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
                         members,
                         initialSpawnPoints(),
                         this,
-                        ZombiesBackpackConfigRepository.getConfig(),
-                        ZombiesWeaponFilterRepository.getConfig(),
+                        backpackConfig(),
+                        weaponFilterConfig(),
                         List.of(new ZombiesStartupMapParticipant())));
         if (!startupResult.success()) {
             notifyStartupFailure(startupResult);
@@ -651,9 +675,52 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
     }
 
     private void loadStartupConfigs(MinecraftServer server) {
-        ZombiesRulesRepository.loadOrCreate(server);
-        ZombiesBackpackConfigRepository.loadOrCreate(server);
-        ZombiesWeaponFilterRepository.loadOrCreate(server);
+        if (server == null) {
+            rulesConfig = new ZombiesRulesConfig();
+            rulesConfig.normalize();
+            backpackConfig = new ZombiesBackpackConfig();
+            backpackConfig.normalize();
+            weaponFilterConfig = new ZombiesWeaponFilterConfig();
+            weaponFilterConfig.normalize();
+            rulesValidationIssues = List.of();
+            return;
+        }
+        String mapName = getMapName();
+        rulesConfig = ZombiesRulesRepository.loadOrCreate(server, mapName);
+        rulesValidationIssues = ZombiesRulesRepository.getLastValidationIssues();
+        backpackConfig = ZombiesBackpackConfigRepository.loadOrCreate(server, mapName);
+        weaponFilterConfig = ZombiesWeaponFilterRepository.loadOrCreate(server, mapName);
+        new ZombiesWaveConfigRepository(
+                ConfigPath.zombiesMapWaves(server, mapName),
+                rulesConfig().getDefaults()).load();
+    }
+
+    private ZombiesRulesConfig rulesConfig() {
+        if (rulesConfig == null) {
+            rulesConfig = new ZombiesRulesConfig();
+            rulesConfig.normalize();
+        }
+        return rulesConfig;
+    }
+
+    private ZombiesBackpackConfig backpackConfig() {
+        if (backpackConfig == null) {
+            backpackConfig = new ZombiesBackpackConfig();
+            backpackConfig.normalize();
+        }
+        return backpackConfig;
+    }
+
+    private ZombiesWeaponFilterConfig weaponFilterConfig() {
+        if (weaponFilterConfig == null) {
+            weaponFilterConfig = new ZombiesWeaponFilterConfig();
+            weaponFilterConfig.normalize();
+        }
+        return weaponFilterConfig;
+    }
+
+    private List<ZombiesValidationIssue> rulesValidationIssues() {
+        return rulesValidationIssues == null ? List.of() : List.copyOf(rulesValidationIssues);
     }
 
     private ZombiesMapSnapshot currentMapSnapshot() {
@@ -718,7 +785,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
     }
 
     private ZombiesPhaseStateMachine.Config lifecycleConfig() {
-        ZombiesRulesConfig.Room room = ZombiesRulesRepository.getConfig().getRoom();
+        ZombiesRulesConfig.Room room = rulesConfig().getRoom();
         return ZombiesPhaseStateMachine.Config.fromSeconds(
                 ZombiesPhaseStateMachine.DEFAULT_OPENING_COUNTDOWN_SECONDS,
                 room.getIntermissionSeconds(),
@@ -726,17 +793,17 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
     }
 
     private long configuredOfflineGraceTicks() {
-        ZombiesRulesConfig.Room room = ZombiesRulesRepository.getConfig().getRoom();
+        ZombiesRulesConfig.Room room = rulesConfig().getRoom();
         return (long) room.getOfflineGraceSeconds() * ZombiesPhaseStateMachine.TICKS_PER_SECOND;
     }
 
     private int voteTimeoutTicks() {
-        ZombiesRulesConfig.Room room = ZombiesRulesRepository.getConfig().getRoom();
+        ZombiesRulesConfig.Room room = rulesConfig().getRoom();
         return room.getStartVoteTimeoutSeconds() * ZombiesPhaseStateMachine.TICKS_PER_SECOND;
     }
 
     private int voteRequiredPercent() {
-        return ZombiesRulesRepository.getConfig().getRoom().getStartVoteRequiredPercent();
+        return rulesConfig().getRoom().getStartVoteRequiredPercent();
     }
 
     private ServerLevel levelForDimension(ResourceKey<Level> dimension) {
@@ -746,6 +813,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
 
     private void runCleanup(String reason) {
         cleanupService.cleanup(roomId, reason, this::levelForDimension);
+        mobRecycleService.reset();
     }
 
     private Optional<ZombiesPostGameTeleportService.TeleportTarget> endTeleportTarget() {
@@ -882,6 +950,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         }
         frozenObjects = ZombiesMapObjects.EMPTY;
         objectsFrozen = false;
+        mobRecycleService.reset();
         resetObjectRuntime();
         syncConfiguredInitialSpawnsToTeam();
     }
@@ -1403,6 +1472,11 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
                 markRosterDirty();
             }
             if (runtimeState.phase() == ZombiesGamePhase.WAVE_ACTIVE && waveDirector != null) {
+                mobRecycleService.tick(
+                        roomId,
+                        getServerLevel(),
+                        runtimeState.waveState(),
+                        runtimeState.roomTick());
                 waveDirector.tick(
                         roomId,
                         getServerLevel(),

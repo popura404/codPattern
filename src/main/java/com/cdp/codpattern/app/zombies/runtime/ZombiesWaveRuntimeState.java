@@ -3,6 +3,8 @@ package com.cdp.codpattern.app.zombies.runtime;
 import com.cdp.codpattern.app.zombies.model.ZombiesWaveDefinition;
 import com.cdp.codpattern.app.zombies.model.ZombiesWaveMobEntry;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -24,9 +26,11 @@ public final class ZombiesWaveRuntimeState {
     private boolean waveComplete;
     private boolean budgetInitialized;
     private long lastSpawnAttemptTick = Long.MIN_VALUE;
+    private int nextSpawnIntervalTicks;
     private String recentSpawnFailureReason = "";
     private String recentLifecycleReason = "";
     private final Map<String, Integer> remainingBudgetByMobId = new HashMap<>();
+    private final Map<String, Deque<Integer>> requeuedRecycleCountsByMobId = new HashMap<>();
     private final Set<UUID> activeZombieEntityIds = ConcurrentHashMap.newKeySet();
 
     public int currentWave() {
@@ -67,6 +71,10 @@ public final class ZombiesWaveRuntimeState {
 
     public long lastSpawnAttemptTick() {
         return lastSpawnAttemptTick;
+    }
+
+    public int nextSpawnIntervalTicks() {
+        return nextSpawnIntervalTicks;
     }
 
     public Optional<String> recentSpawnFailureReason() {
@@ -112,6 +120,7 @@ public final class ZombiesWaveRuntimeState {
 
     public void initializeBudget(ZombiesWaveDefinition definition) {
         remainingBudgetByMobId.clear();
+        requeuedRecycleCountsByMobId.clear();
         activeZombieEntityIds.clear();
         activeZombies = 0;
         remainingBudget = 0;
@@ -119,6 +128,7 @@ public final class ZombiesWaveRuntimeState {
         recentSpawnFailureReason = "";
         recentLifecycleReason = "";
         lastSpawnAttemptTick = Long.MIN_VALUE;
+        nextSpawnIntervalTicks = 0;
         budgetInitialized = true;
         if (definition == null) {
             waveComplete = true;
@@ -150,7 +160,16 @@ public final class ZombiesWaveRuntimeState {
     }
 
     public void recordSpawnAttempt(long roomTick) {
+        recordSpawnAttempt(roomTick, nextSpawnIntervalTicks);
+    }
+
+    public void recordSpawnAttempt(long roomTick, int nextSpawnIntervalTicks) {
         lastSpawnAttemptTick = roomTick;
+        configureNextSpawnIntervalTicks(nextSpawnIntervalTicks);
+    }
+
+    public void configureNextSpawnIntervalTicks(int nextSpawnIntervalTicks) {
+        this.nextSpawnIntervalTicks = Math.max(0, nextSpawnIntervalTicks);
     }
 
     public void recordSpawnFailure(String reason) {
@@ -210,6 +229,41 @@ public final class ZombiesWaveRuntimeState {
         return true;
     }
 
+    public boolean requeueBudget(String mobId) {
+        return requeueBudget(mobId, 0);
+    }
+
+    public boolean requeueBudget(String mobId, int recycleCount) {
+        if (mobId == null || mobId.isBlank()) {
+            return false;
+        }
+        String key = mobId.trim();
+        remainingBudgetByMobId.merge(key, 1, Integer::sum);
+        requeuedRecycleCountsByMobId
+                .computeIfAbsent(key, ignored -> new ArrayDeque<>())
+                .addLast(Math.max(0, recycleCount));
+        remainingBudget++;
+        waveComplete = false;
+        resetWaveCompleteDelay();
+        return true;
+    }
+
+    public int consumeRequeuedRecycleCount(String mobId) {
+        if (mobId == null || mobId.isBlank()) {
+            return 0;
+        }
+        String key = mobId.trim();
+        Deque<Integer> counts = requeuedRecycleCountsByMobId.get(key);
+        if (counts == null || counts.isEmpty()) {
+            return 0;
+        }
+        int recycleCount = Math.max(0, counts.removeFirst());
+        if (counts.isEmpty()) {
+            requeuedRecycleCountsByMobId.remove(key);
+        }
+        return recycleCount;
+    }
+
     public void markWaveComplete() {
         this.waveComplete = true;
         this.remainingBudget = 0;
@@ -217,6 +271,7 @@ public final class ZombiesWaveRuntimeState {
         this.waveCompleteDelayTicks = 0;
         activeZombieEntityIds.clear();
         remainingBudgetByMobId.clear();
+        requeuedRecycleCountsByMobId.clear();
     }
 
     public boolean tickWaveCompleteDelay(int requiredTicks) {
@@ -246,9 +301,11 @@ public final class ZombiesWaveRuntimeState {
         waveComplete = false;
         budgetInitialized = false;
         lastSpawnAttemptTick = Long.MIN_VALUE;
+        nextSpawnIntervalTicks = 0;
         recentSpawnFailureReason = "";
         recentLifecycleReason = "";
         remainingBudgetByMobId.clear();
+        requeuedRecycleCountsByMobId.clear();
         activeZombieEntityIds.clear();
     }
 

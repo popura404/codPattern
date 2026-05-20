@@ -71,6 +71,10 @@ public final class ZombiesHudOverlayStaticContractCompatTest {
                 "ammo prompt must use synced level prices rather than a minimum fallback cost");
         requireContains(overlay, "ZombiesWeaponItemStackService.TAG_WEAPON_LEVEL",
                 "ammo prompt must compute exact price from the held zombies weapon level");
+        requireContains(overlay, "TaczClientApi.resolveReserveAmmo(stack)",
+                "ammo prompt must use live TaCZ reserve ammo instead of stale starter weapon tag reserve");
+        requireContains(overlay, "TaczClientApi.resolveMaxReserveAmmo(stack)",
+                "ammo prompt must use live TaCZ max reserve ammo for full-ammo checks");
         requireContains(overlay, "ultimateMachinePrompt",
                 "interaction prompt must include ultimate machines");
         requireContains(overlay, "sodaMachinePrompt",
