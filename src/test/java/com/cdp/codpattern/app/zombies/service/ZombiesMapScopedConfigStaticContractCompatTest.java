@@ -1,0 +1,150 @@
+package com.cdp.codpattern.app.zombies.service;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public final class ZombiesMapScopedConfigStaticContractCompatTest {
+    private static final Path CONFIG_PATH =
+            Path.of("src/main/java/com/cdp/codpattern/config/path/ConfigPath.java");
+    private static final Path RULES_REPOSITORY =
+            Path.of("src/main/java/com/cdp/codpattern/config/zombies/ZombiesRulesRepository.java");
+    private static final Path BACKPACK_REPOSITORY =
+            Path.of("src/main/java/com/cdp/codpattern/config/zombies/ZombiesBackpackConfigRepository.java");
+    private static final Path FILTER_REPOSITORY =
+            Path.of("src/main/java/com/cdp/codpattern/config/zombies/ZombiesWeaponFilterRepository.java");
+    private static final Path ZOMBIES_MAP =
+            Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/map/ZombiesMap.java");
+    private static final Path STARTUP_VALIDATION =
+            Path.of("src/main/java/com/cdp/codpattern/app/zombies/service/ZombiesStartupValidationService.java");
+    private static final Path STARTER_KIT =
+            Path.of("src/main/java/com/cdp/codpattern/app/zombies/service/ZombiesStarterKitDistributor.java");
+    private static final Path SPAWN_SERVICE =
+            Path.of("src/main/java/com/cdp/codpattern/app/zombies/service/ZombiesMobSpawnService.java");
+
+    private ZombiesMapScopedConfigStaticContractCompatTest() {
+    }
+
+    public static void main(String[] args) throws IOException {
+        String configPath = read(CONFIG_PATH);
+        String rulesRepository = read(RULES_REPOSITORY);
+        String backpackRepository = read(BACKPACK_REPOSITORY);
+        String filterRepository = read(FILTER_REPOSITORY);
+        String zombiesMap = read(ZOMBIES_MAP);
+        String startupValidation = read(STARTUP_VALIDATION);
+        String starterKit = read(STARTER_KIT);
+        String spawnService = read(SPAWN_SERVICE);
+
+        requireContains(configPath,
+                "SERVER_ZOMBIES_RULES_ROOT = \"serverconfig/codpattern/zombies_rules\"",
+                "map-scoped zombies configs must live below zombies_rules");
+        requireContains(configPath,
+                "public static Path zombiesMapRulesConfig(MinecraftServer server, String mapName)",
+                "rules config path must be map-scoped");
+        requireContains(configPath,
+                "public static Path zombiesMapWaves(MinecraftServer server, String mapName)",
+                "wave directory path must be map-scoped");
+        requireContains(configPath,
+                "public static Path zombiesMapBackpackConfig(MinecraftServer server, String mapName)",
+                "starter weapon config path must be map-scoped");
+        requireContains(configPath,
+                "public static Path zombiesMapWeaponFilter(MinecraftServer server, String mapName)",
+                "starter weapon filter path must be map-scoped");
+        requireContains(configPath,
+                "safeMapConfigName(mapName)",
+                "map-scoped config paths must sanitize map names");
+        requireAbsent(configPath,
+                "SERVER_ZOMBIES_RULES_CONFIG",
+                "old global zombies rules config path must not remain");
+        requireAbsent(configPath,
+                "SERVER_ZOMBIES_WAVES",
+                "old global zombies waves path must not remain");
+        requireAbsent(configPath,
+                "SERVER_ZOMBIES_BACKPACK",
+                "old global zombies backpack path must not remain");
+        requireAbsent(configPath,
+                "SERVER_ZOMBIES_FILTER",
+                "old global zombies weapon-filter path must not remain");
+
+        requireContains(rulesRepository,
+                "loadOrCreate(ConfigPath.zombiesMapRulesConfig(server, mapName))",
+                "rules repository must support map-scoped config loading");
+        requireAbsent(rulesRepository,
+                "loadOrCreate(MinecraftServer server) {\n        return loadOrCreate(ConfigPath.",
+                "rules repository must not retain the old global server loader");
+        requireContains(backpackRepository,
+                "loadOrCreate(ConfigPath.zombiesMapBackpackConfig(server, mapName))",
+                "backpack repository must support map-scoped starter weapon loading");
+        requireAbsent(backpackRepository,
+                "loadOrCreate(MinecraftServer server) {\n        return loadOrCreate(ConfigPath.",
+                "backpack repository must not retain the old global server loader");
+        requireContains(filterRepository,
+                "loadOrCreate(ConfigPath.zombiesMapWeaponFilter(server, mapName))",
+                "weapon filter repository must support map-scoped loading");
+        requireAbsent(filterRepository,
+                "loadOrCreate(MinecraftServer server) {\n        return loadOrCreate(ConfigPath.",
+                "weapon filter repository must not retain the old global server loader");
+
+        requireContains(zombiesMap,
+                "loadStartupConfigs(serverLevel == null ? null : serverLevel.getServer());",
+                "map instance construction must bootstrap map-scoped config files");
+        requireContains(zombiesMap,
+                "ZombiesRulesRepository.loadOrCreate(server, mapName)",
+                "map startup must load map-scoped rules");
+        requireContains(zombiesMap,
+                "ZombiesBackpackConfigRepository.loadOrCreate(server, mapName)",
+                "map startup must load map-scoped starter weapons");
+        requireContains(zombiesMap,
+                "ZombiesWeaponFilterRepository.loadOrCreate(server, mapName)",
+                "map startup must load map-scoped weapon filters");
+        requireContains(zombiesMap,
+                "ConfigPath.zombiesMapWaves(server, mapName)",
+                "map startup must generate/load map-scoped wave files");
+        requireContains(zombiesMap,
+                "new ZombiesStartupValidationService(\n                        ConfigPath.zombiesMapWaves(server, getMapName()),\n                        this::rulesConfig,\n                        this::rulesValidationIssues)",
+                "startup validation must read map-scoped waves and rules");
+        requireContains(zombiesMap,
+                "new ZombiesStarterKitDistributor(this::rulesConfig)",
+                "starter weapon ammo rules must use the map instance rules");
+        requireContains(zombiesMap,
+                "new ZombiesWeaponWallOfferService(this::rulesConfig, null, null)",
+                "weapon wall offers must use the map instance rules");
+        requireContains(zombiesMap,
+                "() -> rulesConfig().getSpawnPointWeighting()",
+                "spawn point weighting must use the map instance rules");
+        requireContains(zombiesMap,
+                "backpackConfig(),\n                        weaponFilterConfig()",
+                "startup flow must receive map instance starter weapon configs");
+
+        requireContains(startupValidation,
+                "Supplier<ZombiesRulesConfig> rulesSupplier",
+                "startup validation must be able to use map-scoped wave defaults");
+        requireContains(startupValidation,
+                "Supplier<List<ZombiesValidationIssue>> rulesIssuesSupplier",
+                "startup validation must be able to use map-scoped rules issues");
+        requireContains(starterKit,
+                "private final Supplier<ZombiesRulesConfig> rulesSupplier;",
+                "starter kit distributor must use injected map-scoped rules");
+        requireContains(spawnService,
+                "private final Supplier<ZombiesRulesConfig.SpawnPointWeighting> spawnPointWeightingSupplier;",
+                "spawn service must use injected map-scoped spawn weighting");
+
+        System.out.println("PASS zombies map-scoped config static contract compat");
+    }
+
+    private static String read(Path path) throws IOException {
+        return Files.readString(path);
+    }
+
+    private static void requireContains(String text, String expected, String message) {
+        if (!text.contains(expected)) {
+            throw new AssertionError(message + ": missing `" + expected + "`");
+        }
+    }
+
+    private static void requireAbsent(String text, String unexpected, String message) {
+        if (text.contains(unexpected)) {
+            throw new AssertionError(message + ": found `" + unexpected + "`");
+        }
+    }
+}
