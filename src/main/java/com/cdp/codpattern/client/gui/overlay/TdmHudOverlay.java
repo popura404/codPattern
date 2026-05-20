@@ -151,7 +151,8 @@ public class TdmHudOverlay implements IGuiOverlay {
             return false;
         }
         try {
-            return BuiltInGameModes.isTeamDeathMatch(RoomId.decode(roomKey).gameType());
+            String gameType = RoomId.decode(roomKey).gameType();
+            return BuiltInGameModes.isFrontline(gameType) || BuiltInGameModes.isTeamDeathMatch(gameType);
         } catch (IllegalArgumentException ignored) {
             return false;
         }

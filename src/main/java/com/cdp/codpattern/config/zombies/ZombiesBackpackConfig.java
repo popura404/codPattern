@@ -4,6 +4,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ZombiesBackpackConfig {
+    public static final String DEFAULT_TACZ_GUN_ITEM = "tacz:modern_kinetic_gun";
+    public static final String DEFAULT_STARTER_GUN_ID = "tacz:glock_17";
+    public static final String DEFAULT_STARTER_WEAPON_NBT =
+            "{GunId:\"" + DEFAULT_STARTER_GUN_ID
+                    + "\",GunCurrentAmmoCount:17,GunFireMode:\"SEMI\",HasBulletInBarrel:1}";
+
     private Map<String, PlayerZombiesBackpackData> playerData = new HashMap<>();
 
     public Map<String, PlayerZombiesBackpackData> getPlayerData() {
@@ -36,9 +42,9 @@ public class ZombiesBackpackConfig {
 
     public static WeaponData defaultWeapon() {
         return new WeaponData(
-                "tacz:modern_kinetic_gun",
+                DEFAULT_TACZ_GUN_ITEM,
                 1,
-                "{GunId:\"tacz:glock_17\",GunCurrentAmmoCount:17,GunFireMode:\"SEMI\",HasBulletInBarrel:1}",
+                DEFAULT_STARTER_WEAPON_NBT,
                 null
         );
     }
@@ -113,13 +119,13 @@ public class ZombiesBackpackConfig {
 
         void normalize() {
             if (item == null || item.trim().isEmpty()) {
-                item = "tacz:modern_kinetic_gun";
+                item = DEFAULT_TACZ_GUN_ITEM;
             }
             if (count <= 0) {
                 count = 1;
             }
-            if (nbt == null) {
-                nbt = "";
+            if (nbt == null || nbt.trim().isEmpty()) {
+                nbt = DEFAULT_TACZ_GUN_ITEM.equals(item) ? DEFAULT_STARTER_WEAPON_NBT : "";
             }
         }
     }

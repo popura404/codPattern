@@ -113,6 +113,9 @@ public class AttachmentRefitClientState {
         if (!pendingOpen) {
             return;
         }
+        if (!attachmentCandidatesReady) {
+            return;
+        }
         if (parentScreen != null
                 && mc.screen != parentScreen
                 && !(mc.screen instanceof WeaponMenuScreen)

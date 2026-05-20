@@ -3,6 +3,7 @@ package com.cdp.codpattern.config.zombies;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import com.mojang.logging.LogUtils;
 import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
@@ -40,7 +41,7 @@ public final class ZombiesRulesRepository {
                 serverConfig.normalize();
                 return serverConfig;
             }
-        } catch (IOException e) {
+        } catch (IOException | JsonParseException e) {
             LOGGER.warn("Failed to load zombies rules config: {}", path, e);
         }
 

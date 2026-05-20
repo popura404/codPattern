@@ -10,10 +10,11 @@ import net.minecraftforge.network.NetworkEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(value = ClientMessageUnloadAttachment.class, remap = false)
+@Mixin(value = ClientMessageUnloadAttachment.class, remap = false, priority = 900)
 public abstract class ClientMessageUnloadAttachmentMixin {
     @Redirect(
             method = "lambda$handle$0",
@@ -25,6 +26,11 @@ public abstract class ClientMessageUnloadAttachmentMixin {
     private static Inventory codpattern$useRefitInventory(ServerPlayer player) {
         Inventory refitInventory = AttachmentEditSessionManager.getRefitInventory(player);
         return refitInventory == null ? player.getInventory() : refitInventory;
+    }
+
+    @ModifyVariable(method = "lambda$handle$0", at = @At("STORE"), ordinal = 0)
+    private static Inventory codpattern$keepRefitInventoryVariable(Inventory inventory) {
+        return codpattern$preferBackpackRefitInventory(inventory);
     }
 
     @Inject(
@@ -49,5 +55,13 @@ public abstract class ClientMessageUnloadAttachmentMixin {
                 AttachmentEditSessionManager.getSession(player.getUUID()).getBagId(),
                 AttachmentEditSessionManager.getSession(player.getUUID()).getSlot(),
                 AttachmentEditSessionManager.snapshotAttachmentCandidates(player)), player);
+    }
+
+    private static Inventory codpattern$preferBackpackRefitInventory(Inventory inventory) {
+        if (inventory == null || !(inventory.player instanceof ServerPlayer player)) {
+            return inventory;
+        }
+        Inventory refitInventory = AttachmentEditSessionManager.getRefitInventory(player);
+        return refitInventory == null ? inventory : refitInventory;
     }
 }

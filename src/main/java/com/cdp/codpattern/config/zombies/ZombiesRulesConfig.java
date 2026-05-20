@@ -10,6 +10,9 @@ public class ZombiesRulesConfig {
     public static final String RARITY_COMMON = "common";
     public static final String RARITY_RARE = "rare";
     public static final String RARITY_EPIC = "epic";
+    public static final String DEFAULT_POOL_GLOCK_17 = "tacz:glock_17";
+    public static final String DEFAULT_POOL_AK47 = "tacz:ak47";
+    public static final String DEFAULT_POOL_M4A1 = "tacz:m4a1";
 
     private Room room = new Room();
     private Defaults defaults = new Defaults();
@@ -308,9 +311,7 @@ public class ZombiesRulesConfig {
                             100.0D,
                             500,
                             1.0D,
-                            List.of(
-                                    new GunWeight("codpattern:pistol", 60.0D),
-                                    new GunWeight("codpattern:smg", 40.0D))),
+                            List.of(new GunWeight(DEFAULT_POOL_GLOCK_17, 100.0D))),
                     new Rarity(
                             RARITY_RARE,
                             25.0D,
@@ -319,9 +320,7 @@ public class ZombiesRulesConfig {
                             100.0D,
                             900,
                             1.25D,
-                            List.of(
-                                    new GunWeight("codpattern:rifle", 70.0D),
-                                    new GunWeight("codpattern:shotgun", 30.0D))),
+                            List.of(new GunWeight(DEFAULT_POOL_AK47, 100.0D))),
                     new Rarity(
                             RARITY_EPIC,
                             5.0D,
@@ -330,7 +329,7 @@ public class ZombiesRulesConfig {
                             100.0D,
                             1500,
                             1.6D,
-                            List.of(new GunWeight("codpattern:marksman_rifle", 100.0D))));
+                            List.of(new GunWeight(DEFAULT_POOL_M4A1, 100.0D))));
         }
     }
 
@@ -342,7 +341,7 @@ public class ZombiesRulesConfig {
         private Double maxWeight = 100.0D;
         private Integer price = 500;
         private Double damageMultiplier = 1.0D;
-        private List<GunWeight> guns = List.of(new GunWeight("codpattern:pistol", 1.0D));
+        private List<GunWeight> guns = List.of(new GunWeight(DEFAULT_POOL_GLOCK_17, 1.0D));
 
         public Rarity() {
         }
