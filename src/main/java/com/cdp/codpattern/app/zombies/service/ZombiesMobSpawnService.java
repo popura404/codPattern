@@ -54,6 +54,16 @@ public final class ZombiesMobSpawnService {
     static final double ROOM_MONSTER_DROP_DOWN_PROBE_DISTANCE = 0.9D;
     static final double ROOM_MONSTER_DROP_DOWN_FORWARD_SPEED = 0.28D;
     static final double ROOM_MONSTER_DROP_DOWN_JUMP_SPEED = 0.25D;
+    static final double ROOM_MONSTER_DROP_DOWN_CHASE_SPEED = 1.15D;
+    static final double ROOM_MONSTER_DROP_DOWN_CHASE_MIN_HORIZONTAL_DISTANCE = 1.5D;
+    static final int ROOM_MONSTER_DROP_DOWN_RECOVERY_TICKS = 24;
+    static final int ROOM_MONSTER_DETOUR_STUCK_TICKS = 10;
+    static final int ROOM_MONSTER_DETOUR_DURATION_TICKS = 14;
+    static final int ROOM_MONSTER_DETOUR_COOLDOWN_TICKS = 8;
+    static final double ROOM_MONSTER_DETOUR_SPEED = 1.05D;
+    static final double ROOM_MONSTER_DETOUR_FORWARD_DISTANCE = 0.75D;
+    static final double ROOM_MONSTER_DETOUR_SIDE_DISTANCE = 1.25D;
+    static final double ROOM_MONSTER_DETOUR_MIN_PROGRESS = 0.05D;
 
     private static final AtomicInteger GLOBAL_ACTIVE_ZOMBIES = new AtomicInteger();
 
@@ -155,6 +165,8 @@ public final class ZombiesMobSpawnService {
         applyWaveAttributes(mob, waveDefinition);
         applyRoomMonsterRetention(mob);
         applyRoomMonsterObstacleJumping(mob);
+        applyRoomMonsterObstacleDetouring(mob);
+        applyRoomMonsterDropDownChasing(mob);
         applyRoomMonsterAttackCadence(mob);
         applyRoomMonsterTargeting(mob, survivorTargetSupplier, roomTargetingEnabled);
         attachWaveRewardMetadata(mob, mobId.get(), waveDefinition);
@@ -468,6 +480,22 @@ public final class ZombiesMobSpawnService {
         }
     }
 
+    private static void applyRoomMonsterObstacleDetouring(Mob mob) {
+        if (mob instanceof PathfinderMob pathfinderMob) {
+            pathfinderMob.goalSelector.addGoal(
+                    0,
+                    new RoomMonsterObstacleDetourGoal(pathfinderMob));
+        }
+    }
+
+    private static void applyRoomMonsterDropDownChasing(Mob mob) {
+        if (mob instanceof PathfinderMob pathfinderMob) {
+            pathfinderMob.goalSelector.addGoal(
+                    2,
+                    new RoomMonsterDropDownChaseGoal(pathfinderMob));
+        }
+    }
+
     private static void applyRoomMonsterTargeting(
             Mob mob,
             Supplier<List<ServerPlayer>> targetSupplier,
@@ -567,7 +595,9 @@ public final class ZombiesMobSpawnService {
         @Override
         public boolean canUse() {
             if (cooldownTicks > 0) {
-                cooldownTicks--;
+                if (mob.onGround()) {
+                    cooldownTicks--;
+                }
                 return false;
             }
             pendingJumpImpulse = null;
@@ -580,17 +610,18 @@ public final class ZombiesMobSpawnService {
                     || mob.distanceToSqr(target) <= 2.25D) {
                 return false;
             }
-            if (hasLowFrontObstacle(target)) {
+            pendingJumpImpulse = dropDownImpulse(target);
+            if (pendingJumpImpulse != null) {
                 return true;
             }
-            pendingJumpImpulse = dropDownImpulse(target);
-            return pendingJumpImpulse != null;
+            return hasLowFrontObstacle(target);
         }
 
         @Override
         public void start() {
+            boolean dropDownJump = pendingJumpImpulse != null;
             mob.getJumpControl().jump();
-            if (pendingJumpImpulse != null) {
+            if (dropDownJump) {
                 Vec3 currentMovement = mob.getDeltaMovement();
                 mob.setDeltaMovement(
                         currentMovement.x + pendingJumpImpulse.x,
@@ -598,7 +629,9 @@ public final class ZombiesMobSpawnService {
                         currentMovement.z + pendingJumpImpulse.z);
                 pendingJumpImpulse = null;
             }
-            cooldownTicks = ROOM_MONSTER_OBSTACLE_JUMP_COOLDOWN_TICKS;
+            cooldownTicks = dropDownJump
+                    ? ROOM_MONSTER_DROP_DOWN_RECOVERY_TICKS
+                    : ROOM_MONSTER_OBSTACLE_JUMP_COOLDOWN_TICKS;
         }
 
         @Override
@@ -660,6 +693,223 @@ public final class ZombiesMobSpawnService {
             }
             double yawRadians = Math.toRadians(mob.getYRot());
             return new Vec3(-Math.sin(yawRadians), 0.0D, Math.cos(yawRadians));
+        }
+    }
+
+    private static final class RoomMonsterObstacleDetourGoal extends Goal {
+        private final PathfinderMob mob;
+        private int stuckTicks;
+        private int detourTicks;
+        private int cooldownTicks;
+        private int preferredSide = 1;
+        private double lastTargetDistance = Double.NaN;
+        private Vec3 detourTarget;
+
+        private RoomMonsterObstacleDetourGoal(PathfinderMob mob) {
+            this.mob = Objects.requireNonNull(mob, "mob");
+            setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
+        }
+
+        @Override
+        public boolean canUse() {
+            LivingEntity target = mob.getTarget();
+            if (!canEvaluate(target)) {
+                resetProgressTracking();
+                return false;
+            }
+            if (cooldownTicks > 0) {
+                cooldownTicks--;
+                updateProgressTracking(target);
+                return false;
+            }
+            if (!isCollisionBlocked(directionToTarget(target), ROOM_MONSTER_OBSTACLE_PROBE_DISTANCE)) {
+                resetProgressTracking();
+                return false;
+            }
+            if (isMakingProgress(target)) {
+                stuckTicks = 0;
+                return false;
+            }
+            stuckTicks++;
+            if (stuckTicks < ROOM_MONSTER_DETOUR_STUCK_TICKS) {
+                return false;
+            }
+            detourTarget = chooseDetourTarget(target);
+            return detourTarget != null;
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return detourTicks > 0 && canEvaluate(mob.getTarget()) && detourTarget != null;
+        }
+
+        @Override
+        public void start() {
+            detourTicks = ROOM_MONSTER_DETOUR_DURATION_TICKS;
+            stuckTicks = 0;
+            preferredSide = -preferredSide;
+        }
+
+        @Override
+        public void tick() {
+            LivingEntity target = mob.getTarget();
+            if (!canEvaluate(target) || detourTarget == null) {
+                return;
+            }
+            detourTicks--;
+            mob.getLookControl().setLookAt(target, 30.0F, 30.0F);
+            mob.getMoveControl().setWantedPosition(
+                    detourTarget.x,
+                    detourTarget.y,
+                    detourTarget.z,
+                    ROOM_MONSTER_DETOUR_SPEED);
+        }
+
+        @Override
+        public void stop() {
+            detourTarget = null;
+            detourTicks = 0;
+            cooldownTicks = ROOM_MONSTER_DETOUR_COOLDOWN_TICKS;
+            resetProgressTracking();
+        }
+
+        private boolean canEvaluate(LivingEntity target) {
+            return target != null
+                    && target.isAlive()
+                    && mob.onGround()
+                    && !mob.isInWaterOrBubble()
+                    && !mob.isInLava()
+                    && mob.distanceToSqr(target) > 2.25D;
+        }
+
+        private boolean isMakingProgress(LivingEntity target) {
+            double currentDistance = horizontalDistance(target);
+            boolean makingProgress = Double.isFinite(lastTargetDistance)
+                    && lastTargetDistance - currentDistance > ROOM_MONSTER_DETOUR_MIN_PROGRESS;
+            lastTargetDistance = currentDistance;
+            return makingProgress;
+        }
+
+        private void updateProgressTracking(LivingEntity target) {
+            lastTargetDistance = horizontalDistance(target);
+        }
+
+        private void resetProgressTracking() {
+            stuckTicks = 0;
+            lastTargetDistance = Double.NaN;
+        }
+
+        private Vec3 chooseDetourTarget(LivingEntity target) {
+            Vec3 forward = directionToTarget(target);
+            if (forward.horizontalDistanceSqr() < 0.0001D) {
+                return null;
+            }
+            Vec3 first = detourOffset(forward, preferredSide);
+            if (canDetourThrough(first)) {
+                return mob.position().add(first);
+            }
+            Vec3 second = detourOffset(forward, -preferredSide);
+            if (canDetourThrough(second)) {
+                return mob.position().add(second);
+            }
+            return null;
+        }
+
+        private Vec3 detourOffset(Vec3 forward, int side) {
+            Vec3 lateral = new Vec3(-forward.z * side, 0.0D, forward.x * side);
+            return forward.scale(ROOM_MONSTER_DETOUR_FORWARD_DISTANCE)
+                    .add(lateral.scale(ROOM_MONSTER_DETOUR_SIDE_DISTANCE));
+        }
+
+        private boolean canDetourThrough(Vec3 offset) {
+            AABB detourBox = mob.getBoundingBox()
+                    .move(offset.x, 0.0D, offset.z)
+                    .inflate(ROOM_MONSTER_OBSTACLE_PROBE_INFLATE, 0.0D, ROOM_MONSTER_OBSTACLE_PROBE_INFLATE);
+            if (!mob.level().noCollision(mob, detourBox)) {
+                return false;
+            }
+            return !mob.level().noCollision(mob, detourBox.move(0.0D, -1.0D, 0.0D));
+        }
+
+        private boolean isCollisionBlocked(Vec3 direction, double distance) {
+            if (direction.horizontalDistanceSqr() < 0.0001D) {
+                return false;
+            }
+            AABB probeBox = mob.getBoundingBox()
+                    .move(direction.x * distance, 0.0D, direction.z * distance)
+                    .inflate(ROOM_MONSTER_OBSTACLE_PROBE_INFLATE, 0.0D, ROOM_MONSTER_OBSTACLE_PROBE_INFLATE);
+            return !mob.level().noCollision(mob, probeBox);
+        }
+
+        private Vec3 directionToTarget(LivingEntity target) {
+            double dx = target.getX() - mob.getX();
+            double dz = target.getZ() - mob.getZ();
+            double distance = Math.sqrt(dx * dx + dz * dz);
+            if (distance > 0.001D) {
+                return new Vec3(dx / distance, 0.0D, dz / distance);
+            }
+            double yawRadians = Math.toRadians(mob.getYRot());
+            return new Vec3(-Math.sin(yawRadians), 0.0D, Math.cos(yawRadians));
+        }
+
+        private double horizontalDistance(LivingEntity target) {
+            double dx = target.getX() - mob.getX();
+            double dz = target.getZ() - mob.getZ();
+            return Math.sqrt(dx * dx + dz * dz);
+        }
+    }
+
+    private static final class RoomMonsterDropDownChaseGoal extends Goal {
+        private final PathfinderMob mob;
+
+        private RoomMonsterDropDownChaseGoal(PathfinderMob mob) {
+            this.mob = Objects.requireNonNull(mob, "mob");
+            setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
+        }
+
+        @Override
+        public boolean canUse() {
+            return shouldChaseDown(mob.getTarget());
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return shouldChaseDown(mob.getTarget());
+        }
+
+        @Override
+        public void tick() {
+            LivingEntity target = mob.getTarget();
+            if (!shouldChaseDown(target)) {
+                return;
+            }
+            mob.getLookControl().setLookAt(target, 30.0F, 30.0F);
+            mob.getMoveControl().setWantedPosition(
+                    target.getX(),
+                    mob.getY(),
+                    target.getZ(),
+                    ROOM_MONSTER_DROP_DOWN_CHASE_SPEED);
+        }
+
+        private boolean shouldChaseDown(LivingEntity target) {
+            return target != null
+                    && target.isAlive()
+                    && mob.onGround()
+                    && !mob.isInWaterOrBubble()
+                    && !mob.isInLava()
+                    && mob.getY() - target.getY() >= ROOM_MONSTER_DROP_DOWN_MIN_HEIGHT
+                    && horizontalDistanceSqr(target) >= minHorizontalChaseDistanceSqr();
+        }
+
+        private double horizontalDistanceSqr(LivingEntity target) {
+            double dx = target.getX() - mob.getX();
+            double dz = target.getZ() - mob.getZ();
+            return dx * dx + dz * dz;
+        }
+
+        private static double minHorizontalChaseDistanceSqr() {
+            return ROOM_MONSTER_DROP_DOWN_CHASE_MIN_HORIZONTAL_DISTANCE
+                    * ROOM_MONSTER_DROP_DOWN_CHASE_MIN_HORIZONTAL_DISTANCE;
         }
     }
 

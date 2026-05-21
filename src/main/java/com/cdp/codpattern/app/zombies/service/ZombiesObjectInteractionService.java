@@ -17,6 +17,7 @@ import com.cdp.codpattern.app.zombies.model.ZombiesEquipmentSlot;
 import com.cdp.codpattern.app.zombies.model.ZombiesWeaponInstanceState;
 import com.cdp.codpattern.common.block.CodPatternBlockRegister;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
+import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -90,6 +91,7 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
     private final ZombiesObjectStateStore objectStateStore;
     private final ZombiesBarrierBlockRuntimeService barrierBlockRuntimeService;
     private final ZombiesRoomAnnouncementService announcementService;
+    private final Supplier<ZombiesRulesConfig> rulesSupplier;
     private final ConcurrentMap<InteractionKey, Long> recentInteractions = new ConcurrentHashMap<>();
 
     public ZombiesObjectInteractionService(
@@ -272,10 +274,98 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
             ZombiesPowerService powerService,
             ZombiesBuffService buffService,
             ZombiesUltimateMachineService ultimateMachineService,
+            ZombiesObjectStateStore objectStateStore,
+            ZombiesRoomAnnouncementService announcementService,
+            Supplier<ZombiesRulesConfig> rulesSupplier
+    ) {
+        this(
+                roomId,
+                barriersSupplier,
+                weaponWallsSupplier,
+                ammoBoxesSupplier,
+                armorStationsSupplier,
+                powerSwitchSupplier,
+                sodaMachinesSupplier,
+                ultimateMachinesSupplier,
+                barrierService,
+                weaponInstanceService,
+                ammoBoxService,
+                armorService,
+                powerService,
+                buffService,
+                ultimateMachineService,
+                new ZombiesWeaponInventoryService(),
+                objectStateStore,
+                ZombiesBarrierBlockRuntimeService.instance(),
+                announcementService,
+                rulesSupplier);
+    }
+
+    public ZombiesObjectInteractionService(
+            RoomId roomId,
+            Supplier<Collection<ZombiesBarrierData>> barriersSupplier,
+            Supplier<Collection<ZombiesWeaponWallData>> weaponWallsSupplier,
+            Supplier<Collection<ZombiesAmmoBoxData>> ammoBoxesSupplier,
+            Supplier<Collection<ZombiesArmorStationData>> armorStationsSupplier,
+            Supplier<Optional<ZombiesPowerSwitchData>> powerSwitchSupplier,
+            Supplier<Collection<ZombiesSodaMachineData>> sodaMachinesSupplier,
+            Supplier<Collection<ZombiesUltimateMachineData>> ultimateMachinesSupplier,
+            ZombiesBarrierService barrierService,
+            ZombiesWeaponInstanceService weaponInstanceService,
+            ZombiesAmmoBoxService ammoBoxService,
+            ZombiesArmorService armorService,
+            ZombiesPowerService powerService,
+            ZombiesBuffService buffService,
+            ZombiesUltimateMachineService ultimateMachineService,
             ZombiesWeaponInventoryService weaponInventoryService,
             ZombiesObjectStateStore objectStateStore,
             ZombiesBarrierBlockRuntimeService barrierBlockRuntimeService,
             ZombiesRoomAnnouncementService announcementService
+    ) {
+        this(
+                roomId,
+                barriersSupplier,
+                weaponWallsSupplier,
+                ammoBoxesSupplier,
+                armorStationsSupplier,
+                powerSwitchSupplier,
+                sodaMachinesSupplier,
+                ultimateMachinesSupplier,
+                barrierService,
+                weaponInstanceService,
+                ammoBoxService,
+                armorService,
+                powerService,
+                buffService,
+                ultimateMachineService,
+                weaponInventoryService,
+                objectStateStore,
+                barrierBlockRuntimeService,
+                announcementService,
+                ZombiesRulesConfig::new);
+    }
+
+    public ZombiesObjectInteractionService(
+            RoomId roomId,
+            Supplier<Collection<ZombiesBarrierData>> barriersSupplier,
+            Supplier<Collection<ZombiesWeaponWallData>> weaponWallsSupplier,
+            Supplier<Collection<ZombiesAmmoBoxData>> ammoBoxesSupplier,
+            Supplier<Collection<ZombiesArmorStationData>> armorStationsSupplier,
+            Supplier<Optional<ZombiesPowerSwitchData>> powerSwitchSupplier,
+            Supplier<Collection<ZombiesSodaMachineData>> sodaMachinesSupplier,
+            Supplier<Collection<ZombiesUltimateMachineData>> ultimateMachinesSupplier,
+            ZombiesBarrierService barrierService,
+            ZombiesWeaponInstanceService weaponInstanceService,
+            ZombiesAmmoBoxService ammoBoxService,
+            ZombiesArmorService armorService,
+            ZombiesPowerService powerService,
+            ZombiesBuffService buffService,
+            ZombiesUltimateMachineService ultimateMachineService,
+            ZombiesWeaponInventoryService weaponInventoryService,
+            ZombiesObjectStateStore objectStateStore,
+            ZombiesBarrierBlockRuntimeService barrierBlockRuntimeService,
+            ZombiesRoomAnnouncementService announcementService,
+            Supplier<ZombiesRulesConfig> rulesSupplier
     ) {
         this.roomId = Objects.requireNonNull(roomId, "roomId");
         this.barriersSupplier = Objects.requireNonNull(barriersSupplier, "barriersSupplier");
@@ -300,6 +390,7 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         this.announcementService = announcementService == null
                 ? noopAnnouncementService()
                 : announcementService;
+        this.rulesSupplier = rulesSupplier == null ? ZombiesRulesConfig::new : rulesSupplier;
     }
 
     @Override
@@ -647,7 +738,7 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
                 armorService.purchaseArmor(
                         player.getUUID(),
                         armorStation.armorLevel(),
-                        armorStation.damageTakenMultiplier(),
+                        armorDamageTakenMultiplier(armorStation.armorLevel()),
                         armorStation.buyCost());
         if (result.success()) {
             objectStateStore.markArmorStationPurchased(armorStation);
@@ -659,6 +750,12 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         }
         sendFailureMessage(player, target, result);
         return InteractionResult.FAIL;
+    }
+
+    private double armorDamageTakenMultiplier(int armorLevel) {
+        ZombiesRulesConfig rules = rulesSupplier.get();
+        ZombiesRulesConfig.Armor armor = rules == null ? new ZombiesRulesConfig.Armor() : rules.getArmor();
+        return armor.damageTakenMultiplierForLevel(armorLevel);
     }
 
     private InteractionResult purchasePowerSwitch(ServerPlayer player, InteractionTarget target, ZombiesPowerSwitchData powerSwitch) {
@@ -761,7 +858,7 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
             String gunId = upgrade == null ? "" : upgrade.weapon().gunId();
             int weaponLevel = upgrade == null ? 0 : upgrade.weapon().weaponLevel();
             int upgradeLevel = upgrade == null ? 0 : upgrade.weapon().upgradeLevel();
-            double cost = upgrade == null ? displayUltimateCost(ultimateMachine) : upgrade.cost();
+            double cost = upgrade == null ? displayUltimateCost() : upgrade.cost();
             sendMessage(player, SUCCESS_ULTIMATE, gunId, weaponLevel, upgradeLevel, target.objectId(), displayCost(cost));
             return InteractionResult.SUCCESS;
         }
@@ -777,7 +874,10 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
             return ZombiesServiceResult.failure(ZombiesErrorCode.OBJECT_NOT_FOUND);
         }
         ZombiesServiceResult<ZombiesUltimateMachineService.WeaponUpgradeResult> result =
-                ultimateMachineService.upgradePrimaryWeapon(playerId, ultimateMachine);
+                ultimateMachineService.upgradePrimaryWeapon(
+                        playerId,
+                        ultimateMachineRules(),
+                        ultimateMachine.requiresPower());
         if (result.success()) {
             objectStateStore.markUltimateMachineUsed(ultimateMachine);
         }
@@ -793,7 +893,11 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
             return ZombiesServiceResult.failure(ZombiesErrorCode.OBJECT_NOT_FOUND);
         }
         ZombiesServiceResult<ZombiesUltimateMachineService.WeaponUpgradeResult> result =
-                ultimateMachineService.upgradePrimaryWeapon(playerId, ultimateMachine, commitGuard);
+                ultimateMachineService.upgradePrimaryWeapon(
+                        playerId,
+                        ultimateMachineRules(),
+                        ultimateMachine.requiresPower(),
+                        commitGuard);
         if (result.success()) {
             objectStateStore.markUltimateMachineUsed(ultimateMachine);
         }
@@ -1159,8 +1263,8 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         if (data instanceof ZombiesSodaMachineData sodaMachine) {
             return sodaMachine.cost();
         }
-        if (data instanceof ZombiesUltimateMachineData ultimateMachine) {
-            return displayUltimateCost(ultimateMachine);
+        if (data instanceof ZombiesUltimateMachineData) {
+            return displayUltimateCost();
         }
         return 0;
     }
@@ -1203,9 +1307,9 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         return target.data() instanceof ZombiesUltimateMachineData ? 0 : 0;
     }
 
-    private static int fallbackMaxUpgradeLevel(InteractionTarget target) {
+    private int fallbackMaxUpgradeLevel(InteractionTarget target) {
         Object data = target.data();
-        return data instanceof ZombiesUltimateMachineData ultimateMachine ? ultimateMachine.maxUpgradeLevel() : 0;
+        return data instanceof ZombiesUltimateMachineData ? maxUltimateUpgradeLevel() : 0;
     }
 
     private static Object param(ZombiesServiceResult<?> result, String name, Object fallback) {
@@ -1270,17 +1374,28 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         return cost == Integer.MAX_VALUE ? 0 : cost;
     }
 
-    private static int displayUltimateCost(ZombiesUltimateMachineData ultimateMachine) {
-        if (ultimateMachine == null || ultimateMachine.levels().isEmpty()) {
+    private int displayUltimateCost() {
+        ZombiesRulesConfig.UltimateMachine rules = ultimateMachineRules();
+        if (rules.getLevels().isEmpty()) {
             return 0;
         }
         int cost = Integer.MAX_VALUE;
-        for (ZombiesUltimateMachineData.UpgradeLevelData level : ultimateMachine.levels().values()) {
-            if (level != null && level.cost() >= 0) {
-                cost = Math.min(cost, level.cost());
+        for (ZombiesRulesConfig.UpgradeLevel level : rules.getLevels().values()) {
+            if (level != null && level.getCost() != null && level.getCost() >= 0) {
+                cost = Math.min(cost, level.getCost());
             }
         }
         return cost == Integer.MAX_VALUE ? 0 : cost;
+    }
+
+    private int maxUltimateUpgradeLevel() {
+        ZombiesRulesConfig.UltimateMachine rules = ultimateMachineRules();
+        return Math.max(0, rules.getMaxUpgradeLevel() == null ? 0 : rules.getMaxUpgradeLevel());
+    }
+
+    private ZombiesRulesConfig.UltimateMachine ultimateMachineRules() {
+        ZombiesRulesConfig rules = rulesSupplier.get();
+        return (rules == null ? new ZombiesRulesConfig() : rules).getUltimateMachine();
     }
 
     private void cleanupRecentInteractions(long gameTime) {

@@ -10,6 +10,7 @@ import com.cdp.codpattern.app.zombies.map.object.ZombiesSodaMachineData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesUltimateMachineData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesWeaponWallData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesZombieSpawnData;
+import com.cdp.codpattern.app.zombies.model.ZombiesArmorState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -17,7 +18,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -274,7 +274,7 @@ final class ZombiesDeployObjectEditor {
                         copyObjectId(objects, source.objectId(), type),
                         source.armorLevel(),
                         source.buyCost(),
-                        source.damageTakenMultiplier(),
+                        1.0D,
                         source.dimension(),
                         source.pos(),
                         source.interactionPos());
@@ -304,8 +304,8 @@ final class ZombiesDeployObjectEditor {
                 ZombiesUltimateMachineData source = objects.ultimateMachines().get(selectedIndex);
                 ZombiesUltimateMachineData data = new ZombiesUltimateMachineData(
                         copyObjectId(objects, source.objectId(), type),
-                        source.maxUpgradeLevel(),
-                        source.levels(),
+                        0,
+                        Map.of(),
                         source.requiresPower(),
                         source.dimension(),
                         source.pos(),
@@ -530,14 +530,23 @@ final class ZombiesDeployObjectEditor {
             Map<String, String> fields
     ) {
         String objectId = resolveObjectId(objects, excluded, text(fields, "objectId"), ZombiesDeployFieldSchema.ARMOR_STATION);
+        int armorLevel = intField(fields, "armorLevel");
+        int buyCost = intField(fields, "buyCost");
+        validateArmorStationFields(armorLevel);
         return new ZombiesArmorStationData(
                 objectId,
-                intField(fields, "armorLevel"),
-                intField(fields, "buyCost"),
-                doubleField(fields, "damageTakenMultiplier"),
+                armorLevel,
+                buyCost,
+                1.0D,
                 dimension(fields),
                 blockPos(fields, "pos"),
                 Optional.of(blockPos(fields, "interaction")));
+    }
+
+    private static void validateArmorStationFields(int armorLevel) {
+        if (!ZombiesArmorState.isValidOwnedLevel(armorLevel)) {
+            throw failure("field.invalid_armor_level", "field armorLevel must be 1, 2, or 3: " + armorLevel);
+        }
     }
 
     private static ZombiesPowerSwitchData parsePowerSwitch(
@@ -579,8 +588,8 @@ final class ZombiesDeployObjectEditor {
         String objectId = resolveObjectId(objects, excluded, text(fields, "objectId"), ZombiesDeployFieldSchema.ULTIMATE_MACHINE);
         return new ZombiesUltimateMachineData(
                 objectId,
-                intField(fields, "maxUpgradeLevel"),
-                ultimateLevels(fields, "levels"),
+                0,
+                Map.of(),
                 booleanField(fields, "requiresPower"),
                 dimension(fields),
                 blockPos(fields, "pos"),
@@ -724,7 +733,6 @@ final class ZombiesDeployObjectEditor {
         fields.put("objectId", data.objectId());
         fields.put("armorLevel", Integer.toString(data.armorLevel()));
         fields.put("buyCost", Integer.toString(data.buyCost()));
-        fields.put("damageTakenMultiplier", Double.toString(data.damageTakenMultiplier()));
         putPosition(fields, "interaction", data.interactionPos().orElse(data.pos()));
         return fields;
     }
@@ -750,8 +758,6 @@ final class ZombiesDeployObjectEditor {
     private static Map<String, String> fieldsFrom(ZombiesUltimateMachineData data) {
         Map<String, String> fields = basePositionFields(ZombiesDeployFieldSchema.ULTIMATE_MACHINE, data.dimension(), data.pos());
         fields.put("objectId", data.objectId());
-        fields.put("maxUpgradeLevel", Integer.toString(data.maxUpgradeLevel()));
-        fields.put("levels", serializeUltimateLevels(data.levels()));
         fields.put("requiresPower", Boolean.toString(data.requiresPower()));
         putPosition(fields, "interaction", data.interactionPos().orElse(data.pos()));
         return fields;
@@ -858,46 +864,6 @@ final class ZombiesDeployObjectEditor {
                 parsed.put(entryKey, Integer.parseInt(entryValue));
             } catch (NumberFormatException e) {
                 throw failure("field.invalid_integer", "field " + key + " value must be an integer: " + entryValue);
-            }
-        }
-        return parsed;
-    }
-
-    private static Map<String, ZombiesUltimateMachineData.UpgradeLevelData> ultimateLevels(
-            Map<String, String> fields,
-            String key
-    ) {
-        String value = text(fields, key);
-        Map<String, ZombiesUltimateMachineData.UpgradeLevelData> parsed = new LinkedHashMap<>();
-        if (value.isEmpty()) {
-            return parsed;
-        }
-        for (String entry : value.split("[,;]")) {
-            String trimmed = entry.trim();
-            if (trimmed.isEmpty()) {
-                continue;
-            }
-            int equals = trimmed.indexOf('=');
-            int colon = trimmed.indexOf(':', equals + 1);
-            if (equals <= 0 || colon <= equals + 1 || colon == trimmed.length() - 1) {
-                throw failure("field.invalid_list", "field " + key + " entry must be level=cost:damageMultiplier: " + trimmed);
-            }
-            String level = trimmed.substring(0, equals).trim();
-            String cost = trimmed.substring(equals + 1, colon).trim();
-            String multiplier = trimmed.substring(colon + 1).trim();
-            if (level.isEmpty()) {
-                throw failure("field.invalid_list", "field " + key + " contains an empty level");
-            }
-            try {
-                double parsedMultiplier = Double.parseDouble(multiplier);
-                if (!Double.isFinite(parsedMultiplier)) {
-                    throw failure("field.invalid_decimal", "field " + key + " damage multiplier must be finite: " + multiplier);
-                }
-                parsed.put(level, new ZombiesUltimateMachineData.UpgradeLevelData(
-                        Integer.parseInt(cost),
-                        parsedMultiplier));
-            } catch (NumberFormatException e) {
-                throw failure("field.invalid_list", "field " + key + " entry has invalid numeric values: " + trimmed);
             }
         }
         return parsed;
@@ -1020,31 +986,6 @@ final class ZombiesDeployObjectEditor {
                 .map(entry -> entry.getKey() + "=" + entry.getValue())
                 .reduce((left, right) -> left + "," + right)
                 .orElse("");
-    }
-
-    private static String serializeUltimateLevels(Map<String, ZombiesUltimateMachineData.UpgradeLevelData> map) {
-        if (map == null || map.isEmpty()) {
-            return "";
-        }
-        return map.entrySet().stream()
-                .sorted(Comparator.comparingInt((Map.Entry<String, ZombiesUltimateMachineData.UpgradeLevelData> entry) ->
-                        positiveIntOrMax(entry.getKey())).thenComparing(Map.Entry::getKey))
-                .map(entry -> entry.getKey()
-                        + "="
-                        + entry.getValue().cost()
-                        + ":"
-                        + entry.getValue().damageMultiplier())
-                .reduce((left, right) -> left + ";" + right)
-                .orElse("");
-    }
-
-    private static int positiveIntOrMax(String value) {
-        try {
-            int parsed = Integer.parseInt(Objects.requireNonNullElse(value, "").trim());
-            return parsed > 0 ? parsed : Integer.MAX_VALUE;
-        } catch (NumberFormatException ignored) {
-            return Integer.MAX_VALUE;
-        }
     }
 
     private static <T> List<T> mutable(List<T> list) {

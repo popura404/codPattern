@@ -106,8 +106,18 @@ public final class ZombiesDeployGuiStaticContractCompatTest {
                 "interaction coordinates should stay near the top of the properties list");
         requireContains(screen, "case \"areaFromX\", \"areaFromY\", \"areaFromZ\", \"areaToX\", \"areaToY\", \"areaToZ\" -> 3;",
                 "barrier area coordinates should stay visible in the properties priority order");
-        requireContains(screen, "case \"group\", \"weight\", \"cost\", \"armorLevel\", \"buyCost\", \"buffId\", \"requiresPower\", \"maxUpgradeLevel\" -> 4;",
+        requireContains(screen, "case \"group\", \"weight\", \"cost\", \"armorLevel\", \"buyCost\", \"buffId\", \"requiresPower\" -> 4;",
                 "group, weight, and purchase fields should stay in the high-priority properties group");
+        requireAbsent(fieldSchema, "field(\"damageTakenMultiplier\"",
+                "armor damage reduction must be configured through serverconfig rules, not deploy map objects");
+        requireAbsent(fieldSchema, "field(\"maxUpgradeLevel\"",
+                "ultimate machine max upgrade level must be configured through serverconfig rules, not deploy map objects");
+        requireAbsent(fieldSchema, "field(\"levels\"",
+                "ultimate machine upgrade levels must be configured through serverconfig rules, not deploy map objects");
+        requireAbsent(screen, "\"maxUpgradeLevel\"",
+                "deploy GUI must not expose ultimate machine maxUpgradeLevel map-object fields");
+        requireAbsent(screen, "\"levels\"",
+                "deploy GUI must not expose ultimate machine levels map-object fields");
         requireContains(screen, "if (\"yaw\".equals(field.key())) {\n                first = first + \" (\" + tr(\"gui.codpattern.zombies.deploy.yaw_only_short\") + \")\";\n            }",
                 "yaw field should keep an explicit horizontal-only label");
         requireContains(screen, "return isSelectionOnlyAction(action)\n                ? selectionDraft()\n                : draft();",

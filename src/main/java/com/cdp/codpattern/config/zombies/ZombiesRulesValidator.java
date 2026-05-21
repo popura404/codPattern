@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -15,8 +16,12 @@ public final class ZombiesRulesValidator {
             ZombiesErrorCode.of("rules.invalid_weapon_wall");
     public static final ZombiesErrorCode RULES_INVALID_WEAPON_RULES =
             ZombiesErrorCode.of("rules.invalid_weapon_rules");
+    public static final ZombiesErrorCode RULES_INVALID_ULTIMATE_MACHINE =
+            ZombiesErrorCode.of("rules.invalid_ultimate_machine");
     public static final ZombiesErrorCode RULES_INVALID_SPAWN_POINT_WEIGHTING =
             ZombiesErrorCode.of("rules.invalid_spawn_point_weighting");
+    public static final ZombiesErrorCode RULES_INVALID_ARMOR =
+            ZombiesErrorCode.of("rules.invalid_armor");
 
     private static final Set<String> VALID_RARITIES = Set.of(
             ZombiesRulesConfig.RARITY_COMMON,
@@ -26,10 +31,40 @@ public final class ZombiesRulesValidator {
     public List<ZombiesValidationIssue> validate(ZombiesRulesConfig config) {
         ZombiesRulesConfig resolved = config == null ? new ZombiesRulesConfig() : config;
         List<ZombiesValidationIssue> issues = new ArrayList<>();
+        validateArmor(resolved.getArmor(), issues);
         validateWeaponRules(resolved.getWeaponRules(), issues);
         validateWeaponWall(resolved.getWeaponWall(), issues);
+        validateUltimateMachine(resolved.getUltimateMachine(), issues);
         validateSpawnPointWeighting(resolved.getSpawnPointWeighting(), issues);
         return List.copyOf(issues);
+    }
+
+    private static void validateArmor(
+            ZombiesRulesConfig.Armor armor,
+            List<ZombiesValidationIssue> issues
+    ) {
+        if (armor == null) {
+            issues.add(ZombiesValidationIssue.error(
+                    RULES_INVALID_ARMOR,
+                    "armor",
+                    "Zombies armor config is missing."));
+            return;
+        }
+        validateDamageReduction(
+                armor.getLevel1DamageReduction(),
+                "armor.level1DamageReduction",
+                "Armor level 1 damage reduction must be finite and in [0, 1).",
+                issues);
+        validateDamageReduction(
+                armor.getLevel2DamageReduction(),
+                "armor.level2DamageReduction",
+                "Armor level 2 damage reduction must be finite and in [0, 1).",
+                issues);
+        validateDamageReduction(
+                armor.getLevel3DamageReduction(),
+                "armor.level3DamageReduction",
+                "Armor level 3 damage reduction must be finite and in [0, 1).",
+                issues);
     }
 
     private static void validateSpawnPointWeighting(
@@ -203,6 +238,65 @@ public final class ZombiesRulesValidator {
         }
     }
 
+    private static void validateUltimateMachine(
+            ZombiesRulesConfig.UltimateMachine ultimateMachine,
+            List<ZombiesValidationIssue> issues
+    ) {
+        if (ultimateMachine == null) {
+            issues.add(ZombiesValidationIssue.error(
+                    RULES_INVALID_ULTIMATE_MACHINE,
+                    "ultimateMachine",
+                    "Zombies ultimateMachine config is missing."));
+            return;
+        }
+        Integer maxUpgradeLevel = ultimateMachine.getMaxUpgradeLevel();
+        if (maxUpgradeLevel == null || maxUpgradeLevel <= 0) {
+            issues.add(ZombiesValidationIssue.error(
+                    RULES_INVALID_ULTIMATE_MACHINE,
+                    "ultimateMachine.maxUpgradeLevel",
+                    "Ultimate machine maxUpgradeLevel must be positive."));
+            return;
+        }
+
+        Set<Integer> configuredLevels = new LinkedHashSet<>();
+        for (Map.Entry<String, ZombiesRulesConfig.UpgradeLevel> entry : safeUpgradeLevels(ultimateMachine).entrySet()) {
+            int level = parsePositiveLevel(entry.getKey());
+            if (level < 0) {
+                issues.add(ZombiesValidationIssue.error(
+                        RULES_INVALID_ULTIMATE_MACHINE,
+                        "ultimateMachine.levels",
+                        "Ultimate machine level keys must be positive integers."));
+            } else {
+                configuredLevels.add(level);
+            }
+            ZombiesRulesConfig.UpgradeLevel levelData = entry.getValue();
+            if (levelData == null || levelData.getCost() == null || levelData.getCost() < 0) {
+                issues.add(ZombiesValidationIssue.error(
+                        RULES_INVALID_ULTIMATE_MACHINE,
+                        "ultimateMachine.levels." + entry.getKey() + ".cost",
+                        "Ultimate machine level cost must be non-negative."));
+            }
+            if (levelData == null
+                    || levelData.getDamageMultiplier() == null
+                    || !Double.isFinite(levelData.getDamageMultiplier())
+                    || levelData.getDamageMultiplier() <= 0.0D) {
+                issues.add(ZombiesValidationIssue.error(
+                        RULES_INVALID_ULTIMATE_MACHINE,
+                        "ultimateMachine.levels." + entry.getKey() + ".damageMultiplier",
+                        "Ultimate machine level damageMultiplier must be positive and finite."));
+            }
+        }
+        for (int level = 1; level <= maxUpgradeLevel; level++) {
+            if (!configuredLevels.contains(level)) {
+                issues.add(ZombiesValidationIssue.error(
+                        RULES_INVALID_ULTIMATE_MACHINE,
+                        "ultimateMachine.levels",
+                        "Ultimate machine levels must cover 1..maxUpgradeLevel."));
+                break;
+            }
+        }
+    }
+
     private static void validateRarity(
             ZombiesRulesConfig.Rarity rarity,
             String rarityId,
@@ -299,6 +393,21 @@ public final class ZombiesRulesValidator {
         return rarity == null || rarity.getGuns() == null ? List.of() : rarity.getGuns();
     }
 
+    private static Map<String, ZombiesRulesConfig.UpgradeLevel> safeUpgradeLevels(
+            ZombiesRulesConfig.UltimateMachine ultimateMachine
+    ) {
+        return ultimateMachine == null || ultimateMachine.getLevels() == null ? Map.of() : ultimateMachine.getLevels();
+    }
+
+    private static int parsePositiveLevel(String value) {
+        try {
+            int level = Integer.parseInt(Objects.requireNonNullElse(value, "").trim());
+            return level > 0 ? level : -1;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
     private static String normalizeRarityId(String rarityId) {
         return Objects.requireNonNullElse(rarityId, "").trim().toLowerCase(Locale.ROOT);
     }
@@ -309,6 +418,20 @@ public final class ZombiesRulesValidator {
 
     private static boolean positiveFinite(Double value) {
         return value != null && Double.isFinite(value) && value > 0.0D;
+    }
+
+    private static void validateDamageReduction(
+            Double value,
+            String subject,
+            String message,
+            List<ZombiesValidationIssue> issues
+    ) {
+        if (value == null || !Double.isFinite(value) || value < 0.0D || value >= 1.0D) {
+            issues.add(ZombiesValidationIssue.error(
+                    RULES_INVALID_ARMOR,
+                    subject,
+                    message));
+        }
     }
 
     private static void validatePositiveFinite(

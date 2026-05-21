@@ -7,7 +7,6 @@ import com.cdp.codpattern.app.zombies.map.object.ZombiesBarrierData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesInitialSpawnData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesPowerSwitchData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesSodaMachineData;
-import com.cdp.codpattern.app.zombies.map.object.ZombiesUltimateMachineData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesWeaponWallData;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
@@ -29,9 +28,10 @@ public final class ZombiesDeployObjectEditorCompatTest {
         barrierAreaFieldsParseUpdateAndDuplicate();
         ammoBoxPricesByWeaponLevelParseAndUpdateFromListField();
         armorStationFieldsParseAndUpdate();
+        armorStationRejectsInvalidLevel();
         powerSwitchSingleObjectCrudKeepsFieldValues();
         sodaMachineFieldsParseAndDuplicate();
-        ultimateMachineLevelsParseFromListField();
+        ultimateMachineRuleFieldsIgnoredAndRemovedFromEditorFields();
         duplicateDeleteAndClearKeepSelectionAndCountsStable();
         failurePathsKeepOriginalObjects();
         weaponWallDeprecatedFieldsIgnoredAndRemovedFromEditorFields();
@@ -203,19 +203,17 @@ public final class ZombiesDeployObjectEditorCompatTest {
                         "objectId", "armor-2",
                         "armorLevel", "2",
                         "buyCost", "750",
-                        "damageTakenMultiplier", "0.5",
                         "posX", "4",
                         "posY", "64",
                         "posZ", "9"));
 
         requireSuccess(add, "armor_station add should succeed");
         ZombiesArmorStationData added = only(add.objects().armorStations(), "added armor station");
-        requireArmorStation(added, "armor-2", 2, 750, 0.5D, new BlockPos(4, 64, 9));
+        requireArmorStation(added, "armor-2", 2, 750, 1.0D, new BlockPos(4, 64, 9));
 
         Map<String, String> updateFields = new LinkedHashMap<>(add.fields());
         updateFields.put("armorLevel", "3");
         updateFields.put("buyCost", "1200");
-        updateFields.put("damageTakenMultiplier", "0.35");
         ZombiesDeployObjectEditor.EditResult update = edit(
                 add.objects(),
                 ZombiesDeployObjectEditor.Operation.UPDATE,
@@ -225,7 +223,22 @@ public final class ZombiesDeployObjectEditorCompatTest {
 
         requireSuccess(update, "armor_station update should succeed");
         ZombiesArmorStationData updated = only(update.objects().armorStations(), "updated armor station");
-        requireArmorStation(updated, "armor-2", 3, 1200, 0.35D, new BlockPos(4, 64, 9));
+        requireArmorStation(updated, "armor-2", 3, 1200, 1.0D, new BlockPos(4, 64, 9));
+    }
+
+    private static void armorStationRejectsInvalidLevel() {
+        ZombiesDeployObjectEditor.EditResult invalidLevel = edit(
+                ZombiesMapObjects.EMPTY,
+                ZombiesDeployObjectEditor.Operation.ADD,
+                ZombiesDeployFieldSchema.ARMOR_STATION,
+                -1,
+                fields(ZombiesDeployFieldSchema.ARMOR_STATION,
+                        "objectId", "armor-4",
+                        "armorLevel", "4",
+                        "buyCost", "750"));
+
+        requireFailure(invalidLevel, "field.invalid_armor_level", "armor_station invalid armorLevel should fail");
+        require(invalidLevel.objects().armorStations().isEmpty(), "invalid armorLevel should not append armor station");
     }
 
     private static void powerSwitchSingleObjectCrudKeepsFieldValues() {
@@ -335,7 +348,7 @@ public final class ZombiesDeployObjectEditorCompatTest {
                 "soda_machine duplicate should generate non-conflicting object id");
     }
 
-    private static void ultimateMachineLevelsParseFromListField() {
+    private static void ultimateMachineRuleFieldsIgnoredAndRemovedFromEditorFields() {
         ZombiesDeployObjectEditor.EditResult add = edit(
                 ZombiesMapObjects.EMPTY,
                 ZombiesDeployObjectEditor.Operation.ADD,
@@ -348,13 +361,17 @@ public final class ZombiesDeployObjectEditorCompatTest {
                         "requiresPower", "false"));
 
         requireSuccess(add, "ultimate_machine add should succeed");
-        ZombiesUltimateMachineData ultimate = only(add.objects().ultimateMachines(), "ultimate machine");
+        var ultimate = only(add.objects().ultimateMachines(), "ultimate machine");
         require("ultimate-1".equals(ultimate.objectId()), "ultimate_machine objectId should parse");
-        require(ultimate.maxUpgradeLevel() == 3, "ultimate_machine maxUpgradeLevel should parse");
         require(!ultimate.requiresPower(), "ultimate_machine requiresPower should parse");
-        requireUltimateLevel(ultimate.levels(), "1", 2500, 1.5D);
-        requireUltimateLevel(ultimate.levels(), "2", 5000, 2.0D);
-        requireUltimateLevel(ultimate.levels(), "3", 7500, 2.5D);
+        require(ultimate.maxUpgradeLevel() == 0,
+                "ultimate_machine maxUpgradeLevel should stay serverconfig-owned");
+        require(ultimate.levels().isEmpty(),
+                "ultimate_machine levels should stay serverconfig-owned");
+        require(!add.fields().containsKey("maxUpgradeLevel"),
+                "ultimate_machine editor fields should not expose serverconfig maxUpgradeLevel");
+        require(!add.fields().containsKey("levels"),
+                "ultimate_machine editor fields should not expose serverconfig levels");
     }
 
     private static void duplicateDeleteAndClearKeepSelectionAndCountsStable() {
@@ -643,19 +660,6 @@ public final class ZombiesDeployObjectEditorCompatTest {
         require(soda.cost() == cost, "soda_machine cost should match");
         require(soda.requiresPower() == requiresPower, "soda_machine requiresPower should match");
         require(pos.equals(soda.pos()), "soda_machine position should match");
-    }
-
-    private static void requireUltimateLevel(
-            Map<String, ZombiesUltimateMachineData.UpgradeLevelData> levels,
-            String level,
-            int cost,
-            double damageMultiplier
-    ) {
-        ZombiesUltimateMachineData.UpgradeLevelData data = levels.get(level);
-        require(data != null, "ultimate_machine should include level " + level);
-        require(data.cost() == cost, "ultimate_machine level " + level + " cost should parse");
-        requireClose(data.damageMultiplier(), damageMultiplier,
-                "ultimate_machine level " + level + " damage multiplier should parse");
     }
 
     private static void requireMapValue(Map<String, Integer> values, String key, int expected, String message) {

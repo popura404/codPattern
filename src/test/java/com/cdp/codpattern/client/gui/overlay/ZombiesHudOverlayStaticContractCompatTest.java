@@ -49,6 +49,24 @@ public final class ZombiesHudOverlayStaticContractCompatTest {
                 "teammate points should render as a bare number");
         requireContains(overlay, "Integer.toString(Math.max(0, teammate.armorLevel()))",
                 "teammate armor should render as a right-aligned numeric value");
+        requireContains(overlay, "renderHeldWeaponRarity",
+                "zombies overlay must render the held weapon rarity marker");
+        requireContains(overlay, "ZombiesWeaponItemStackService.TAG_RARITY_ID",
+                "held weapon rarity marker must read the explicit zombies rarity tag");
+        requireContains(overlay, "ZombiesRarityDisplay.fromRarityId(rarityId)",
+                "held weapon rarity marker must ignore blank or unsupported rarity ids");
+        requireContains(overlay, "graphics.fillGradient(",
+                "held weapon rarity marker must use a translucent gradient color panel");
+        requireContains(overlay, "renderHeldWeaponUpgradeLevel",
+                "zombies overlay must render the held weapon upgrade level marker");
+        requireContains(overlay, "HELD_UPGRADE_LEVEL_BOTTOM_MARGIN = 28",
+                "held weapon upgrade level marker should stay in the lower-right corner below rarity");
+        requireContains(overlay, "int upgradeLevel = heldWeaponUpgradeLevel(player.getMainHandItem(), roomKey);",
+                "held weapon upgrade level marker must read the currently held weapon");
+        requireContains(overlay, "return positiveIntTag(tag, ZombiesWeaponItemStackService.TAG_UPGRADE_LEVEL);",
+                "held weapon upgrade level marker must use the explicit zombies upgrade-level tag");
+        requireContains(overlay, "graphics.drawString(font, text, x, y, TEXT_PRIMARY, true);",
+                "held weapon upgrade level marker must render as white text");
         requireContains(overlay, "renderInteractionPrompt",
                 "zombies overlay must render crosshair interaction prompts");
         requireContains(overlay, "ClientModeObjectState.roomStates(roomKey)",

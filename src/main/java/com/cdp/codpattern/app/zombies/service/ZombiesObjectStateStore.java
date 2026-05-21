@@ -9,6 +9,7 @@ import com.cdp.codpattern.app.zombies.map.object.ZombiesSodaMachineData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesUltimateMachineData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesWeaponWallData;
 import com.cdp.codpattern.app.zombies.sync.ZombiesObjectStateKeys;
+import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 
@@ -20,6 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 public final class ZombiesObjectStateStore {
     private static final String OBJECT_TYPE_BARRIER = "barrier";
@@ -59,6 +61,7 @@ public final class ZombiesObjectStateStore {
     private final Map<String, Long> ultimateMachineRevisionsByObjectId = new LinkedHashMap<>();
     private final BooleanSupplier powerOnSupplier;
     private final ZombiesWeaponWallOfferService weaponWallOfferService;
+    private final Supplier<ZombiesRulesConfig> rulesSupplier;
     private long revision;
 
     public ZombiesObjectStateStore() {
@@ -73,10 +76,19 @@ public final class ZombiesObjectStateStore {
             BooleanSupplier powerOnSupplier,
             ZombiesWeaponWallOfferService weaponWallOfferService
     ) {
+        this(powerOnSupplier, weaponWallOfferService, ZombiesRulesConfig::new);
+    }
+
+    public ZombiesObjectStateStore(
+            BooleanSupplier powerOnSupplier,
+            ZombiesWeaponWallOfferService weaponWallOfferService,
+            Supplier<ZombiesRulesConfig> rulesSupplier
+    ) {
         this.powerOnSupplier = powerOnSupplier == null ? () -> false : powerOnSupplier;
         this.weaponWallOfferService = weaponWallOfferService == null
                 ? new ZombiesWeaponWallOfferService()
                 : weaponWallOfferService;
+        this.rulesSupplier = rulesSupplier == null ? ZombiesRulesConfig::new : rulesSupplier;
     }
 
     public synchronized void resetBarriers(Collection<ZombiesBarrierData> barriers) {
@@ -436,10 +448,7 @@ public final class ZombiesObjectStateStore {
                 Math.max(0, armorStation.buyCost()),
                 armorStation.armorLevel() >= 1
                         && armorStation.armorLevel() <= 3
-                        && armorStation.buyCost() >= 0
-                        && Double.isFinite(armorStation.damageTakenMultiplier())
-                        && armorStation.damageTakenMultiplier() > 0.0D
-                        && armorStation.damageTakenMultiplier() <= 1.0D);
+                        && armorStation.buyCost() >= 0);
         payload.putInt(PAYLOAD_ARMOR_LEVEL, Math.max(0, armorStation.armorLevel()));
         return new ModeObjectState(
                 objectId,
@@ -498,17 +507,19 @@ public final class ZombiesObjectStateStore {
             long objectRevision
     ) {
         boolean powerOn = isPowerOn();
-        boolean enabled = ultimateMachine.maxUpgradeLevel() > 0
-                && !ultimateMachine.levels().isEmpty()
+        ZombiesRulesConfig.UltimateMachine rules = ultimateMachineRules();
+        int maxUpgradeLevel = Math.max(0, rules.getMaxUpgradeLevel() == null ? 0 : rules.getMaxUpgradeLevel());
+        boolean enabled = maxUpgradeLevel > 0
+                && !rules.getLevels().isEmpty()
                 && (!ultimateMachine.requiresPower() || powerOn);
         CompoundTag payload = basePurchasePayload(
                 objectId,
                 OBJECT_TYPE_ULTIMATE_MACHINE,
-                displayUltimateCost(ultimateMachine),
+                displayUltimateCost(rules),
                 enabled);
         payload.putBoolean(PAYLOAD_REQUIRES_POWER, ultimateMachine.requiresPower());
         payload.putBoolean(PAYLOAD_POWER_ON, powerOn);
-        payload.putInt(PAYLOAD_MAX_UPGRADE_LEVEL, Math.max(0, ultimateMachine.maxUpgradeLevel()));
+        payload.putInt(PAYLOAD_MAX_UPGRADE_LEVEL, maxUpgradeLevel);
         return new ModeObjectState(
                 objectId,
                 ZombiesObjectStateKeys.STATUS,
@@ -801,17 +812,22 @@ public final class ZombiesObjectStateStore {
         return prices;
     }
 
-    private static int displayUltimateCost(ZombiesUltimateMachineData ultimateMachine) {
-        if (ultimateMachine == null || ultimateMachine.levels().isEmpty()) {
+    private int displayUltimateCost(ZombiesRulesConfig.UltimateMachine rules) {
+        if (rules == null || rules.getLevels().isEmpty()) {
             return 0;
         }
         int cost = Integer.MAX_VALUE;
-        for (ZombiesUltimateMachineData.UpgradeLevelData level : ultimateMachine.levels().values()) {
-            if (level != null && level.cost() >= 0) {
-                cost = Math.min(cost, level.cost());
+        for (ZombiesRulesConfig.UpgradeLevel level : rules.getLevels().values()) {
+            if (level != null && level.getCost() != null && level.getCost() >= 0) {
+                cost = Math.min(cost, level.getCost());
             }
         }
         return cost == Integer.MAX_VALUE ? 0 : cost;
+    }
+
+    private ZombiesRulesConfig.UltimateMachine ultimateMachineRules() {
+        ZombiesRulesConfig rules = rulesSupplier.get();
+        return (rules == null ? new ZombiesRulesConfig() : rules).getUltimateMachine();
     }
 
     private boolean isPowerOn() {

@@ -7,6 +7,7 @@ import com.cdp.codpattern.app.zombies.model.ZombiesBuffState;
 import com.cdp.codpattern.app.zombies.model.ZombiesBuffType;
 import com.cdp.codpattern.app.zombies.model.ZombiesPlayerRuntimeState;
 import com.cdp.codpattern.app.zombies.model.ZombiesWeaponInstanceState;
+import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -255,11 +256,13 @@ public final class ZombiesMvp3DeepCoverageCompatTest {
 
     private static void ultimateCommitFailureDoesNotSpendMutateOrRevise() {
         Services services = services();
-        ZombiesObjectStateStore store = new ZombiesObjectStateStore();
+        ZombiesRulesConfig rules = ultimateRules(1, Map.of(
+                "1", new ZombiesRulesConfig.UpgradeLevel(300, 1.75D)));
+        ZombiesObjectStateStore store = new ZombiesObjectStateStore(() -> false, null, () -> rules);
         ZombiesUltimateMachineData machine = new ZombiesUltimateMachineData(
                 "ultimate-commit-fail",
-                1,
-                Map.of("1", new ZombiesUltimateMachineData.UpgradeLevelData(300, 1.75D)),
+                9,
+                Map.of("1", new ZombiesUltimateMachineData.UpgradeLevelData(999, 9.0D)),
                 false,
                 dimension(),
                 new BlockPos(8, 64, 8),
@@ -273,7 +276,7 @@ public final class ZombiesMvp3DeepCoverageCompatTest {
         services.economy.addPoints(playerId, 1_000.0D);
         services.players.getOrCreate(playerId).setPrimaryWeapon(originalWeapon);
 
-        ZombiesObjectInteractionService interactionService = interactionService(services, store, List.of(machine));
+        ZombiesObjectInteractionService interactionService = interactionService(services, store, List.of(machine), rules);
         ZombiesServiceResult<ZombiesUltimateMachineService.WeaponUpgradeResult> result =
                 interactionService.useUltimateMachine(
                         playerId,
@@ -356,7 +359,8 @@ public final class ZombiesMvp3DeepCoverageCompatTest {
     private static ZombiesObjectInteractionService interactionService(
             Services services,
             ZombiesObjectStateStore store,
-            List<ZombiesUltimateMachineData> ultimateMachines
+            List<ZombiesUltimateMachineData> ultimateMachines,
+            ZombiesRulesConfig rules
     ) {
         RoomId roomId = RoomId.of(BuiltInGameModes.ZOMBIES, "mvp3-deep");
         return new ZombiesObjectInteractionService(
@@ -382,7 +386,22 @@ public final class ZombiesMvp3DeepCoverageCompatTest {
                 services.power,
                 services.buffs,
                 services.ultimate,
-                store);
+                store,
+                null,
+                () -> rules);
+    }
+
+    private static ZombiesRulesConfig ultimateRules(
+            int maxUpgradeLevel,
+            Map<String, ZombiesRulesConfig.UpgradeLevel> levels
+    ) {
+        ZombiesRulesConfig config = new ZombiesRulesConfig();
+        ZombiesRulesConfig.UltimateMachine ultimate = new ZombiesRulesConfig.UltimateMachine();
+        ultimate.setMaxUpgradeLevel(maxUpgradeLevel);
+        ultimate.setLevels(levels);
+        config.setUltimateMachine(ultimate);
+        config.normalize();
+        return config;
     }
 
     private static long ultimateRevision(ZombiesObjectStateStore store, ZombiesUltimateMachineData machine) {

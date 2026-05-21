@@ -1189,7 +1189,6 @@ public class ZombiesDeployToolScreen extends Screen {
     private ListFieldPreview listPreview(String fieldKey, String value) {
         return switch (fieldKey) {
             case "pricesByWeaponLevel" -> previewIntegerMap(value, tr("gui.codpattern.zombies.deploy.hint.prices"), tr("gui.codpattern.zombies.deploy.level"), tr("gui.codpattern.zombies.deploy.cost"));
-            case "levels" -> previewUltimateLevels(value);
             default -> previewGenericList(value);
         };
     }
@@ -1221,57 +1220,6 @@ public class ZombiesDeployToolScreen extends Screen {
         return new ListFieldPreview(hint, rows, issues, containsError(issues), containsWarning(issues));
     }
 
-    private ListFieldPreview previewUltimateLevels(String value) {
-        List<String> entries = splitLooseEntries(value);
-        List<String> rows = new ArrayList<>();
-        List<String> issues = new ArrayList<>();
-        Set<Integer> levels = new LinkedHashSet<>();
-        for (int i = 0; i < entries.size(); i++) {
-            String entry = entries.get(i);
-            int equals = entry.indexOf('=');
-            int colon = entry.indexOf(':', equals + 1);
-            if (equals <= 0 || colon <= equals + 1 || colon == entry.length() - 1) {
-                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.ultimate_format", i + 1));
-                rows.add("#" + (i + 1) + "  " + entry);
-                continue;
-            }
-            String levelText = entry.substring(0, equals).trim();
-            String costText = entry.substring(equals + 1, colon).trim();
-            String multiplierText = entry.substring(colon + 1).trim();
-            Integer level = parseInteger(levelText);
-            Integer cost = parseInteger(costText);
-            Double multiplier = parseFiniteDouble(multiplierText);
-            if (level == null || level < 1 || cost == null || cost < 0 || multiplier == null || multiplier <= 0.0D) {
-                issues.add(errorIssue("gui.codpattern.zombies.deploy.issue.ultimate_range", i + 1));
-            } else if (!levels.add(level)) {
-                issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.duplicate_level", i + 1, level));
-            }
-            rows.add("#" + (i + 1) + "  level " + levelText + " -> cost " + costText + "  x" + multiplierText);
-        }
-
-        Integer maxLevel = parseInteger(this.draftFields.getOrDefault("maxUpgradeLevel", ""));
-        if (maxLevel != null && maxLevel > 0 && !containsError(issues)) {
-            for (int level = 1; level <= maxLevel; level++) {
-                if (!levels.contains(level)) {
-                    issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.missing_level", level, maxLevel));
-                    break;
-                }
-            }
-            for (Integer level : levels) {
-                if (level > maxLevel) {
-                    issues.add(warningIssue("gui.codpattern.zombies.deploy.issue.level_above_max", level, maxLevel));
-                    break;
-                }
-            }
-        }
-        return new ListFieldPreview(
-                tr("gui.codpattern.zombies.deploy.hint.ultimate_levels"),
-                rows,
-                issues,
-                containsError(issues),
-                containsWarning(issues));
-    }
-
     private ListFieldPreview previewGenericList(String value) {
         List<String> entries = splitRows(value);
         List<String> rows = new ArrayList<>();
@@ -1299,8 +1247,7 @@ public class ZombiesDeployToolScreen extends Screen {
     }
 
     private boolean usesLooseListRows(String fieldKey) {
-        return "pricesByWeaponLevel".equals(fieldKey)
-                || "levels".equals(fieldKey);
+        return "pricesByWeaponLevel".equals(fieldKey);
     }
 
     private String serializeListRows(String fieldKey, List<String> rows, String previousValue) {
@@ -1351,15 +1298,6 @@ public class ZombiesDeployToolScreen extends Screen {
         }
     }
 
-    private Double parseFiniteDouble(String value) {
-        try {
-            double parsed = Double.parseDouble(Objects.requireNonNullElse(value, "").trim());
-            return Double.isFinite(parsed) ? parsed : null;
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
     private boolean containsError(List<String> issues) {
         return issues.stream().anyMatch(issue -> issue.startsWith("E|"));
     }
@@ -1392,14 +1330,6 @@ public class ZombiesDeployToolScreen extends Screen {
             return tr("gui.codpattern.zombies.deploy.warning") + ": " + count;
         }
         return tr("gui.codpattern.zombies.deploy.ok") + ": " + count;
-    }
-
-    private String joinIntegers(Set<Integer> values) {
-        List<String> parts = new ArrayList<>();
-        for (Integer value : values) {
-            parts.add(Integer.toString(value));
-        }
-        return String.join(", ", parts);
     }
 
     private void drawStatus(GuiGraphics guiGraphics, int left, int top, int width) {
@@ -1576,7 +1506,7 @@ public class ZombiesDeployToolScreen extends Screen {
             case "posX", "posY", "posZ" -> 1;
             case "interactionX", "interactionY", "interactionZ" -> 2;
             case "areaFromX", "areaFromY", "areaFromZ", "areaToX", "areaToY", "areaToZ" -> 3;
-            case "group", "weight", "cost", "armorLevel", "buyCost", "buffId", "requiresPower", "maxUpgradeLevel" -> 4;
+            case "group", "weight", "cost", "armorLevel", "buyCost", "buffId", "requiresPower" -> 4;
             case "dimension", "yaw" -> 5;
             default -> 8;
         };

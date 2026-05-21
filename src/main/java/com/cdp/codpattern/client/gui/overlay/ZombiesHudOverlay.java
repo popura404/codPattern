@@ -6,6 +6,7 @@ import com.cdp.codpattern.app.zombies.sync.ZombiesObjectStateKeys;
 import com.cdp.codpattern.client.ClientMatchState;
 import com.cdp.codpattern.client.ClientModeObjectState;
 import com.cdp.codpattern.client.zombies.ClientZombiesState;
+import com.cdp.codpattern.client.zombies.ZombiesRarityDisplay;
 import com.cdp.codpattern.common.block.CodPatternBlockRegister;
 import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.tacz.guns.client.input.InteractKey;
@@ -77,6 +78,9 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
     private static final int TEAMMATE_ROW_GAP = 5;
     private static final int TEAMMATE_STATUS_BOTTOM_GAP = 8;
     private static final int TEAMMATE_MIN_RIGHT_MARGIN = 8;
+    private static final int HELD_RARITY_RIGHT_MARGIN = 16;
+    private static final int HELD_RARITY_BOTTOM_MARGIN = 42;
+    private static final int HELD_UPGRADE_LEVEL_BOTTOM_MARGIN = 28;
     private static int intermissionWaveNumber = Integer.MIN_VALUE;
     private static long intermissionWaveStartedAtMs;
 
@@ -102,6 +106,8 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
         renderPhaseNotice(graphics, font, screenWidth, screenHeight);
         renderInteractionPrompt(graphics, font, screenWidth, screenHeight);
         renderPlayerStatus(graphics, font, screenWidth, screenHeight);
+        renderHeldWeaponRarity(graphics, font, screenWidth, screenHeight);
+        renderHeldWeaponUpgradeLevel(graphics, font, screenWidth, screenHeight);
     }
 
     private static void renderTopStats(GuiGraphics graphics, Font font, int screenWidth) {
@@ -586,6 +592,114 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
                 positiveIntTag(tag, ZombiesWeaponItemStackService.TAG_UPGRADE_LEVEL),
                 reserveAmmo,
                 maxReserveAmmo));
+    }
+
+    private static void renderHeldWeaponRarity(
+            GuiGraphics graphics,
+            Font font,
+            int screenWidth,
+            int screenHeight
+    ) {
+        Minecraft minecraft = Minecraft.getInstance();
+        LocalPlayer player = minecraft.player;
+        String roomKey = ClientMatchState.roomContextName();
+        if (player == null || roomKey == null || roomKey.isBlank()) {
+            return;
+        }
+
+        Optional<ZombiesRarityDisplay.Entry> rarity = heldWeaponRarity(player.getMainHandItem(), roomKey);
+        if (rarity.isEmpty()) {
+            return;
+        }
+
+        ZombiesRarityDisplay.Entry display = rarity.get();
+        String text = display.label();
+        int textWidth = font.width(text);
+        int x = screenWidth - HELD_RARITY_RIGHT_MARGIN - textWidth;
+        int y = screenHeight - HELD_RARITY_BOTTOM_MARGIN - font.lineHeight;
+        if (x < 2 || y < 2) {
+            return;
+        }
+
+        graphics.fillGradient(
+                x - 9,
+                y - 6,
+                x + textWidth + 9,
+                y + font.lineHeight + 6,
+                withAlpha(display.color(), 22),
+                withAlpha(display.color(), 112));
+        graphics.drawString(font, text, x, y, display.color(), true);
+    }
+
+    private static Optional<ZombiesRarityDisplay.Entry> heldWeaponRarity(ItemStack stack, String roomKey) {
+        if (stack == null || stack.isEmpty() || stack.getTag() == null) {
+            return Optional.empty();
+        }
+        CompoundTag tag = stack.getTag();
+        String taggedRoom = tag.contains(ZombiesWeaponItemStackService.TAG_ROOM_ID, Tag.TAG_STRING)
+                ? tag.getString(ZombiesWeaponItemStackService.TAG_ROOM_ID).trim()
+                : "";
+        if (taggedRoom.isBlank() || !taggedRoom.equals(roomKey)) {
+            return Optional.empty();
+        }
+        String gunId = tag.contains(ZombiesWeaponItemStackService.TAG_GUN_ID, Tag.TAG_STRING)
+                ? tag.getString(ZombiesWeaponItemStackService.TAG_GUN_ID).trim()
+                : "";
+        String rarityId = tag.contains(ZombiesWeaponItemStackService.TAG_RARITY_ID, Tag.TAG_STRING)
+                ? tag.getString(ZombiesWeaponItemStackService.TAG_RARITY_ID).trim()
+                : "";
+        if (gunId.isBlank() || rarityId.isBlank()) {
+            return Optional.empty();
+        }
+        return ZombiesRarityDisplay.fromRarityId(rarityId);
+    }
+
+    private static void renderHeldWeaponUpgradeLevel(
+            GuiGraphics graphics,
+            Font font,
+            int screenWidth,
+            int screenHeight
+    ) {
+        Minecraft minecraft = Minecraft.getInstance();
+        LocalPlayer player = minecraft.player;
+        String roomKey = ClientMatchState.roomContextName();
+        if (player == null || roomKey == null || roomKey.isBlank()) {
+            return;
+        }
+
+        int upgradeLevel = heldWeaponUpgradeLevel(player.getMainHandItem(), roomKey);
+        if (upgradeLevel <= 0) {
+            return;
+        }
+
+        String text = Integer.toString(upgradeLevel);
+        int textWidth = font.width(text);
+        int x = screenWidth - HELD_RARITY_RIGHT_MARGIN - textWidth;
+        int y = screenHeight - HELD_UPGRADE_LEVEL_BOTTOM_MARGIN - font.lineHeight;
+        if (x < 2 || y < 2) {
+            return;
+        }
+        graphics.drawString(font, text, x, y, TEXT_PRIMARY, true);
+    }
+
+    private static int heldWeaponUpgradeLevel(ItemStack stack, String roomKey) {
+        if (stack == null || stack.isEmpty() || stack.getTag() == null) {
+            return 0;
+        }
+        CompoundTag tag = stack.getTag();
+        String taggedRoom = tag.contains(ZombiesWeaponItemStackService.TAG_ROOM_ID, Tag.TAG_STRING)
+                ? tag.getString(ZombiesWeaponItemStackService.TAG_ROOM_ID).trim()
+                : "";
+        if (taggedRoom.isBlank() || !taggedRoom.equals(roomKey)) {
+            return 0;
+        }
+        String gunId = tag.contains(ZombiesWeaponItemStackService.TAG_GUN_ID, Tag.TAG_STRING)
+                ? tag.getString(ZombiesWeaponItemStackService.TAG_GUN_ID).trim()
+                : "";
+        if (gunId.isBlank()) {
+            return 0;
+        }
+        return positiveIntTag(tag, ZombiesWeaponItemStackService.TAG_UPGRADE_LEVEL);
     }
 
     private static int ammoCost(CompoundTag payload, int weaponLevel) {

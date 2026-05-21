@@ -1,8 +1,10 @@
 package com.cdp.codpattern.config.zombies;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 public class ZombiesRulesConfig {
@@ -16,7 +18,9 @@ public class ZombiesRulesConfig {
 
     private Room room = new Room();
     private Defaults defaults = new Defaults();
+    private Armor armor = new Armor();
     private WeaponWall weaponWall = WeaponWall.defaults();
+    private UltimateMachine ultimateMachine = UltimateMachine.defaults();
     private WeaponRules weaponRules = new WeaponRules();
     private SpawnPointWeighting spawnPointWeighting = new SpawnPointWeighting();
 
@@ -42,6 +46,17 @@ public class ZombiesRulesConfig {
         this.defaults = defaults == null ? new Defaults() : defaults;
     }
 
+    public Armor getArmor() {
+        if (armor == null) {
+            armor = new Armor();
+        }
+        return armor;
+    }
+
+    public void setArmor(Armor armor) {
+        this.armor = armor == null ? new Armor() : armor;
+    }
+
     public WeaponWall getWeaponWall() {
         if (weaponWall == null) {
             weaponWall = WeaponWall.defaults();
@@ -51,6 +66,17 @@ public class ZombiesRulesConfig {
 
     public void setWeaponWall(WeaponWall weaponWall) {
         this.weaponWall = weaponWall == null ? WeaponWall.defaults() : weaponWall;
+    }
+
+    public UltimateMachine getUltimateMachine() {
+        if (ultimateMachine == null) {
+            ultimateMachine = UltimateMachine.defaults();
+        }
+        return ultimateMachine;
+    }
+
+    public void setUltimateMachine(UltimateMachine ultimateMachine) {
+        this.ultimateMachine = ultimateMachine == null ? UltimateMachine.defaults() : ultimateMachine;
     }
 
     public WeaponRules getWeaponRules() {
@@ -78,12 +104,16 @@ public class ZombiesRulesConfig {
     public void normalize() {
         setRoom(room);
         setDefaults(defaults);
+        setArmor(armor);
         setWeaponWall(weaponWall);
+        setUltimateMachine(ultimateMachine);
         setWeaponRules(weaponRules);
         setSpawnPointWeighting(spawnPointWeighting);
         room.normalize();
         defaults.normalize();
+        armor.normalize();
         weaponWall.normalize();
+        ultimateMachine.normalize();
         weaponRules.normalize();
         spawnPointWeighting.normalize();
     }
@@ -255,6 +285,51 @@ public class ZombiesRulesConfig {
             }
             killPoints = nonNegativeOrDefault(killPoints, 10);
             assistPoints = nonNegativeOrDefault(assistPoints, 3);
+        }
+    }
+
+    public static class Armor {
+        private Double level1DamageReduction = 0.25D;
+        private Double level2DamageReduction = 0.50D;
+        private Double level3DamageReduction = 0.75D;
+
+        public Double getLevel1DamageReduction() {
+            return level1DamageReduction;
+        }
+
+        public void setLevel1DamageReduction(Double level1DamageReduction) {
+            this.level1DamageReduction = level1DamageReduction;
+        }
+
+        public Double getLevel2DamageReduction() {
+            return level2DamageReduction;
+        }
+
+        public void setLevel2DamageReduction(Double level2DamageReduction) {
+            this.level2DamageReduction = level2DamageReduction;
+        }
+
+        public Double getLevel3DamageReduction() {
+            return level3DamageReduction;
+        }
+
+        public void setLevel3DamageReduction(Double level3DamageReduction) {
+            this.level3DamageReduction = level3DamageReduction;
+        }
+
+        public double damageTakenMultiplierForLevel(int armorLevel) {
+            return 1.0D - switch (armorLevel) {
+                case 1 -> validDamageReductionOrDefault(level1DamageReduction, 0.25D);
+                case 2 -> validDamageReductionOrDefault(level2DamageReduction, 0.50D);
+                case 3 -> validDamageReductionOrDefault(level3DamageReduction, 0.75D);
+                default -> 0.0D;
+            };
+        }
+
+        private void normalize() {
+            level1DamageReduction = validDamageReductionOrDefault(level1DamageReduction, 0.25D);
+            level2DamageReduction = validDamageReductionOrDefault(level2DamageReduction, 0.50D);
+            level3DamageReduction = validDamageReductionOrDefault(level3DamageReduction, 0.75D);
         }
     }
 
@@ -490,6 +565,95 @@ public class ZombiesRulesConfig {
         }
     }
 
+    public static class UltimateMachine {
+        private Integer maxUpgradeLevel = 2;
+        private Map<String, UpgradeLevel> levels = defaultLevels();
+
+        public static UltimateMachine defaults() {
+            UltimateMachine ultimateMachine = new UltimateMachine();
+            ultimateMachine.normalize();
+            return ultimateMachine;
+        }
+
+        public Integer getMaxUpgradeLevel() {
+            return maxUpgradeLevel;
+        }
+
+        public void setMaxUpgradeLevel(Integer maxUpgradeLevel) {
+            this.maxUpgradeLevel = maxUpgradeLevel;
+        }
+
+        public Map<String, UpgradeLevel> getLevels() {
+            if (levels == null) {
+                levels = defaultLevels();
+            }
+            return levels;
+        }
+
+        public void setLevels(Map<String, UpgradeLevel> levels) {
+            this.levels = levels == null ? defaultLevels() : new LinkedHashMap<>(levels);
+        }
+
+        private void normalize() {
+            maxUpgradeLevel = positiveOrDefault(maxUpgradeLevel, 2);
+            Map<String, UpgradeLevel> normalized = new LinkedHashMap<>();
+            for (Map.Entry<String, UpgradeLevel> entry : getLevels().entrySet()) {
+                String level = Objects.requireNonNullElse(entry.getKey(), "").trim();
+                if (level.isBlank()) {
+                    continue;
+                }
+                UpgradeLevel resolved = entry.getValue() == null ? new UpgradeLevel() : entry.getValue();
+                resolved.normalize();
+                normalized.put(level, resolved);
+            }
+            if (normalized.isEmpty()) {
+                normalized.putAll(defaultLevels());
+            }
+            levels = normalized;
+        }
+
+        private static Map<String, UpgradeLevel> defaultLevels() {
+            Map<String, UpgradeLevel> defaults = new LinkedHashMap<>();
+            defaults.put("1", new UpgradeLevel(2500, 2.0D));
+            defaults.put("2", new UpgradeLevel(5000, 3.0D));
+            return defaults;
+        }
+    }
+
+    public static class UpgradeLevel {
+        private Integer cost = 2500;
+        private Double damageMultiplier = 2.0D;
+
+        public UpgradeLevel() {
+        }
+
+        public UpgradeLevel(Integer cost, Double damageMultiplier) {
+            this.cost = cost;
+            this.damageMultiplier = damageMultiplier;
+        }
+
+        public Integer getCost() {
+            return cost;
+        }
+
+        public void setCost(Integer cost) {
+            this.cost = cost;
+        }
+
+        public Double getDamageMultiplier() {
+            return damageMultiplier;
+        }
+
+        public void setDamageMultiplier(Double damageMultiplier) {
+            this.damageMultiplier = damageMultiplier;
+        }
+
+        private void normalize() {
+            cost = nonNegativeOrDefault(cost, 0);
+            damageMultiplier = positiveFiniteOrDefault(damageMultiplier, 1.0D);
+        }
+    }
+
     public static class WeaponRules {
         private Integer starterWeaponAmmunitionPerMagazineMultiple = 7;
         private Integer weaponPoolAmmunitionPerMagazineMultiple = 7;
@@ -649,6 +813,10 @@ public class ZombiesRulesConfig {
 
     private static double positiveFiniteOrDefault(Double value, double defaultValue) {
         return value == null || !Double.isFinite(value) || value <= 0.0 ? defaultValue : value;
+    }
+
+    private static double validDamageReductionOrDefault(Double value, double defaultValue) {
+        return value == null || !Double.isFinite(value) || value < 0.0D || value >= 1.0D ? defaultValue : value;
     }
 
     private static double finiteOrDefault(Double value, double defaultValue) {

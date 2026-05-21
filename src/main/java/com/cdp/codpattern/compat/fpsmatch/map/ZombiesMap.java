@@ -183,7 +183,8 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         this.ultimateMachineService = new ZombiesUltimateMachineService(economyService, powerService);
         this.objectStateStore = new ZombiesObjectStateStore(
                 powerService::isPowerOn,
-                new ZombiesWeaponWallOfferService(this::rulesConfig, null, null));
+                new ZombiesWeaponWallOfferService(this::rulesConfig, null, null),
+                this::rulesConfig);
         this.barrierVisualService = ZombiesBarrierVisualService.instance();
         this.barrierBlockRuntimeService = ZombiesBarrierBlockRuntimeService.instance();
         ZombiesBarrierService barrierService = new ZombiesBarrierService(
@@ -218,7 +219,8 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
                 buffService,
                 ultimateMachineService,
                 objectStateStore,
-                new ZombiesRoomAnnouncementService(this::survivorPlayers));
+                new ZombiesRoomAnnouncementService(this::survivorPlayers),
+                this::rulesConfig);
         this.cleanupService = new ZombiesCleanupService(
                 ModeEntityOwnershipRegistry.instance(),
                 ZombiesMapOccupancyService.instance(),

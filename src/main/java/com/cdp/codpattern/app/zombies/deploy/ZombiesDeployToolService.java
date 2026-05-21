@@ -1135,7 +1135,7 @@ public final class ZombiesDeployToolService {
             case ZombiesDeployFieldSchema.ULTIMATE_MACHINE -> {
                 for (int i = 0; i < resolved.ultimateMachines().size(); i++) {
                     ZombiesUltimateMachineData data = resolved.ultimateMachines().get(i);
-                    summaries.add(summary(i, type, data.objectId(), "max " + data.maxUpgradeLevel(), detail(data.dimension(), data.pos())));
+                    summaries.add(summary(i, type, data.objectId(), data.requiresPower() ? "requires power" : "no power", detail(data.dimension(), data.pos())));
                 }
             }
             default -> {

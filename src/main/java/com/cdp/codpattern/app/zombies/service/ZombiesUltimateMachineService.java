@@ -4,6 +4,7 @@ import com.cdp.codpattern.app.match.model.ModePlayerValue;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesUltimateMachineData;
 import com.cdp.codpattern.app.zombies.model.ZombiesPlayerRuntimeState;
 import com.cdp.codpattern.app.zombies.model.ZombiesWeaponInstanceState;
+import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -45,6 +46,14 @@ public final class ZombiesUltimateMachineService {
 
     public ZombiesServiceResult<WeaponUpgradeResult> upgradePrimaryWeapon(
             UUID playerId,
+            ZombiesRulesConfig.UltimateMachine rules,
+            boolean requiresPower
+    ) {
+        return upgradePrimaryWeapon(playerId, rules, requiresPower, null);
+    }
+
+    public ZombiesServiceResult<WeaponUpgradeResult> upgradePrimaryWeapon(
+            UUID playerId,
             ZombiesUltimateMachineData machine,
             WeaponUpgradeCommitGuard commitGuard
     ) {
@@ -66,6 +75,34 @@ public final class ZombiesUltimateMachineService {
             boolean requiresPower,
             WeaponUpgradeCommitGuard commitGuard
     ) {
+        return upgradePrimaryWeaponResolved(playerId, maxUpgradeLevel, legacyLevels(levels), requiresPower, commitGuard);
+    }
+
+    public ZombiesServiceResult<WeaponUpgradeResult> upgradePrimaryWeapon(
+            UUID playerId,
+            ZombiesRulesConfig.UltimateMachine rules,
+            boolean requiresPower,
+            WeaponUpgradeCommitGuard commitGuard
+    ) {
+        if (rules == null) {
+            return ZombiesServiceResult.failure(ULTIMATE_INVALID_LEVEL);
+        }
+        int maxUpgradeLevel = Math.max(0, rules.getMaxUpgradeLevel() == null ? 0 : rules.getMaxUpgradeLevel());
+        return upgradePrimaryWeaponResolved(
+                playerId,
+                maxUpgradeLevel,
+                ruleLevels(rules.getLevels()),
+                requiresPower,
+                commitGuard);
+    }
+
+    private ZombiesServiceResult<WeaponUpgradeResult> upgradePrimaryWeaponResolved(
+            UUID playerId,
+            int maxUpgradeLevel,
+            Map<String, LevelData> levels,
+            boolean requiresPower,
+            WeaponUpgradeCommitGuard commitGuard
+    ) {
         if (requiresPower && !powerService.isPowerOn()) {
             return ZombiesServiceResult.failure(ZombiesErrorCode.POWER_REQUIRES_POWER);
         }
@@ -80,7 +117,7 @@ public final class ZombiesUltimateMachineService {
         }
 
         int targetLevel = currentWeapon.upgradeLevel() + 1;
-        ZombiesUltimateMachineData.UpgradeLevelData target = levelData(levels, targetLevel);
+        LevelData target = levelData(levels, targetLevel);
         if (target == null || !ZombiesWeaponInstanceState.isValidDamageMultiplier(target.damageMultiplier())) {
             return ZombiesServiceResult.failure(ULTIMATE_INVALID_LEVEL, weaponParams(currentWeapon), "");
         }
@@ -94,7 +131,7 @@ public final class ZombiesUltimateMachineService {
                 return ZombiesServiceResult.failure(ZombiesErrorCode.WEAPON_MAX_UPGRADE, weaponParams(lockedWeapon), "");
             }
             int lockedTargetLevel = lockedWeapon.upgradeLevel() + 1;
-            ZombiesUltimateMachineData.UpgradeLevelData lockedTarget = levelData(levels, lockedTargetLevel);
+            LevelData lockedTarget = levelData(levels, lockedTargetLevel);
             if (!Objects.equals(target, lockedTarget)) {
                 return ZombiesServiceResult.failure(ULTIMATE_INVALID_LEVEL, weaponParams(lockedWeapon), "");
             }
@@ -121,15 +158,44 @@ public final class ZombiesUltimateMachineService {
                 && ZombiesWeaponInstanceState.isValidWeaponLevel(weapon.weaponLevel());
     }
 
-    private static ZombiesUltimateMachineData.UpgradeLevelData levelData(
-            Map<String, ZombiesUltimateMachineData.UpgradeLevelData> levels,
+    private static LevelData levelData(
+            Map<String, LevelData> levels,
             int targetLevel
     ) {
         if (levels == null) {
             return null;
         }
-        ZombiesUltimateMachineData.UpgradeLevelData level = levels.get(Integer.toString(targetLevel));
-        return level == null ? levels.get(targetLevel) : level;
+        return levels.get(Integer.toString(targetLevel));
+    }
+
+    private static Map<String, LevelData> legacyLevels(Map<String, ZombiesUltimateMachineData.UpgradeLevelData> levels) {
+        Map<String, LevelData> normalized = new LinkedHashMap<>();
+        if (levels == null) {
+            return normalized;
+        }
+        levels.forEach((level, data) -> {
+            String key = Objects.requireNonNullElse(level, "").trim();
+            if (!key.isBlank() && data != null) {
+                normalized.put(key, new LevelData(data.cost(), data.damageMultiplier()));
+            }
+        });
+        return normalized;
+    }
+
+    private static Map<String, LevelData> ruleLevels(Map<String, ZombiesRulesConfig.UpgradeLevel> levels) {
+        Map<String, LevelData> normalized = new LinkedHashMap<>();
+        if (levels == null) {
+            return normalized;
+        }
+        levels.forEach((level, data) -> {
+            String key = Objects.requireNonNullElse(level, "").trim();
+            if (!key.isBlank() && data != null) {
+                int cost = data.getCost() == null ? 0 : data.getCost();
+                double damageMultiplier = data.getDamageMultiplier() == null ? 0.0D : data.getDamageMultiplier();
+                normalized.put(key, new LevelData(cost, damageMultiplier));
+            }
+        });
+        return normalized;
     }
 
     private static Map<String, ModePlayerValue> weaponParams(ZombiesWeaponInstanceState weapon) {
@@ -155,5 +221,8 @@ public final class ZombiesUltimateMachineService {
         ZombiesServiceResult<?> beforeCommit(
                 ZombiesWeaponInstanceState currentWeapon,
                 ZombiesWeaponInstanceState upgradedWeapon);
+    }
+
+    private record LevelData(int cost, double damageMultiplier) {
     }
 }

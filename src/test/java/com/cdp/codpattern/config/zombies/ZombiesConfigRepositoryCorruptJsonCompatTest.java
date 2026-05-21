@@ -33,8 +33,9 @@ public final class ZombiesConfigRepositoryCorruptJsonCompatTest {
         ZombiesRulesConfig config = ZombiesRulesRepository.loadOrCreate(path);
 
         require(config.getDefaults() != null, "corrupt rules config should fall back to defaults");
+        require(config.getArmor() != null, "corrupt rules config should include armor defaults");
         require(
-                Files.readString(path).contains("\"defaults\""),
+                Files.readString(path).contains("\"armor\""),
                 "corrupt rules config should be replaced with generated JSON");
     }
 

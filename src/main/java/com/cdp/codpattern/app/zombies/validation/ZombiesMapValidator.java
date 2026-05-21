@@ -250,14 +250,6 @@ public final class ZombiesMapValidator {
                         subject,
                         "Armor station cost must be non-negative."));
             }
-            if (!Double.isFinite(armorStation.damageTakenMultiplier())
-                    || armorStation.damageTakenMultiplier() <= 0.0D
-                    || armorStation.damageTakenMultiplier() > 1.0D) {
-                issues.add(ZombiesValidationIssue.error(
-                        MAP_INVALID_ARMOR_STATION,
-                        subject,
-                        "Armor station damageTakenMultiplier must be in (0, 1]."));
-            }
         }
         if (snapshot.weaponWalls().isEmpty()) {
             issues.add(ZombiesValidationIssue.error(
@@ -836,50 +828,7 @@ public final class ZombiesMapValidator {
             ZombiesMapSnapshot.UltimateMachineSnapshot ultimateMachine,
             List<ZombiesValidationIssue> issues
     ) {
-        String subject = subject("ultimate_machine", ultimateMachine.objectId(), ultimateMachine.featureKey());
-        if (ultimateMachine.maxUpgradeLevel() <= 0) {
-            issues.add(ZombiesValidationIssue.error(
-                    MAP_INVALID_ULTIMATE_MACHINE,
-                    subject,
-                    "Ultimate machine maxUpgradeLevel must be positive."));
-            return;
-        }
-
-        Set<Integer> configuredLevels = new HashSet<>();
-        for (Map.Entry<String, ZombiesMapSnapshot.UltimateLevelSnapshot> entry : ultimateMachine.levels().entrySet()) {
-            int level = parsePositiveLevel(entry.getKey());
-            if (level < 0) {
-                issues.add(ZombiesValidationIssue.error(
-                        MAP_INVALID_ULTIMATE_MACHINE,
-                        subject,
-                        "Ultimate machine level keys must be positive integers."));
-            } else {
-                configuredLevels.add(level);
-            }
-            ZombiesMapSnapshot.UltimateLevelSnapshot levelData = entry.getValue();
-            if (levelData == null || levelData.cost() < 0) {
-                issues.add(ZombiesValidationIssue.error(
-                        MAP_INVALID_ULTIMATE_MACHINE,
-                        subject,
-                        "Ultimate machine level cost must be non-negative."));
-            }
-            if (levelData == null || !Double.isFinite(levelData.damageMultiplier())
-                    || levelData.damageMultiplier() <= 0.0D) {
-                issues.add(ZombiesValidationIssue.error(
-                        MAP_INVALID_ULTIMATE_MACHINE,
-                        subject,
-                        "Ultimate machine level damageMultiplier must be positive."));
-            }
-        }
-        for (int level = 1; level <= ultimateMachine.maxUpgradeLevel(); level++) {
-            if (!configuredLevels.contains(level)) {
-                issues.add(ZombiesValidationIssue.error(
-                        MAP_INVALID_ULTIMATE_MACHINE,
-                        subject,
-                        "Ultimate machine levels must cover 1..maxUpgradeLevel."));
-                break;
-            }
-        }
+        // Ultimate-machine upgrade levels are validated from zombies_rules/<map>/config.json.
     }
 
     private static int parsePositiveLevel(String value) {

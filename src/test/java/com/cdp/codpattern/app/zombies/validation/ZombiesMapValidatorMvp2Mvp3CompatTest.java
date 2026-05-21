@@ -28,8 +28,7 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
         mvp3InvalidSodaBuffFails();
         mvp3InvalidPowerSwitchIdentifierFails();
         playerInitialSpawnsMoreThanFourFails();
-        mvp3UltimateMissingLevelFails();
-        mvp3UltimateInvalidDamageMultiplierFails();
+        mvp3UltimateMapLevelFieldsAreIgnored();
         mvp3SpawnMissingLocationFails();
         mvp3RequiredObjectMissingLocationFails();
         mvp3RequiredObjectCrossDimensionFails();
@@ -173,38 +172,25 @@ public final class ZombiesMapValidatorMvp2Mvp3CompatTest {
         requireIssue(report, "map.too_many_initial_player_spawns");
     }
 
-    private static void mvp3UltimateMissingLevelFails() {
+    private static void mvp3UltimateMapLevelFieldsAreIgnored() {
         ZombiesMapSnapshot.UltimateMachineSnapshot ultimate = new ZombiesMapSnapshot.UltimateMachineSnapshot(
                 "ultimate-1",
                 "ultimateMachine",
                 3,
                 Map.of(
                         "1", new ZombiesMapSnapshot.UltimateLevelSnapshot(1200, 1.25D),
-                        "3", new ZombiesMapSnapshot.UltimateLevelSnapshot(5000, 2.0D)),
-                true);
+                        "3", new ZombiesMapSnapshot.UltimateLevelSnapshot(5000, Double.NaN)),
+                true,
+                MAP_DIMENSION,
+                new BlockPos(5, 1, 5));
         ZombiesMapValidationReport report = validate(
                 ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
                 snapshot(List.of(), List.of(powerSwitch("power-1")), List.of(validSoda()), List.of(ultimate)));
 
-        require(report.hasErrors(), "MVP3 ultimate machine missing a configured level should fail");
-        requireIssue(report, "map.invalid_ultimate_machine");
-    }
-
-    private static void mvp3UltimateInvalidDamageMultiplierFails() {
-        ZombiesMapSnapshot.UltimateMachineSnapshot ultimate = new ZombiesMapSnapshot.UltimateMachineSnapshot(
-                "ultimate-1",
-                "ultimateMachine",
-                2,
-                Map.of(
-                        "1", new ZombiesMapSnapshot.UltimateLevelSnapshot(1200, 1.25D),
-                        "2", new ZombiesMapSnapshot.UltimateLevelSnapshot(2500, Double.NaN)),
-                true);
-        ZombiesMapValidationReport report = validate(
-                ZombiesMapValidationProfile.MVP3_FULL_INITIAL,
-                snapshot(List.of(), List.of(powerSwitch("power-1")), List.of(validSoda()), List.of(ultimate)));
-
-        require(report.hasErrors(), "MVP3 ultimate machine with invalid damage multiplier should fail");
-        requireIssue(report, "map.invalid_ultimate_machine");
+        require(report.valid(),
+                "MVP3 ultimate machine map-object level fields should be ignored in favor of serverconfig rules: "
+                        + issueCodes(report));
+        requireNoIssue(report, "map.invalid_ultimate_machine");
     }
 
     private static void mvp3SpawnMissingLocationFails() {

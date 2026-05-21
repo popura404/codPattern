@@ -9,6 +9,7 @@ import com.cdp.codpattern.app.zombies.map.object.ZombiesUltimateMachineData;
 import com.cdp.codpattern.app.zombies.model.ZombiesGamePhase;
 import com.cdp.codpattern.app.zombies.model.ZombiesPlayerRuntimeState;
 import com.cdp.codpattern.app.zombies.model.ZombiesWeaponInstanceState;
+import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -31,7 +32,8 @@ public final class ZombiesMvp3ObjectRuntimeCompatTest {
 
     private static void objectStatesExposePowerSodaAndUltimateRuntimePayload() {
         Services services = services();
-        ZombiesObjectStateStore store = new ZombiesObjectStateStore(services.power::isPowerOn);
+        ZombiesRulesConfig rules = ultimateRules();
+        ZombiesObjectStateStore store = new ZombiesObjectStateStore(services.power::isPowerOn, null, () -> rules);
         Fixtures fixtures = fixtures();
         store.resetObjects(
                 List.of(),
@@ -83,8 +85,9 @@ public final class ZombiesMvp3ObjectRuntimeCompatTest {
 
     private static void objectInteractionsBridgeMvp3ServicesAndRevisions() {
         Services services = services();
-        ZombiesObjectStateStore store = new ZombiesObjectStateStore(services.power::isPowerOn);
-        ZombiesObjectInteractionService interactionService = interactionService(services, store);
+        ZombiesRulesConfig rules = ultimateRules();
+        ZombiesObjectStateStore store = new ZombiesObjectStateStore(services.power::isPowerOn, null, () -> rules);
+        ZombiesObjectInteractionService interactionService = interactionService(services, store, rules);
         Fixtures fixtures = fixtures();
         store.resetObjects(
                 List.of(),
@@ -144,6 +147,8 @@ public final class ZombiesMvp3ObjectRuntimeCompatTest {
         requirePoints(services.players, playerId, 1_550.0D, "ultimate interaction should spend target level cost");
         require(primary(services.players, playerId).upgradeLevel() == 1,
                 "ultimate interaction should update primary weapon upgrade");
+        requireClose(primary(services.players, playerId).damageMultiplier(), 1.75D,
+                "ultimate interaction should use serverconfig level damage");
         require(stateRevision(store, fixtures, "ultimate-1") > ultimateBefore,
                 "successful ultimate interaction should advance ultimate revision");
 
@@ -152,6 +157,8 @@ public final class ZombiesMvp3ObjectRuntimeCompatTest {
                 "second ultimate interaction should upgrade to max level");
         require(primary(services.players, playerId).upgradeLevel() == 2,
                 "second ultimate interaction should update primary weapon to max");
+        requireClose(primary(services.players, playerId).damageMultiplier(), 2.25D,
+                "second ultimate interaction should use serverconfig max-level damage");
 
         ZombiesServiceResult<ZombiesUltimateMachineService.WeaponUpgradeResult> max =
                 interactionService.useUltimateMachine(playerId, fixtures.ultimateMachine());
@@ -162,7 +169,8 @@ public final class ZombiesMvp3ObjectRuntimeCompatTest {
 
     private static ZombiesObjectInteractionService interactionService(
             Services services,
-            ZombiesObjectStateStore store
+            ZombiesObjectStateStore store,
+            ZombiesRulesConfig rules
     ) {
         RoomId roomId = RoomId.of(BuiltInGameModes.ZOMBIES, "mvp3-runtime");
         return new ZombiesObjectInteractionService(
@@ -188,7 +196,9 @@ public final class ZombiesMvp3ObjectRuntimeCompatTest {
                 services.power,
                 services.buffs,
                 services.ultimate,
-                store);
+                store,
+                null,
+                () -> rules);
     }
 
     private static List<ModeObjectState> objectStates(ZombiesObjectStateStore store, Fixtures fixtures) {
@@ -236,15 +246,27 @@ public final class ZombiesMvp3ObjectRuntimeCompatTest {
                 Optional.empty());
         ZombiesUltimateMachineData ultimateMachine = new ZombiesUltimateMachineData(
                 "ultimate-1",
-                2,
+                9,
                 Map.of(
-                        "1", new ZombiesUltimateMachineData.UpgradeLevelData(700, 1.75D),
-                        "2", new ZombiesUltimateMachineData.UpgradeLevelData(1_100, 2.25D)),
+                        "1", new ZombiesUltimateMachineData.UpgradeLevelData(1, 9.0D),
+                        "2", new ZombiesUltimateMachineData.UpgradeLevelData(2, 9.5D)),
                 true,
                 dimension(),
                 new BlockPos(4, 64, 1),
                 Optional.empty());
         return new Fixtures(powerSwitch, sodaMachine, ultimateMachine);
+    }
+
+    private static ZombiesRulesConfig ultimateRules() {
+        ZombiesRulesConfig config = new ZombiesRulesConfig();
+        ZombiesRulesConfig.UltimateMachine rules = new ZombiesRulesConfig.UltimateMachine();
+        rules.setMaxUpgradeLevel(2);
+        rules.setLevels(Map.of(
+                "1", new ZombiesRulesConfig.UpgradeLevel(700, 1.75D),
+                "2", new ZombiesRulesConfig.UpgradeLevel(1_100, 2.25D)));
+        config.setUltimateMachine(rules);
+        config.normalize();
+        return config;
     }
 
     private static ModeObjectState state(List<ModeObjectState> states, String objectKey) {

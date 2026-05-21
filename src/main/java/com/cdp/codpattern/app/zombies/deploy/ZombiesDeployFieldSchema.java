@@ -88,7 +88,6 @@ public final class ZombiesDeployFieldSchema {
                     field("objectId", FieldType.TEXT, ""),
                     field("armorLevel", FieldType.INTEGER, "1"),
                     field("buyCost", FieldType.INTEGER, "500"),
-                    field("damageTakenMultiplier", FieldType.DECIMAL, "0.9"),
                     field("dimension", FieldType.TEXT, "minecraft:overworld"),
                     field("posX", FieldType.INTEGER, "0"),
                     field("posY", FieldType.INTEGER, "64"),
@@ -121,8 +120,6 @@ public final class ZombiesDeployFieldSchema {
             )),
             new ObjectTypeSchema(ULTIMATE_MACHINE, "gui.codpattern.zombies.deploy.type.ultimate_machine", false, false, List.of(
                     field("objectId", FieldType.TEXT, ""),
-                    field("maxUpgradeLevel", FieldType.INTEGER, "2"),
-                    field("levels", FieldType.LIST, "1=2500:1.5;2=5000:2.0"),
                     field("requiresPower", FieldType.BOOLEAN, "true"),
                     field("dimension", FieldType.TEXT, "minecraft:overworld"),
                     field("posX", FieldType.INTEGER, "0"),
