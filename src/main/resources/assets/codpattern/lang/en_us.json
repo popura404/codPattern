@@ -693,5 +693,5 @@
     "gui.codpattern.zombies.deploy.blocking.missing_soda_machine": "Missing soda machine",
     "gui.codpattern.zombies.deploy.blocking.missing_ultimate_machine": "Missing ultimate machine",
     "gui.codpattern.zombies.deploy.blocking.mvp1_has_errors": "MVP1 still has errors",
-    "screen.codpattern.room.button": "Frontline / TeamDeathMatch"
+    "screen.codpattern.room.button": "Game Lobby"
 }

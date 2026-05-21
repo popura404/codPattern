@@ -648,5 +648,5 @@
     "gui.codpattern.zombies.deploy.blocking.missing_soda_machine": "ソーダマシンが不足しています",
     "gui.codpattern.zombies.deploy.blocking.missing_ultimate_machine": "強化マシンが不足しています",
     "gui.codpattern.zombies.deploy.blocking.mvp1_has_errors": "MVP1 にエラーがあります",
-    "screen.codpattern.room.button": "Frontline / TeamDeathMatch"
+    "screen.codpattern.room.button": "ゲームロビー"
 }

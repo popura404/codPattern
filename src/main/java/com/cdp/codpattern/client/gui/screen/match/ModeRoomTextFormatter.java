@@ -3,6 +3,7 @@ package com.cdp.codpattern.client.gui.screen.match;
 import com.cdp.codpattern.app.match.model.RoomSummaryMetric;
 import net.minecraft.network.chat.Component;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -60,6 +61,30 @@ public final class ModeRoomTextFormatter {
         }
         return Component.translatable(metric.translationKey())
                 .append(Component.literal(": " + formattedMetricValue(metric)));
+    }
+
+    public static String metricInlineText(List<RoomSummaryMetric> metrics, int maxCount) {
+        if (metrics == null || metrics.isEmpty() || maxCount <= 0) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        int appended = 0;
+        for (RoomSummaryMetric metric : metrics) {
+            if (metric == null) {
+                continue;
+            }
+            if (appended > 0) {
+                builder.append("  ");
+            }
+            builder.append(Component.translatable(metric.translationKey()).getString())
+                    .append(" ")
+                    .append(formattedMetricValue(metric));
+            appended++;
+            if (appended >= maxCount) {
+                break;
+            }
+        }
+        return builder.toString();
     }
 
     private static String formattedMetricValue(RoomSummaryMetric metric) {

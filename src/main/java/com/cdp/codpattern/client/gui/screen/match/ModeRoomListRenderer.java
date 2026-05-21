@@ -535,16 +535,22 @@ public final class ModeRoomListRenderer {
     ) {
         String playerText = room.playerCount + "/" + room.maxPlayers;
         String phaseText = ModeRoomTextFormatter.phaseStatusText(room.state, room.remainingTimeTicks);
+        String metricText = ModeRoomTextFormatter.metricInlineText(room.metrics, 2);
         int statsColor = joined ? 0xFFE3EDF6 : (selected ? 0xFFD5E5FB : 0xFFB7C2CD);
         int separatorColor = joined ? 0xFF8FA7B4 : 0xFF70808D;
 
-        return Component.empty()
+        MutableComponent result = Component.empty()
                 .append(Component.literal(Component.translatable(descriptor.displayNameKey()).getString())
                         .withStyle(style -> style.withItalic(true).withColor(modeAccentColor(room.gameType))))
                 .append(Component.literal("  ").withStyle(style -> style.withColor(separatorColor)))
                 .append(Component.literal(playerText).withStyle(style -> style.withColor(statsColor)))
                 .append(Component.literal("  ").withStyle(style -> style.withColor(separatorColor)))
                 .append(Component.literal(phaseText).withStyle(style -> style.withColor(statusColor(room.state))));
+        if (!metricText.isBlank()) {
+            result.append(Component.literal("  ").withStyle(style -> style.withColor(separatorColor)))
+                    .append(Component.literal(metricText).withStyle(style -> style.withColor(statsColor)));
+        }
+        return result;
     }
 
     private static Comparator<Map.Entry<String, ModeRoomData>> roomComparator(String joinedRoom) {

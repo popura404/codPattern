@@ -1,5 +1,7 @@
 package com.cdp.codpattern.client.gui.screen.match;
 
+import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.model.TeamDescriptor;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
@@ -16,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 public final class ModeRoomRosterRenderer {
     private static final String LEGACY_KORTAC_TEAM = "kortac";
@@ -34,19 +37,25 @@ public final class ModeRoomRosterRenderer {
             int startY,
             int maxY,
             Map<String, List<PlayerInfo>> teamPlayers,
+            String gameType,
             float alphaFactor,
             long nowMs) {
-        List<String> teamOrder = new ArrayList<>();
-        teamOrder.add(LEGACY_KORTAC_TEAM);
-        teamOrder.add(LEGACY_SPECGRU_TEAM);
-        for (String key : teamPlayers.keySet()) {
-            if (!teamOrder.contains(key)) {
-                teamOrder.add(key);
-            }
-        }
+        Map<String, List<PlayerInfo>> safeTeamPlayers = teamPlayers == null ? Map.of() : teamPlayers;
+        List<String> teamOrder = orderedTeamNames(gameType, safeTeamPlayers);
 
         if (panelWidth < GuiTextHelper.referenceScaled(120)) {
-            renderSingleColumn(graphics, mc, panelX, panelWidth, startY, maxY, teamOrder, teamPlayers, alphaFactor, nowMs);
+            renderSingleColumn(
+                    graphics,
+                    mc,
+                    panelX,
+                    panelWidth,
+                    startY,
+                    maxY,
+                    teamOrder,
+                    safeTeamPlayers,
+                    gameType,
+                    alphaFactor,
+                    nowMs);
             return;
         }
 
@@ -56,7 +65,7 @@ public final class ModeRoomRosterRenderer {
         int rowIndex = 0;
         for (int index = 0; index < teamOrder.size(); index++) {
             String teamName = teamOrder.get(index);
-            List<PlayerInfo> players = new ArrayList<>(teamPlayers.getOrDefault(teamName, List.of()));
+            List<PlayerInfo> players = new ArrayList<>(safeTeamPlayers.getOrDefault(teamName, List.of()));
             players.sort(playerComparator());
             int columnIndex = index % 2;
             int columnX = panelX + columnIndex * (columnWidth + columnGap);
@@ -73,6 +82,7 @@ public final class ModeRoomRosterRenderer {
                     teamName,
                     players,
                     rowIndex,
+                    gameType,
                     alphaFactor,
                     nowMs);
             columnYs[columnIndex] = result.nextY;
@@ -89,6 +99,7 @@ public final class ModeRoomRosterRenderer {
             int maxY,
             List<String> teamOrder,
             Map<String, List<PlayerInfo>> teamPlayers,
+            String gameType,
             float alphaFactor,
             long nowMs) {
         int y = startY;
@@ -106,6 +117,7 @@ public final class ModeRoomRosterRenderer {
                     teamName,
                     players,
                     rowIndex,
+                    gameType,
                     alphaFactor,
                     nowMs);
             y = result.nextY;
@@ -126,9 +138,10 @@ public final class ModeRoomRosterRenderer {
             String teamName,
             List<PlayerInfo> players,
             int rowIndex,
+            String gameType,
             float alphaFactor,
             long nowMs) {
-        int accent = getTeamAccentColor(teamName);
+        int accent = getTeamAccentColor(gameType, teamName);
         int headerHeight = GuiTextHelper.referenceScaled(15);
         int lineHeight = GuiTextHelper.referenceLineHeight(mc.font);
         if (startY + headerHeight > maxY) {
@@ -140,11 +153,7 @@ public final class ModeRoomRosterRenderer {
         graphics.fill(panelX, startY + headerHeight - 1, panelX + panelWidth, startY + headerHeight,
                 scaleAlpha(withAlpha(accent, 160), alphaFactor));
 
-        String teamKey = "screen.codpattern.room.team." + teamName.toLowerCase(Locale.ROOT);
-        String teamLabel = Component.translatable(teamKey).getString();
-        if (teamLabel.equals(teamKey)) {
-            teamLabel = teamName.toUpperCase(Locale.ROOT);
-        }
+        String teamLabel = teamDisplayName(gameType, teamName);
         String headerText = teamLabel + "  (" + players.size() + ")";
         GuiTextHelper.drawReferenceString(
                 graphics,
@@ -267,7 +276,67 @@ public final class ModeRoomRosterRenderer {
                 .thenComparing(PlayerInfo::name, String.CASE_INSENSITIVE_ORDER);
     }
 
-    private static int getTeamAccentColor(String teamName) {
+    private static List<String> orderedTeamNames(String gameType, Map<String, List<PlayerInfo>> teamPlayers) {
+        List<String> teamOrder = new ArrayList<>();
+        for (TeamDescriptor descriptor : modeTeamDescriptors(gameType)) {
+            addTeamIfMissing(teamOrder, descriptor.teamName());
+        }
+        if (teamOrder.isEmpty()) {
+            addTeamIfMissing(teamOrder, LEGACY_KORTAC_TEAM);
+            addTeamIfMissing(teamOrder, LEGACY_SPECGRU_TEAM);
+        }
+        for (String key : teamPlayers.keySet()) {
+            addTeamIfMissing(teamOrder, key);
+        }
+        return teamOrder;
+    }
+
+    private static void addTeamIfMissing(List<String> teamOrder, String teamName) {
+        if (teamName == null || teamName.isBlank()) {
+            return;
+        }
+        for (String existing : teamOrder) {
+            if (existing.equalsIgnoreCase(teamName)) {
+                return;
+            }
+        }
+        teamOrder.add(teamName);
+    }
+
+    private static List<TeamDescriptor> modeTeamDescriptors(String gameType) {
+        if (gameType == null || gameType.isBlank()) {
+            return List.of();
+        }
+        return GameModeRegistry.getOrDefault(gameType).teams();
+    }
+
+    private static Optional<TeamDescriptor> modeTeamDescriptor(String gameType, String teamName) {
+        if (teamName == null || teamName.isBlank()) {
+            return Optional.empty();
+        }
+        return modeTeamDescriptors(gameType).stream()
+                .filter(descriptor -> descriptor.teamName().equalsIgnoreCase(teamName))
+                .findFirst();
+    }
+
+    private static String teamDisplayName(String gameType, String teamName) {
+        Optional<TeamDescriptor> descriptor = modeTeamDescriptor(gameType, teamName);
+        if (descriptor.isPresent()) {
+            return Component.translatable(descriptor.get().displayNameKey()).getString();
+        }
+        String teamKey = "screen.codpattern.room.team." + teamName.toLowerCase(Locale.ROOT);
+        String teamLabel = Component.translatable(teamKey).getString();
+        if (teamLabel.equals(teamKey)) {
+            return teamName.toUpperCase(Locale.ROOT);
+        }
+        return teamLabel;
+    }
+
+    private static int getTeamAccentColor(String gameType, String teamName) {
+        Optional<TeamDescriptor> descriptor = modeTeamDescriptor(gameType, teamName);
+        if (descriptor.isPresent()) {
+            return descriptor.get().accentColor();
+        }
         if (LEGACY_KORTAC_TEAM.equalsIgnoreCase(teamName)) {
             return 0xFFE35A5A;
         }

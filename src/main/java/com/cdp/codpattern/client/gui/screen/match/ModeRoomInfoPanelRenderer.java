@@ -236,6 +236,7 @@ public final class ModeRoomInfoPanelRenderer {
                         rosterTop,
                         rosterBottom,
                         teamPlayers,
+                        activeRoomSummary.gameType,
                         contentFactor,
                         nowMs);
             }
