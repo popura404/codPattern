@@ -30,7 +30,7 @@ public final class FPSMItemRegister {
     }
 
     public static void onBuildCreativeModeTabContents(BuildCreativeModeTabContentsEvent event) {
-        if (event.hasPermissions() && CreativeModeTabs.TOOLS_AND_UTILITIES.equals(event.getTabKey())) {
+        if (CreativeModeTabs.TOOLS_AND_UTILITIES.equals(event.getTabKey())) {
             event.accept(MAP_CREATOR_TOOL);
             event.accept(SPAWN_POINT_TOOL);
             event.accept(ZOMBIES_DEPLOY_TOOL);

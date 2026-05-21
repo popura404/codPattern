@@ -1,6 +1,8 @@
 {
   "replace": false,
   "values": [
+    "codpattern:zombies_power_switch",
+    "codpattern:zombies_player_barrier",
     "codpattern:zombies_weapon_wall_box",
     "codpattern:zombies_ammo_box",
     "codpattern:zombies_armor_station_box",

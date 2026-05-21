@@ -34,6 +34,15 @@ public final class CodPatternBlockRegister {
                     .isSuffocating((state, level, pos) -> false)
                     .isViewBlocking((state, level, pos) -> false))
     );
+    public static final RegistryObject<ZombiesRedPlayerBarrierBlock> ZOMBIES_RED_PLAYER_BARRIER = BLOCKS.register(
+            "zombies_red_player_barrier",
+            () -> new ZombiesRedPlayerBarrierBlock(BlockBehaviour.Properties.copy(Blocks.RED_STAINED_GLASS)
+                    .strength(-1.0F, 3_600_000.0F)
+                    .sound(SoundType.GLASS)
+                    .noOcclusion()
+                    .isSuffocating((state, level, pos) -> false)
+                    .isViewBlocking((state, level, pos) -> false))
+    );
     public static final RegistryObject<ZombiesBoxInteractionBlock> ZOMBIES_WEAPON_WALL_BOX = BLOCKS.register(
             "zombies_weapon_wall_box",
             () -> new ZombiesBoxInteractionBlock(BlockBehaviour.Properties.copy(Blocks.RED_CONCRETE)
@@ -68,6 +77,10 @@ public final class CodPatternBlockRegister {
     public static final RegistryObject<Item> ZOMBIES_POWER_SWITCH_ITEM = ITEMS.register(
             "zombies_power_switch",
             () -> new BlockItem(ZOMBIES_POWER_SWITCH.get(), new Item.Properties())
+    );
+    public static final RegistryObject<Item> ZOMBIES_RED_PLAYER_BARRIER_ITEM = ITEMS.register(
+            "zombies_red_player_barrier",
+            () -> new BlockItem(ZOMBIES_RED_PLAYER_BARRIER.get(), new Item.Properties())
     );
     public static final RegistryObject<Item> ZOMBIES_WEAPON_WALL_BOX_ITEM = ITEMS.register(
             "zombies_weapon_wall_box",

@@ -8,6 +8,7 @@ import com.cdp.codpattern.app.zombies.deploy.ZombiesDeploySnapshot;
 import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployToolService;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.tool.CreatorToolItem;
+import com.phasetranscrystal.fpsmatch.common.item.tool.ToolAccessHelper;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionAction;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionHit;
 import com.phasetranscrystal.fpsmatch.common.item.tool.WorldToolItem;
@@ -54,6 +55,9 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
 
     @Override
     public void handleWorldInteraction(ServerPlayer player, ItemStack stack, ToolInteractionAction action, ToolInteractionHit hit) {
+        if (!ToolAccessHelper.ensureAdminAccess(player)) {
+            return;
+        }
         switch (action) {
             case CTRL_RIGHT_CLICK -> ZombiesDeployToolActionC2SPacket.sendScreen(player, stack, getDraft(stack));
             case LEFT_CLICK_BLOCK -> {
@@ -73,6 +77,10 @@ public class ZombiesDeployTool extends CreatorToolItem implements WorldToolItem 
 
     public void syncHeldPreview(ServerPlayer player, ItemStack stack) {
         if (player == null || stack == null || !(stack.getItem() instanceof ZombiesDeployTool)) {
+            clearHeldPreview(player);
+            return;
+        }
+        if (!ToolAccessHelper.hasAdminAccess(player)) {
             clearHeldPreview(player);
             return;
         }

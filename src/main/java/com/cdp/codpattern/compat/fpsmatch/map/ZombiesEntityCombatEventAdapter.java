@@ -14,6 +14,8 @@ import com.cdp.codpattern.app.zombies.service.ZombiesMobSpawnService;
 import com.cdp.codpattern.app.zombies.service.ZombiesPlayerStateService;
 import com.cdp.codpattern.app.zombies.service.ZombiesWeaponItemStackService;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.LivingEntity;
 
 import java.util.LinkedHashSet;
@@ -130,6 +132,10 @@ public class ZombiesEntityCombatEventAdapter implements ModeEntityCombatEventPor
         if (entity == null || context == null || !isOwnedByThisRoom(entity) || !isPositiveFinite(context.amount())) {
             return DamageDecision.passThrough();
         }
+        if (isFallDamage(context)) {
+            entity.fallDistance = 0.0F;
+            return DamageDecision.cancel();
+        }
         ServerPlayer attacker = context.attacker().orElse(null);
         if (attacker == null) {
             return DamageDecision.passThrough();
@@ -188,6 +194,11 @@ public class ZombiesEntityCombatEventAdapter implements ModeEntityCombatEventPor
         return other != null
                 && GameModeRegistry.canonicalize(other.gameType()).equals(gameType())
                 && other.mapName().equals(mapName());
+    }
+
+    private static boolean isFallDamage(EntityDamageContext context) {
+        DamageSource source = context == null ? null : context.source();
+        return source != null && source.is(DamageTypes.FALL);
     }
 
     static float scaledDamageAmount(float amount, double multiplier) {

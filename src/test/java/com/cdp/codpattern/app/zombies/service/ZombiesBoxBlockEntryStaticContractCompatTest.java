@@ -68,6 +68,10 @@ public final class ZombiesBoxBlockEntryStaticContractCompatTest {
                 "soda machine box registry id must use a simple yellow box block");
         requireContains(registry, "new ZombiesBoxInteractionBlock(BlockBehaviour.Properties.copy(Blocks.PURPLE_CONCRETE)",
                 "ultimate machine box registry id must use a simple purple box block");
+        requireContains(taczInteractWhitelist, "\"codpattern:zombies_power_switch\"",
+                "power switch must be whitelisted for TaCZ interact-key block interaction");
+        requireContains(taczInteractWhitelist, "\"codpattern:zombies_player_barrier\"",
+                "player barrier must be whitelisted for TaCZ interact-key block interaction");
         requireContains(taczInteractWhitelist, "\"codpattern:zombies_weapon_wall_box\"",
                 "weapon wall box must be whitelisted for TaCZ interact-key block interaction");
         requireContains(taczInteractWhitelist, "\"codpattern:zombies_ammo_box\"",
@@ -90,7 +94,11 @@ public final class ZombiesBoxBlockEntryStaticContractCompatTest {
                 "EntityInteract handler must remain separate for non-block fallback behavior");
 
         requireContains(service, "InteractionResult gateResult = gateBoxStyleInteraction(player, target, context);\n        if (gateResult != null) {\n            return gateResult;\n        }\n\n        long gameTime",
-                "recent interaction de-duplication must only run after box-style target and hand gating");
+                "recent interaction de-duplication must only run after box-style hand gating");
+        requireAbsent(service, "gateTaggedTaczWeaponInteraction",
+                "general object interactions must not reject held TaCZ guns by zombies weapon tag");
+        requireAbsent(service, "currentWeaponTag(roomId, context.itemStack())",
+                "barrier, armor station, soda, and power interactions must not require a held zombies weapon tag");
         requireContains(service, ".filter(candidate -> !isBoxStyleObject(candidate.type()))",
                 "no-block-position fallback must keep excluding box-style objects");
         String boxGate = methodBody(service, "private InteractionResult gateBoxStyleInteraction");

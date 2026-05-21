@@ -68,8 +68,14 @@ public final class ZombiesRoomAnnouncementStaticContractCompatTest {
                 "client object state must publish the display name");
 
         requireContains(announcementService,
-                "player.displayClientMessage(message, true);",
-                "room announcements must use hotbar/actionbar display");
+                "ClientboundSetSubtitleTextPacket",
+                "room announcements must use subtitle display");
+        requireContains(announcementService,
+                "ClientboundSetTitleTextPacket(Component.empty())",
+                "room announcements must clear the title while showing subtitle text");
+        requireContains(announcementService,
+                "SoundEvents.NOTE_BLOCK_CHIME.get()",
+                "room announcements must play a music-box style unlock sound");
         requireContains(interactionService,
                 "ANNOUNCEMENT_BARRIER = MESSAGE_PREFIX + \"announcement.barrier\"",
                 "barrier opening must have a dedicated announcement key");
@@ -77,10 +83,10 @@ public final class ZombiesRoomAnnouncementStaticContractCompatTest {
                 "ANNOUNCEMENT_POWER = MESSAGE_PREFIX + \"announcement.power\"",
                 "power opening must have a dedicated announcement key");
         requireContains(interactionService,
-                "announcementService.broadcastHotbar(\n                    ANNOUNCEMENT_BARRIER,\n                    playerDisplayName(player),\n                    barrier.displayName())",
+                "announcementService.broadcastSubtitle(\n                    ANNOUNCEMENT_BARRIER,\n                    playerDisplayName(player),\n                    barrier.displayName())",
                 "barrier purchase success must broadcast player and barrier name");
         requireContains(interactionService,
-                "announcementService.broadcastHotbar(\n                        ANNOUNCEMENT_POWER,\n                        playerDisplayName(player))",
+                "announcementService.broadcastSubtitle(\n                        ANNOUNCEMENT_POWER,\n                        playerDisplayName(player))",
                 "initial power purchase success must broadcast player name");
         requireContains(zombiesMap,
                 "new ZombiesRoomAnnouncementService(this::survivorPlayers)",

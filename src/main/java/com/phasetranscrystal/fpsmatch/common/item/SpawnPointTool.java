@@ -10,6 +10,7 @@ import com.cdp.codpattern.app.match.port.ModeMapEditPort;
 import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.tool.CreatorToolItem;
+import com.phasetranscrystal.fpsmatch.common.item.tool.ToolAccessHelper;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionAction;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionHit;
 import com.phasetranscrystal.fpsmatch.common.item.tool.WorldToolItem;
@@ -56,6 +57,9 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
 
     @Override
     public void handleWorldInteraction(ServerPlayer player, ItemStack stack, ToolInteractionAction action, ToolInteractionHit hit) {
+        if (!ToolAccessHelper.ensureAdminAccess(player)) {
+            return;
+        }
         if (isAreaMode(stack)) {
             handleAreaWorldInteraction(player, stack, action, hit);
             return;
@@ -84,6 +88,13 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
     }
 
     public void syncHeldPreview(ServerPlayer player, ItemStack stack) {
+        if (player == null) {
+            return;
+        }
+        if (!ToolAccessHelper.hasAdminAccess(player)) {
+            clearHeldPreview(player);
+            return;
+        }
         if (isAreaMode(stack)) {
             syncAreaHeldPreview(player, stack);
             return;

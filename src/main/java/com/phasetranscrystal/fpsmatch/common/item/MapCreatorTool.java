@@ -3,6 +3,7 @@ package com.phasetranscrystal.fpsmatch.common.item;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.tool.CreatorToolItem;
+import com.phasetranscrystal.fpsmatch.common.item.tool.ToolAccessHelper;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionAction;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionHit;
 import com.phasetranscrystal.fpsmatch.common.item.tool.WorldToolItem;
@@ -38,6 +39,9 @@ public class MapCreatorTool extends CreatorToolItem implements WorldToolItem {
 
     @Override
     public void handleWorldInteraction(ServerPlayer player, ItemStack stack, ToolInteractionAction action, ToolInteractionHit hit) {
+        if (!ToolAccessHelper.ensureAdminAccess(player)) {
+            return;
+        }
         switch (action) {
             case LEFT_CLICK_BLOCK -> {
                 if (hit == null) {
@@ -65,6 +69,13 @@ public class MapCreatorTool extends CreatorToolItem implements WorldToolItem {
     }
 
     public void syncHeldPreview(ServerPlayer player, ItemStack stack) {
+        if (player == null) {
+            return;
+        }
+        if (!ToolAccessHelper.hasAdminAccess(player)) {
+            clearHeldPreview(player);
+            return;
+        }
         BlockPos pos1 = getBlockPos(stack, BLOCK_POS_TAG_1);
         BlockPos pos2 = getBlockPos(stack, BLOCK_POS_TAG_2);
         if (pos1 == null || pos2 == null) {

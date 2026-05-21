@@ -63,6 +63,33 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
                 "mob.setPersistenceRequired();",
                 "room monsters should not despawn just because they are far from players");
         requireContains(spawnService,
+                "static final float ROOM_MONSTER_MAX_UP_STEP = 1.25F;",
+                "room monsters should be allowed to step over low non-standard obstacle shapes");
+        requireContains(spawnService,
+                "mob.setMaxUpStep(ROOM_MONSTER_MAX_UP_STEP);",
+                "spawned room monsters should receive the zombies obstacle step height");
+        requireContains(spawnService,
+                "new RoomMonsterObstacleJumpGoal(pathfinderMob));",
+                "spawned room monsters should receive the zombies obstacle jump goal");
+        requireContains(spawnService,
+                "mob.getJumpControl().jump();",
+                "room monster obstacle handling should force a jump when blocked by low shapes");
+        requireContains(spawnService,
+                "mob.level().noCollision(mob, probeBox)",
+                "room monster obstacle detection should use collision boxes for non-standard block shapes");
+        requireContains(spawnService,
+                "static final double ROOM_MONSTER_DROP_DOWN_MIN_HEIGHT = 2.0D;",
+                "room monsters should actively jump down when the target is at least two blocks lower");
+        requireContains(spawnService,
+                "pendingJumpImpulse = dropDownImpulse(target);",
+                "room monster terrain jumping should attempt a drop-down impulse after low-obstacle checks");
+        requireContains(spawnService,
+                "mob.setDeltaMovement(",
+                "drop-down jumping should push the mob forward off ledges");
+        requireContains(spawnService,
+                "mob.level().noCollision(mob, dropBox)",
+                "drop-down jumping should detect an open ledge space below the forward probe");
+        requireContains(spawnService,
                 "effectiveSpawnWeight(spawn.weight(), targetDistance, nearestDistance, weighting)",
                 "spawn-point selection should combine map weight with distance multiplier");
         requireContains(spawnService,
@@ -107,6 +134,12 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
         requireContains(combatAdapter,
                 "persistentRewardOrDefault(\n                            entity,\n                            ZombiesMobSpawnService.WAVE_ASSIST_POINTS_TAG",
                 "death reward resolver should read wave assist reward metadata");
+        requireContains(combatAdapter,
+                "source.is(DamageTypes.FALL)",
+                "owned zombies room monsters should reject fall damage");
+        requireContains(combatAdapter,
+                "entity.fallDistance = 0.0F;",
+                "fall-damage rejection should clear accumulated fall distance");
         requireContains(waveState,
                 "public Set<UUID> activeZombieEntityIdsSnapshot()",
                 "wave runtime must expose active zombie ids for client marker sync");

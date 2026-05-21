@@ -410,7 +410,7 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
                 barrierService.purchase(player, barrier);
         if (result.success()) {
             sendMessage(player, SUCCESS_BARRIER, target.objectId(), barrier.cost(), barrier.group());
-            announcementService.broadcastHotbar(
+            announcementService.broadcastSubtitle(
                     ANNOUNCEMENT_BARRIER,
                     playerDisplayName(player),
                     barrier.displayName());
@@ -672,7 +672,7 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
                 ZombiesPowerService.PowerPurchaseResult purchase = result.value().orElse(null);
                 double cost = purchase == null ? powerSwitch.cost() : purchase.cost();
                 sendMessage(player, SUCCESS_POWER, target.objectId(), displayCost(cost));
-                announcementService.broadcastHotbar(
+                announcementService.broadcastSubtitle(
                         ANNOUNCEMENT_POWER,
                         playerDisplayName(player));
             }

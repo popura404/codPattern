@@ -124,6 +124,9 @@ public class SpawnPointToolActionC2SPacket {
     public static void sendScreen(ServerPlayer player, ItemStack stack, String requestedType, String requestedMap,
             String requestedTeam, String requestedKind, int requestedIndex, String requestedEditMode,
             String requestedAreaLayer, int requestedAreaIndex) {
+        if (!ToolAccessHelper.ensureAdminAccess(player)) {
+            return;
+        }
         SelectionSnapshot snapshot = resolveSelection(
                 stack,
                 requestedType,

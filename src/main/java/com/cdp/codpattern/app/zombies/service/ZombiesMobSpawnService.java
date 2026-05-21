@@ -20,6 +20,8 @@ import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.animal.Wolf;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -43,6 +45,15 @@ public final class ZombiesMobSpawnService {
     static final double ROOM_MONSTER_FOLLOW_RANGE = 128.0D;
     static final int ROOM_MONSTER_TARGET_REFRESH_INTERVAL_TICKS = 20;
     static final int ROOM_MONSTER_WOLF_ANGER_TICKS = 20 * 60 * 60;
+    static final float ROOM_MONSTER_MAX_UP_STEP = 1.25F;
+    static final int ROOM_MONSTER_OBSTACLE_JUMP_COOLDOWN_TICKS = 8;
+    static final double ROOM_MONSTER_OBSTACLE_PROBE_DISTANCE = 0.8D;
+    static final double ROOM_MONSTER_OBSTACLE_PROBE_INFLATE = 0.05D;
+    static final double ROOM_MONSTER_OBSTACLE_CLEARANCE_HEIGHT = 1.25D;
+    static final double ROOM_MONSTER_DROP_DOWN_MIN_HEIGHT = 2.0D;
+    static final double ROOM_MONSTER_DROP_DOWN_PROBE_DISTANCE = 0.9D;
+    static final double ROOM_MONSTER_DROP_DOWN_FORWARD_SPEED = 0.28D;
+    static final double ROOM_MONSTER_DROP_DOWN_JUMP_SPEED = 0.25D;
 
     private static final AtomicInteger GLOBAL_ACTIVE_ZOMBIES = new AtomicInteger();
 
@@ -143,6 +154,7 @@ public final class ZombiesMobSpawnService {
         applySpawnedMobSpecialRules(mob);
         applyWaveAttributes(mob, waveDefinition);
         applyRoomMonsterRetention(mob);
+        applyRoomMonsterObstacleJumping(mob);
         applyRoomMonsterAttackCadence(mob);
         applyRoomMonsterTargeting(mob, survivorTargetSupplier, roomTargetingEnabled);
         attachWaveRewardMetadata(mob, mobId.get(), waveDefinition);
@@ -442,7 +454,18 @@ public final class ZombiesMobSpawnService {
         if (followRange != null && followRange.getBaseValue() < ROOM_MONSTER_FOLLOW_RANGE) {
             followRange.setBaseValue(ROOM_MONSTER_FOLLOW_RANGE);
         }
+        if (mob.maxUpStep() < ROOM_MONSTER_MAX_UP_STEP) {
+            mob.setMaxUpStep(ROOM_MONSTER_MAX_UP_STEP);
+        }
         mob.setPersistenceRequired();
+    }
+
+    private static void applyRoomMonsterObstacleJumping(Mob mob) {
+        if (mob instanceof PathfinderMob pathfinderMob) {
+            pathfinderMob.goalSelector.addGoal(
+                    0,
+                    new RoomMonsterObstacleJumpGoal(pathfinderMob));
+        }
     }
 
     private static void applyRoomMonsterTargeting(
@@ -528,6 +551,115 @@ public final class ZombiesMobSpawnService {
         @Override
         protected int getAttackInterval() {
             return ROOM_MONSTER_MELEE_ATTACK_INTERVAL_TICKS;
+        }
+    }
+
+    private static final class RoomMonsterObstacleJumpGoal extends Goal {
+        private final PathfinderMob mob;
+        private int cooldownTicks;
+        private Vec3 pendingJumpImpulse;
+
+        private RoomMonsterObstacleJumpGoal(PathfinderMob mob) {
+            this.mob = Objects.requireNonNull(mob, "mob");
+            setFlags(EnumSet.of(Goal.Flag.JUMP));
+        }
+
+        @Override
+        public boolean canUse() {
+            if (cooldownTicks > 0) {
+                cooldownTicks--;
+                return false;
+            }
+            pendingJumpImpulse = null;
+            LivingEntity target = mob.getTarget();
+            if (target == null
+                    || !target.isAlive()
+                    || !mob.onGround()
+                    || mob.isInWaterOrBubble()
+                    || mob.isInLava()
+                    || mob.distanceToSqr(target) <= 2.25D) {
+                return false;
+            }
+            if (hasLowFrontObstacle(target)) {
+                return true;
+            }
+            pendingJumpImpulse = dropDownImpulse(target);
+            return pendingJumpImpulse != null;
+        }
+
+        @Override
+        public void start() {
+            mob.getJumpControl().jump();
+            if (pendingJumpImpulse != null) {
+                Vec3 currentMovement = mob.getDeltaMovement();
+                mob.setDeltaMovement(
+                        currentMovement.x + pendingJumpImpulse.x,
+                        Math.max(currentMovement.y, ROOM_MONSTER_DROP_DOWN_JUMP_SPEED),
+                        currentMovement.z + pendingJumpImpulse.z);
+                pendingJumpImpulse = null;
+            }
+            cooldownTicks = ROOM_MONSTER_OBSTACLE_JUMP_COOLDOWN_TICKS;
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return false;
+        }
+
+        private Vec3 dropDownImpulse(LivingEntity target) {
+            if (mob.getY() - target.getY() < ROOM_MONSTER_DROP_DOWN_MIN_HEIGHT) {
+                return null;
+            }
+            Vec3 direction = directionToTarget(target);
+            if (direction.horizontalDistanceSqr() < 0.0001D) {
+                return null;
+            }
+            AABB frontBox = mob.getBoundingBox()
+                    .move(
+                            direction.x * ROOM_MONSTER_DROP_DOWN_PROBE_DISTANCE,
+                            0.0D,
+                            direction.z * ROOM_MONSTER_DROP_DOWN_PROBE_DISTANCE)
+                    .inflate(ROOM_MONSTER_OBSTACLE_PROBE_INFLATE, 0.0D, ROOM_MONSTER_OBSTACLE_PROBE_INFLATE);
+            if (!mob.level().noCollision(mob, frontBox)) {
+                return null;
+            }
+            AABB dropBox = frontBox.move(0.0D, -1.0D, 0.0D);
+            if (!mob.level().noCollision(mob, dropBox)) {
+                return null;
+            }
+            return new Vec3(
+                    direction.x * ROOM_MONSTER_DROP_DOWN_FORWARD_SPEED,
+                    0.0D,
+                    direction.z * ROOM_MONSTER_DROP_DOWN_FORWARD_SPEED);
+        }
+
+        private boolean hasLowFrontObstacle(LivingEntity target) {
+            Vec3 direction = directionToTarget(target);
+            if (direction.horizontalDistanceSqr() < 0.0001D) {
+                return false;
+            }
+            AABB probeBox = mob.getBoundingBox()
+                    .move(
+                            direction.x * ROOM_MONSTER_OBSTACLE_PROBE_DISTANCE,
+                            0.0D,
+                            direction.z * ROOM_MONSTER_OBSTACLE_PROBE_DISTANCE)
+                    .inflate(ROOM_MONSTER_OBSTACLE_PROBE_INFLATE, 0.0D, ROOM_MONSTER_OBSTACLE_PROBE_INFLATE);
+            if (mob.level().noCollision(mob, probeBox)) {
+                return false;
+            }
+            AABB clearanceBox = probeBox.move(0.0D, ROOM_MONSTER_OBSTACLE_CLEARANCE_HEIGHT, 0.0D);
+            return mob.level().noCollision(mob, clearanceBox);
+        }
+
+        private Vec3 directionToTarget(LivingEntity target) {
+            double dx = target.getX() - mob.getX();
+            double dz = target.getZ() - mob.getZ();
+            double distance = Math.sqrt(dx * dx + dz * dz);
+            if (distance > 0.001D) {
+                return new Vec3(dx / distance, 0.0D, dz / distance);
+            }
+            double yawRadians = Math.toRadians(mob.getYRot());
+            return new Vec3(-Math.sin(yawRadians), 0.0D, Math.cos(yawRadians));
         }
     }
 

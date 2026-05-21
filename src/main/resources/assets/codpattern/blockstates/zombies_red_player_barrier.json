@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "codpattern:block/zombies_red_player_barrier"
+    }
+  }
+}
