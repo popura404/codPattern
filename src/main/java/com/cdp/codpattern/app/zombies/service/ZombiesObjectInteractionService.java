@@ -37,6 +37,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 public final class ZombiesObjectInteractionService implements ModeInteractableObjectPort {
@@ -56,6 +57,7 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
     private static final String FAILURE_ARMOR_ALREADY_OWNED = MESSAGE_PREFIX + "failure.armor_already_owned";
     private static final String FAILURE_SODA_ALREADY_OWNED = MESSAGE_PREFIX + "failure.soda_already_owned";
     private static final String FAILURE_REQUIRES_POWER = MESSAGE_PREFIX + "failure.requires_power";
+    private static final String FAILURE_PHASE_LOCKED = MESSAGE_PREFIX + "failure.phase_locked";
     private static final String FAILURE_INVALID_CURRENT_WEAPON = MESSAGE_PREFIX + "failure.invalid_current_weapon";
     private static final String FAILURE_MAX_UPGRADE = MESSAGE_PREFIX + "failure.max_upgrade";
     private static final String FAILURE_GENERIC = MESSAGE_PREFIX + "failure.generic";
@@ -92,6 +94,7 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
     private final ZombiesBarrierBlockRuntimeService barrierBlockRuntimeService;
     private final ZombiesRoomAnnouncementService announcementService;
     private final Supplier<ZombiesRulesConfig> rulesSupplier;
+    private final BooleanSupplier purchasesAllowedSupplier;
     private final ConcurrentMap<InteractionKey, Long> recentInteractions = new ConcurrentHashMap<>();
 
     public ZombiesObjectInteractionService(
@@ -317,6 +320,51 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
             ZombiesPowerService powerService,
             ZombiesBuffService buffService,
             ZombiesUltimateMachineService ultimateMachineService,
+            ZombiesObjectStateStore objectStateStore,
+            ZombiesRoomAnnouncementService announcementService,
+            Supplier<ZombiesRulesConfig> rulesSupplier,
+            BooleanSupplier purchasesAllowedSupplier
+    ) {
+        this(
+                roomId,
+                barriersSupplier,
+                weaponWallsSupplier,
+                ammoBoxesSupplier,
+                armorStationsSupplier,
+                powerSwitchSupplier,
+                sodaMachinesSupplier,
+                ultimateMachinesSupplier,
+                barrierService,
+                weaponInstanceService,
+                ammoBoxService,
+                armorService,
+                powerService,
+                buffService,
+                ultimateMachineService,
+                new ZombiesWeaponInventoryService(),
+                objectStateStore,
+                ZombiesBarrierBlockRuntimeService.instance(),
+                announcementService,
+                rulesSupplier,
+                purchasesAllowedSupplier);
+    }
+
+    public ZombiesObjectInteractionService(
+            RoomId roomId,
+            Supplier<Collection<ZombiesBarrierData>> barriersSupplier,
+            Supplier<Collection<ZombiesWeaponWallData>> weaponWallsSupplier,
+            Supplier<Collection<ZombiesAmmoBoxData>> ammoBoxesSupplier,
+            Supplier<Collection<ZombiesArmorStationData>> armorStationsSupplier,
+            Supplier<Optional<ZombiesPowerSwitchData>> powerSwitchSupplier,
+            Supplier<Collection<ZombiesSodaMachineData>> sodaMachinesSupplier,
+            Supplier<Collection<ZombiesUltimateMachineData>> ultimateMachinesSupplier,
+            ZombiesBarrierService barrierService,
+            ZombiesWeaponInstanceService weaponInstanceService,
+            ZombiesAmmoBoxService ammoBoxService,
+            ZombiesArmorService armorService,
+            ZombiesPowerService powerService,
+            ZombiesBuffService buffService,
+            ZombiesUltimateMachineService ultimateMachineService,
             ZombiesWeaponInventoryService weaponInventoryService,
             ZombiesObjectStateStore objectStateStore,
             ZombiesBarrierBlockRuntimeService barrierBlockRuntimeService,
@@ -367,6 +415,53 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
             ZombiesRoomAnnouncementService announcementService,
             Supplier<ZombiesRulesConfig> rulesSupplier
     ) {
+        this(
+                roomId,
+                barriersSupplier,
+                weaponWallsSupplier,
+                ammoBoxesSupplier,
+                armorStationsSupplier,
+                powerSwitchSupplier,
+                sodaMachinesSupplier,
+                ultimateMachinesSupplier,
+                barrierService,
+                weaponInstanceService,
+                ammoBoxService,
+                armorService,
+                powerService,
+                buffService,
+                ultimateMachineService,
+                weaponInventoryService,
+                objectStateStore,
+                barrierBlockRuntimeService,
+                announcementService,
+                rulesSupplier,
+                () -> true);
+    }
+
+    public ZombiesObjectInteractionService(
+            RoomId roomId,
+            Supplier<Collection<ZombiesBarrierData>> barriersSupplier,
+            Supplier<Collection<ZombiesWeaponWallData>> weaponWallsSupplier,
+            Supplier<Collection<ZombiesAmmoBoxData>> ammoBoxesSupplier,
+            Supplier<Collection<ZombiesArmorStationData>> armorStationsSupplier,
+            Supplier<Optional<ZombiesPowerSwitchData>> powerSwitchSupplier,
+            Supplier<Collection<ZombiesSodaMachineData>> sodaMachinesSupplier,
+            Supplier<Collection<ZombiesUltimateMachineData>> ultimateMachinesSupplier,
+            ZombiesBarrierService barrierService,
+            ZombiesWeaponInstanceService weaponInstanceService,
+            ZombiesAmmoBoxService ammoBoxService,
+            ZombiesArmorService armorService,
+            ZombiesPowerService powerService,
+            ZombiesBuffService buffService,
+            ZombiesUltimateMachineService ultimateMachineService,
+            ZombiesWeaponInventoryService weaponInventoryService,
+            ZombiesObjectStateStore objectStateStore,
+            ZombiesBarrierBlockRuntimeService barrierBlockRuntimeService,
+            ZombiesRoomAnnouncementService announcementService,
+            Supplier<ZombiesRulesConfig> rulesSupplier,
+            BooleanSupplier purchasesAllowedSupplier
+    ) {
         this.roomId = Objects.requireNonNull(roomId, "roomId");
         this.barriersSupplier = Objects.requireNonNull(barriersSupplier, "barriersSupplier");
         this.weaponWallsSupplier = Objects.requireNonNull(weaponWallsSupplier, "weaponWallsSupplier");
@@ -391,6 +486,7 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
                 ? noopAnnouncementService()
                 : announcementService;
         this.rulesSupplier = rulesSupplier == null ? ZombiesRulesConfig::new : rulesSupplier;
+        this.purchasesAllowedSupplier = purchasesAllowedSupplier == null ? () -> true : purchasesAllowedSupplier;
     }
 
     @Override
@@ -433,6 +529,10 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         InteractionResult gateResult = gateBoxStyleInteraction(player, target, context);
         if (gateResult != null) {
             return gateResult;
+        }
+        if (!purchasesAllowedSupplier.getAsBoolean()) {
+            sendMessage(player, FAILURE_PHASE_LOCKED, target.objectId());
+            return InteractionResult.FAIL;
         }
 
         long gameTime = Math.max(0L, player.level().getGameTime());
@@ -487,7 +587,7 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         if (!isBoxStyleObject(target.type()) || !matchesExpectedInteractionBlock(player, target)) {
             return Optional.empty();
         }
-        boolean interactable = canHandleBoxStyleInteraction(target, context);
+        boolean interactable = purchasesAllowedSupplier.getAsBoolean() && canHandleBoxStyleInteraction(target, context);
         return Optional.of(new ZombiesInteractionPrompt(
                 objectTypeId(target.type()),
                 target.objectId(),

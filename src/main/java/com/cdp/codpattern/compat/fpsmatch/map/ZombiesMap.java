@@ -221,7 +221,8 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
                 ultimateMachineService,
                 objectStateStore,
                 new ZombiesRoomAnnouncementService(this::survivorPlayers),
-                this::rulesConfig);
+                this::rulesConfig,
+                () -> runtimeState.phase().allowsPurchases());
         this.cleanupService = new ZombiesCleanupService(
                 ModeEntityOwnershipRegistry.instance(),
                 ZombiesMapOccupancyService.instance(),
@@ -324,9 +325,15 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         if (player == null || !hasSurvivor(player.getUUID())) {
             return;
         }
+        if (runtimeState.phase() == ZombiesGamePhase.WAITING || runtimeState.phase() == ZombiesGamePhase.START_VOTE) {
+            leaveRoomPlayer(player);
+            syncRosterToSurvivors();
+            return;
+        }
         connectionStateService.markOffline(player.getUUID(), runtimeState.roomTick());
         barrierVisualService.clearPlayer(player, roomId);
         markRosterDirty();
+        syncRosterToSurvivors();
     }
 
     @Override
@@ -460,6 +467,12 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         return Set.copyOf(survivorPlayerIdList());
     }
 
+    Set<UUID> onlineSurvivorPlayerIds() {
+        return survivorPlayers().stream()
+                .map(ServerPlayer::getUUID)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
+
     List<UUID> survivorPlayerIdList() {
         Set<UUID> playerIds = new LinkedHashSet<>();
         getMapTeams().getTeamByName(ZombiesTeamNames.SURVIVORS)
@@ -527,6 +540,14 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
     void markRosterDirty() {
         rosterVersion = Math.max(1, rosterVersion + 1);
         markRoomListDirty();
+    }
+
+    private void syncRosterToSurvivors() {
+        roomHandle.rosterPort().ifPresent(port -> {
+            for (ServerPlayer survivor : survivorPlayers()) {
+                port.requestRosterResync(survivor);
+            }
+        });
     }
 
     private void notifySurvivors(Component message) {
@@ -1210,7 +1231,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
     private final class ZombiesStartVoteHooks implements ZombiesStartVoteService.Hooks {
         @Override
         public Collection<UUID> currentMembers() {
-            return survivorPlayerIds();
+            return onlineSurvivorPlayerIds();
         }
 
         @Override

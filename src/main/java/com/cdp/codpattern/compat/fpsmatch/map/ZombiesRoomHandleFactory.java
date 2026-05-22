@@ -18,6 +18,7 @@ import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
 import com.cdp.codpattern.app.match.port.ModeRosterPort;
 import com.cdp.codpattern.app.match.port.ModeRuntimeStatePort;
+import com.cdp.codpattern.app.match.port.ReadyStatePort;
 import com.cdp.codpattern.app.zombies.model.ZombiesGamePhase;
 import com.cdp.codpattern.app.zombies.model.ZombiesPlayerRuntimeState;
 import com.cdp.codpattern.app.zombies.model.ZombiesTeamNames;
@@ -96,7 +97,7 @@ final class ZombiesRoomHandleFactory {
                 ports,
                 Optional.empty(),
                 Optional.empty(),
-                Optional.of(map.readyService()),
+                Optional.of(ports),
                 Optional.of(map.startVoteService()),
                 Optional.of(playerCombatPort),
                 Optional.of(ports),
@@ -111,7 +112,7 @@ final class ZombiesRoomHandleFactory {
                 Optional.of(respawnPolicy));
     }
 
-    private static final class ZombiesPorts implements ModeRoomSummaryPort, ModeRoomLifecyclePort, ModeRosterPort, ModeRuntimeStatePort {
+    private static final class ZombiesPorts implements ModeRoomSummaryPort, ModeRoomLifecyclePort, ModeRosterPort, ModeRuntimeStatePort, ReadyStatePort {
         private final ZombiesMap map;
 
         private ZombiesPorts(ZombiesMap map) {
@@ -220,6 +221,20 @@ final class ZombiesRoomHandleFactory {
             map.leaveRoomPlayer(player);
             sendRosterSnapshotToSurvivors();
             return LeaveRoomResult.success(roomId(), CODE_OK);
+        }
+
+        @Override
+        public void initializeReadyState(ServerPlayer player) {
+            map.readyService().initializeReadyState(player);
+        }
+
+        @Override
+        public boolean setPlayerReady(ServerPlayer player, boolean ready) {
+            boolean changed = map.readyService().setPlayerReady(player, ready);
+            if (changed) {
+                sendRosterSnapshotToSurvivors();
+            }
+            return changed;
         }
 
         @Override

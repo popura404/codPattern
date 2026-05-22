@@ -93,8 +93,8 @@ public final class ZombiesBoxBlockEntryStaticContractCompatTest {
         requireContains(handler, "public static void onEntityInteract",
                 "EntityInteract handler must remain separate for non-block fallback behavior");
 
-        requireContains(service, "InteractionResult gateResult = gateBoxStyleInteraction(player, target, context);\n        if (gateResult != null) {\n            return gateResult;\n        }\n\n        long gameTime",
-                "recent interaction de-duplication must only run after box-style hand gating");
+        requireContains(service, "InteractionResult gateResult = gateBoxStyleInteraction(player, target, context);\n        if (gateResult != null) {\n            return gateResult;\n        }\n        if (!purchasesAllowedSupplier.getAsBoolean()) {\n            sendMessage(player, FAILURE_PHASE_LOCKED, target.objectId());\n            return InteractionResult.FAIL;\n        }\n\n        long gameTime",
+                "recent interaction de-duplication must only run after box-style hand and phase gating");
         requireAbsent(service, "gateTaggedTaczWeaponInteraction",
                 "general object interactions must not reject held TaCZ guns by zombies weapon tag");
         requireAbsent(service, "currentWeaponTag(roomId, context.itemStack())",

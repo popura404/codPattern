@@ -475,6 +475,7 @@
     "message.codpattern.zombies.interaction.failure.armor_already_owned": "§eアーマーレベル %s はすでに所持しています（%s）。",
     "message.codpattern.zombies.interaction.failure.soda_already_owned": "§eバフ %s はすでに所持しています（%s）。",
     "message.codpattern.zombies.interaction.failure.requires_power": "§c%s は電源をオンにする必要があります。",
+    "message.codpattern.zombies.interaction.failure.phase_locked": "§c%s はゾンビラウンド開始後のみ使用できます。",
     "message.codpattern.zombies.interaction.notice.power_already_on": "§e%s の電源はすでにオンです。",
     "message.codpattern.zombies.interaction.failure.invalid_current_weapon": "§c現在の武器は %s に使用できません（gun %s、レベル %s）。",
     "message.codpattern.zombies.interaction.failure.max_upgrade": "§e%s はすでに強化 %s/%s です（%s レベル %s）。",

@@ -113,7 +113,7 @@ public final class ZombiesMapScopedConfigStaticContractCompatTest {
                 "new ZombiesObjectStateStore(\n                powerService::isPowerOn,\n                new ZombiesWeaponWallOfferService(this::rulesConfig, null, null),\n                this::rulesConfig)",
                 "object state payloads must use map-scoped rules for weapon wall and ultimate machine config");
         requireContains(zombiesMap,
-                "new ZombiesRoomAnnouncementService(this::survivorPlayers),\n                this::rulesConfig)",
+                "new ZombiesRoomAnnouncementService(this::survivorPlayers),\n                this::rulesConfig,\n                () -> runtimeState.phase().allowsPurchases())",
                 "object interactions must use the map instance rules for armor and ultimate machine config");
         requireContains(zombiesMap,
                 "() -> rulesConfig().getSpawnPointWeighting()",

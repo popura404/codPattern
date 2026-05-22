@@ -520,6 +520,7 @@
     "message.codpattern.zombies.interaction.failure.armor_already_owned": "§e你已拥有 %s 级装甲，来源 %s。",
     "message.codpattern.zombies.interaction.failure.soda_already_owned": "§e你已拥有汽水效果 %s，来源 %s。",
     "message.codpattern.zombies.interaction.failure.requires_power": "§c%s 需要先开启电源。",
+    "message.codpattern.zombies.interaction.failure.phase_locked": "§c%s 只能在僵尸回合开始后使用。",
     "message.codpattern.zombies.interaction.notice.power_already_on": "§e%s 的电源已开启。",
     "message.codpattern.zombies.interaction.failure.invalid_current_weapon": "§c当前武器无法用于 %s（gun %s，等级 %s）。",
     "message.codpattern.zombies.interaction.failure.max_upgrade": "§e%s 已达到强化 %s/%s（%s 等级 %s）。",

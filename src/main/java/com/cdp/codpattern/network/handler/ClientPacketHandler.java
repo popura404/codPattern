@@ -249,7 +249,11 @@ public class ClientPacketHandler {
     }
 
     public static void handleModeRuntimeState(ModeRuntimeStateSnapshot snapshot) {
-        Minecraft.getInstance().execute(() -> ClientModeRuntimeState.update(snapshot));
+        Minecraft.getInstance().execute(() -> {
+            Minecraft minecraft = Minecraft.getInstance();
+            closeStaleModeVoteDialog(minecraft, snapshot);
+            ClientModeRuntimeState.update(snapshot);
+        });
     }
 
     public static void handleModeObjectStates(String roomKey, List<ModeObjectState> states, long revision) {
@@ -358,13 +362,25 @@ public class ClientPacketHandler {
     }
 
     private static void closeActiveVoteDialog(Minecraft minecraft) {
+        closeActiveVoteDialog(minecraft, false);
+    }
+
+    private static void closeStaleModeVoteDialog(Minecraft minecraft, ModeRuntimeStateSnapshot snapshot) {
+        if (snapshot == null || "START_VOTE".equalsIgnoreCase(snapshot.phaseKey())) {
+            return;
+        }
+        closeActiveVoteDialog(minecraft, true);
+    }
+
+    private static void closeActiveVoteDialog(Minecraft minecraft, boolean restorePreviousScreen) {
         Screen dialogScreen = activeVoteDialogScreen;
         if (dialogScreen == null) {
             return;
         }
+        Screen previousScreen = activeVoteDialogPreviousScreen;
         clearActiveVoteDialog(dialogScreen);
         if (minecraft.screen == dialogScreen) {
-            minecraft.setScreen(null);
+            minecraft.setScreen(restorePreviousScreen ? previousScreen : null);
         }
     }
 
