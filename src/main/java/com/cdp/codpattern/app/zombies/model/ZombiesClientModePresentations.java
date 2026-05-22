@@ -14,8 +14,8 @@ public final class ZombiesClientModePresentations {
     public static ClientModePresentation zombiesPresentation() {
         return new ClientModePresentation(
                 "textures/gui/modes/zombies_preview.png",
-                16047,
-                9001,
+                1920,
+                1080,
                 0xFF9B2F2F,
                 "screen.codpattern.mode_select.hover_zombies",
                 "zombies");

@@ -14,17 +14,13 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
@@ -42,7 +38,7 @@ public final class ZombiesObjectLabelWorldRenderer {
     private static final double MAX_RENDER_DISTANCE_SQR = MAX_RENDER_DISTANCE * MAX_RENDER_DISTANCE;
     private static final double MIN_RENDER_DEPTH = 0.05D;
     private static final int MAX_RENDERED_LABELS = 32;
-    private static final float LABEL_SCALE = 1.35F;
+    private static final float FIXED_LABEL_SCALE = 0.035F;
     private static final int TITLE_COLOR = 0xFFFFF1C2;
     private static final int ACTIVE_COLOR = 0xFFE8F4FF;
     private static final int DISABLED_COLOR = 0xFFFF7777;
@@ -65,12 +61,6 @@ public final class ZombiesObjectLabelWorldRenderer {
     private static final String PAYLOAD_POWER_ON = "powerOn";
     private static final String PAYLOAD_BUFF_ID = "buffId";
     private static final String PAYLOAD_MAX_UPGRADE_LEVEL = "maxUpgradeLevel";
-    private static final String PAYLOAD_AREA_FROM_X = "areaFromX";
-    private static final String PAYLOAD_AREA_FROM_Y = "areaFromY";
-    private static final String PAYLOAD_AREA_FROM_Z = "areaFromZ";
-    private static final String PAYLOAD_AREA_TO_X = "areaToX";
-    private static final String PAYLOAD_AREA_TO_Y = "areaToY";
-    private static final String PAYLOAD_AREA_TO_Z = "areaToZ";
 
     private ZombiesObjectLabelWorldRenderer() {
     }
@@ -82,11 +72,10 @@ public final class ZombiesObjectLabelWorldRenderer {
         }
 
         Minecraft minecraft = Minecraft.getInstance();
-        LocalPlayer localPlayer = minecraft.player;
         ClientLevel level = minecraft.level;
         Camera camera = event.getCamera();
         String roomKey = ClientMatchState.roomContextName();
-        if (localPlayer == null
+        if (minecraft.player == null
                 || level == null
                 || camera == null
                 || !camera.isInitialized()
@@ -95,16 +84,8 @@ public final class ZombiesObjectLabelWorldRenderer {
             return;
         }
 
-        List<RenderCandidate> candidates = collectCandidates(event, level, localPlayer, camera, roomKey);
+        List<RenderCandidate> candidates = collectCandidates(event, level, camera, roomKey);
         if (candidates.isEmpty()) {
-            return;
-        }
-
-        int screenHeight = Math.max(1, minecraft.getWindow().getHeight());
-        double tanHalfFov = event.getProjectionMatrix().m11() == 0.0F
-                ? 0.0D
-                : Math.abs(1.0D / event.getProjectionMatrix().m11());
-        if (tanHalfFov <= 0.0D) {
             return;
         }
 
@@ -128,12 +109,7 @@ public final class ZombiesObjectLabelWorldRenderer {
                     continue;
                 }
 
-                float pixelScale = (float) ((2.0D * depth * tanHalfFov) / screenHeight);
-                if (!Float.isFinite(pixelScale) || pixelScale <= 0.0F) {
-                    continue;
-                }
-
-                renderLabel(poseStack, bufferSource, font, minecraft, relative, pixelScale, candidate.label());
+                renderLabel(poseStack, bufferSource, font, minecraft, relative, candidate.label());
                 rendered++;
                 if (rendered >= MAX_RENDERED_LABELS) {
                     break;
@@ -150,7 +126,6 @@ public final class ZombiesObjectLabelWorldRenderer {
     private static List<RenderCandidate> collectCandidates(
             RenderLevelStageEvent event,
             ClientLevel level,
-            LocalPlayer localPlayer,
             Camera camera,
             String roomKey
     ) {
@@ -174,8 +149,7 @@ public final class ZombiesObjectLabelWorldRenderer {
             if (distanceSqr > MAX_RENDER_DISTANCE_SQR) {
                 continue;
             }
-            if (!event.getFrustum().isVisible(new AABB(anchor, anchor).inflate(0.45D))
-                    || !hasClearView(level, localPlayer, cameraPos, anchor, state.position(), payload, type)) {
+            if (!event.getFrustum().isVisible(new AABB(anchor, anchor).inflate(0.45D))) {
                 continue;
             }
             candidates.add(new RenderCandidate(anchor, distanceSqr, label));
@@ -190,13 +164,12 @@ public final class ZombiesObjectLabelWorldRenderer {
             Font font,
             Minecraft minecraft,
             Vec3 relative,
-            float pixelScale,
             ObjectLabel label
     ) {
         poseStack.pushPose();
         poseStack.translate(relative.x, relative.y, relative.z);
         poseStack.mulPose(minecraft.getEntityRenderDispatcher().cameraOrientation());
-        poseStack.scale(-pixelScale * LABEL_SCALE, -pixelScale * LABEL_SCALE, pixelScale * LABEL_SCALE);
+        poseStack.scale(-FIXED_LABEL_SCALE, -FIXED_LABEL_SCALE, FIXED_LABEL_SCALE);
 
         drawCenteredLine(poseStack, bufferSource, font, label.title(), -font.lineHeight - 2, label.titleColor());
         if (!label.detail().isBlank()) {
@@ -361,55 +334,6 @@ public final class ZombiesObjectLabelWorldRenderer {
             case PAYLOAD_TYPE_ULTIMATE_MACHINE -> CodPatternBlockRegister.ZOMBIES_ULTIMATE_MACHINE_BOX.get();
             default -> null;
         };
-    }
-
-    private static boolean hasClearView(
-            ClientLevel level,
-            LocalPlayer localPlayer,
-            Vec3 cameraPos,
-            Vec3 anchor,
-            BlockPos objectPos,
-            CompoundTag payload,
-            String type
-    ) {
-        HitResult result = level.clip(new ClipContext(
-                cameraPos,
-                anchor,
-                ClipContext.Block.COLLIDER,
-                ClipContext.Fluid.NONE,
-                localPlayer));
-        if (result == null || result.getType() == HitResult.Type.MISS) {
-            return true;
-        }
-        if (!(result instanceof BlockHitResult blockHit)) {
-            return false;
-        }
-        if (blockHit.getLocation().distanceToSqr(anchor) <= 0.35D) {
-            return true;
-        }
-        BlockPos hitPos = blockHit.getBlockPos();
-        return hitPos.equals(objectPos) || (PAYLOAD_TYPE_BARRIER.equals(type) && barrierContains(payload, hitPos));
-    }
-
-    private static boolean barrierContains(CompoundTag payload, BlockPos pos) {
-        if (payload == null || pos == null
-                || !payload.contains(PAYLOAD_AREA_FROM_X, Tag.TAG_INT)
-                || !payload.contains(PAYLOAD_AREA_FROM_Y, Tag.TAG_INT)
-                || !payload.contains(PAYLOAD_AREA_FROM_Z, Tag.TAG_INT)
-                || !payload.contains(PAYLOAD_AREA_TO_X, Tag.TAG_INT)
-                || !payload.contains(PAYLOAD_AREA_TO_Y, Tag.TAG_INT)
-                || !payload.contains(PAYLOAD_AREA_TO_Z, Tag.TAG_INT)) {
-            return false;
-        }
-        int minX = Math.min(payload.getInt(PAYLOAD_AREA_FROM_X), payload.getInt(PAYLOAD_AREA_TO_X));
-        int maxX = Math.max(payload.getInt(PAYLOAD_AREA_FROM_X), payload.getInt(PAYLOAD_AREA_TO_X));
-        int minY = Math.min(payload.getInt(PAYLOAD_AREA_FROM_Y), payload.getInt(PAYLOAD_AREA_TO_Y));
-        int maxY = Math.max(payload.getInt(PAYLOAD_AREA_FROM_Y), payload.getInt(PAYLOAD_AREA_TO_Y));
-        int minZ = Math.min(payload.getInt(PAYLOAD_AREA_FROM_Z), payload.getInt(PAYLOAD_AREA_TO_Z));
-        int maxZ = Math.max(payload.getInt(PAYLOAD_AREA_FROM_Z), payload.getInt(PAYLOAD_AREA_TO_Z));
-        return pos.getX() >= minX && pos.getX() <= maxX
-                && pos.getY() >= minY && pos.getY() <= maxY
-                && pos.getZ() >= minZ && pos.getZ() <= maxZ;
     }
 
     private static String trimToWidth(Font font, String text, int maxWidth) {

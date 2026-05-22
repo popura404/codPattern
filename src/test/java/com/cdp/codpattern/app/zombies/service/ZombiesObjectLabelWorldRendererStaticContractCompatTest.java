@@ -69,8 +69,17 @@ public final class ZombiesObjectLabelWorldRendererStaticContractCompatTest {
                 "MAX_RENDER_DISTANCE",
                 "object labels must be distance gated");
         requireContains(renderer,
+                "FIXED_LABEL_SCALE",
+                "object labels must use a fixed world-space text scale");
+        requireNotContains(renderer,
+                "tanHalfFov",
+                "object labels must not scale text from camera distance and FOV");
+        requireNotContains(renderer,
+                "pixelScale",
+                "object labels must not scale text from camera distance");
+        requireNotContains(renderer,
                 "new ClipContext(",
-                "object labels must avoid rendering through walls");
+                "object labels must be allowed to render through walls");
         requireContains(renderer,
                 "MAX_RENDERED_LABELS",
                 "object labels must cap per-frame label count");
@@ -81,6 +90,12 @@ public final class ZombiesObjectLabelWorldRendererStaticContractCompatTest {
     private static void requireContains(String text, String expected, String message) {
         if (!text.contains(expected)) {
             throw new AssertionError(message + ": missing `" + expected + "`");
+        }
+    }
+
+    private static void requireNotContains(String text, String unexpected, String message) {
+        if (text.contains(unexpected)) {
+            throw new AssertionError(message + ": found `" + unexpected + "`");
         }
     }
 }
