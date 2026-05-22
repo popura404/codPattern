@@ -25,6 +25,7 @@ public final class ClientZombiesStateGrowthCompatTest {
         activeZombieIdsReadFromPlayerValues();
         survivorStatusReadsRoomRosterRuntimeValues();
         roomTeammatesExcludeSelfAndLeftPlayers();
+        resultRowsSortByScoreKillsBarriersDeathsThenName();
     }
 
     private static void missingGrowthKeysUseDefaults() {
@@ -79,6 +80,10 @@ public final class ClientZombiesStateGrowthCompatTest {
                 ZombiesRuntimeStateKeys.survivorLifeState(playerId.toString()), ModePlayerValue.ofString("ALIVE"),
                 ZombiesRuntimeStateKeys.survivorConnectionState(playerId.toString()), ModePlayerValue.ofString("ONLINE"),
                 ZombiesRuntimeStateKeys.survivorPoints(playerId.toString()), ModePlayerValue.ofInt(1250),
+                ZombiesRuntimeStateKeys.survivorTotalEarnedPoints(playerId.toString()), ModePlayerValue.ofInt(1800),
+                ZombiesRuntimeStateKeys.survivorKills(playerId.toString()), ModePlayerValue.ofInt(12),
+                ZombiesRuntimeStateKeys.survivorDeaths(playerId.toString()), ModePlayerValue.ofInt(1),
+                ZombiesRuntimeStateKeys.survivorBarriersOpened(playerId.toString()), ModePlayerValue.ofInt(3),
                 ZombiesRuntimeStateKeys.survivorArmorLevel(playerId.toString()), ModePlayerValue.ofInt(2),
                 ZombiesRuntimeStateKeys.survivorHealth(playerId.toString()), ModePlayerValue.ofDouble(14.5D),
                 ZombiesRuntimeStateKeys.survivorMaxHealth(playerId.toString()), ModePlayerValue.ofDouble(20.0D)
@@ -96,6 +101,10 @@ public final class ClientZombiesStateGrowthCompatTest {
         require("ALIVE".equals(survivor.lifeState()), "life state should come from runtime values");
         require("ONLINE".equals(survivor.connectionState()), "connection state should come from runtime values");
         require(survivor.points() == 1250, "survivor points should come from runtime values");
+        require(survivor.totalEarnedPoints() == 1800, "survivor total earned should come from runtime values");
+        require(survivor.kills() == 12, "survivor kills should come from runtime values");
+        require(survivor.deaths() == 1, "survivor deaths should come from runtime values");
+        require(survivor.barriersOpened() == 3, "survivor barriers should come from runtime values");
         require(survivor.armorLevel() == 2, "survivor armor should come from runtime values");
         requireClose(survivor.health(), 14.5D, "survivor health should come from runtime values");
         requireClose(survivor.maxHealth(), 20.0D, "survivor max health should come from runtime values");
@@ -127,6 +136,61 @@ public final class ClientZombiesStateGrowthCompatTest {
                 .findFirst()
                 .orElseThrow();
         requireClose(leftStatus.health(), 0.0D, "LEFT survivor missing health should default to zero");
+    }
+
+    private static void resultRowsSortByScoreKillsBarriersDeathsThenName() {
+        UUID alpha = UUID.fromString("00000000-0000-0000-0000-000000000301");
+        UUID bravo = UUID.fromString("00000000-0000-0000-0000-000000000302");
+        UUID charlie = UUID.fromString("00000000-0000-0000-0000-000000000303");
+        UUID delta = UUID.fromString("00000000-0000-0000-0000-000000000304");
+        UUID echo = UUID.fromString("00000000-0000-0000-0000-000000000305");
+        ModeRuntimeStateSnapshot snapshot = snapshot(Map.ofEntries(
+                Map.entry(ZombiesRuntimeStateKeys.survivorName(alpha.toString()), ModePlayerValue.ofString("alpha")),
+                Map.entry(ZombiesRuntimeStateKeys.survivorTotalEarnedPoints(alpha.toString()), ModePlayerValue.ofInt(900)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorKills(alpha.toString()), ModePlayerValue.ofInt(9)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorBarriersOpened(alpha.toString()), ModePlayerValue.ofInt(1)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorDeaths(alpha.toString()), ModePlayerValue.ofInt(0)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorName(bravo.toString()), ModePlayerValue.ofString("bravo")),
+                Map.entry(ZombiesRuntimeStateKeys.survivorTotalEarnedPoints(bravo.toString()), ModePlayerValue.ofInt(900)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorKills(bravo.toString()), ModePlayerValue.ofInt(8)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorBarriersOpened(bravo.toString()), ModePlayerValue.ofInt(4)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorDeaths(bravo.toString()), ModePlayerValue.ofInt(0)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorName(charlie.toString()), ModePlayerValue.ofString("charlie")),
+                Map.entry(ZombiesRuntimeStateKeys.survivorTotalEarnedPoints(charlie.toString()), ModePlayerValue.ofInt(900)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorKills(charlie.toString()), ModePlayerValue.ofInt(8)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorBarriersOpened(charlie.toString()), ModePlayerValue.ofInt(3)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorDeaths(charlie.toString()), ModePlayerValue.ofInt(0)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorName(delta.toString()), ModePlayerValue.ofString("delta")),
+                Map.entry(ZombiesRuntimeStateKeys.survivorTotalEarnedPoints(delta.toString()), ModePlayerValue.ofInt(900)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorKills(delta.toString()), ModePlayerValue.ofInt(8)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorBarriersOpened(delta.toString()), ModePlayerValue.ofInt(3)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorDeaths(delta.toString()), ModePlayerValue.ofInt(2)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorName(echo.toString()), ModePlayerValue.ofString("echo")),
+                Map.entry(ZombiesRuntimeStateKeys.survivorTotalEarnedPoints(echo.toString()), ModePlayerValue.ofInt(700)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorKills(echo.toString()), ModePlayerValue.ofInt(20)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorBarriersOpened(echo.toString()), ModePlayerValue.ofInt(9)),
+                Map.entry(ZombiesRuntimeStateKeys.survivorDeaths(echo.toString()), ModePlayerValue.ofInt(0))
+        ));
+
+        List<ClientZombiesState.ResultRow> rows = ClientZombiesState.buildResultRows(
+                snapshot,
+                Map.of(ZombiesTeamNames.SURVIVORS, List.of(
+                        player(alpha, "alpha", true),
+                        player(bravo, "bravo", true),
+                        player(charlie, "charlie", true),
+                        player(delta, "delta", false),
+                        player(echo, "echo", true))),
+                alpha);
+
+        require(rows.stream().map(ClientZombiesState.ResultRow::playerId).toList().equals(List.of(
+                alpha,
+                bravo,
+                charlie,
+                delta,
+                echo
+        )), "result rows should sort by total score, kills, barriers, deaths, then name");
+        require(rows.get(0).self(), "local player row should be marked self");
+        require(!rows.get(3).alive(), "dead result row should expose non-alive status");
     }
 
     private static ModeRuntimeStateSnapshot snapshot(Map<String, ModePlayerValue> values) {

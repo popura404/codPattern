@@ -139,6 +139,14 @@ public final class ZombiesWaveConfigRepositoryCompatTest {
         require(generatedJson.contains("\"minecraft:creeper\""), context + " default wave should contain creeper");
         require(generatedJson.contains("\"minecraft:wolf\""), context + " default wave should contain wolf");
         require(generatedJson.contains("\"minecraft:silverfish\""), context + " default wave should contain silverfish");
+        require(generatedJson.contains("\"minecraft:vindicator\""), context + " default wave should contain vindicator");
+        require(generatedJson.contains("\"minecraft:vex\""), context + " default wave should contain vex");
+        require(generatedJson.contains("\"healthMultiplier\": 1.0"),
+                context + " default wave should show optional per-mob health multiplier");
+        require(generatedJson.contains("\"damageMultiplier\": 1.0"),
+                context + " default wave should show optional per-mob damage multiplier");
+        require(generatedJson.contains("\"speedMultiplier\": 1.0"),
+                context + " default wave should show optional per-mob speed multiplier");
         require(result.isValid(), context + " default wave should load without issues: " + firstIssue(result));
         require(result.getMaxWave() == 1, context + " default wave should set maxWave to 1");
         require(result.getWaves().size() == 1, context + " default wave should load exactly one wave");
@@ -154,6 +162,11 @@ public final class ZombiesWaveConfigRepositoryCompatTest {
         requireReward(wave, "minecraft:creeper", 60, 18, context);
         requireReward(wave, "minecraft:wolf", 36, 12, context);
         requireReward(wave, "minecraft:silverfish", 15, 6, context);
+        requireReward(wave, "minecraft:vindicator", 70, 22, context);
+        requireReward(wave, "minecraft:vex", 50, 16, context);
+        requireMultipliers(wave, "minecraft:zombie", 1.0D, 1.0D, 1.0D, context);
+        requireMultipliers(wave, "minecraft:vindicator", 1.0D, 1.0D, 1.0D, context);
+        requireMultipliers(wave, "minecraft:vex", 1.0D, 1.0D, 1.0D, context);
     }
 
     private static void requireReward(
@@ -173,6 +186,28 @@ public final class ZombiesWaveConfigRepositoryCompatTest {
             }
         }
         throw new AssertionError(context + " default wave should contain reward entry for " + entity);
+    }
+
+    private static void requireMultipliers(
+            ZombiesWaveDefinition wave,
+            String entity,
+            double healthMultiplier,
+            double damageMultiplier,
+            double speedMultiplier,
+            String context
+    ) {
+        for (ZombiesWaveMobEntry mob : wave.getMobs()) {
+            if (entity.equals(mob.getEntity())) {
+                requireClose(mob.getHealthMultiplier(), healthMultiplier,
+                        context + " default health multiplier for " + entity);
+                requireClose(mob.getDamageMultiplier(), damageMultiplier,
+                        context + " default damage multiplier for " + entity);
+                requireClose(mob.getSpeedMultiplier(), speedMultiplier,
+                        context + " default speed multiplier for " + entity);
+                return;
+            }
+        }
+        throw new AssertionError(context + " default wave should contain multiplier entry for " + entity);
     }
 
     private static String firstIssue(ZombiesWaveConfigRepository.LoadResult result) {
@@ -198,6 +233,12 @@ public final class ZombiesWaveConfigRepositoryCompatTest {
     private static void require(boolean condition, String message) {
         if (!condition) {
             throw new AssertionError(message);
+        }
+    }
+
+    private static void requireClose(double actual, double expected, String message) {
+        if (Math.abs(actual - expected) > 0.0001D) {
+            throw new AssertionError(message + ": expected " + expected + " got " + actual);
         }
     }
 }

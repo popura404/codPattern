@@ -15,6 +15,7 @@ import com.cdp.codpattern.app.zombies.map.object.ZombiesInitialSpawnData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesWeaponWallData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesZombieSpawnData;
 import com.cdp.codpattern.app.zombies.model.ZombiesGamePhase;
+import com.cdp.codpattern.app.zombies.model.ZombiesPlayerRuntimeState;
 import com.cdp.codpattern.app.zombies.model.ZombiesTeamNames;
 import com.cdp.codpattern.app.zombies.runtime.ZombiesLifecycleRuntime;
 import com.cdp.codpattern.app.zombies.runtime.ZombiesPhaseStateMachine;
@@ -333,12 +334,46 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         if (player == null || !hasSurvivor(player.getUUID())) {
             return;
         }
+        playerStateService.recordPlayerName(player.getUUID(), player.getName().getString());
         connectionStateService.markOnline(player.getUUID());
         if (runtimeState.phase() == ZombiesGamePhase.WAITING) {
             readyService.initializeReadyState(player);
         }
         syncBarrierVisual(player);
         markRosterDirty();
+    }
+
+    public boolean restoreActiveRoundReconnect(ServerPlayer player) {
+        if (player == null || !isStart || !runtimeState.phase().isRoundRunning()) {
+            return false;
+        }
+        UUID playerId = player.getUUID();
+        if (!playerStateService.canRestoreActiveRoundPlayer(playerId)) {
+            return false;
+        }
+        Optional<ZombiesPlayerRuntimeState> state = playerStateService.get(playerId);
+        if (state.isEmpty()) {
+            return false;
+        }
+
+        playerStateService.recordPlayerName(playerId, player.getName().getString());
+        if (!hasSurvivor(playerId)) {
+            getMapTeams().getTeamByName(ZombiesTeamNames.SURVIVORS)
+                    .ifPresent(team -> team.join(player));
+            if (!hasSurvivor(playerId)) {
+                return false;
+            }
+        }
+
+        connectionStateService.markOnline(playerId);
+        if (state.get().lifeState().isDeadSpectating()) {
+            keepDeadSpectating(player);
+        } else if (!player.gameMode.getGameModeForPlayer().isCreative()) {
+            player.setGameMode(GameType.ADVENTURE);
+        }
+        syncBarrierVisual(player);
+        markRosterDirty();
+        return true;
     }
 
     public ModeRoomHandle roomHandle() {
@@ -437,6 +472,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
             return;
         }
         UUID playerId = player.getUUID();
+        playerStateService.recordPlayerName(playerId, player.getName().getString());
         playerStateService.markAlive(playerId);
         connectionStateService.markOnline(playerId);
         readyService.initializeReadyState(player);
@@ -1275,6 +1311,10 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
                 isStart = true;
                 playerStateService.registerPlayers(context.memberIds());
                 context.memberIds().forEach(playerId -> {
+                    Optional.ofNullable(getServerLevel().getPlayerByUUID(playerId))
+                            .ifPresent(player -> playerStateService.recordPlayerName(
+                                    playerId,
+                                    player.getName().getString()));
                     playerStateService.markAlive(playerId);
                     connectionStateService.markOnline(playerId);
                 });

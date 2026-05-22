@@ -208,6 +208,7 @@ final class ZombiesRoomHandleFactory {
             }
 
             map.onSurvivorJoined(player);
+            sendRosterSnapshotToSurvivors();
             return JoinRoomResult.success(roomId(), CODE_OK);
         }
 
@@ -217,6 +218,7 @@ final class ZombiesRoomHandleFactory {
                 return LeaveRoomResult.failure(roomId(), CODE_PLAYER_MISSING, "");
             }
             map.leaveRoomPlayer(player);
+            sendRosterSnapshotToSurvivors();
             return LeaveRoomResult.success(roomId(), CODE_OK);
         }
 
@@ -280,6 +282,19 @@ final class ZombiesRoomHandleFactory {
                     player);
         }
 
+        private void sendRosterSnapshotToSurvivors() {
+            Map<String, List<PlayerInfo>> teamPlayers = buildTeamPlayers(map);
+            int rosterVersion = map.rosterVersion();
+            String roomKey = roomId().encode();
+            for (ServerPlayer survivor : map.survivorPlayers()) {
+                if (survivor != null) {
+                    ModNetworkChannel.sendToPlayer(
+                            new TeamPlayerListPacket(roomKey, rosterVersion, teamPlayers),
+                            survivor);
+                }
+            }
+        }
+
         private void appendSurvivorHealthValues(ZombiesMap map, Map<String, ModePlayerValue> playerValues) {
             for (ServerPlayer player : map.survivorPlayers()) {
                 if (player == null) {
@@ -333,6 +348,7 @@ final class ZombiesRoomHandleFactory {
         List<PlayerInfo> survivors = new ArrayList<>();
         for (ServerPlayer player : map.survivorPlayers()) {
             UUID playerId = player.getUUID();
+            map.playerStateService().recordPlayerName(playerId, player.getName().getString());
             ZombiesPlayerRuntimeState state = map.playerStateService()
                     .get(playerId)
                     .orElseGet(() -> map.playerStateService().getOrCreate(playerId));
@@ -349,9 +365,29 @@ final class ZombiesRoomHandleFactory {
             ));
         }
         survivors.sort((left, right) -> {
+            int leftScore = map.playerStateService().get(left.uuid())
+                    .map(ZombiesPlayerRuntimeState::displayTotalEarnedPoints)
+                    .orElse(0);
+            int rightScore = map.playerStateService().get(right.uuid())
+                    .map(ZombiesPlayerRuntimeState::displayTotalEarnedPoints)
+                    .orElse(0);
+            int byScore = Integer.compare(rightScore, leftScore);
+            if (byScore != 0) {
+                return byScore;
+            }
             int byKills = Integer.compare(right.kills(), left.kills());
             if (byKills != 0) {
                 return byKills;
+            }
+            int leftBarriers = map.playerStateService().get(left.uuid())
+                    .map(ZombiesPlayerRuntimeState::barriersOpened)
+                    .orElse(0);
+            int rightBarriers = map.playerStateService().get(right.uuid())
+                    .map(ZombiesPlayerRuntimeState::barriersOpened)
+                    .orElse(0);
+            int byBarriers = Integer.compare(rightBarriers, leftBarriers);
+            if (byBarriers != 0) {
+                return byBarriers;
             }
             int byDeaths = Integer.compare(left.deaths(), right.deaths());
             if (byDeaths != 0) {

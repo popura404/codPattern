@@ -92,6 +92,7 @@ public final class ZombiesBarrierService {
 
             ZombiesObjectStateStore.BarrierGroupUpdate update = clearResult.value().orElseThrow();
             activeSpawnGroupService.activate(update.group());
+            economyService.recordBarrierOpened(playerId);
             BarrierPurchaseResult purchase = new BarrierPurchaseResult(
                     roomId,
                     update.group(),

@@ -162,7 +162,7 @@ public final class ZombiesMobSpawnService {
                 spawn.yaw(),
                 spawn.pitch());
         applySpawnedMobSpecialRules(mob);
-        applyWaveAttributes(mob, waveDefinition);
+        applyWaveAttributes(mob, mobId.get(), waveDefinition);
         applyRoomMonsterRetention(mob);
         applyRoomMonsterObstacleJumping(mob);
         applyRoomMonsterObstacleDetouring(mob);
@@ -440,17 +440,54 @@ public final class ZombiesMobSpawnService {
         return Math.max(min, Math.min(max, value));
     }
 
-    private static void applyWaveAttributes(Mob mob, ZombiesWaveDefinition waveDefinition) {
+    private static void applyWaveAttributes(Mob mob, String rawMobId, ZombiesWaveDefinition waveDefinition) {
         if (waveDefinition == null) {
             return;
         }
-        multiplyAttribute(mob, Attributes.MAX_HEALTH, waveDefinition.getHealthMultiplier());
-        multiplyAttribute(mob, Attributes.MOVEMENT_SPEED, waveDefinition.getSpeedMultiplier());
-        multiplyAttribute(mob, Attributes.ATTACK_DAMAGE, waveDefinition.getDamageMultiplier());
+        String normalizedMobId = ZombiesWaveValidator.normalizedEntityId(rawMobId).orElse("");
+        ZombiesWaveMobEntry mobEntry = matchingMobEntry(waveDefinition, normalizedMobId).orElse(null);
+        multiplyAttribute(
+                mob,
+                Attributes.MAX_HEALTH,
+                combinedAttributeMultiplier(waveDefinition.getHealthMultiplier(), mobEntryHealthMultiplier(mobEntry)));
+        multiplyAttribute(
+                mob,
+                Attributes.MOVEMENT_SPEED,
+                combinedAttributeMultiplier(waveDefinition.getSpeedMultiplier(), mobEntrySpeedMultiplier(mobEntry)));
+        multiplyAttribute(
+                mob,
+                Attributes.ATTACK_DAMAGE,
+                combinedAttributeMultiplier(waveDefinition.getDamageMultiplier(), mobEntryDamageMultiplier(mobEntry)));
         mob.setHealth(mob.getMaxHealth());
     }
 
+    private static double mobEntryHealthMultiplier(ZombiesWaveMobEntry mobEntry) {
+        return mobEntry == null ? 1.0D : mobEntry.getHealthMultiplier();
+    }
+
+    private static double mobEntryDamageMultiplier(ZombiesWaveMobEntry mobEntry) {
+        return mobEntry == null ? 1.0D : mobEntry.getDamageMultiplier();
+    }
+
+    private static double mobEntrySpeedMultiplier(ZombiesWaveMobEntry mobEntry) {
+        return mobEntry == null ? 1.0D : mobEntry.getSpeedMultiplier();
+    }
+
+    private static double combinedAttributeMultiplier(double waveMultiplier, double mobMultiplier) {
+        if (!Double.isFinite(waveMultiplier) || waveMultiplier <= 0.0D) {
+            return mobMultiplier;
+        }
+        if (!Double.isFinite(mobMultiplier) || mobMultiplier <= 0.0D) {
+            return waveMultiplier;
+        }
+        double combined = waveMultiplier * mobMultiplier;
+        return Double.isFinite(combined) && combined > 0.0D ? combined : waveMultiplier;
+    }
+
     private static void applyRoomMonsterAttackCadence(Mob mob) {
+        if (usesVanillaPhaseMovement(mob)) {
+            return;
+        }
         if (mob instanceof PathfinderMob pathfinderMob) {
             pathfinderMob.goalSelector.addGoal(
                     1,
@@ -473,6 +510,9 @@ public final class ZombiesMobSpawnService {
     }
 
     private static void applyRoomMonsterObstacleJumping(Mob mob) {
+        if (usesVanillaPhaseMovement(mob)) {
+            return;
+        }
         if (mob instanceof PathfinderMob pathfinderMob) {
             pathfinderMob.goalSelector.addGoal(
                     0,
@@ -481,6 +521,9 @@ public final class ZombiesMobSpawnService {
     }
 
     private static void applyRoomMonsterObstacleDetouring(Mob mob) {
+        if (usesVanillaPhaseMovement(mob)) {
+            return;
+        }
         if (mob instanceof PathfinderMob pathfinderMob) {
             pathfinderMob.goalSelector.addGoal(
                     0,
@@ -489,6 +532,9 @@ public final class ZombiesMobSpawnService {
     }
 
     private static void applyRoomMonsterDropDownChasing(Mob mob) {
+        if (usesVanillaPhaseMovement(mob)) {
+            return;
+        }
         if (mob instanceof PathfinderMob pathfinderMob) {
             pathfinderMob.goalSelector.addGoal(
                     2,
@@ -524,6 +570,10 @@ public final class ZombiesMobSpawnService {
             wolf.setPersistentAngerTarget(target.getUUID());
             wolf.setRemainingPersistentAngerTime(ROOM_MONSTER_WOLF_ANGER_TICKS);
         }
+    }
+
+    private static boolean usesVanillaPhaseMovement(Mob mob) {
+        return mob != null && mob.getType() == EntityType.VEX;
     }
 
     private static void attachWaveRewardMetadata(Mob mob, String rawMobId, ZombiesWaveDefinition waveDefinition) {
@@ -1088,6 +1138,8 @@ public final class ZombiesMobSpawnService {
             case ZombiesWaveValidator.VANILLA_CREEPER_ID -> EntityType.CREEPER.create(level);
             case ZombiesWaveValidator.VANILLA_WOLF_ID -> EntityType.WOLF.create(level);
             case ZombiesWaveValidator.VANILLA_SILVERFISH_ID -> EntityType.SILVERFISH.create(level);
+            case ZombiesWaveValidator.VANILLA_VINDICATOR_ID -> EntityType.VINDICATOR.create(level);
+            case ZombiesWaveValidator.VANILLA_VEX_ID -> EntityType.VEX.create(level);
             default -> null;
         };
     }

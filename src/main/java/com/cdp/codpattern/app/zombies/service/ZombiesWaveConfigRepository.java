@@ -77,6 +77,26 @@ public final class ZombiesWaveConfigRepository {
                   "count": 4,
                   "killPoints": 15,
                   "assistPoints": 6
+                },
+                {
+                  "entity": "minecraft:vindicator",
+                  "description": "Direct melee illager example with optional per-mob attribute multipliers.",
+                  "count": 1,
+                  "healthMultiplier": 1.0,
+                  "damageMultiplier": 1.0,
+                  "speedMultiplier": 1.0,
+                  "killPoints": 70,
+                  "assistPoints": 22
+                },
+                {
+                  "entity": "minecraft:vex",
+                  "description": "Phasing flying mob example; zombies mode leaves its wall-passing movement intact.",
+                  "count": 2,
+                  "healthMultiplier": 1.0,
+                  "damageMultiplier": 1.0,
+                  "speedMultiplier": 1.0,
+                  "killPoints": 50,
+                  "assistPoints": 16
                 }
               ]
             }

@@ -5,6 +5,7 @@ import com.cdp.codpattern.app.zombies.model.ZombiesBuffType;
 import com.cdp.codpattern.app.zombies.model.ZombiesConnectionState;
 import com.cdp.codpattern.app.zombies.model.ZombiesLifeState;
 import com.cdp.codpattern.app.zombies.model.ZombiesPlayerRuntimeState;
+import com.cdp.codpattern.app.zombies.sync.ZombiesRuntimeStateKeys;
 
 import java.util.List;
 import java.util.UUID;
@@ -15,11 +16,13 @@ public final class ZombiesEconomyConnectionServiceCompatTest {
 
     public static void main(String[] args) {
         displayPointsFloorsFractionalPoints();
+        totalEarnedPointsTracksAwardsButNotSpendOrRefund();
         spendSuccessDeductsPoints();
         spendFailuresKeepBalanceAndReturnExpectedErrors();
         killAndAssistsSkipsKillerAndLeftContributor();
         scoreMultiplierAppliesToKillAndAssistRewards();
         offlineGraceCountsAlivePlayersUntilTimeout();
+        activeRoundReconnectEligibilityKeepsExistingStats();
     }
 
     private static void displayPointsFloorsFractionalPoints() {
@@ -31,6 +34,24 @@ public final class ZombiesEconomyConnectionServiceCompatTest {
 
         require(economy.displayPoints(playerId) == 12, "display points should floor fractional points");
         requireIntPlayerValue(players, playerId, "points", 12, "player values should expose floored points");
+    }
+
+    private static void totalEarnedPointsTracksAwardsButNotSpendOrRefund() {
+        ZombiesPlayerStateService players = new ZombiesPlayerStateService();
+        ZombiesEconomyService economy = new ZombiesEconomyService(players);
+        UUID playerId = playerId(30);
+
+        requireSuccess(economy.addPoints(playerId, 20.5D), "setup earned points should succeed");
+        requireSuccess(economy.spend(playerId, 7.25D), "spend should not affect total earned points");
+        players.getOrCreate(playerId).refundPoints(4.0D);
+        requireSuccess(economy.awardKill(playerId, 10.0D), "kill reward should count as earned points");
+
+        ZombiesPlayerRuntimeState state = players.get(playerId).orElseThrow();
+        requireClose(state.points(), 27.25D, "balance should include refund and kill reward");
+        requireClose(state.totalEarnedPoints(), 30.5D, "total earned should include grants and kill rewards only");
+        require(state.displayTotalEarnedPoints() == 30, "display total earned should floor fractional total");
+        requireIntPlayerValue(players, playerId, ZombiesRuntimeStateKeys.PLAYER_TOTAL_EARNED_POINTS, 30,
+                "player values should expose floored total earned points");
     }
 
     private static void spendSuccessDeductsPoints() {
@@ -146,6 +167,34 @@ public final class ZombiesEconomyConnectionServiceCompatTest {
                 "timeout should not rewrite offline connection state");
         require(players.aliveCount(121L, connections.offlineGraceTicks()) == 1,
                 "timed out offline player should no longer count as alive");
+    }
+
+    private static void activeRoundReconnectEligibilityKeepsExistingStats() {
+        ZombiesPlayerStateService players = new ZombiesPlayerStateService();
+        ZombiesConnectionStateService connections = new ZombiesConnectionStateService(players, 20L);
+        UUID reconnectingId = playerId(12);
+
+        ZombiesPlayerRuntimeState state = players.getOrCreate(reconnectingId);
+        state.addPoints(42.0D);
+        state.addKill();
+        connections.markOffline(reconnectingId, 200L);
+
+        require(players.canRestoreActiveRoundPlayer(reconnectingId),
+                "offline player with existing runtime state should be eligible for active-round reconnect restore");
+
+        connections.markOnline(reconnectingId);
+
+        ZombiesPlayerRuntimeState restored = players.get(reconnectingId).orElseThrow();
+        requireClose(restored.points(), 42.0D, "active-round reconnect should keep point balance");
+        require(restored.kills() == 1, "active-round reconnect should keep kill stats");
+        require(restored.connectionState() == ZombiesConnectionState.ONLINE,
+                "active-round reconnect should mark the existing runtime state online");
+
+        restored.markLeft();
+        require(!players.canRestoreActiveRoundPlayer(reconnectingId),
+                "explicitly left player should not be eligible for active-round reconnect restore");
+        require(!players.canRestoreActiveRoundPlayer(playerId(13)),
+                "unknown player should not be eligible for active-round reconnect restore");
     }
 
     private static void assertSpendFailureKeepsBalance(

@@ -18,13 +18,22 @@ public final class ZombiesSurvivorRuntimeStateSyncCompatTest {
     private static void survivorValuesIncludeRoomTeammateHudFields() {
         UUID playerId = UUID.fromString("00000000-0000-0000-0000-000000000301");
         ZombiesPlayerStateService players = new ZombiesPlayerStateService();
-        players.getOrCreate(playerId).setPoints(1500.0D);
+        players.recordPlayerName(playerId, "sync-player");
+        players.getOrCreate(playerId).addPoints(1500.0D);
+        players.getOrCreate(playerId).addKill();
+        players.getOrCreate(playerId).addBarrierOpened();
+        players.getOrCreate(playerId).markDeadSpectating();
         players.getOrCreate(playerId).setArmor(new ZombiesArmorState(3, 0.65D));
 
         Map<String, ModePlayerValue> values = players.survivorValues();
-        requireValue(values, ZombiesRuntimeStateKeys.survivorLifeState(playerId.toString()), "ALIVE");
+        requireValue(values, ZombiesRuntimeStateKeys.survivorName(playerId.toString()), "sync-player");
+        requireValue(values, ZombiesRuntimeStateKeys.survivorLifeState(playerId.toString()), "DEAD_SPECTATING");
         requireValue(values, ZombiesRuntimeStateKeys.survivorConnectionState(playerId.toString()), "ONLINE");
         requireValue(values, ZombiesRuntimeStateKeys.survivorPoints(playerId.toString()), "1500");
+        requireValue(values, ZombiesRuntimeStateKeys.survivorTotalEarnedPoints(playerId.toString()), "1500");
+        requireValue(values, ZombiesRuntimeStateKeys.survivorKills(playerId.toString()), "1");
+        requireValue(values, ZombiesRuntimeStateKeys.survivorDeaths(playerId.toString()), "1");
+        requireValue(values, ZombiesRuntimeStateKeys.survivorBarriersOpened(playerId.toString()), "1");
         requireValue(values, ZombiesRuntimeStateKeys.survivorArmorLevel(playerId.toString()), "3");
 
         System.out.println("PASS zombies survivor runtime state sync compat");

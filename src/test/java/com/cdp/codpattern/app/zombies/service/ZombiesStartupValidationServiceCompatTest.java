@@ -99,13 +99,13 @@ public final class ZombiesStartupValidationServiceCompatTest {
                     "preflight should create default wave_001.json");
             require(snapshot.waveLoadResult().getWaves().size() == 1,
                     "preflight should load generated default wave");
-            require(snapshot.waveLoadResult().getWaves().get(0).totalMobCount() == 23,
+            require(snapshot.waveLoadResult().getWaves().get(0).totalMobCount() == 26,
                     "generated default wave should be usable by runtime budget initialization");
             ZombiesWaveRuntimeState waveState = new ZombiesWaveRuntimeState();
             new ZombiesWaveDirector(snapshot.waveLoadResult().getWaves()).enterTargetWave(waveState);
             require(waveState.maxWave() == 1, "generated default wave should configure director maxWave");
             require(waveState.currentWave() == 1, "generated default wave should enter wave 1");
-            require(waveState.remainingBudget() == 23, "generated default wave should initialize runtime budget");
+            require(waveState.remainingBudget() == 26, "generated default wave should initialize runtime budget");
         });
     }
 

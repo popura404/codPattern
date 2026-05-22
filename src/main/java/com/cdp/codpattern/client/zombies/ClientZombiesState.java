@@ -15,6 +15,7 @@ import net.minecraft.client.Minecraft;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +88,14 @@ public final class ClientZombiesState {
                 .orElse(0);
     }
 
+    public static int totalEarnedPoints() {
+        return snapshot()
+                .map(snapshot -> intValue(
+                        snapshot.playerValues().get(ZombiesRuntimeStateKeys.PLAYER_TOTAL_EARNED_POINTS),
+                        0))
+                .orElse(0);
+    }
+
     public static int kills() {
         return snapshot()
                 .map(snapshot -> intValue(snapshot.playerValues().get(ZombiesRuntimeStateKeys.PLAYER_KILLS), 0))
@@ -102,6 +111,12 @@ public final class ClientZombiesState {
     public static int deaths() {
         return snapshot()
                 .map(snapshot -> intValue(snapshot.playerValues().get(ZombiesRuntimeStateKeys.PLAYER_DEATHS), 0))
+                .orElse(0);
+    }
+
+    public static int barriersOpened() {
+        return snapshot()
+                .map(snapshot -> intValue(snapshot.playerValues().get(ZombiesRuntimeStateKeys.PLAYER_BARRIERS_OPENED), 0))
                 .orElse(0);
     }
 
@@ -192,6 +207,15 @@ public final class ClientZombiesState {
         return filterRoomTeammates(survivors());
     }
 
+    public static List<ResultRow> leaderboardRows() {
+        Optional<ModeRuntimeStateSnapshot> snapshotOptional = snapshot();
+        if (snapshotOptional.isEmpty()) {
+            return List.of();
+        }
+        UUID localPlayerId = Minecraft.getInstance().player == null ? null : Minecraft.getInstance().player.getUUID();
+        return buildResultRows(snapshotOptional.get(), ClientMatchState.teamPlayersSnapshot(), localPlayerId);
+    }
+
     static List<SurvivorStatus> buildSurvivorStatuses(
             ModeRuntimeStateSnapshot snapshot,
             Map<String, List<PlayerInfo>> rosters,
@@ -221,6 +245,18 @@ public final class ClientZombiesState {
             int points = intValue(
                     snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorPoints(playerIdText)),
                     0);
+            int totalEarnedPoints = intValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorTotalEarnedPoints(playerIdText)),
+                    points);
+            int kills = intValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorKills(playerIdText)),
+                    playerInfo.kills());
+            int deaths = intValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorDeaths(playerIdText)),
+                    playerInfo.deaths());
+            int barriersOpened = intValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorBarriersOpened(playerIdText)),
+                    0);
             int armorLevel = intValue(
                     snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorArmorLevel(playerIdText)),
                     0);
@@ -237,6 +273,10 @@ public final class ClientZombiesState {
                     lifeState,
                     connectionState,
                     points,
+                    totalEarnedPoints,
+                    kills,
+                    deaths,
+                    barriersOpened,
                     armorLevel,
                     health,
                     maxHealth,
@@ -253,6 +293,78 @@ public final class ClientZombiesState {
                 .filter(survivor -> survivor != null && !survivor.self())
                 .filter(survivor -> !"LEFT".equals(survivor.connectionState()))
                 .toList();
+    }
+
+    static List<ResultRow> buildResultRows(
+            ModeRuntimeStateSnapshot snapshot,
+            Map<String, List<PlayerInfo>> rosters,
+            UUID localPlayerId
+    ) {
+        if (snapshot == null) {
+            return List.of();
+        }
+        Map<UUID, PlayerInfo> rosterById = new LinkedHashMap<>();
+        if (rosters != null) {
+            for (List<PlayerInfo> players : rosters.values()) {
+                if (players == null) {
+                    continue;
+                }
+                for (PlayerInfo player : players) {
+                    if (player != null && player.uuid() != null) {
+                        rosterById.putIfAbsent(player.uuid(), player);
+                    }
+                }
+            }
+        }
+
+        Set<UUID> playerIds = new LinkedHashSet<>(rosterById.keySet());
+        for (String key : snapshot.playerValues().keySet()) {
+            UUID playerId = survivorPlayerIdFromKey(key);
+            if (playerId != null) {
+                playerIds.add(playerId);
+            }
+        }
+
+        List<ResultRow> rows = new ArrayList<>();
+        for (UUID playerId : playerIds) {
+            String playerIdText = playerId.toString();
+            PlayerInfo player = rosterById.get(playerId);
+            String syncedName = stringValue(snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorName(playerIdText)), "");
+            String name = safeName(syncedName.isBlank() && player != null ? player.name() : syncedName);
+            int rosterKills = player == null ? 0 : player.kills();
+            int rosterDeaths = player == null ? 0 : player.deaths();
+            int points = intValue(snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorPoints(playerIdText)), 0);
+            int totalEarnedPoints = intValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorTotalEarnedPoints(playerIdText)),
+                    points);
+            int kills = intValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorKills(playerIdText)),
+                    rosterKills);
+            int deaths = intValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorDeaths(playerIdText)),
+                    rosterDeaths);
+            int barriersOpened = intValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorBarriersOpened(playerIdText)),
+                    0);
+            String lifeState = stringValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorLifeState(playerIdText)),
+                    player != null && player.isAlive() ? "ALIVE" : "DEAD_SPECTATING");
+            String connectionState = stringValue(
+                    snapshot.playerValues().get(ZombiesRuntimeStateKeys.survivorConnectionState(playerIdText)),
+                    "");
+            rows.add(new ResultRow(
+                    playerId,
+                    name,
+                    lifeState,
+                    connectionState,
+                    totalEarnedPoints,
+                    kills,
+                    barriersOpened,
+                    deaths,
+                    playerId.equals(localPlayerId)));
+        }
+        rows.sort(RESULT_ROW_COMPARATOR);
+        return List.copyOf(rows);
     }
 
     private static int metric(ModeRuntimeStateSnapshot snapshot, String key) {
@@ -275,6 +387,29 @@ public final class ClientZombiesState {
             return BuiltInGameModes.isZombies(RoomId.decode(roomKey).gameType());
         } catch (IllegalArgumentException ignored) {
             return false;
+        }
+    }
+
+    private static final Comparator<ResultRow> RESULT_ROW_COMPARATOR = Comparator
+            .comparingInt(ResultRow::totalEarnedPoints).reversed()
+            .thenComparing(Comparator.comparingInt(ResultRow::kills).reversed())
+            .thenComparing(Comparator.comparingInt(ResultRow::barriersOpened).reversed())
+            .thenComparingInt(ResultRow::deaths)
+            .thenComparing(row -> safeName(row.name()), String.CASE_INSENSITIVE_ORDER);
+
+    private static UUID survivorPlayerIdFromKey(String key) {
+        if (key == null || !key.startsWith("survivor.")) {
+            return null;
+        }
+        String remainder = key.substring("survivor.".length());
+        int separator = remainder.indexOf('.');
+        if (separator <= 0) {
+            return null;
+        }
+        try {
+            return UUID.fromString(remainder.substring(0, separator));
+        } catch (IllegalArgumentException ignored) {
+            return null;
         }
     }
 
@@ -323,6 +458,10 @@ public final class ClientZombiesState {
         return value.value();
     }
 
+    private static String safeName(String name) {
+        return name == null || name.isBlank() ? "Player" : name;
+    }
+
     private static double defaultSurvivorHealth(String lifeState, String connectionState) {
         if ("DEAD_SPECTATING".equals(lifeState) || "OFFLINE".equals(connectionState) || "LEFT".equals(connectionState)) {
             return 0.0D;
@@ -336,10 +475,30 @@ public final class ClientZombiesState {
             String lifeState,
             String connectionState,
             int points,
+            int totalEarnedPoints,
+            int kills,
+            int deaths,
+            int barriersOpened,
             int armorLevel,
             double health,
             double maxHealth,
             boolean self
     ) {
+    }
+
+    public record ResultRow(
+            UUID playerId,
+            String name,
+            String lifeState,
+            String connectionState,
+            int totalEarnedPoints,
+            int kills,
+            int barriersOpened,
+            int deaths,
+            boolean self
+    ) {
+        public boolean alive() {
+            return !"LEFT".equals(connectionState) && "ALIVE".equals(lifeState);
+        }
     }
 }

@@ -78,11 +78,20 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
     private static final int TEAMMATE_ROW_GAP = 5;
     private static final int TEAMMATE_STATUS_BOTTOM_GAP = 8;
     private static final int TEAMMATE_MIN_RIGHT_MARGIN = 8;
+    private static final int LEADERBOARD_LEFT = 8;
+    private static final int LEADERBOARD_ROW_WIDTH = 156;
+    private static final int LEADERBOARD_ROW_HEIGHT = 18;
+    private static final int LEADERBOARD_ROW_GAP = 3;
+    private static final int RESULT_PAGE_COUNT = 2;
+    private static final long RESULT_PAGE_DURATION_MS = 5000L;
+    private static final long RESULT_PAGE_FADE_MS = 550L;
     private static final int HELD_RARITY_RIGHT_MARGIN = 16;
     private static final int HELD_RARITY_BOTTOM_MARGIN = 42;
     private static final int HELD_UPGRADE_LEVEL_BOTTOM_MARGIN = 28;
     private static int intermissionWaveNumber = Integer.MIN_VALUE;
     private static long intermissionWaveStartedAtMs;
+    private static String resultPhaseKey = "";
+    private static long resultPhaseStartedAtMs;
 
     private ZombiesHudOverlay() {
     }
@@ -96,12 +105,19 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
         Font font = Minecraft.getInstance().font;
         TdmHudOverlay.INSTANCE.renderSharedPlayerScreenEffects(graphics, partialTick, screenWidth, screenHeight);
         String phase = ClientZombiesState.phaseKey();
+        if (isResultPhase(phase)) {
+            clearIntermissionWaveAnnouncement();
+            renderZombiesResultOverlay(graphics, font, screenWidth / 2, screenWidth, screenHeight, phase);
+            return;
+        }
+        clearResultPageTracking();
         if ("INTERMISSION".equals(phase)) {
             renderIntermissionWaveAnnouncement(graphics, font, screenWidth, screenHeight);
         } else {
             clearIntermissionWaveAnnouncement();
             renderTopStats(graphics, font, screenWidth);
         }
+        renderScoreLeaderboard(graphics, font, screenWidth, screenHeight);
         renderRoomTeammateStatus(graphics, font, screenWidth, screenHeight);
         renderPhaseNotice(graphics, font, screenWidth, screenHeight);
         renderInteractionPrompt(graphics, font, screenWidth, screenHeight);
@@ -127,6 +143,54 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
         int x = right - font.width(label) - font.width(value);
         graphics.drawString(font, label, x, y, TEXT_PRIMARY, true);
         graphics.drawString(font, value, x + font.width(label), y, TEXT_ZOMBIES_DARK_YELLOW, true);
+    }
+
+    private static void renderScoreLeaderboard(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
+        List<ClientZombiesState.ResultRow> rows = ClientZombiesState.leaderboardRows();
+        if (rows.isEmpty()) {
+            return;
+        }
+        int x = LEADERBOARD_LEFT;
+        int y = screenHeight >= 500 ? 92 : 70;
+        int width = LEADERBOARD_ROW_WIDTH;
+        if (x + width >= screenWidth || y >= screenHeight - 40) {
+            return;
+        }
+
+        String title = Component.translatable("hud.codpattern.zombies.leaderboard.title").getString();
+        graphics.drawString(font, fit(font, title, width), x, y, TEXT_ACCENT, true);
+        int rowY = y + font.lineHeight + 4;
+        int maxRows = Math.min(rows.size(), Math.max(0, (screenHeight - rowY - 8) / (LEADERBOARD_ROW_HEIGHT + LEADERBOARD_ROW_GAP)));
+        for (int i = 0; i < maxRows; i++) {
+            renderScoreLeaderboardRow(graphics, font, x, rowY + i * (LEADERBOARD_ROW_HEIGHT + LEADERBOARD_ROW_GAP),
+                    width, LEADERBOARD_ROW_HEIGHT, i, rows.get(i));
+        }
+    }
+
+    private static void renderScoreLeaderboardRow(
+            GuiGraphics graphics,
+            Font font,
+            int x,
+            int y,
+            int width,
+            int height,
+            int index,
+            ClientZombiesState.ResultRow row
+    ) {
+        int accent = row.self() ? TEXT_ACCENT : (row.alive() ? TEXT_OK : TEXT_SECONDARY);
+        graphics.fillGradient(x, y, x + width, y + height, withAlpha(0xFF111820, 160), withAlpha(0xFF080D12, 112));
+        graphics.fill(x, y, x + 2, y + height, withAlpha(accent, 210));
+
+        String rank = Integer.toString(index + 1);
+        graphics.drawString(font, rank, x + 5, y + 5, withAlpha(TEXT_SECONDARY, 230), false);
+
+        String score = Integer.toString(Math.max(0, row.totalEarnedPoints()));
+        int scoreWidth = font.width(score);
+        graphics.drawString(font, score, x + width - scoreWidth - 6, y + 5, TEXT_ACCENT, false);
+
+        int nameX = x + 19;
+        int nameWidth = Math.max(0, width - 28 - scoreWidth);
+        graphics.drawString(font, fit(font, safeName(row.name()), nameWidth), nameX, y + 5, accent, false);
     }
 
     private static void renderIntermissionWaveAnnouncement(
@@ -302,6 +366,206 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
         int y = Math.max(58, screenHeight / 3);
         graphics.fill(x - 8, y - 6, x + font.width(text) + 8, y + font.lineHeight + 6, 0x77000000);
         graphics.drawString(font, text, x, y, phaseColor(phase), true);
+    }
+
+    private static void renderZombiesResultOverlay(
+            GuiGraphics graphics,
+            Font font,
+            int centerX,
+            int screenWidth,
+            int screenHeight,
+            String phase
+    ) {
+        long pageTick = resultPageTickMs(phase);
+        int pageIndex = resultPageIndex(pageTick);
+        int alpha = Mth.clamp(Math.round(computeResultPageAlpha(pageTick) * 255.0F), 0, 255);
+        if (alpha <= 0) {
+            return;
+        }
+
+        int accent = resultAccentColor(phase);
+        renderResultBackdrop(graphics, screenWidth, screenHeight, alpha, accent);
+        if (pageIndex == 0) {
+            renderResultSurvivalPage(graphics, font, centerX, screenWidth, screenHeight, alpha, accent, phase);
+        } else {
+            renderResultSettlementPage(graphics, font, centerX, screenWidth, screenHeight, alpha, accent, pageTick);
+        }
+
+        String pageText = Component.translatable(
+                "hud.codpattern.zombies.result.page_index",
+                pageIndex + 1,
+                RESULT_PAGE_COUNT).getString();
+        drawCenteredString(graphics, font, pageText, centerX, screenHeight - 20, withAlpha(0xFFE4E4E4, alpha));
+    }
+
+    private static void renderResultBackdrop(GuiGraphics graphics, int screenWidth, int screenHeight, int alpha, int accent) {
+        graphics.fill(0, 0, screenWidth, screenHeight, (alpha * 3 / 7) << 24);
+        graphics.fill(0, 0, screenWidth, 36, withAlpha(accent, alpha));
+        graphics.fill(0, screenHeight - 36, screenWidth, screenHeight, withAlpha(accent, alpha));
+    }
+
+    private static void renderResultSurvivalPage(
+            GuiGraphics graphics,
+            Font font,
+            int centerX,
+            int screenWidth,
+            int screenHeight,
+            int alpha,
+            int accent,
+            String phase
+    ) {
+        List<ClientZombiesState.ResultRow> rows = ClientZombiesState.leaderboardRows();
+        int panelWidth = Math.min(700, screenWidth - 36);
+        int panelHeight = Math.min(254, screenHeight - 84);
+        int x = centerX - panelWidth / 2;
+        int y = screenHeight / 2 - panelHeight / 2;
+
+        graphics.fillGradient(x, y, x + panelWidth, y + panelHeight, withAlpha(0xFF0F1520, alpha), withAlpha(0xFF151D2A, alpha));
+        graphics.fill(x, y + panelHeight - 3, x + panelWidth, y + panelHeight, withAlpha(accent, alpha));
+
+        String title = Component.translatable("hud.codpattern.zombies.result.title." + phase.toLowerCase(Locale.ROOT)).getString();
+        drawScaledCenteredString(graphics, font, title, centerX, y + 20, withAlpha(TEXT_PRIMARY, alpha), 1.8F);
+
+        long alive = rows.stream().filter(ClientZombiesState.ResultRow::alive).count();
+        String summary = Component.translatable(
+                "hud.codpattern.zombies.result.survival.summary",
+                Math.max(0, ClientZombiesState.wave()),
+                alive,
+                rows.size()).getString();
+        drawCenteredString(graphics, font, summary, centerX, y + 56, withAlpha(TEXT_SECONDARY, alpha));
+        drawCenteredString(graphics, font, Component.translatable("hud.codpattern.zombies.result.page.survival").getString(),
+                centerX, y + 76, withAlpha(TEXT_ACCENT, alpha));
+
+        int rowWidth = Math.min(312, panelWidth - 28);
+        int columns = panelWidth >= 590 ? 2 : 1;
+        int gap = 12;
+        int columnWidth = columns == 2 ? (panelWidth - 28 - gap) / 2 : rowWidth;
+        int startX = columns == 2 ? x + 14 : centerX - columnWidth / 2;
+        int startY = y + 98;
+        int rowHeight = 28;
+        int rowGap = 5;
+        int maxRowsPerColumn = Math.max(1, (panelHeight - 112) / (rowHeight + rowGap));
+        int maxRows = Math.min(rows.size(), maxRowsPerColumn * columns);
+        for (int i = 0; i < maxRows; i++) {
+            int column = columns == 1 ? 0 : i / maxRowsPerColumn;
+            int rowIndex = columns == 1 ? i : i % maxRowsPerColumn;
+            int rowX = startX + column * (columnWidth + gap);
+            int rowY = startY + rowIndex * (rowHeight + rowGap);
+            renderResultSurvivorRow(graphics, font, rowX, rowY, columnWidth, rowHeight, rows.get(i), alpha);
+        }
+    }
+
+    private static void renderResultSurvivorRow(
+            GuiGraphics graphics,
+            Font font,
+            int x,
+            int y,
+            int width,
+            int height,
+            ClientZombiesState.ResultRow row,
+            int alpha
+    ) {
+        int accent = row.alive() ? TEXT_OK : TEXT_DANGER;
+        graphics.fillGradient(x, y, x + width, y + height, withAlpha(0xFF111820, alpha), withAlpha(0xFF0A0F15, alpha));
+        graphics.fill(x, y, x + 2, y + height, withAlpha(accent, alpha));
+
+        renderSurvivorAvatar(graphics, row.playerId(), row.name(), x + 5, y + 5, 18);
+        int textX = x + 29;
+        String status = resultStatusText(row);
+        graphics.drawString(font, fit(font, safeName(row.name()), Math.max(0, width - 104)), textX, y + 4,
+                withAlpha(TEXT_PRIMARY, alpha), false);
+        graphics.drawString(font, fit(font, status, Math.max(0, width - 104)), textX, y + 15,
+                withAlpha(accent, alpha), false);
+        String score = Integer.toString(Math.max(0, row.totalEarnedPoints()));
+        graphics.drawString(font, score, x + width - font.width(score) - 6, y + 10, withAlpha(TEXT_ACCENT, alpha), false);
+    }
+
+    private static void renderResultSettlementPage(
+            GuiGraphics graphics,
+            Font font,
+            int centerX,
+            int screenWidth,
+            int screenHeight,
+            int alpha,
+            int accent,
+            long pageTick
+    ) {
+        List<ClientZombiesState.ResultRow> rows = ClientZombiesState.leaderboardRows();
+        int panelWidth = Math.min(820, screenWidth - 30);
+        int panelHeight = Math.min(282, screenHeight - 76);
+        int x = centerX - panelWidth / 2;
+        int y = screenHeight / 2 - panelHeight / 2;
+
+        graphics.fillGradient(x, y, x + panelWidth, y + panelHeight, withAlpha(0xFF0E141D, alpha), withAlpha(0xFF141E2B, alpha));
+        graphics.fill(x, y + panelHeight - 3, x + panelWidth, y + panelHeight, withAlpha(accent, alpha));
+        drawCenteredString(graphics, font, Component.translatable("hud.codpattern.zombies.result.page.settlement").getString(),
+                centerX, y + 10, withAlpha(TEXT_PRIMARY, alpha));
+
+        int contentX = x + 12;
+        int contentY = y + 29;
+        int contentWidth = panelWidth - 24;
+        renderResultTableHeader(graphics, font, contentX, contentY, contentWidth, alpha);
+
+        int rowY = contentY + 17;
+        int rowHeight = 24;
+        int rowGap = 3;
+        int maxRows = Math.min(rows.size(), Math.max(0, (panelHeight - 50) / (rowHeight + rowGap)));
+        for (int i = 0; i < maxRows; i++) {
+            float progress = resultRowAppearProgress(pageTick, i);
+            if (progress <= 0.0F) {
+                continue;
+            }
+            int rowAlpha = Mth.clamp(Math.round(alpha * progress), 0, 255);
+            int yOffset = Math.round((1.0F - progress) * 6.0F);
+            renderResultSettlementRow(graphics, font, contentX, rowY + i * (rowHeight + rowGap) + yOffset,
+                    contentWidth, rowHeight, i, rows.get(i), rowAlpha);
+        }
+    }
+
+    private static void renderResultTableHeader(GuiGraphics graphics, Font font, int x, int y, int width, int alpha) {
+        graphics.drawString(font, Component.translatable("hud.codpattern.zombies.result.column.player").getString(),
+                x + 28, y, withAlpha(TEXT_SECONDARY, alpha), false);
+        drawRightAligned(graphics, font, Component.translatable("hud.codpattern.zombies.result.column.score").getString(),
+                x + width - 162, y, withAlpha(TEXT_SECONDARY, alpha));
+        drawRightAligned(graphics, font, Component.translatable("hud.codpattern.zombies.result.column.kills").getString(),
+                x + width - 104, y, withAlpha(TEXT_SECONDARY, alpha));
+        drawRightAligned(graphics, font, Component.translatable("hud.codpattern.zombies.result.column.barriers").getString(),
+                x + width - 55, y, withAlpha(TEXT_SECONDARY, alpha));
+        drawRightAligned(graphics, font, Component.translatable("hud.codpattern.zombies.result.column.deaths").getString(),
+                x + width - 8, y, withAlpha(TEXT_SECONDARY, alpha));
+    }
+
+    private static void renderResultSettlementRow(
+            GuiGraphics graphics,
+            Font font,
+            int x,
+            int y,
+            int width,
+            int height,
+            int index,
+            ClientZombiesState.ResultRow row,
+            int alpha
+    ) {
+        int accent = row.self() ? TEXT_ACCENT : (row.alive() ? TEXT_OK : TEXT_SECONDARY);
+        graphics.fillGradient(x, y, x + width, y + height, withAlpha(0xFF141A24, alpha), withAlpha(0xFF10151E, alpha));
+        graphics.fill(x, y, x + 2, y + height, withAlpha(accent, alpha));
+
+        String rank = Integer.toString(index + 1);
+        graphics.drawString(font, rank, x + 6, y + 8, withAlpha(TEXT_SECONDARY, alpha), false);
+        renderSurvivorAvatar(graphics, row.playerId(), row.name(), x + 24, y + 4, 16);
+        graphics.drawString(font, fit(font, safeName(row.name()), Math.max(0, width - 230)), x + 46, y + 4,
+                withAlpha(TEXT_PRIMARY, alpha), false);
+        graphics.drawString(font, fit(font, resultStatusText(row), Math.max(0, width - 230)), x + 46, y + 14,
+                withAlpha(accent, alpha), false);
+
+        drawRightAligned(graphics, font, Integer.toString(Math.max(0, row.totalEarnedPoints())),
+                x + width - 162, y + 8, withAlpha(TEXT_ACCENT, alpha));
+        drawRightAligned(graphics, font, Integer.toString(Math.max(0, row.kills())),
+                x + width - 104, y + 8, withAlpha(TEXT_PRIMARY, alpha));
+        drawRightAligned(graphics, font, Integer.toString(Math.max(0, row.barriersOpened())),
+                x + width - 55, y + 8, withAlpha(TEXT_PRIMARY, alpha));
+        drawRightAligned(graphics, font, Integer.toString(Math.max(0, row.deaths())),
+                x + width - 8, y + 8, withAlpha(TEXT_PRIMARY, alpha));
     }
 
     private static void renderInteractionPrompt(GuiGraphics graphics, Font font, int screenWidth, int screenHeight) {
@@ -823,6 +1087,65 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
         return Math.max(1, (ClientZombiesState.remainingTimeTicks() + 19) / 20);
     }
 
+    private static boolean isResultPhase(String phase) {
+        return "VICTORY".equals(phase) || "FAILED".equals(phase);
+    }
+
+    private static void clearResultPageTracking() {
+        resultPhaseKey = "";
+        resultPhaseStartedAtMs = 0L;
+    }
+
+    private static long resultPageTickMs(String phase) {
+        long now = System.currentTimeMillis();
+        String safePhase = phase == null ? "" : phase;
+        if (!safePhase.equals(resultPhaseKey) || resultPhaseStartedAtMs <= 0L) {
+            resultPhaseKey = safePhase;
+            resultPhaseStartedAtMs = now;
+        }
+        return Math.max(0L, now - resultPhaseStartedAtMs);
+    }
+
+    private static int resultPageIndex(long pageTickMs) {
+        long page = Math.max(0L, pageTickMs) / Math.max(1L, RESULT_PAGE_DURATION_MS);
+        return (int) (page % RESULT_PAGE_COUNT);
+    }
+
+    private static float computeResultPageAlpha(long pageTickMs) {
+        long pagePosition = Math.floorMod(Math.max(0L, pageTickMs), Math.max(1L, RESULT_PAGE_DURATION_MS));
+        float fadeIn = RESULT_PAGE_FADE_MS <= 0L ? 1.0F : pagePosition / (float) RESULT_PAGE_FADE_MS;
+        float fadeOut = RESULT_PAGE_FADE_MS <= 0L
+                ? 1.0F
+                : (RESULT_PAGE_DURATION_MS - pagePosition) / (float) RESULT_PAGE_FADE_MS;
+        return Mth.clamp(Math.min(1.0F, Math.min(fadeIn, fadeOut)), 0.0F, 1.0F);
+    }
+
+    private static float resultRowAppearProgress(long pageTickMs, int index) {
+        long pagePosition = Math.floorMod(Math.max(0L, pageTickMs), Math.max(1L, RESULT_PAGE_DURATION_MS));
+        float progress = (pagePosition - 250L - index * 60L) / 260.0F;
+        return Mth.clamp(progress, 0.0F, 1.0F);
+    }
+
+    private static int resultAccentColor(String phase) {
+        return "VICTORY".equals(phase) ? 0xFF235A34 : 0xFF5D1D22;
+    }
+
+    private static String resultStatusText(ClientZombiesState.ResultRow row) {
+        if (row == null) {
+            return Component.translatable("hud.codpattern.zombies.result.status.dead").getString();
+        }
+        if ("LEFT".equals(row.connectionState())) {
+            return Component.translatable("hud.codpattern.zombies.result.status.left").getString();
+        }
+        if ("OFFLINE".equals(row.connectionState())) {
+            return Component.translatable("hud.codpattern.zombies.result.status.offline").getString();
+        }
+        if (row.alive()) {
+            return Component.translatable("hud.codpattern.zombies.result.status.survived").getString();
+        }
+        return Component.translatable("hud.codpattern.zombies.result.status.dead").getString();
+    }
+
     private static int survivorColor(ClientZombiesState.SurvivorStatus survivor) {
         String lifeState = survivor.lifeState() == null ? "" : survivor.lifeState();
         String connectionState = survivor.connectionState() == null ? "" : survivor.connectionState();
@@ -845,6 +1168,34 @@ public final class ZombiesHudOverlay implements IGuiOverlay {
 
     private static int withAlpha(int color, int alpha) {
         return (Mth.clamp(alpha, 0, 255) << 24) | (color & 0x00FFFFFF);
+    }
+
+    private static void drawCenteredString(GuiGraphics graphics, Font font, String text, int centerX, int y, int color) {
+        String safe = text == null ? "" : text;
+        graphics.drawString(font, safe, centerX - font.width(safe) / 2, y, color, false);
+    }
+
+    private static void drawScaledCenteredString(
+            GuiGraphics graphics,
+            Font font,
+            String text,
+            int centerX,
+            int y,
+            int color,
+            float scale
+    ) {
+        String safe = text == null ? "" : text;
+        float safeScale = Math.max(0.1F, scale);
+        graphics.pose().pushPose();
+        graphics.pose().translate(centerX, y, 0);
+        graphics.pose().scale(safeScale, safeScale, 1.0F);
+        graphics.drawString(font, safe, -font.width(safe) / 2, 0, color, false);
+        graphics.pose().popPose();
+    }
+
+    private static void drawRightAligned(GuiGraphics graphics, Font font, String text, int rightX, int y, int color) {
+        String safe = text == null ? "" : text;
+        graphics.drawString(font, safe, rightX - font.width(safe), y, color, false);
     }
 
     private static String safeName(String name) {

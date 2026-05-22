@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ZombiesPlayerStateService {
     private final Map<UUID, ZombiesPlayerRuntimeState> statesByPlayer = new ConcurrentHashMap<>();
+    private final Map<UUID, String> namesByPlayer = new ConcurrentHashMap<>();
 
     public ZombiesPlayerRuntimeState getOrCreate(UUID playerId) {
         return statesByPlayer.computeIfAbsent(playerId, ZombiesPlayerRuntimeState::new);
@@ -50,6 +51,14 @@ public class ZombiesPlayerStateService {
 
     public void clear() {
         statesByPlayer.clear();
+        namesByPlayer.clear();
+    }
+
+    public void recordPlayerName(UUID playerId, String playerName) {
+        if (playerId == null || playerName == null || playerName.isBlank()) {
+            return;
+        }
+        namesByPlayer.put(playerId, playerName.trim());
     }
 
     public void markAlive(UUID playerId) {
@@ -79,6 +88,12 @@ public class ZombiesPlayerStateService {
     public boolean canInteract(UUID playerId) {
         return get(playerId)
                 .map(ZombiesPlayerRuntimeState::canInteract)
+                .orElse(false);
+    }
+
+    public boolean canRestoreActiveRoundPlayer(UUID playerId) {
+        return get(playerId)
+                .map(state -> !state.connectionState().isLeft())
                 .orElse(false);
     }
 
@@ -121,12 +136,22 @@ public class ZombiesPlayerStateService {
         for (ZombiesPlayerRuntimeState state : states()) {
             String playerId = state.playerId().toString();
             Map<String, ModePlayerValue> playerValues = state.toPlayerValues();
+            String playerName = namesByPlayer.getOrDefault(state.playerId(), "");
+            values.put(ZombiesRuntimeStateKeys.survivorName(playerId), ModePlayerValue.ofString(playerName));
             values.put(ZombiesRuntimeStateKeys.survivorLifeState(playerId),
                     playerValues.get(ZombiesRuntimeStateKeys.PLAYER_LIFE_STATE));
             values.put(ZombiesRuntimeStateKeys.survivorConnectionState(playerId),
                     playerValues.get(ZombiesRuntimeStateKeys.PLAYER_CONNECTION_STATE));
             values.put(ZombiesRuntimeStateKeys.survivorPoints(playerId),
                     playerValues.get(ZombiesRuntimeStateKeys.PLAYER_POINTS));
+            values.put(ZombiesRuntimeStateKeys.survivorTotalEarnedPoints(playerId),
+                    playerValues.get(ZombiesRuntimeStateKeys.PLAYER_TOTAL_EARNED_POINTS));
+            values.put(ZombiesRuntimeStateKeys.survivorKills(playerId),
+                    playerValues.get(ZombiesRuntimeStateKeys.PLAYER_KILLS));
+            values.put(ZombiesRuntimeStateKeys.survivorDeaths(playerId),
+                    playerValues.get(ZombiesRuntimeStateKeys.PLAYER_DEATHS));
+            values.put(ZombiesRuntimeStateKeys.survivorBarriersOpened(playerId),
+                    playerValues.get(ZombiesRuntimeStateKeys.PLAYER_BARRIERS_OPENED));
             values.put(ZombiesRuntimeStateKeys.survivorArmorLevel(playerId),
                     playerValues.get(ZombiesRuntimeStateKeys.PLAYER_ARMOR_LEVEL));
         }

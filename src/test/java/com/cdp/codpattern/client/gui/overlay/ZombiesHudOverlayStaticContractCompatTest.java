@@ -27,6 +27,28 @@ public final class ZombiesHudOverlayStaticContractCompatTest {
                 "teammate rows must use room teammate filtering");
         requireContains(overlay, "renderRoomTeammateStatus",
                 "zombies overlay must render the room teammate status block");
+        requireContains(overlay, "renderScoreLeaderboard",
+                "zombies overlay must render the left-side match score leaderboard");
+        requireContains(overlay, "ClientZombiesState.leaderboardRows()",
+                "zombies leaderboard and settlement pages must use client result rows");
+        requireContains(overlay, "LEADERBOARD_LEFT = 8",
+                "leaderboard should stay anchored to the left edge like the TDM score panel");
+        requireContains(overlay, "screenHeight >= 500 ? 92 : 70",
+                "leaderboard vertical position should mirror the TDM left score panel");
+        requireContains(overlay, "renderZombiesResultOverlay",
+                "zombies overlay must render a zombies-specific settlement overlay");
+        requireContains(overlay, "RESULT_PAGE_COUNT = 2",
+                "zombies settlement must use two pages");
+        requireContains(overlay, "renderResultSurvivalPage",
+                "zombies settlement must include a survival information page");
+        requireContains(overlay, "renderResultSettlementPage",
+                "zombies settlement must include a score-sorted settlement page");
+        requireAbsent(overlay, "renderMvpSvpPage",
+                "zombies settlement must not render TDM MVP/SVP spotlight pages");
+        requireAbsent(overlay, "hud.codpattern.tdm.result.mvp",
+                "zombies settlement must not use TDM MVP localization");
+        requireAbsent(overlay, "hud.codpattern.tdm.result.svp",
+                "zombies settlement must not use TDM SVP localization");
         requireContains(overlay, "renderIntermissionWaveAnnouncement",
                 "zombies overlay must render the wave-only intermission announcement");
         requireContains(overlay, "INTERMISSION_WAVE_FADE_IN_MS = 1000L",

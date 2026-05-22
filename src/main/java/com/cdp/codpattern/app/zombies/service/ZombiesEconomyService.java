@@ -37,6 +37,12 @@ public class ZombiesEconomyService {
                 .orElse(0);
     }
 
+    public void recordBarrierOpened(UUID playerId) {
+        if (playerId != null) {
+            playerStateService.getOrCreate(playerId).addBarrierOpened();
+        }
+    }
+
     public ZombiesServiceResult<Double> addPoints(UUID playerId, double amount) {
         if (!Double.isFinite(amount) || amount < 0.0D) {
             return ZombiesServiceResult.failure(ZombiesErrorCode.ECONOMY_INVALID_COST);

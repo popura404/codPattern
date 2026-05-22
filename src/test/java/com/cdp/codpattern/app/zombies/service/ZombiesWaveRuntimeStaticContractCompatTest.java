@@ -57,6 +57,21 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
                 "attachWaveRewardMetadata(mob, mobId.get(), waveDefinition);",
                 "spawn path should attach wave reward metadata before entity ownership is used");
         requireContains(spawnService,
+                "applyWaveAttributes(mob, mobId.get(), waveDefinition);",
+                "spawn path should apply per-entity wave attributes using the selected mob id");
+        requireContains(spawnService,
+                "combinedAttributeMultiplier(waveDefinition.getHealthMultiplier(), mobEntryHealthMultiplier(mobEntry))",
+                "mob-specific health multiplier should combine with the wave multiplier");
+        requireContains(spawnService,
+                "combinedAttributeMultiplier(waveDefinition.getSpeedMultiplier(), mobEntrySpeedMultiplier(mobEntry))",
+                "mob-specific speed multiplier should combine with the wave multiplier");
+        requireContains(spawnService,
+                "combinedAttributeMultiplier(waveDefinition.getDamageMultiplier(), mobEntryDamageMultiplier(mobEntry))",
+                "mob-specific damage multiplier should combine with the wave multiplier");
+        requireContains(spawnService,
+                "return mobEntry == null ? 1.0D : mobEntry.getHealthMultiplier();",
+                "missing mob-specific multipliers should default to 1.0");
+        requireContains(spawnService,
                 "static final double ROOM_MONSTER_FOLLOW_RANGE = 128.0D;",
                 "room monsters should use an extended zombies-mode follow range");
         requireContains(spawnService,
@@ -158,6 +173,15 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
         requireContains(spawnService,
                 "case ZombiesWaveValidator.VANILLA_SILVERFISH_ID -> EntityType.SILVERFISH.create(level);",
                 "silverfish should be a supported zombies wave entity");
+        requireContains(spawnService,
+                "case ZombiesWaveValidator.VANILLA_VINDICATOR_ID -> EntityType.VINDICATOR.create(level);",
+                "vindicator should be a supported zombies wave entity");
+        requireContains(spawnService,
+                "case ZombiesWaveValidator.VANILLA_VEX_ID -> EntityType.VEX.create(level);",
+                "vex should be a supported zombies wave entity");
+        requireContains(spawnService,
+                "return mob != null && mob.getType() == EntityType.VEX;",
+                "vex should keep vanilla phasing movement instead of ground movement overrides");
         requireContains(spawnService,
                 "wolf.setPersistentAngerTarget(target.getUUID());",
                 "zombies wolves should keep anger on their room target");

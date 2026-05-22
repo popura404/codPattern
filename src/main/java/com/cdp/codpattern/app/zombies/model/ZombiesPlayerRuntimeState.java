@@ -19,9 +19,11 @@ import java.util.UUID;
 public class ZombiesPlayerRuntimeState {
     private final UUID playerId;
     private double points;
+    private double totalEarnedPoints;
     private int kills;
     private int assists;
     private int deaths;
+    private int barriersOpened;
     private ZombiesLifeState lifeState;
     private ZombiesConnectionState connectionState;
     private Long offlineSinceTick;
@@ -74,11 +76,44 @@ public class ZombiesPlayerRuntimeState {
             ZombiesWeaponInstanceState primaryWeapon,
             ZombiesArmorState armor
     ) {
+        this(
+                playerId,
+                points,
+                points,
+                kills,
+                assists,
+                deaths,
+                0,
+                lifeState,
+                connectionState,
+                offlineSinceTick,
+                lastAliveTargetPos,
+                primaryWeapon,
+                armor);
+    }
+
+    public ZombiesPlayerRuntimeState(
+            UUID playerId,
+            double points,
+            double totalEarnedPoints,
+            int kills,
+            int assists,
+            int deaths,
+            int barriersOpened,
+            ZombiesLifeState lifeState,
+            ZombiesConnectionState connectionState,
+            Long offlineSinceTick,
+            BlockPos lastAliveTargetPos,
+            ZombiesWeaponInstanceState primaryWeapon,
+            ZombiesArmorState armor
+    ) {
         this.playerId = Objects.requireNonNull(playerId, "playerId");
         this.points = sanitizePoints(points);
+        this.totalEarnedPoints = Math.max(this.points, sanitizePoints(totalEarnedPoints));
         this.kills = Math.max(0, kills);
         this.assists = Math.max(0, assists);
         this.deaths = Math.max(0, deaths);
+        this.barriersOpened = Math.max(0, barriersOpened);
         this.lifeState = lifeState == null ? ZombiesLifeState.ALIVE : lifeState;
         this.connectionState = connectionState == null ? ZombiesConnectionState.ONLINE : connectionState;
         this.offlineSinceTick = offlineSinceTick;
@@ -101,6 +136,14 @@ public class ZombiesPlayerRuntimeState {
         return (int) Math.floor(points);
     }
 
+    public synchronized double totalEarnedPoints() {
+        return totalEarnedPoints;
+    }
+
+    public synchronized int displayTotalEarnedPoints() {
+        return (int) Math.floor(totalEarnedPoints);
+    }
+
     public synchronized int kills() {
         return kills;
     }
@@ -111,6 +154,10 @@ public class ZombiesPlayerRuntimeState {
 
     public synchronized int deaths() {
         return deaths;
+    }
+
+    public synchronized int barriersOpened() {
+        return barriersOpened;
     }
 
     public synchronized ZombiesLifeState lifeState() {
@@ -170,8 +217,15 @@ public class ZombiesPlayerRuntimeState {
     }
 
     public synchronized void addPoints(double amount) {
+        addPoints(amount, true);
+    }
+
+    public synchronized void addPoints(double amount, boolean countAsEarned) {
         if (Double.isFinite(amount) && amount > 0.0D) {
             points = sanitizePoints(points + amount);
+            if (countAsEarned) {
+                totalEarnedPoints = sanitizePoints(totalEarnedPoints + amount);
+            }
         }
     }
 
@@ -184,7 +238,7 @@ public class ZombiesPlayerRuntimeState {
     }
 
     public synchronized void refundPoints(double amount) {
-        addPoints(amount);
+        addPoints(amount, false);
     }
 
     public synchronized void setPoints(double points) {
@@ -197,6 +251,10 @@ public class ZombiesPlayerRuntimeState {
 
     public synchronized void addAssist() {
         assists++;
+    }
+
+    public synchronized void addBarrierOpened() {
+        barriersOpened++;
     }
 
     public synchronized void markAlive() {
@@ -285,12 +343,15 @@ public class ZombiesPlayerRuntimeState {
 
     public synchronized Map<String, ModePlayerValue> toPlayerValues() {
         Map<String, ModePlayerValue> values = new LinkedHashMap<>();
-        values.put("points", ModePlayerValue.ofInt(displayPoints()));
-        values.put("kills", ModePlayerValue.ofInt(kills));
-        values.put("assists", ModePlayerValue.ofInt(assists));
-        values.put("deaths", ModePlayerValue.ofInt(deaths));
-        values.put("life_state", ModePlayerValue.ofString(lifeState.name()));
-        values.put("connection_state", ModePlayerValue.ofString(connectionState.name()));
+        values.put(ZombiesRuntimeStateKeys.PLAYER_POINTS, ModePlayerValue.ofInt(displayPoints()));
+        values.put(ZombiesRuntimeStateKeys.PLAYER_TOTAL_EARNED_POINTS,
+                ModePlayerValue.ofInt(displayTotalEarnedPoints()));
+        values.put(ZombiesRuntimeStateKeys.PLAYER_KILLS, ModePlayerValue.ofInt(kills));
+        values.put(ZombiesRuntimeStateKeys.PLAYER_ASSISTS, ModePlayerValue.ofInt(assists));
+        values.put(ZombiesRuntimeStateKeys.PLAYER_DEATHS, ModePlayerValue.ofInt(deaths));
+        values.put(ZombiesRuntimeStateKeys.PLAYER_BARRIERS_OPENED, ModePlayerValue.ofInt(barriersOpened));
+        values.put(ZombiesRuntimeStateKeys.PLAYER_LIFE_STATE, ModePlayerValue.ofString(lifeState.name()));
+        values.put(ZombiesRuntimeStateKeys.PLAYER_CONNECTION_STATE, ModePlayerValue.ofString(connectionState.name()));
         values.put(ZombiesRuntimeStateKeys.PLAYER_WEAPON_PRIMARY_LEVEL,
                 ModePlayerValue.ofInt(primaryWeapon == null ? 0 : primaryWeapon.weaponLevel()));
         values.put(ZombiesRuntimeStateKeys.PLAYER_WEAPON_PRIMARY_UPGRADE,

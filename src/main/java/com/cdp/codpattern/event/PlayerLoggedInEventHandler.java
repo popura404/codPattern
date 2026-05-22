@@ -108,6 +108,13 @@ public class PlayerLoggedInEventHandler {
             markerService.clearTemporaryPlayerState(player, clearInventory);
         }
 
+        @Override
+        public boolean restoreActiveRoomPlayer(ServerPlayer player, RoomId roomId) {
+            return findZombiesMap(roomId)
+                    .map(map -> map.restoreActiveRoundReconnect(player))
+                    .orElse(false);
+        }
+
         private static Optional<ZombiesMap> findZombiesMap(RoomId roomId) {
             if (roomId == null || !BuiltInGameModes.isZombies(roomId.gameType()) || !FPSMCore.initialized()) {
                 return Optional.empty();

@@ -292,7 +292,9 @@ MVP 3 起，除单人对局外，已记录为本局成员的死亡观战玩家�
     { "entity": "minecraft:wither_skeleton", "count": 1, "killPoints": 50, "assistPoints": 16 },
     { "entity": "minecraft:creeper", "count": 1, "killPoints": 40, "assistPoints": 12 },
     { "entity": "minecraft:wolf", "count": 2, "killPoints": 24, "assistPoints": 8 },
-    { "entity": "minecraft:silverfish", "count": 4, "killPoints": 10, "assistPoints": 4 }
+    { "entity": "minecraft:silverfish", "count": 4, "killPoints": 10, "assistPoints": 4 },
+    { "entity": "minecraft:vindicator", "count": 1, "healthMultiplier": 1.50, "damageMultiplier": 1.20, "speedMultiplier": 1.00, "killPoints": 45, "assistPoints": 14 },
+    { "entity": "minecraft:vex", "count": 2, "healthMultiplier": 0.80, "damageMultiplier": 1.10, "speedMultiplier": 1.25, "killPoints": 35, "assistPoints": 12 }
   ]
 }
 ```
@@ -300,9 +302,12 @@ MVP 3 起，除单人对局外，已记录为本局成员的死亡观战玩家�
 继承规则：
 
 - 没写的倍率、`maxAlive`、`fastestSpawnIntervalTicks` 和 `slowestSpawnIntervalTicks` 从 `defaults` 继承。旧 `spawnIntervalTicks` 仍作为定长间隔兼容字段读取。
+- `mobs[].healthMultiplier`、`mobs[].damageMultiplier` 和 `mobs[].speedMultiplier` 缺失时默认为 `1.0`；最终属性倍率为波次级倍率乘以该怪物实体的单项倍率。
 - `mobs[].killPoints` 和 `mobs[].assistPoints` 缺失时从 `defaults` 继承。
 - 本波预算完全由 `mobs[].count` 决定，不按玩家人数缩放。
-- 当前支持的怪物实体：`minecraft:zombie`、`minecraft:husk`、`minecraft:wither_skeleton`、`minecraft:creeper`、`minecraft:wolf`、`minecraft:silverfish`。
+- 同一波中 `count > 0` 的同一种 `entity` 只能配置一次，避免预算聚合后倍率/奖励来源不明确。
+- 当前支持的怪物实体：`minecraft:zombie`、`minecraft:husk`、`minecraft:wither_skeleton`、`minecraft:creeper`、`minecraft:wolf`、`minecraft:silverfish`、`minecraft:vindicator`、`minecraft:vex`。
+- `minecraft:vex` 保留原版飞行/穿墙移动，不套用僵尸模式的地面障碍跳跃和绕路覆盖。
 - 僵尸模式房间归属的苦力怕自爆不破坏方块，并按已击杀怪物处理本波存活计数。
 - 僵尸模式房间归属的狼按非驯服、持续仇恨狼处理，房间索敌刷新时同步仇恨目标。
 - 初版不发命中奖励。
@@ -325,9 +330,11 @@ MVP 3 起，除单人对局外，已记录为本局成员的死亡观战玩家�
 |---|---|
 | `wave` / 文件名编号 | 整数，`>= 1` |
 | `healthMultiplier` / `damageMultiplier` / `speedMultiplier` | 有限正数，`> 0`；超出 `0.01-100.0` 给 warning |
+| `mobs[].healthMultiplier` / `mobs[].damageMultiplier` / `mobs[].speedMultiplier` | 可选；有限正数，`> 0`；缺失时为 `1.0`，并与波次级倍率叠乘 |
 | `maxAlive` | 整数，`>= 1`；本波怪物总数为 0 时可忽略 |
 | `fastestSpawnIntervalTicks` / `slowestSpawnIntervalTicks` | 整数，`>= 1`，且最快值 `<=` 最慢值；旧 `spawnIntervalTicks` 仍兼容 |
 | `mobs[].count` | 整数，`>= 0` |
+| `mobs[].entity` | `count > 0` 时必须是支持列表中的实体；同一波中同一种实体只能出现一次 |
 | `killPoints` / `assistPoints` | 整数，`>= 0` |
 | 对象价格和扣费项 | 整数，`>= 0` |
 | `zombie_spawn.group` / `barrier.group` | 整数，`>= 1` |

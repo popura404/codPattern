@@ -22,6 +22,9 @@ public final class ZombiesWaveValidatorCompatTest {
         filenameWaveConflictIsInvalid();
         duplicateWaveNumberIsInvalid();
         supportedDefaultEntitiesAreValid();
+        mobAttributeMultipliersDefaultToOneAndValidateWhenPositive();
+        invalidMobAttributeMultiplierIsRejected();
+        duplicatePositiveCountMobEntityIsRejected();
         invalidEntityIdIsRejected();
         unsupportedEntityIdIsRejected();
     }
@@ -137,11 +140,85 @@ public final class ZombiesWaveValidatorCompatTest {
                         + "{\"entity\":\"minecraft:wither_skeleton\",\"count\":1},"
                         + "{\"entity\":\"minecraft:creeper\",\"count\":1},"
                         + "{\"entity\":\"minecraft:wolf\",\"count\":1},"
-                        + "{\"entity\":\"minecraft:silverfish\",\"count\":1}"
+                        + "{\"entity\":\"minecraft:silverfish\",\"count\":1},"
+                        + "{\"entity\":\"minecraft:vindicator\",\"count\":1},"
+                        + "{\"entity\":\"minecraft:vex\",\"count\":1}"
                         + "]"
                         + "}");
 
         requireValid(wave, "supported zombie-mode hostile entities should be valid");
+    }
+
+    private static void mobAttributeMultipliersDefaultToOneAndValidateWhenPositive() {
+        ZombiesWaveDefinition wave = readWave(
+                "wave_001.json",
+                1,
+                "{"
+                        + "\"wave\":1,"
+                        + "\"mobs\":["
+                        + "{\"entity\":\"minecraft:zombie\",\"count\":1},"
+                        + "{"
+                        + "\"entity\":\"minecraft:vindicator\","
+                        + "\"count\":1,"
+                        + "\"healthMultiplier\":1.5,"
+                        + "\"damageMultiplier\":1.25,"
+                        + "\"speedMultiplier\":0.9"
+                        + "}"
+                        + "]"
+                        + "}");
+
+        requireValid(wave, "positive per-mob attribute multipliers should be valid");
+        requireClose(wave.getMobs().get(0).getHealthMultiplier(), 1.0D,
+                "missing mob health multiplier should default to 1");
+        requireClose(wave.getMobs().get(0).getDamageMultiplier(), 1.0D,
+                "missing mob damage multiplier should default to 1");
+        requireClose(wave.getMobs().get(0).getSpeedMultiplier(), 1.0D,
+                "missing mob speed multiplier should default to 1");
+        requireClose(wave.getMobs().get(1).getHealthMultiplier(), 1.5D,
+                "configured mob health multiplier should be retained");
+        requireClose(wave.getMobs().get(1).getDamageMultiplier(), 1.25D,
+                "configured mob damage multiplier should be retained");
+        requireClose(wave.getMobs().get(1).getSpeedMultiplier(), 0.9D,
+                "configured mob speed multiplier should be retained");
+    }
+
+    private static void invalidMobAttributeMultiplierIsRejected() {
+        ZombiesWaveDefinition wave = readWave(
+                "wave_001.json",
+                1,
+                "{"
+                        + "\"wave\":1,"
+                        + "\"mobs\":[{"
+                        + "\"entity\":\"minecraft:zombie\","
+                        + "\"count\":1,"
+                        + "\"healthMultiplier\":0"
+                        + "}]"
+                        + "}");
+
+        ZombiesWaveValidator.ValidationReport report = VALIDATOR.validate(List.of(wave));
+        require(report.hasIssue(ZombiesWaveValidator.INVALID_MULTIPLIER),
+                "invalid per-mob attribute multiplier should be rejected");
+        require(firstIssue(report).contains("healthMultiplier"),
+                "invalid per-mob multiplier message should identify the field");
+    }
+
+    private static void duplicatePositiveCountMobEntityIsRejected() {
+        ZombiesWaveDefinition wave = readWave(
+                "wave_001.json",
+                1,
+                "{"
+                        + "\"wave\":1,"
+                        + "\"mobs\":["
+                        + "{\"entity\":\"minecraft:zombie\",\"count\":1,\"healthMultiplier\":1.0},"
+                        + "{\"entity\":\"zombie\",\"count\":2,\"healthMultiplier\":1.5}"
+                        + "]"
+                        + "}");
+
+        ZombiesWaveValidator.ValidationReport report = VALIDATOR.validate(List.of(wave));
+        require(report.hasIssue(ZombiesWaveValidator.DUPLICATE_MOB_ENTITY),
+                "duplicate positive-count mob entities should be rejected");
+        require(firstIssue(report).contains("more than once"),
+                "duplicate mob entity message should identify the one-entry-per-entity rule");
     }
 
     private static void invalidEntityIdIsRejected() {
@@ -188,6 +265,12 @@ public final class ZombiesWaveValidatorCompatTest {
     private static void require(boolean condition, String message) {
         if (!condition) {
             throw new AssertionError(message);
+        }
+    }
+
+    private static void requireClose(double actual, double expected, String message) {
+        if (Math.abs(actual - expected) > 0.0001D) {
+            throw new AssertionError(message + ": expected " + expected + " got " + actual);
         }
     }
 }

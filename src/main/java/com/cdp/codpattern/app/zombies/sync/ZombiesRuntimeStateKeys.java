@@ -11,9 +11,11 @@ public final class ZombiesRuntimeStateKeys {
     public static final String METRIC_ACTIVE_ZOMBIES = "active_zombies";
 
     public static final String PLAYER_POINTS = "points";
+    public static final String PLAYER_TOTAL_EARNED_POINTS = "score.total_earned";
     public static final String PLAYER_KILLS = "kills";
     public static final String PLAYER_ASSISTS = "assists";
     public static final String PLAYER_DEATHS = "deaths";
+    public static final String PLAYER_BARRIERS_OPENED = "barriers_opened";
     public static final String PLAYER_LIFE_STATE = "life_state";
     public static final String PLAYER_CONNECTION_STATE = "connection_state";
     public static final String PLAYER_ARMOR_LEVEL = "armor.level";
@@ -34,8 +36,28 @@ public final class ZombiesRuntimeStateKeys {
         return survivorKey(playerId, "connection_state");
     }
 
+    public static String survivorName(String playerId) {
+        return survivorKey(playerId, "name");
+    }
+
     public static String survivorPoints(String playerId) {
         return survivorKey(playerId, "points");
+    }
+
+    public static String survivorTotalEarnedPoints(String playerId) {
+        return survivorKey(playerId, PLAYER_TOTAL_EARNED_POINTS);
+    }
+
+    public static String survivorKills(String playerId) {
+        return survivorKey(playerId, PLAYER_KILLS);
+    }
+
+    public static String survivorDeaths(String playerId) {
+        return survivorKey(playerId, PLAYER_DEATHS);
+    }
+
+    public static String survivorBarriersOpened(String playerId) {
+        return survivorKey(playerId, PLAYER_BARRIERS_OPENED);
     }
 
     public static String survivorArmorLevel(String playerId) {

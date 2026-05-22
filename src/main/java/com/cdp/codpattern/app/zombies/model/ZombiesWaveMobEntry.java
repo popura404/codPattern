@@ -7,6 +7,9 @@ public class ZombiesWaveMobEntry {
     // Optional example/documentation metadata; validation and spawn logic ignore it.
     private Object description;
     private int count;
+    private Double healthMultiplier;
+    private Double damageMultiplier;
+    private Double speedMultiplier;
     private Integer killPoints;
     private Integer assistPoints;
 
@@ -22,6 +25,18 @@ public class ZombiesWaveMobEntry {
 
     public int getCount() {
         return count;
+    }
+
+    public double getHealthMultiplier() {
+        return positiveFiniteOrDefault(healthMultiplier, 1.0D);
+    }
+
+    public double getDamageMultiplier() {
+        return positiveFiniteOrDefault(damageMultiplier, 1.0D);
+    }
+
+    public double getSpeedMultiplier() {
+        return positiveFiniteOrDefault(speedMultiplier, 1.0D);
     }
 
     public int getKillPoints() {
@@ -40,6 +55,18 @@ public class ZombiesWaveMobEntry {
         return assistPoints;
     }
 
+    public Double getConfiguredHealthMultiplier() {
+        return healthMultiplier;
+    }
+
+    public Double getConfiguredDamageMultiplier() {
+        return damageMultiplier;
+    }
+
+    public Double getConfiguredSpeedMultiplier() {
+        return speedMultiplier;
+    }
+
     public void applyDefaults(ZombiesRulesConfig.Defaults defaults) {
         this.defaults = defaults != null ? defaults : new ZombiesRulesConfig.Defaults();
     }
@@ -54,5 +81,9 @@ public class ZombiesWaveMobEntry {
 
     private static int nonNegativeOrDefault(Integer value, int defaultValue) {
         return value == null || value < 0 ? defaultValue : value;
+    }
+
+    private static double positiveFiniteOrDefault(Double value, double defaultValue) {
+        return value == null || !Double.isFinite(value) || value <= 0.0D ? defaultValue : value;
     }
 }

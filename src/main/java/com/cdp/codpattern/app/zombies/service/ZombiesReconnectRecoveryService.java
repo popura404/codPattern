@@ -92,6 +92,13 @@ public final class ZombiesReconnectRecoveryService {
                         attempt.teleported(),
                         attempt.usedFallback());
             }
+            if (resolver.restoreActiveRoomPlayer(player, value.roomId())) {
+                return new LoginRecoveryResult(
+                        RecoveryOutcome.ACTIVE_ROUND_REJOIN,
+                        Optional.of(value.roomId()),
+                        false,
+                        false);
+            }
             return LoginRecoveryResult.none();
         }
 
@@ -140,12 +147,17 @@ public final class ZombiesReconnectRecoveryService {
         Optional<RoomId> inactiveZombiesRoomContaining(ServerPlayer player);
 
         void clearZombiesTemporaryState(ServerPlayer player, RoomId roomId, boolean clearInventory);
+
+        default boolean restoreActiveRoomPlayer(ServerPlayer player, RoomId roomId) {
+            return false;
+        }
     }
 
     public enum RecoveryOutcome {
         NONE,
         PENDING_ENDTP,
         PERSISTENT_PENDING_ENDTP,
+        ACTIVE_ROUND_REJOIN,
         STALE_ACTIVE_MARKER,
         INACTIVE_MAP_POSITION
     }

@@ -28,6 +28,9 @@ public final class ZombiesMvp3CompatTestSuite {
             new ZombiesCompatSuiteRunner.TestEntry("MVP3 crash recovery compat",
                     "com.cdp.codpattern.app.zombies.service.ZombiesCrashRecoveryServiceCompatTest",
                     true),
+            new ZombiesCompatSuiteRunner.TestEntry("Zombies reconnect recovery static contract compat",
+                    "com.cdp.codpattern.app.zombies.service.ZombiesReconnectRecoveryStaticContractCompatTest",
+                    false),
             new ZombiesCompatSuiteRunner.TestEntry("MVP3 runtime closure compat",
                     "com.cdp.codpattern.app.zombies.service.ZombiesMvp3RuntimeClosureCompatTest",
                     true),
@@ -53,7 +56,7 @@ public final class ZombiesMvp3CompatTestSuite {
                     "intermission candidate selection, member-order spawn planning, successful prep, and teleport failure handling"),
             new CoverageItem(
                     "reconnect cleanup",
-                    "offline pending endtp write, rewrite, clear, and one-shot consume behavior"),
+                    "offline pending endtp write, rewrite, clear, active-round reconnect restore, and one-shot consume behavior"),
             new CoverageItem(
                     "crash cleanup",
                     "server-stop running-room cleanup and startup/stopping occupancy cleanup entry points")

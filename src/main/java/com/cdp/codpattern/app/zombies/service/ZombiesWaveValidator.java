@@ -22,6 +22,7 @@ public final class ZombiesWaveValidator {
     public static final String INVALID_MAX_ALIVE = "rules.invalid_max_alive";
     public static final String INVALID_SPAWN_INTERVAL = "rules.invalid_spawn_interval";
     public static final String INVALID_MOB_COUNT = "rules.invalid_mob_count";
+    public static final String DUPLICATE_MOB_ENTITY = "rules.duplicate_mob_entity";
     public static final String INVALID_REWARD_POINTS = "rules.invalid_reward_points";
 
     static final String VANILLA_ZOMBIE_ID = "minecraft:zombie";
@@ -30,6 +31,8 @@ public final class ZombiesWaveValidator {
     static final String VANILLA_CREEPER_ID = "minecraft:creeper";
     static final String VANILLA_WOLF_ID = "minecraft:wolf";
     static final String VANILLA_SILVERFISH_ID = "minecraft:silverfish";
+    static final String VANILLA_VINDICATOR_ID = "minecraft:vindicator";
+    static final String VANILLA_VEX_ID = "minecraft:vex";
 
     private static final String DEFAULT_NAMESPACE = "minecraft";
     private static final List<String> SUPPORTED_ENTITY_IDS = List.of(
@@ -38,7 +41,9 @@ public final class ZombiesWaveValidator {
             VANILLA_WITHER_SKELETON_ID,
             VANILLA_CREEPER_ID,
             VANILLA_WOLF_ID,
-            VANILLA_SILVERFISH_ID);
+            VANILLA_SILVERFISH_ID,
+            VANILLA_VINDICATOR_ID,
+            VANILLA_VEX_ID);
 
     public ValidationReport validate(List<ZombiesWaveDefinition> waves) {
         List<ValidationIssue> issues = new ArrayList<>();
@@ -125,6 +130,7 @@ public final class ZombiesWaveValidator {
                         "Wave " + wave.getWave() + " fastestSpawnIntervalTicks must be <= slowestSpawnIntervalTicks"));
                 valid = false;
             }
+            List<String> seenMobEntityIds = new ArrayList<>();
             for (ZombiesWaveMobEntry mob : wave.getMobs()) {
                 if (mob == null) {
                     continue;
@@ -134,6 +140,27 @@ public final class ZombiesWaveValidator {
                             INVALID_MOB_COUNT,
                             wave.getSourcePath(),
                             "Wave " + wave.getWave() + " has a mob with negative count"));
+                    valid = false;
+                }
+                if (!isPositiveFiniteIfPresent(mob.getConfiguredHealthMultiplier())) {
+                    issues.add(new ValidationIssue(
+                            INVALID_MULTIPLIER,
+                            wave.getSourcePath(),
+                            "Wave " + wave.getWave() + " has a mob with invalid healthMultiplier"));
+                    valid = false;
+                }
+                if (!isPositiveFiniteIfPresent(mob.getConfiguredDamageMultiplier())) {
+                    issues.add(new ValidationIssue(
+                            INVALID_MULTIPLIER,
+                            wave.getSourcePath(),
+                            "Wave " + wave.getWave() + " has a mob with invalid damageMultiplier"));
+                    valid = false;
+                }
+                if (!isPositiveFiniteIfPresent(mob.getConfiguredSpeedMultiplier())) {
+                    issues.add(new ValidationIssue(
+                            INVALID_MULTIPLIER,
+                            wave.getSourcePath(),
+                            "Wave " + wave.getWave() + " has a mob with invalid speedMultiplier"));
                     valid = false;
                 }
                 if (mob.getConfiguredKillPoints() != null && mob.getConfiguredKillPoints() < 0) {
@@ -155,6 +182,18 @@ public final class ZombiesWaveValidator {
                     if (entityIssue != null) {
                         issues.add(entityIssue.toValidationIssue(wave.getSourcePath()));
                         valid = false;
+                    } else {
+                        String normalizedEntityId = normalizedEntityId(mob.getEntity()).orElse("");
+                        if (seenMobEntityIds.contains(normalizedEntityId)) {
+                            issues.add(new ValidationIssue(
+                                    DUPLICATE_MOB_ENTITY,
+                                    wave.getSourcePath(),
+                                    "Wave " + wave.getWave() + " defines entity '" + normalizedEntityId
+                                            + "' more than once; use one mobs[] entry per entity"));
+                            valid = false;
+                        } else {
+                            seenMobEntityIds.add(normalizedEntityId);
+                        }
                     }
                 }
             }

@@ -13,7 +13,10 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,11 +26,12 @@ public final class ZombiesPurchaseStateServicesCompatTest {
     private ZombiesPurchaseStateServicesCompatTest() {
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         wallWeaponPurchaseSetsUniquePrimaryAndDuplicateFailsWithoutSpend();
         wallWeaponInteractionPurchaseUsesRuntimeCurrentOffer();
         ammoBoxRefillsHeldWeaponsByWeaponLevelAndStarterIsCharged();
         armorUpgradeReplacesLowerLevelAndRepeatOrDowngradeFails();
+        barrierPurchaseSuccessRecordsOpenCounter();
     }
 
     private static void wallWeaponPurchaseSetsUniquePrimaryAndDuplicateFailsWithoutSpend() {
@@ -175,6 +179,20 @@ public final class ZombiesPurchaseStateServicesCompatTest {
                 "lower armor level should fail when higher level is owned");
         requireArmor(services.players, playerId, 3, 0.35D, "downgrade attempt should keep higher armor");
         requirePoints(services.players, playerId, 1_300.0D, "downgrade armor purchase should not deduct");
+    }
+
+    private static void barrierPurchaseSuccessRecordsOpenCounter() throws IOException {
+        String service = Files.readString(Path.of(
+                "src/main/java/com/cdp/codpattern/app/zombies/service/ZombiesBarrierService.java"));
+        requireContains(service, "objectStateStore.clearBarrierGroup(barrier.group(), barriersSupplier.get())",
+                "barrier purchase must clear a barrier group before recording stats");
+        requireContains(service, "economyService.recordBarrierOpened(playerId);",
+                "barrier purchase success must increment the buyer's opened-barrier counter");
+        requireOrder(
+                service,
+                "ZombiesObjectStateStore.BarrierGroupUpdate update = clearResult.value().orElseThrow();",
+                "economyService.recordBarrierOpened(playerId);",
+                "barrier counter must be recorded only after the clear result succeeds");
     }
 
     private static Services services() {
@@ -328,6 +346,18 @@ public final class ZombiesPurchaseStateServicesCompatTest {
         require(!result.success(), message + ": expected failure");
         require(expectedCode.equals(result.code()),
                 message + ": expected " + expectedCode + " but was " + result.code());
+    }
+
+    private static void requireContains(String text, String needle, String message) {
+        require(text.contains(needle), message + ": missing `" + needle + "`");
+    }
+
+    private static void requireOrder(String text, String first, String second, String message) {
+        int firstIndex = text.indexOf(first);
+        int secondIndex = text.indexOf(second);
+        require(firstIndex >= 0, message + ": missing first token");
+        require(secondIndex >= 0, message + ": missing second token");
+        require(firstIndex < secondIndex, message + ": wrong order");
     }
 
     private static void requireClose(double actual, double expected, String message) {
