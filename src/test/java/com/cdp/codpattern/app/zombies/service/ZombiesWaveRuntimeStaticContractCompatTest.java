@@ -23,6 +23,8 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
             Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/map/ZombiesRoomHandleFactory.java");
     private static final Path ZOMBIES_MAP =
             Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/map/ZombiesMap.java");
+    private static final Path MODE_ROOM_TICK_EVENT_HANDLER =
+            Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/event/ModeRoomTickEventHandler.java");
     private static final Path COD_TDM_EVENT_HANDLER =
             Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/event/CodTdmEventHandler.java");
     private static final Path CLIENT_STATE =
@@ -43,6 +45,7 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
         String phaseStateMachine = read(PHASE_STATE_MACHINE);
         String roomHandle = read(ROOM_HANDLE);
         String zombiesMap = read(ZOMBIES_MAP);
+        String modeRoomTickEventHandler = read(MODE_ROOM_TICK_EVENT_HANDLER);
         String codTdmEventHandler = read(COD_TDM_EVENT_HANDLER);
         String clientState = read(CLIENT_STATE);
         String zombiesMarkerRenderer = read(ZOMBIES_MARKER_RENDERER);
@@ -174,14 +177,44 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
                 "case ZombiesWaveValidator.VANILLA_SILVERFISH_ID -> EntityType.SILVERFISH.create(level);",
                 "silverfish should be a supported zombies wave entity");
         requireContains(spawnService,
+                "case ZombiesWaveValidator.VANILLA_SPIDER_ID -> EntityType.SPIDER.create(level);",
+                "spider should be a supported zombies wave entity");
+        requireContains(spawnService,
                 "case ZombiesWaveValidator.VANILLA_VINDICATOR_ID -> EntityType.VINDICATOR.create(level);",
                 "vindicator should be a supported zombies wave entity");
         requireContains(spawnService,
                 "case ZombiesWaveValidator.VANILLA_VEX_ID -> EntityType.VEX.create(level);",
                 "vex should be a supported zombies wave entity");
         requireContains(spawnService,
+                "case ZombiesWaveValidator.VANILLA_WARDEN_ID -> EntityType.WARDEN.create(level);",
+                "warden should be a supported zombies wave entity");
+        requireContains(spawnService,
                 "return mob != null && mob.getType() == EntityType.VEX;",
                 "vex should keep vanilla phasing movement instead of ground movement overrides");
+        requireContains(spawnService,
+                "return mob != null && mob.getType() == EntityType.WARDEN;",
+                "warden should keep its vanilla brain combat movement instead of ground movement overrides");
+        requireContains(spawnService,
+                "static final int WARDEN_ROOM_DIG_COOLDOWN_TICKS = 20 * 60 * 60;",
+                "warden room mobs should have a long room-managed dig cooldown");
+        requireContains(spawnService,
+                "MemoryModuleType.DIG_COOLDOWN,",
+                "warden room mobs should keep vanilla digging disabled through brain memory");
+        requireContains(spawnService,
+                "Unit.INSTANCE,",
+                "warden room dig cooldown should store the vanilla unit marker");
+        requireContains(spawnService,
+                "warden.increaseAngerAt(target, WARDEN_ROOM_TARGET_ANGER, false);",
+                "warden should refresh anger toward room survivors");
+        requireContains(spawnService,
+                "warden.setAttackTarget(target);",
+                "warden should receive a brain attack target for room survivors");
+        requireContains(spawnService,
+                "nearestRoomSurvivor(pathfinderMob, safeTargets(targetSupplier)).ifPresent(target -> {",
+                "warden should receive an immediate room target before its vanilla brain can choose to dig");
+        requireContains(spawnService,
+                "applyRoomTargetSpecialRules(mob, (ServerPlayer) currentTarget);",
+                "warden should refresh anger and dig cooldown while its current room target remains valid");
         requireContains(spawnService,
                 "wolf.setPersistentAngerTarget(target.getUUID());",
                 "zombies wolves should keep anger on their room target");
@@ -311,6 +344,9 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
         requireContains(zombiesMap,
                 "mobRecycleService.reset();",
                 "zombies map should reset recycle monitor state during cleanup/runtime reset");
+        requireContains(modeRoomTickEventHandler,
+                "ZombiesActiveMobCounter.instance().unregister(entry.roomId(), entry.entityId());",
+                "missing zombies entities must clear active mob counters even when no lifecycle port handles them");
         requireContains(codTdmEventHandler,
                 "public static void onExplosionDetonate(ExplosionEvent.Detonate event)",
                 "owned creeper explosions should be handled by the Forge explosion event");

@@ -1,7 +1,5 @@
 package com.cdp.codpattern.app.zombies.service;
 
-import com.cdp.codpattern.app.zombies.model.ZombiesConnectionState;
-import com.cdp.codpattern.app.zombies.model.ZombiesLifeState;
 import com.cdp.codpattern.app.zombies.model.ZombiesPlayerRuntimeState;
 
 import java.util.ArrayList;
@@ -94,12 +92,10 @@ public final class ZombiesIntermissionRespawnService {
             long currentTick,
             long offlineGraceTicks
     ) {
-        ZombiesLifeState lifeState = state.lifeState();
-        ZombiesConnectionState connectionState = state.connectionState();
-        if (!lifeState.isAlive() || connectionState.isLeft()) {
+        if (state == null || !state.lifeState().isAlive() || state.connectionState().isLeft()) {
             return false;
         }
-        if (connectionState.isOnline()) {
+        if (state.connectionState().isOnline()) {
             return true;
         }
         return state.offlineSinceTick()

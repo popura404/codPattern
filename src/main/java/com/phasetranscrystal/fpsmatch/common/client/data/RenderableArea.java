@@ -12,7 +12,7 @@ import net.minecraft.world.phys.AABB;
 public record RenderableArea(String key, Component name, int color, AreaData area) {
     public void render(PoseStack poseStack, MultiBufferSource bufferSource) {
         VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.lines());
-        AABB aabb = area.getAABB();
+        AABB aabb = area.getBlockInclusiveAABB();
         float red = ((color >> 16) & 0xFF) / 255.0F;
         float green = ((color >> 8) & 0xFF) / 255.0F;
         float blue = (color & 0xFF) / 255.0F;

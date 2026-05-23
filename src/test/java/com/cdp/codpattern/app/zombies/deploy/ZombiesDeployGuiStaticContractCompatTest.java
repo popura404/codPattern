@@ -21,6 +21,7 @@ public final class ZombiesDeployGuiStaticContractCompatTest {
     private static final Path TOOL_INTERACTION_HANDLER = Path.of("src/main/java/com/phasetranscrystal/fpsmatch/common/item/tool/ToolInteractionClientHandler.java");
     private static final Path WORLD_TOOL_ITEM = Path.of("src/main/java/com/phasetranscrystal/fpsmatch/common/item/tool/WorldToolItem.java");
     private static final Path TOOL_INTERACTION_HIT = Path.of("src/main/java/com/phasetranscrystal/fpsmatch/common/item/tool/ToolInteractionHit.java");
+    private static final Path RENDERABLE_AREA = Path.of("src/main/java/com/phasetranscrystal/fpsmatch/common/client/data/RenderableArea.java");
     private static final Path FIELD_SCHEMA = Path.of("src/main/java/com/cdp/codpattern/app/zombies/deploy/ZombiesDeployFieldSchema.java");
     private static final List<Path> KEY_SOURCE_FILES = List.of(
             Path.of("src/main/java/com/cdp/codpattern/client/gui/screen/zombies/deploy/ZombiesDeployToolScreen.java"),
@@ -52,6 +53,7 @@ public final class ZombiesDeployGuiStaticContractCompatTest {
         String toolInteractionHandler = read(TOOL_INTERACTION_HANDLER);
         String worldToolItem = read(WORLD_TOOL_ITEM);
         String toolInteractionHit = read(TOOL_INTERACTION_HIT);
+        String renderableArea = read(RENDERABLE_AREA);
         String fieldSchema = read(FIELD_SCHEMA);
         requireAbsent(screen, "newDraftButton", "new draft button must stay removed");
         requireAbsent(screen, "saveObjectButton", "save object button must stay removed");
@@ -406,6 +408,23 @@ public final class ZombiesDeployGuiStaticContractCompatTest {
                 "object-stage preview must send only the selected map boundary");
         requireContains(objectStagePreviewBody, "sendCurrentObjectList(player, request, map.objects());",
                 "object-stage preview must send all deployed positions for the selected object type in the selected map");
+
+        String currentObjectListBody = methodBody(preview, "private void sendCurrentObjectList");
+        requireAbsent(currentObjectListBody,
+                "sendSlotPointForField(player, key, label, binding, \"areaFrom\"",
+                "deployed barrier area previews must not render an endpoint point marker");
+        requireAbsent(currentObjectListBody,
+                "sendSlotPointForField(player, key, label, binding, \"areaTo\"",
+                "deployed barrier area previews must not render an endpoint point marker");
+        String sendDraftBody = methodBody(preview, "private void sendDraft");
+        requireAbsent(sendDraftBody,
+                "sendSlotPointForField(player, key, label, binding, \"areaFrom\"",
+                "barrier draft previews must not render an endpoint point marker");
+        requireAbsent(sendDraftBody,
+                "sendSlotPointForField(player, key, label, binding, \"areaTo\"",
+                "barrier draft previews must not render an endpoint point marker");
+        requireContains(renderableArea, "AABB aabb = area.getBlockInclusiveAABB();",
+                "area previews must include the complete block volume at both placement endpoints");
 
         String editObjectBody = methodBody(service, "private ZombiesDeployServiceResult<ZombiesDeploySnapshot> editObject");
         requireContains(editObjectBody, "ZombiesMapObjects previousObjects = map.objects();",

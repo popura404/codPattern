@@ -139,8 +139,10 @@ public final class ZombiesWaveConfigRepositoryCompatTest {
         require(generatedJson.contains("\"minecraft:creeper\""), context + " default wave should contain creeper");
         require(generatedJson.contains("\"minecraft:wolf\""), context + " default wave should contain wolf");
         require(generatedJson.contains("\"minecraft:silverfish\""), context + " default wave should contain silverfish");
+        require(generatedJson.contains("\"minecraft:spider\""), context + " default wave should contain spider");
         require(generatedJson.contains("\"minecraft:vindicator\""), context + " default wave should contain vindicator");
         require(generatedJson.contains("\"minecraft:vex\""), context + " default wave should contain vex");
+        require(generatedJson.contains("\"minecraft:warden\""), context + " default wave should contain warden");
         require(generatedJson.contains("\"healthMultiplier\": 1.0"),
                 context + " default wave should show optional per-mob health multiplier");
         require(generatedJson.contains("\"damageMultiplier\": 1.0"),
@@ -162,11 +164,15 @@ public final class ZombiesWaveConfigRepositoryCompatTest {
         requireReward(wave, "minecraft:creeper", 60, 18, context);
         requireReward(wave, "minecraft:wolf", 36, 12, context);
         requireReward(wave, "minecraft:silverfish", 15, 6, context);
+        requireReward(wave, "minecraft:spider", 42, 14, context);
         requireReward(wave, "minecraft:vindicator", 70, 22, context);
         requireReward(wave, "minecraft:vex", 50, 16, context);
+        requireReward(wave, "minecraft:warden", 500, 160, context);
         requireMultipliers(wave, "minecraft:zombie", 1.0D, 1.0D, 1.0D, context);
+        requireMultipliers(wave, "minecraft:spider", 1.0D, 1.0D, 1.0D, context);
         requireMultipliers(wave, "minecraft:vindicator", 1.0D, 1.0D, 1.0D, context);
         requireMultipliers(wave, "minecraft:vex", 1.0D, 1.0D, 1.0D, context);
+        requireMultipliers(wave, "minecraft:warden", 1.0D, 1.0D, 1.0D, context);
     }
 
     private static void requireReward(

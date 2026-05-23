@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Idempotent cleanup orchestrator for zombies rounds. It only depends on public
@@ -78,6 +79,7 @@ public class ZombiesCleanupService {
             ServerLevel level = levelResolver == null ? null : levelResolver.level(entry.dimension());
             Entity entity = level == null ? null : level.getEntity(entry.entityId());
             if (entity == null) {
+                hooks.onMissingEntityCleanup(entry);
                 missingEntities++;
                 continue;
             }
@@ -87,6 +89,21 @@ public class ZombiesCleanupService {
             removedEntities++;
         }
         return new EntityCleanupSummary(entries.size(), removedEntities, missingEntities);
+    }
+
+    public EntityCleanupSummary cleanupMissingEntity(RoomId roomId, ModeEntityOwnershipRegistry.Entry entry) {
+        Objects.requireNonNull(roomId, "roomId");
+        if (entry == null || !sameRoom(entry.roomId(), roomId)) {
+            return new EntityCleanupSummary(0, 0, 0);
+        }
+
+        Optional<ModeEntityOwnershipRegistry.Entry> removed = ownershipRegistry.unregister(entry.entityId());
+        ModeEntityOwnershipRegistry.Entry cleanupEntry = removed.orElse(entry);
+        if (!sameRoom(cleanupEntry.roomId(), roomId)) {
+            return new EntityCleanupSummary(0, 0, 0);
+        }
+        hooks.onMissingEntityCleanup(cleanupEntry);
+        return new EntityCleanupSummary(1, 0, 1);
     }
 
     private ZombiesServiceResult<Void> runParticipants(ZombiesCleanupParticipant.ZombiesCleanupContext context) {
@@ -100,6 +117,13 @@ public class ZombiesCleanupService {
             }
         }
         return ZombiesServiceResult.ok();
+    }
+
+    private static boolean sameRoom(RoomId left, RoomId right) {
+        return left != null
+                && right != null
+                && left.gameType().equalsIgnoreCase(right.gameType())
+                && left.mapName().equals(right.mapName());
     }
 
     public interface Hooks {
@@ -125,6 +149,9 @@ public class ZombiesCleanupService {
         }
 
         default void onEntityCleanup(Entity entity) {
+        }
+
+        default void onMissingEntityCleanup(ModeEntityOwnershipRegistry.Entry entry) {
         }
 
         default void afterOccupancyReleased(ZombiesCleanupParticipant.ZombiesCleanupContext context, boolean released) {

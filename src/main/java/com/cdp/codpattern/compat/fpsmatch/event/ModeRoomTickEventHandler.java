@@ -2,11 +2,16 @@ package com.cdp.codpattern.compat.fpsmatch.event;
 
 import com.cdp.codpattern.CodPattern;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
+import com.cdp.codpattern.app.match.BuiltInGameModes;
+import com.cdp.codpattern.app.match.model.EntityLifecycleContext;
 import com.cdp.codpattern.app.match.model.ModeRoomTickContext;
 import com.cdp.codpattern.app.match.model.ModeRuntimeStateSnapshot;
 import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.port.ModeEntityLifecyclePort;
 import com.cdp.codpattern.app.match.port.ModePlayerRuntimeStatePort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
+import com.cdp.codpattern.app.match.runtime.ModeEntityOwnershipRegistry;
+import com.cdp.codpattern.app.zombies.service.ZombiesActiveMobCounter;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGateway;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.cdp.codpattern.network.match.ModeObjectStateSyncPacket;
@@ -43,8 +48,9 @@ public final class ModeRoomTickEventHandler {
         }
 
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
+        ModeEntityOwnershipRegistry ownershipRegistry = gateway.entityOwnershipRegistry();
         for (ServerLevel level : server.getAllLevels()) {
-            gateway.entityOwnershipRegistry().clearMissingEntities(level);
+            clearMissingRoomEntities(gateway, ownershipRegistry, level);
         }
 
         ServerLevel level = server.overworld();
@@ -59,6 +65,24 @@ public final class ModeRoomTickEventHandler {
         if (gameTime % STATE_SYNC_INTERVAL_TICKS == 0L) {
             syncRuntimeStateToPlayers(server, gateway);
             syncObjectStateToPlayers(server, gateway);
+        }
+    }
+
+    private static void clearMissingRoomEntities(
+            FpsMatchGateway gateway,
+            ModeEntityOwnershipRegistry ownershipRegistry,
+            ServerLevel level
+    ) {
+        for (ModeEntityOwnershipRegistry.Entry entry : ownershipRegistry.missingEntities(level)) {
+            ModeEntityLifecyclePort lifecyclePort = gateway.findRoomEntityLifecyclePort(entry.roomId()).orElse(null);
+            boolean handled = lifecyclePort != null
+                    && lifecyclePort.onRoomEntityMissing(entry, new EntityLifecycleContext(entry.roomId()));
+            if (!handled) {
+                if (BuiltInGameModes.isZombies(entry.roomId().gameType())) {
+                    ZombiesActiveMobCounter.instance().unregister(entry.roomId(), entry.entityId());
+                }
+                ownershipRegistry.unregister(entry.entityId());
+            }
         }
     }
 

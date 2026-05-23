@@ -22,6 +22,7 @@ public final class ZombiesMvp3GrowthServicesCompatTest {
         powerPurchaseIsSharedAtomicAndRepeatDoesNotSpend();
         buffPurchaseHonorsPowerGateAndRepeatDoesNotSpend();
         scoreMultiplierAppliesToKillAndAssistRewards();
+        speedAndHeadshotBuffMultipliersReadOwnedState();
         buffDamageTakenMultiplierCombinesArmorAndDoubleHealth();
         buffCombatServiceScalesRoomMobDamageAndRequestsReactiveExplosion();
         deathOrReviveClearRemovesBuffsAndHalvesDoubleAmmoReserve();
@@ -102,6 +103,30 @@ public final class ZombiesMvp3GrowthServicesCompatTest {
         requireSuccess(result, "score multiplier should apply through economy reward path");
         requirePoints(services.players, killerId, 12.5D, "killer score multiplier should scale kill reward");
         requirePoints(services.players, assisterId, 6.0D, "assister score multiplier should scale assist reward");
+    }
+
+    private static void speedAndHeadshotBuffMultipliersReadOwnedState() {
+        Services services = services();
+        UUID playerId = playerId(63);
+        ZombiesPlayerRuntimeState state = services.players.getOrCreate(playerId);
+
+        requireClose(services.buffs.speedMultiplier(playerId), 1.0D,
+                "missing speed_boost should default to neutral multiplier");
+        state.addBuff(ZombiesBuffState.defaultFor(ZombiesBuffType.SPEED_BOOST));
+        requireClose(services.buffs.speedMultiplier(playerId), 1.25D,
+                "speed_boost should expose configured movement multiplier");
+
+        ZombiesBuffCombatService combat = new ZombiesBuffCombatService(
+                RoomId.of("zombies", "growth-headshot"),
+                services.players,
+                null);
+        requireClose(combat.headshotDamageMultiplier(playerId), 1.0D,
+                "missing headshot_damage should default to neutral multiplier");
+        state.addBuff(ZombiesBuffState.defaultFor(ZombiesBuffType.HEADSHOT_DAMAGE));
+        requireClose(combat.headshotDamageMultiplier(playerId), 1.5D,
+                "headshot_damage should expose configured damage multiplier");
+        requireClose(ZombiesBuffCombatService.scaledHeadshotMultiplier(2.0F, 1.5D), 3.0D,
+                "headshot_damage should scale TaCZ headshot multiplier");
     }
 
     private static void buffDamageTakenMultiplierCombinesArmorAndDoubleHealth() {

@@ -40,4 +40,19 @@ public record AreaData(BlockPos pos1, BlockPos pos2) {
                 Math.max(pos1.getZ(), pos2.getZ())
         );
     }
+
+    /**
+     * Returns preview bounds that cover the complete block volumes at both
+     * inclusive endpoints.
+     */
+    public AABB getBlockInclusiveAABB() {
+        return new AABB(
+                Math.min(pos1.getX(), pos2.getX()),
+                Math.min(pos1.getY(), pos2.getY()),
+                Math.min(pos1.getZ(), pos2.getZ()),
+                Math.max(pos1.getX(), pos2.getX()) + 1.0D,
+                Math.max(pos1.getY(), pos2.getY()) + 1.0D,
+                Math.max(pos1.getZ(), pos2.getZ()) + 1.0D
+        );
+    }
 }

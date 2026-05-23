@@ -141,8 +141,10 @@ public final class ZombiesWaveValidatorCompatTest {
                         + "{\"entity\":\"minecraft:creeper\",\"count\":1},"
                         + "{\"entity\":\"minecraft:wolf\",\"count\":1},"
                         + "{\"entity\":\"minecraft:silverfish\",\"count\":1},"
+                        + "{\"entity\":\"minecraft:spider\",\"count\":1},"
                         + "{\"entity\":\"minecraft:vindicator\",\"count\":1},"
-                        + "{\"entity\":\"minecraft:vex\",\"count\":1}"
+                        + "{\"entity\":\"minecraft:vex\",\"count\":1},"
+                        + "{\"entity\":\"minecraft:warden\",\"count\":1}"
                         + "]"
                         + "}");
 

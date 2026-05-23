@@ -66,6 +66,15 @@ public class ZombiesEntityLifecyclePortAdapter implements ModeEntityLifecyclePor
     }
 
     @Override
+    public boolean onRoomEntityMissing(ModeEntityOwnershipRegistry.Entry entry, EntityLifecycleContext context) {
+        if (entry == null || !sameRoom(entry.roomId())) {
+            return false;
+        }
+        cleanupService.cleanupMissingEntity(roomId, entry);
+        return true;
+    }
+
+    @Override
     public void onRoomEntitiesCleared(RoomId roomId) {
         if (roomId != null && sameRoom(roomId)) {
             cleanupService.cleanupEntities(roomId, levelResolver);

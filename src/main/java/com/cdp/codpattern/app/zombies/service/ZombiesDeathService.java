@@ -49,7 +49,7 @@ public class ZombiesDeathService {
             if (memberCount <= 1) {
                 failed = true;
                 reason = FAILURE_REASON_SINGLE_PLAYER_DEATH;
-            } else if (!playerStateService.hasAnyAlive(currentTick, offlineGraceTicks)) {
+            } else if (!playerStateService.hasAnyOnlineAlive()) {
                 failed = true;
                 reason = FAILURE_REASON_ALL_SURVIVORS_DOWN;
             }

@@ -9,8 +9,10 @@ import com.cdp.codpattern.app.zombies.model.ZombiesWaveMobEntry;
 import com.cdp.codpattern.app.zombies.runtime.ZombiesWaveRuntimeState;
 import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 import com.cdp.codpattern.config.zombies.ZombiesRulesRepository;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Unit;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -19,11 +21,15 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.animal.Wolf;
+import net.minecraft.world.entity.monster.warden.Warden;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
@@ -32,7 +38,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 public final class ZombiesMobSpawnService {
@@ -64,10 +70,11 @@ public final class ZombiesMobSpawnService {
     static final double ROOM_MONSTER_DETOUR_FORWARD_DISTANCE = 0.75D;
     static final double ROOM_MONSTER_DETOUR_SIDE_DISTANCE = 1.25D;
     static final double ROOM_MONSTER_DETOUR_MIN_PROGRESS = 0.05D;
-
-    private static final AtomicInteger GLOBAL_ACTIVE_ZOMBIES = new AtomicInteger();
+    static final int WARDEN_ROOM_TARGET_ANGER = 100;
+    static final int WARDEN_ROOM_DIG_COOLDOWN_TICKS = 20 * 60 * 60;
 
     private final ModeEntityOwnershipRegistry ownershipRegistry;
+    private final ZombiesActiveMobCounter activeMobCounter;
     private final int globalMaxAliveZombies;
     private final Supplier<List<ServerPlayer>> survivorTargetSupplier;
     private final Supplier<ZombiesRulesConfig.SpawnPointWeighting> spawnPointWeightingSupplier;
@@ -99,7 +106,23 @@ public final class ZombiesMobSpawnService {
             Supplier<List<ServerPlayer>> survivorTargetSupplier,
             Supplier<ZombiesRulesConfig.SpawnPointWeighting> spawnPointWeightingSupplier
     ) {
+        this(
+                ownershipRegistry,
+                globalMaxAliveZombies,
+                survivorTargetSupplier,
+                spawnPointWeightingSupplier,
+                ZombiesActiveMobCounter.instance());
+    }
+
+    public ZombiesMobSpawnService(
+            ModeEntityOwnershipRegistry ownershipRegistry,
+            int globalMaxAliveZombies,
+            Supplier<List<ServerPlayer>> survivorTargetSupplier,
+            Supplier<ZombiesRulesConfig.SpawnPointWeighting> spawnPointWeightingSupplier,
+            ZombiesActiveMobCounter activeMobCounter
+    ) {
         this.ownershipRegistry = Objects.requireNonNull(ownershipRegistry, "ownershipRegistry");
+        this.activeMobCounter = activeMobCounter == null ? ZombiesActiveMobCounter.instance() : activeMobCounter;
         this.globalMaxAliveZombies = Math.max(1, globalMaxAliveZombies);
         this.survivorTargetSupplier = survivorTargetSupplier == null ? List::of : survivorTargetSupplier;
         this.spawnPointWeightingSupplier = spawnPointWeightingSupplier == null
@@ -126,7 +149,7 @@ public final class ZombiesMobSpawnService {
         if (waveState.activeZombies() >= safeMaxAlive(waveDefinition)) {
             return SpawnResult.failure(SpawnFailureReason.MAX_ALIVE_REACHED);
         }
-        if (GLOBAL_ACTIVE_ZOMBIES.get() >= globalMaxAliveZombies) {
+        if (activeMobCounter.totalCount() >= globalMaxAliveZombies) {
             return SpawnResult.failure(SpawnFailureReason.GLOBAL_CAP_REACHED);
         }
 
@@ -181,7 +204,7 @@ public final class ZombiesMobSpawnService {
         }
         ownershipRegistry.register(roomId, mob);
         waveState.registerActiveZombie(mob.getUUID());
-        GLOBAL_ACTIVE_ZOMBIES.incrementAndGet();
+        activeMobCounter.register(roomId, mob.getUUID());
         return SpawnResult.spawned(mob, mobId.get(), spawn.objectId());
     }
 
@@ -190,16 +213,27 @@ public final class ZombiesMobSpawnService {
         return weighting == null ? new ZombiesRulesConfig.SpawnPointWeighting() : weighting;
     }
 
-    public void recordMobEnded() {
-        GLOBAL_ACTIVE_ZOMBIES.updateAndGet(value -> Math.max(0, value - 1));
+    public boolean recordMobEnded(RoomId roomId, UUID entityId) {
+        return activeMobCounter.unregister(roomId, entityId);
     }
 
     public int globalActiveZombies() {
-        return GLOBAL_ACTIVE_ZOMBIES.get();
+        return activeMobCounter.totalCount();
+    }
+
+    public int roomActiveZombies(RoomId roomId) {
+        return activeMobCounter.roomCount(roomId);
     }
 
     public int globalMaxAliveZombies() {
         return globalMaxAliveZombies;
+    }
+
+    public ZombiesActiveMobCounter.ReconcileSummary reconcileActiveZombies(
+            Collection<ModeEntityOwnershipRegistry.Entry> entries,
+            Function<ResourceKey<Level>, ServerLevel> levelResolver
+    ) {
+        return activeMobCounter.reconcile(entries, levelResolver);
     }
 
     private static int safeMaxAlive(ZombiesWaveDefinition waveDefinition) {
@@ -485,7 +519,7 @@ public final class ZombiesMobSpawnService {
     }
 
     private static void applyRoomMonsterAttackCadence(Mob mob) {
-        if (usesVanillaPhaseMovement(mob)) {
+        if (usesVanillaPhaseMovement(mob) || usesWardenBrainCombat(mob)) {
             return;
         }
         if (mob instanceof PathfinderMob pathfinderMob) {
@@ -510,7 +544,7 @@ public final class ZombiesMobSpawnService {
     }
 
     private static void applyRoomMonsterObstacleJumping(Mob mob) {
-        if (usesVanillaPhaseMovement(mob)) {
+        if (usesVanillaPhaseMovement(mob) || usesWardenBrainCombat(mob)) {
             return;
         }
         if (mob instanceof PathfinderMob pathfinderMob) {
@@ -521,7 +555,7 @@ public final class ZombiesMobSpawnService {
     }
 
     private static void applyRoomMonsterObstacleDetouring(Mob mob) {
-        if (usesVanillaPhaseMovement(mob)) {
+        if (usesVanillaPhaseMovement(mob) || usesWardenBrainCombat(mob)) {
             return;
         }
         if (mob instanceof PathfinderMob pathfinderMob) {
@@ -532,7 +566,7 @@ public final class ZombiesMobSpawnService {
     }
 
     private static void applyRoomMonsterDropDownChasing(Mob mob) {
-        if (usesVanillaPhaseMovement(mob)) {
+        if (usesVanillaPhaseMovement(mob) || usesWardenBrainCombat(mob)) {
             return;
         }
         if (mob instanceof PathfinderMob pathfinderMob) {
@@ -553,6 +587,10 @@ public final class ZombiesMobSpawnService {
         pathfinderMob.targetSelector.addGoal(
                 0,
                 new RoomSurvivorTargetGoal(pathfinderMob, targetSupplier));
+        nearestRoomSurvivor(pathfinderMob, safeTargets(targetSupplier)).ifPresent(target -> {
+            applyRoomTargetSpecialRules(pathfinderMob, target);
+            pathfinderMob.setTarget(target);
+        });
     }
 
     private static void applySpawnedMobSpecialRules(Mob mob) {
@@ -560,6 +598,9 @@ public final class ZombiesMobSpawnService {
             wolf.setTame(false);
             wolf.setOrderedToSit(false);
             wolf.setRemainingPersistentAngerTime(ROOM_MONSTER_WOLF_ANGER_TICKS);
+        }
+        if (mob instanceof Warden warden) {
+            refreshWardenRoomDigCooldown(warden);
         }
     }
 
@@ -570,10 +611,63 @@ public final class ZombiesMobSpawnService {
             wolf.setPersistentAngerTarget(target.getUUID());
             wolf.setRemainingPersistentAngerTime(ROOM_MONSTER_WOLF_ANGER_TICKS);
         }
+        if (mob instanceof Warden warden && target != null) {
+            warden.increaseAngerAt(target, WARDEN_ROOM_TARGET_ANGER, false);
+            warden.setAttackTarget(target);
+            refreshWardenRoomDigCooldown(warden);
+        }
+    }
+
+    private static void refreshWardenRoomDigCooldown(Warden warden) {
+        if (warden == null) {
+            return;
+        }
+        warden.getBrain().setMemoryWithExpiry(
+                MemoryModuleType.DIG_COOLDOWN,
+                Unit.INSTANCE,
+                WARDEN_ROOM_DIG_COOLDOWN_TICKS);
+    }
+
+    private static Optional<ServerPlayer> nearestRoomSurvivor(Mob mob, List<ServerPlayer> targets) {
+        if (mob == null) {
+            return Optional.empty();
+        }
+        return (targets == null ? List.<ServerPlayer>of() : targets).stream()
+                .filter(player -> isEligibleRoomSurvivor(mob, player))
+                .min(Comparator.comparingDouble(mob::distanceToSqr));
+    }
+
+    private static boolean isEligibleRoomSurvivor(Mob mob, ServerPlayer player) {
+        if (mob == null || player == null || !player.isAlive() || player.isSpectator()) {
+            return false;
+        }
+        if (!player.level().dimension().equals(mob.level().dimension())) {
+            return false;
+        }
+        double followRange = Math.max(ROOM_MONSTER_FOLLOW_RANGE, currentFollowRange(mob));
+        return mob.distanceToSqr(player) <= followRange * followRange;
+    }
+
+    private static List<ServerPlayer> safeTargets(Supplier<List<ServerPlayer>> targetSupplier) {
+        try {
+            List<ServerPlayer> targets = targetSupplier == null ? List.of() : targetSupplier.get();
+            return targets == null ? List.of() : targets;
+        } catch (RuntimeException ignored) {
+            return List.of();
+        }
+    }
+
+    private static double currentFollowRange(Mob mob) {
+        AttributeInstance followRange = mob == null ? null : mob.getAttribute(Attributes.FOLLOW_RANGE);
+        return followRange == null ? ROOM_MONSTER_FOLLOW_RANGE : followRange.getValue();
     }
 
     private static boolean usesVanillaPhaseMovement(Mob mob) {
         return mob != null && mob.getType() == EntityType.VEX;
+    }
+
+    private static boolean usesWardenBrainCombat(Mob mob) {
+        return mob != null && mob.getType() == EntityType.WARDEN;
     }
 
     private static void attachWaveRewardMetadata(Mob mob, String rawMobId, ZombiesWaveDefinition waveDefinition) {
@@ -996,7 +1090,7 @@ public final class ZombiesMobSpawnService {
             if (nextScanDelay > 0) {
                 nextScanDelay--;
                 if (!isCurrentRoomTarget(mob.getTarget())) {
-                    mob.setTarget(null);
+                    clearRoomTarget(mob);
                 }
                 return;
             }
@@ -1007,7 +1101,7 @@ public final class ZombiesMobSpawnService {
         @Override
         public void stop() {
             if (!isCurrentRoomTarget(mob.getTarget())) {
-                mob.setTarget(null);
+                clearRoomTarget(mob);
             }
         }
 
@@ -1015,18 +1109,28 @@ public final class ZombiesMobSpawnService {
             List<ServerPlayer> targets = safeTargets();
             LivingEntity currentTarget = mob.getTarget();
             if (isCurrentRoomTarget(currentTarget) && containsCurrentTarget(targets)) {
+                applyRoomTargetSpecialRules(mob, (ServerPlayer) currentTarget);
+                mob.setTarget(currentTarget);
                 return;
             }
             Optional<ServerPlayer> nextTarget = nearestRoomSurvivor(targets);
             currentRoomTargetId = nextTarget.map(ServerPlayer::getUUID).orElse(null);
             nextTarget.ifPresent(target -> applyRoomTargetSpecialRules(mob, target));
             mob.setTarget(nextTarget.orElse(null));
+            if (nextTarget.isEmpty()) {
+                clearRoomTarget(mob);
+            }
+        }
+
+        private static void clearRoomTarget(PathfinderMob mob) {
+            if (mob instanceof Warden warden) {
+                warden.setAttackTarget(null);
+            }
+            mob.setTarget(null);
         }
 
         private Optional<ServerPlayer> nearestRoomSurvivor(List<ServerPlayer> targets) {
-            return targets.stream()
-                    .filter(this::isEligibleRoomSurvivor)
-                    .min(Comparator.comparingDouble(mob::distanceToSqr));
+            return ZombiesMobSpawnService.nearestRoomSurvivor(mob, targets);
         }
 
         private boolean isCurrentRoomTarget(LivingEntity target) {
@@ -1039,14 +1143,7 @@ public final class ZombiesMobSpawnService {
         }
 
         private boolean isEligibleRoomSurvivor(ServerPlayer player) {
-            if (player == null || !player.isAlive() || player.isSpectator()) {
-                return false;
-            }
-            if (!player.level().dimension().equals(mob.level().dimension())) {
-                return false;
-            }
-            double followRange = Math.max(ROOM_MONSTER_FOLLOW_RANGE, currentFollowRange(mob));
-            return mob.distanceToSqr(player) <= followRange * followRange;
+            return ZombiesMobSpawnService.isEligibleRoomSurvivor(mob, player);
         }
 
         private boolean containsCurrentTarget(List<ServerPlayer> targets) {
@@ -1059,17 +1156,7 @@ public final class ZombiesMobSpawnService {
         }
 
         private List<ServerPlayer> safeTargets() {
-            try {
-                List<ServerPlayer> targets = targetSupplier.get();
-                return targets == null ? List.of() : targets;
-            } catch (RuntimeException ignored) {
-                return List.of();
-            }
-        }
-
-        private static double currentFollowRange(Mob mob) {
-            AttributeInstance followRange = mob == null ? null : mob.getAttribute(Attributes.FOLLOW_RANGE);
-            return followRange == null ? ROOM_MONSTER_FOLLOW_RANGE : followRange.getValue();
+            return ZombiesMobSpawnService.safeTargets(targetSupplier);
         }
 
         private static int staggeredInitialDelay(Mob mob) {
@@ -1138,8 +1225,10 @@ public final class ZombiesMobSpawnService {
             case ZombiesWaveValidator.VANILLA_CREEPER_ID -> EntityType.CREEPER.create(level);
             case ZombiesWaveValidator.VANILLA_WOLF_ID -> EntityType.WOLF.create(level);
             case ZombiesWaveValidator.VANILLA_SILVERFISH_ID -> EntityType.SILVERFISH.create(level);
+            case ZombiesWaveValidator.VANILLA_SPIDER_ID -> EntityType.SPIDER.create(level);
             case ZombiesWaveValidator.VANILLA_VINDICATOR_ID -> EntityType.VINDICATOR.create(level);
             case ZombiesWaveValidator.VANILLA_VEX_ID -> EntityType.VEX.create(level);
+            case ZombiesWaveValidator.VANILLA_WARDEN_ID -> EntityType.WARDEN.create(level);
             default -> null;
         };
     }

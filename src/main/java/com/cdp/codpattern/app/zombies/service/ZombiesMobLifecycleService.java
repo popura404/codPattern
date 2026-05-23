@@ -7,6 +7,7 @@ import net.minecraft.world.entity.Entity;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 public final class ZombiesMobLifecycleService {
     private final ModeEntityOwnershipRegistry ownershipRegistry;
@@ -40,6 +41,24 @@ public final class ZombiesMobLifecycleService {
         return unregister(roomId, entity, waveState, TerminationReason.CLEANUP);
     }
 
+    public LifecycleResult onMissing(RoomId roomId, UUID entityId, ZombiesWaveRuntimeState waveState,
+            TerminationReason reason) {
+        if (entityId == null) {
+            return LifecycleResult.ignored(reason, "entity_missing");
+        }
+
+        Optional<ModeEntityOwnershipRegistry.Entry> existingEntry = ownershipRegistry.entryOf(entityId);
+        if (existingEntry.isPresent() && roomId != null && !sameRoom(existingEntry.get().roomId(), roomId)) {
+            boolean activeRemoved = unregisterActiveZombie(roomId, entityId, waveState, reason);
+            return new LifecycleResult(activeRemoved, reason, activeRemoved ? "registry_room_mismatch" : "room_mismatch");
+        }
+
+        Optional<ModeEntityOwnershipRegistry.Entry> removedEntry = ownershipRegistry.unregister(entityId);
+        RoomId counterRoomId = removedEntry.map(ModeEntityOwnershipRegistry.Entry::roomId).orElse(roomId);
+        boolean activeRemoved = unregisterActiveZombie(counterRoomId, entityId, waveState, reason);
+        return new LifecycleResult(removedEntry.isPresent() || activeRemoved, reason, "");
+    }
+
     public LifecycleResult unregister(
             RoomId roomId,
             Entity entity,
@@ -56,14 +75,26 @@ public final class ZombiesMobLifecycleService {
         }
 
         Optional<ModeEntityOwnershipRegistry.Entry> removedEntry = ownershipRegistry.unregister(entity);
-        boolean activeRemoved = waveState != null && waveState.unregisterActiveZombie(entity.getUUID(), reason.key());
-        if (activeRemoved && spawnService != null) {
-            spawnService.recordMobEnded();
-        }
+        RoomId counterRoomId = removedEntry.map(ModeEntityOwnershipRegistry.Entry::roomId).orElse(roomId);
+        boolean activeRemoved = unregisterActiveZombie(counterRoomId, entity.getUUID(), waveState, reason);
         if (!activeRemoved && waveState != null) {
             waveState.recordLifecycleReason(reason.key());
         }
         return new LifecycleResult(removedEntry.isPresent() || activeRemoved, reason, "");
+    }
+
+    private boolean unregisterActiveZombie(
+            RoomId roomId,
+            UUID entityId,
+            ZombiesWaveRuntimeState waveState,
+            TerminationReason reason
+    ) {
+        boolean activeRemoved = waveState != null && waveState.unregisterActiveZombie(entityId, reason.key());
+        boolean counterRemoved = spawnService != null && spawnService.recordMobEnded(roomId, entityId);
+        if (!activeRemoved && counterRemoved && waveState != null) {
+            waveState.recordLifecycleReason(reason.key());
+        }
+        return activeRemoved || counterRemoved;
     }
 
     private static boolean sameRoom(RoomId left, RoomId right) {

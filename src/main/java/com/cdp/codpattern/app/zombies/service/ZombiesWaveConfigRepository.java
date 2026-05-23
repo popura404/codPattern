@@ -39,7 +39,7 @@ public final class ZombiesWaveConfigRepository {
                 {
                   "entity": "minecraft:zombie",
                   "description": "Basic starter zombie example.",
-                  "count": 12,
+                  "count": 9,
                   "killPoints": 30,
                   "assistPoints": 9
                 },
@@ -79,6 +79,16 @@ public final class ZombiesWaveConfigRepository {
                   "assistPoints": 6
                 },
                 {
+                  "entity": "minecraft:spider",
+                  "description": "Wall-climbing melee mob example.",
+                  "count": 2,
+                  "healthMultiplier": 1.0,
+                  "damageMultiplier": 1.0,
+                  "speedMultiplier": 1.0,
+                  "killPoints": 42,
+                  "assistPoints": 14
+                },
+                {
                   "entity": "minecraft:vindicator",
                   "description": "Direct melee illager example with optional per-mob attribute multipliers.",
                   "count": 1,
@@ -97,6 +107,16 @@ public final class ZombiesWaveConfigRepository {
                   "speedMultiplier": 1.0,
                   "killPoints": 50,
                   "assistPoints": 16
+                },
+                {
+                  "entity": "minecraft:warden",
+                  "description": "Boss mob example; zombies mode refreshes its room target anger when survivors are present.",
+                  "count": 1,
+                  "healthMultiplier": 1.0,
+                  "damageMultiplier": 1.0,
+                  "speedMultiplier": 1.0,
+                  "killPoints": 500,
+                  "assistPoints": 160
                 }
               ]
             }

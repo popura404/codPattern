@@ -47,6 +47,15 @@ public final class ModeEntityOwnershipRegistry {
         return Optional.ofNullable(entriesByEntityId.remove(entity.getUUID()));
     }
 
+    public Optional<Entry> unregister(UUID entityId) {
+        if (entityId == null) {
+            return Optional.empty();
+        }
+        Optional<Entry> removed = Optional.ofNullable(entriesByEntityId.remove(entityId));
+        removed.ifPresent(ignored -> suppressedPersistentRestores.add(entityId));
+        return removed;
+    }
+
     public Optional<RoomId> roomIdOf(Entity entity) {
         return entryOf(entity).map(Entry::roomId);
     }
@@ -77,6 +86,17 @@ public final class ModeEntityOwnershipRegistry {
         }
     }
 
+    public Optional<Entry> entryOf(UUID entityId) {
+        if (entityId == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(entriesByEntityId.get(entityId));
+    }
+
+    public List<Entry> entries() {
+        return List.copyOf(entriesByEntityId.values());
+    }
+
     public List<Entry> entitiesInRoom(RoomId roomId) {
         if (roomId == null) {
             return List.of();
@@ -99,17 +119,20 @@ public final class ModeEntityOwnershipRegistry {
         return removed;
     }
 
-    public int clearMissingEntities(ServerLevel level) {
+    public List<Entry> missingEntities(ServerLevel level) {
         if (level == null) {
-            return 0;
+            return List.of();
         }
+        return entriesByEntityId.values().stream()
+                .filter(entry -> entry.dimension().equals(level.dimension()))
+                .filter(entry -> level.getEntity(entry.entityId()) == null)
+                .toList();
+    }
+
+    public int clearMissingEntities(ServerLevel level) {
         int removed = 0;
-        for (Entry entry : List.copyOf(entriesByEntityId.values())) {
-            if (!entry.dimension().equals(level.dimension())) {
-                continue;
-            }
-            if (level.getEntity(entry.entityId()) == null
-                    && entriesByEntityId.remove(entry.entityId(), entry)) {
+        for (Entry entry : missingEntities(level)) {
+            if (entriesByEntityId.remove(entry.entityId(), entry)) {
                 removed++;
             }
         }

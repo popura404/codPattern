@@ -31,8 +31,10 @@ public final class ZombiesWaveValidator {
     static final String VANILLA_CREEPER_ID = "minecraft:creeper";
     static final String VANILLA_WOLF_ID = "minecraft:wolf";
     static final String VANILLA_SILVERFISH_ID = "minecraft:silverfish";
+    static final String VANILLA_SPIDER_ID = "minecraft:spider";
     static final String VANILLA_VINDICATOR_ID = "minecraft:vindicator";
     static final String VANILLA_VEX_ID = "minecraft:vex";
+    static final String VANILLA_WARDEN_ID = "minecraft:warden";
 
     private static final String DEFAULT_NAMESPACE = "minecraft";
     private static final List<String> SUPPORTED_ENTITY_IDS = List.of(
@@ -42,8 +44,10 @@ public final class ZombiesWaveValidator {
             VANILLA_CREEPER_ID,
             VANILLA_WOLF_ID,
             VANILLA_SILVERFISH_ID,
+            VANILLA_SPIDER_ID,
             VANILLA_VINDICATOR_ID,
-            VANILLA_VEX_ID);
+            VANILLA_VEX_ID,
+            VANILLA_WARDEN_ID);
 
     public ValidationReport validate(List<ZombiesWaveDefinition> waves) {
         List<ValidationIssue> issues = new ArrayList<>();

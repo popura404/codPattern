@@ -390,9 +390,6 @@ public final class ZombiesDeployPreviewService {
                             data.dimension(),
                             data.areaFrom(),
                             data.areaTo());
-                    sendSlotPointForField(player, key, label, binding, "areaFrom", data.dimension(), data.areaFrom(), selectedIndex == i);
-                    sendSlotPointForField(player, key, label, binding, "areaTo", data.dimension(), data.areaTo(), selectedIndex == i);
-                    sendSlotPointForField(player, key, label, binding, "interaction", data.dimension(), data.interactionPos(), selectedIndex == i);
                 }
             }
             case ZombiesDeployFieldSchema.WEAPON_WALL -> {
@@ -512,9 +509,6 @@ public final class ZombiesDeployPreviewService {
                     draftPreview.dimension(),
                     draftPreview.areaFrom(),
                     draftPreview.areaTo());
-            sendSlotPointForField(player, key, label, binding, "areaFrom", draftPreview.dimension(), draftPreview.areaFrom(), true);
-            sendSlotPointForField(player, key, label, binding, "areaTo", draftPreview.dimension(), draftPreview.areaTo(), true);
-            sendSlotPointForField(player, key, label, binding, "interaction", draftPreview.dimension(), draftPreview.interactionPos(), true);
             return;
         }
         sendPoint(

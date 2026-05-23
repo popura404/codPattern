@@ -3,10 +3,13 @@ package com.cdp.codpattern.app.zombies.service;
 import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesBarrierData;
+import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.lang.reflect.Constructor;
 import java.util.List;
@@ -18,6 +21,7 @@ public final class ZombiesBarrierVisualServiceCompatTest {
 
     public static void main(String[] args) {
         activePreviewsOnlyIncludeUnclearedBarriersInViewerDimension();
+        previewBoundsIncludeBothPlacementEndpoints();
         signatureChangesWhenBarrierClears();
         previewPrefixIsScopedByRoomAndPlayer();
     }
@@ -39,6 +43,23 @@ public final class ZombiesBarrierVisualServiceCompatTest {
         require(preview.group() == 2, "visible preview should keep the barrier group");
         require(new BlockPos(5, 64, 5).equals(preview.area().pos1()), "visible preview should use areaFrom");
         require(new BlockPos(5, 66, 7).equals(preview.area().pos2()), "visible preview should use areaTo");
+    }
+
+    private static void previewBoundsIncludeBothPlacementEndpoints() {
+        BlockPos from = new BlockPos(5, 64, 5);
+        BlockPos to = new BlockPos(5, 66, 7);
+        AABB bounds = new AreaData(from, to).getBlockInclusiveAABB();
+
+        require(bounds.contains(Vec3.atCenterOf(from)),
+                "preview bounds should include the center of areaFrom placementPos");
+        require(bounds.contains(Vec3.atCenterOf(to)),
+                "preview bounds should include the center of areaTo placementPos");
+        require(bounds.minX == 5.0D && bounds.maxX == 6.0D,
+                "single-block X span should render with one full block of thickness");
+        require(bounds.minY == 64.0D && bounds.maxY == 67.0D,
+                "preview Y bounds should cover both endpoint block volumes");
+        require(bounds.minZ == 5.0D && bounds.maxZ == 8.0D,
+                "preview Z bounds should cover both endpoint block volumes");
     }
 
     private static void signatureChangesWhenBarrierClears() {

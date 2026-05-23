@@ -131,6 +131,24 @@ public final class ZombiesBuffCombatService {
                 .orElse(1.0D);
     }
 
+    public double headshotDamageMultiplier(UUID playerId) {
+        return playerStateService.get(playerId)
+                .flatMap(state -> state.buff(ZombiesBuffType.HEADSHOT_DAMAGE))
+                .map(buff -> buff.multiplier())
+                .filter(multiplier -> Double.isFinite(multiplier) && multiplier > 0.0D)
+                .orElse(1.0D);
+    }
+
+    public float applyHeadshotDamageMultiplier(ServerPlayer attacker, Entity hurtEntity, float currentMultiplier) {
+        if (attacker == null || hurtEntity == null || !playerStateService.canInteract(attacker.getUUID())) {
+            return currentMultiplier;
+        }
+        if (sameRoomMonster(hurtEntity).isEmpty()) {
+            return currentMultiplier;
+        }
+        return scaledHeadshotMultiplier(currentMultiplier, headshotDamageMultiplier(attacker.getUUID()));
+    }
+
     public Optional<LivingEntity> sameRoomMonsterAttacker(DamageContext context) {
         if (context == null) {
             return Optional.empty();
@@ -218,6 +236,20 @@ public final class ZombiesBuffCombatService {
         double scaled = amount * multiplier;
         if (!Double.isFinite(scaled)) {
             return amount;
+        }
+        return scaled >= Float.MAX_VALUE ? Float.MAX_VALUE : (float) scaled;
+    }
+
+    static float scaledHeadshotMultiplier(float currentMultiplier, double buffMultiplier) {
+        if (!isPositiveFinite(currentMultiplier)
+                || !Double.isFinite(buffMultiplier)
+                || buffMultiplier <= 0.0D
+                || buffMultiplier == 1.0D) {
+            return currentMultiplier;
+        }
+        double scaled = currentMultiplier * buffMultiplier;
+        if (!Double.isFinite(scaled)) {
+            return currentMultiplier;
         }
         return scaled >= Float.MAX_VALUE ? Float.MAX_VALUE : (float) scaled;
     }

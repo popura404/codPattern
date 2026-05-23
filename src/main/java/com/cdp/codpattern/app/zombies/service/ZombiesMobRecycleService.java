@@ -63,10 +63,20 @@ public final class ZombiesMobRecycleService {
             Entity entity = level.getEntity(entityId);
             if (!(entity instanceof Mob mob) || mob.isRemoved() || !mob.isAlive()) {
                 monitorStates.remove(entityId);
+                lifecycleService.onMissing(
+                        roomId,
+                        entityId,
+                        waveState,
+                        ZombiesMobLifecycleService.TerminationReason.REMOVED_CONSUME_BUDGET);
                 continue;
             }
             if (!isOwnedByRoom(mob, roomId)) {
                 monitorStates.remove(entityId);
+                lifecycleService.onMissing(
+                        roomId,
+                        entityId,
+                        waveState,
+                        ZombiesMobLifecycleService.TerminationReason.REMOVED_CONSUME_BUDGET);
                 continue;
             }
             RecycleDecision decision = evaluate(mob, roomTick);

@@ -95,10 +95,15 @@ public final class ZombiesBuffService {
     }
 
     public double scoreMultiplier(UUID playerId) {
-        return economyService.state(playerId)
-                .flatMap(state -> state.buff(ZombiesBuffType.SCORE_MULTIPLIER))
-                .map(ZombiesBuffState::multiplier)
-                .orElse(1.0D);
+        return buffMultiplier(playerId, ZombiesBuffType.SCORE_MULTIPLIER);
+    }
+
+    public double speedMultiplier(UUID playerId) {
+        return buffMultiplier(playerId, ZombiesBuffType.SPEED_BOOST);
+    }
+
+    public double headshotDamageMultiplier(UUID playerId) {
+        return buffMultiplier(playerId, ZombiesBuffType.HEADSHOT_DAMAGE);
     }
 
     public double damageTakenMultiplier(UUID playerId) {
@@ -132,6 +137,14 @@ public final class ZombiesBuffService {
         Map<String, ModePlayerValue> params = new LinkedHashMap<>();
         params.put("buffId", ModePlayerValue.ofString(buffId));
         return params;
+    }
+
+    private double buffMultiplier(UUID playerId, ZombiesBuffType type) {
+        return economyService.state(playerId)
+                .flatMap(state -> state.buff(type))
+                .map(ZombiesBuffState::multiplier)
+                .filter(multiplier -> Double.isFinite(multiplier) && multiplier > 0.0D)
+                .orElse(1.0D);
     }
 
     public record BuffPurchaseResult(

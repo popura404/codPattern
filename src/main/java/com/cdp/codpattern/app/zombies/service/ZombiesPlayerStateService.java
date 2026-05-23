@@ -117,6 +117,20 @@ public class ZombiesPlayerStateService {
         return aliveCount(currentTick, offlineGraceTicks) > 0;
     }
 
+    public int onlineAliveCount() {
+        int count = 0;
+        for (ZombiesPlayerRuntimeState state : statesByPlayer.values()) {
+            if (state.isOnlineAlive()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public boolean hasAnyOnlineAlive() {
+        return onlineAliveCount() > 0;
+    }
+
     public List<UUID> alivePlayerIds(long currentTick, long offlineGraceTicks) {
         return statesByPlayer.values().stream()
                 .filter(state -> isAliveForFailureCheck(state, currentTick, offlineGraceTicks))

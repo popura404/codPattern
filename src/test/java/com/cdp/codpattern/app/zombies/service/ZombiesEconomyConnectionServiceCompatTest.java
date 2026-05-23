@@ -22,6 +22,7 @@ public final class ZombiesEconomyConnectionServiceCompatTest {
         killAndAssistsSkipsKillerAndLeftContributor();
         scoreMultiplierAppliesToKillAndAssistRewards();
         offlineGraceCountsAlivePlayersUntilTimeout();
+        offlineGraceDoesNotPreventOnlineWipeFailureCheck();
         activeRoundReconnectEligibilityKeepsExistingStats();
     }
 
@@ -167,6 +168,29 @@ public final class ZombiesEconomyConnectionServiceCompatTest {
                 "timeout should not rewrite offline connection state");
         require(players.aliveCount(121L, connections.offlineGraceTicks()) == 1,
                 "timed out offline player should no longer count as alive");
+    }
+
+    private static void offlineGraceDoesNotPreventOnlineWipeFailureCheck() {
+        ZombiesPlayerStateService players = new ZombiesPlayerStateService();
+        ZombiesConnectionStateService connections = new ZombiesConnectionStateService(players, 20L);
+        UUID onlineId = playerId(40);
+        UUID offlineId = playerId(41);
+
+        players.markAlive(onlineId);
+        players.markAlive(offlineId);
+        connections.markOffline(offlineId, 100L);
+
+        require(players.aliveCount(119L, connections.offlineGraceTicks()) == 2,
+                "offline alive player should still count for grace-aware display state");
+        require(players.hasAnyOnlineAlive(),
+                "online alive teammate should satisfy round survival before death");
+
+        players.markDeadSpectating(onlineId);
+
+        require(players.aliveCount(119L, connections.offlineGraceTicks()) == 1,
+                "offline grace should still preserve the disconnected player's alive display state");
+        require(!players.hasAnyOnlineAlive(),
+                "offline grace must not prevent round failure after all online survivors die");
     }
 
     private static void activeRoundReconnectEligibilityKeepsExistingStats() {
