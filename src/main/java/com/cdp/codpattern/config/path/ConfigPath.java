@@ -16,7 +16,6 @@ public enum ConfigPath {
     private static final String SERVER_ZOMBIES_RULES_ROOT = "serverconfig/codpattern/zombies_rules";
     private static final String ZOMBIES_RULES_CONFIG_FILE = "config.json";
     private static final String ZOMBIES_WAVES_DIRECTORY = "waves";
-    private static final String ZOMBIES_BACKPACK_CONFIG_FILE = "zombies_backpack_config.json";
     private static final String ZOMBIES_WEAPON_FILTER_FILE = "zombies_weapon_filter.json";
 
     private final String path;
@@ -41,10 +40,6 @@ public enum ConfigPath {
 
     public static Path zombiesMapWaves(MinecraftServer server, String mapName) {
         return zombiesMapRulesRoot(server, mapName).resolve(ZOMBIES_WAVES_DIRECTORY);
-    }
-
-    public static Path zombiesMapBackpackConfig(MinecraftServer server, String mapName) {
-        return zombiesMapRulesRoot(server, mapName).resolve(ZOMBIES_BACKPACK_CONFIG_FILE);
     }
 
     public static Path zombiesMapWeaponFilter(MinecraftServer server, String mapName) {

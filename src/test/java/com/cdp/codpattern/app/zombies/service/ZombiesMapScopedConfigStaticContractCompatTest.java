@@ -9,10 +9,10 @@ public final class ZombiesMapScopedConfigStaticContractCompatTest {
             Path.of("src/main/java/com/cdp/codpattern/config/path/ConfigPath.java");
     private static final Path RULES_REPOSITORY =
             Path.of("src/main/java/com/cdp/codpattern/config/zombies/ZombiesRulesRepository.java");
-    private static final Path BACKPACK_REPOSITORY =
-            Path.of("src/main/java/com/cdp/codpattern/config/zombies/ZombiesBackpackConfigRepository.java");
     private static final Path FILTER_REPOSITORY =
             Path.of("src/main/java/com/cdp/codpattern/config/zombies/ZombiesWeaponFilterRepository.java");
+    private static final Path RULES_CONFIG =
+            Path.of("src/main/java/com/cdp/codpattern/config/zombies/ZombiesRulesConfig.java");
     private static final Path ZOMBIES_MAP =
             Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/map/ZombiesMap.java");
     private static final Path STARTUP_VALIDATION =
@@ -28,8 +28,8 @@ public final class ZombiesMapScopedConfigStaticContractCompatTest {
     public static void main(String[] args) throws IOException {
         String configPath = read(CONFIG_PATH);
         String rulesRepository = read(RULES_REPOSITORY);
-        String backpackRepository = read(BACKPACK_REPOSITORY);
         String filterRepository = read(FILTER_REPOSITORY);
+        String rulesConfig = read(RULES_CONFIG);
         String zombiesMap = read(ZOMBIES_MAP);
         String startupValidation = read(STARTUP_VALIDATION);
         String starterKit = read(STARTER_KIT);
@@ -45,11 +45,14 @@ public final class ZombiesMapScopedConfigStaticContractCompatTest {
                 "public static Path zombiesMapWaves(MinecraftServer server, String mapName)",
                 "wave directory path must be map-scoped");
         requireContains(configPath,
-                "public static Path zombiesMapBackpackConfig(MinecraftServer server, String mapName)",
-                "starter weapon config path must be map-scoped");
-        requireContains(configPath,
                 "public static Path zombiesMapWeaponFilter(MinecraftServer server, String mapName)",
                 "starter weapon filter path must be map-scoped");
+        requireAbsent(configPath,
+                "zombiesMapBackpackConfig",
+                "starter weapon must not use a separate backpack config path");
+        requireAbsent(configPath,
+                "zombies_backpack_config.json",
+                "starter weapon must not generate a separate backpack config file");
         requireContains(configPath,
                 "safeMapConfigName(mapName)",
                 "map-scoped config paths must sanitize map names");
@@ -72,12 +75,12 @@ public final class ZombiesMapScopedConfigStaticContractCompatTest {
         requireAbsent(rulesRepository,
                 "loadOrCreate(MinecraftServer server) {\n        return loadOrCreate(ConfigPath.",
                 "rules repository must not retain the old global server loader");
-        requireContains(backpackRepository,
-                "loadOrCreate(ConfigPath.zombiesMapBackpackConfig(server, mapName))",
-                "backpack repository must support map-scoped starter weapon loading");
-        requireAbsent(backpackRepository,
-                "loadOrCreate(MinecraftServer server) {\n        return loadOrCreate(ConfigPath.",
-                "backpack repository must not retain the old global server loader");
+        requireContains(rulesConfig,
+                "private StarterWeapon starterWeapon = StarterWeapon.defaults();",
+                "config.json must own the single starter weapon definition");
+        requireContains(rulesConfig,
+                "public StarterWeapon getStarterWeapon()",
+                "rules config must expose starter weapon settings");
         requireContains(filterRepository,
                 "loadOrCreate(ConfigPath.zombiesMapWeaponFilter(server, mapName))",
                 "weapon filter repository must support map-scoped loading");
@@ -91,9 +94,9 @@ public final class ZombiesMapScopedConfigStaticContractCompatTest {
         requireContains(zombiesMap,
                 "ZombiesRulesRepository.loadOrCreate(server, mapName)",
                 "map startup must load map-scoped rules");
-        requireContains(zombiesMap,
-                "ZombiesBackpackConfigRepository.loadOrCreate(server, mapName)",
-                "map startup must load map-scoped starter weapons");
+        requireAbsent(zombiesMap,
+                "ZombiesBackpackConfigRepository",
+                "map startup must not load a separate starter weapon backpack config");
         requireContains(zombiesMap,
                 "ZombiesWeaponFilterRepository.loadOrCreate(server, mapName)",
                 "map startup must load map-scoped weapon filters");
@@ -118,9 +121,9 @@ public final class ZombiesMapScopedConfigStaticContractCompatTest {
         requireContains(zombiesMap,
                 "() -> rulesConfig().getSpawnPointWeighting()",
                 "spawn point weighting must use the map instance rules");
-        requireContains(zombiesMap,
-                "backpackConfig(),\n                        weaponFilterConfig()",
-                "startup flow must receive map instance starter weapon configs");
+        requireAbsent(zombiesMap,
+                "backpackConfig()",
+                "startup flow must receive starter weapons from config.json rules, not backpack config");
 
         requireContains(startupValidation,
                 "Supplier<ZombiesRulesConfig> rulesSupplier",
@@ -131,6 +134,9 @@ public final class ZombiesMapScopedConfigStaticContractCompatTest {
         requireContains(starterKit,
                 "private final Supplier<ZombiesRulesConfig> rulesSupplier;",
                 "starter kit distributor must use injected map-scoped rules");
+        requireContains(starterKit,
+                "rulesConfig().getStarterWeapon()",
+                "starter kit distributor must read the unified starter weapon from rules config");
         requireContains(spawnService,
                 "private final Supplier<ZombiesRulesConfig.SpawnPointWeighting> spawnPointWeightingSupplier;",
                 "spawn service must use injected map-scoped spawn weighting");

@@ -3,7 +3,9 @@ package com.cdp.codpattern.config.zombies;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
 import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
@@ -35,10 +37,14 @@ public final class ZombiesRulesRepository {
         try {
             if (Files.exists(path)) {
                 String configJson = Files.readString(path);
+                boolean shouldBackfillStarterWeapon = missingStarterWeaponSection(configJson);
                 ZombiesRulesConfig loaded = GSON.fromJson(configJson, ZombiesRulesConfig.class);
                 serverConfig = loaded != null ? loaded : new ZombiesRulesConfig();
                 lastValidationIssues = VALIDATOR.validate(serverConfig);
                 serverConfig.normalize();
+                if (shouldBackfillStarterWeapon) {
+                    lastSaveResult = save(serverConfig);
+                }
                 return serverConfig;
             }
         } catch (IOException | JsonParseException e) {
@@ -100,6 +106,11 @@ public final class ZombiesRulesRepository {
 
     public static List<com.cdp.codpattern.app.zombies.validation.ZombiesValidationIssue> getLastValidationIssues() {
         return lastValidationIssues == null ? List.of() : List.copyOf(lastValidationIssues);
+    }
+
+    private static boolean missingStarterWeaponSection(String configJson) {
+        JsonElement parsed = JsonParser.parseString(configJson);
+        return !parsed.isJsonObject() || !parsed.getAsJsonObject().has("starterWeapon");
     }
 
 }

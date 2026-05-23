@@ -3,7 +3,6 @@ package com.cdp.codpattern.app.zombies.service;
 import com.cdp.codpattern.app.match.model.ModePlayerValue;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.zombies.map.ZombiesMapSnapshot;
-import com.cdp.codpattern.config.zombies.ZombiesBackpackConfig;
 import com.cdp.codpattern.config.zombies.ZombiesWeaponFilterConfig;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
@@ -71,7 +70,6 @@ public final class ZombiesStartupFlow {
                 starterKitDistributor.prepareStarterWeapons(
                         request.roomId(),
                         request.memberIds(),
-                        request.backpackConfig(),
                         request.weaponFilterConfig());
         if (!starterKitResult.success() || starterKitResult.value().isEmpty()) {
             return failureResult(work, starterKitResult.code(), starterKitResult.params(), starterKitResult.logMessage());
@@ -300,7 +298,6 @@ public final class ZombiesStartupFlow {
             List<SpawnPointData> initialSpawnPoints,
             Optional<BaseMap> map,
             Optional<ServerLevel> serverLevel,
-            ZombiesBackpackConfig backpackConfig,
             ZombiesWeaponFilterConfig weaponFilterConfig,
             List<ZombiesStartupParticipant> participants
     ) {
@@ -320,7 +317,6 @@ public final class ZombiesStartupFlow {
                 Collection<UUID> memberIds,
                 List<SpawnPointData> initialSpawnPoints,
                 BaseMap map,
-                ZombiesBackpackConfig backpackConfig,
                 ZombiesWeaponFilterConfig weaponFilterConfig,
                 List<ZombiesStartupParticipant> participants
         ) {
@@ -332,7 +328,6 @@ public final class ZombiesStartupFlow {
                     initialSpawnPoints,
                     Optional.ofNullable(map),
                     Optional.ofNullable(level),
-                    backpackConfig,
                     weaponFilterConfig,
                     participants);
         }
@@ -343,7 +338,6 @@ public final class ZombiesStartupFlow {
                 Collection<UUID> memberIds,
                 List<SpawnPointData> initialSpawnPoints,
                 ServerLevel serverLevel,
-                ZombiesBackpackConfig backpackConfig,
                 ZombiesWeaponFilterConfig weaponFilterConfig,
                 List<ZombiesStartupParticipant> participants
         ) {
@@ -354,7 +348,6 @@ public final class ZombiesStartupFlow {
                     initialSpawnPoints,
                     Optional.empty(),
                     Optional.ofNullable(serverLevel),
-                    backpackConfig,
                     weaponFilterConfig,
                     participants);
         }

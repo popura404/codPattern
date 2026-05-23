@@ -8,6 +8,7 @@ public final class ZombiesWeaponDefaultsCompatTest {
         starterWeaponDefaultsToTaczGlock();
         blankStarterWeaponNormalizesToTaczGlock();
         weaponPoolDefaultsUseTaczGunIds();
+        weaponRulesDefaultAmmoUsesScaledReserve();
         armorDefaultsUseRequestedDamageReductions();
         armorValidatorRejectsOutOfRangeReduction();
         ultimateMachineDefaultsUseServerconfigLevelDamage();
@@ -15,10 +16,10 @@ public final class ZombiesWeaponDefaultsCompatTest {
     }
 
     private static void starterWeaponDefaultsToTaczGlock() {
-        ZombiesBackpackConfig.WeaponData weapon = ZombiesBackpackConfig.defaultWeapon();
+        ZombiesRulesConfig.StarterWeapon weapon = new ZombiesRulesConfig().getStarterWeapon();
 
         require(
-                ZombiesBackpackConfig.DEFAULT_TACZ_GUN_ITEM.equals(weapon.getItem()),
+                ZombiesRulesConfig.DEFAULT_STARTER_GUN_ITEM.equals(weapon.getItem()),
                 "starter item should be the TaCZ gun item");
         require(
                 weapon.getNbt().contains("GunId:\"tacz:glock_17\""),
@@ -26,14 +27,20 @@ public final class ZombiesWeaponDefaultsCompatTest {
     }
 
     private static void blankStarterWeaponNormalizesToTaczGlock() {
-        ZombiesBackpackConfig.WeaponData weapon = new ZombiesBackpackConfig.WeaponData();
-        weapon.normalize();
+        ZombiesRulesConfig.StarterWeapon weapon = new ZombiesRulesConfig.StarterWeapon();
+        weapon.setItem("");
+        weapon.setCount(0);
+        weapon.setNbt("");
+        ZombiesRulesConfig config = new ZombiesRulesConfig();
+        config.setStarterWeapon(weapon);
+        config.normalize();
+        ZombiesRulesConfig.StarterWeapon normalizedWeapon = config.getStarterWeapon();
 
         require(
-                ZombiesBackpackConfig.DEFAULT_TACZ_GUN_ITEM.equals(weapon.getItem()),
+                ZombiesRulesConfig.DEFAULT_STARTER_GUN_ITEM.equals(normalizedWeapon.getItem()),
                 "blank starter item should normalize to the TaCZ gun item");
         require(
-                weapon.getNbt().contains("GunId:\"tacz:glock_17\""),
+                normalizedWeapon.getNbt().contains("GunId:\"tacz:glock_17\""),
                 "blank starter nbt should normalize to tacz:glock_17");
     }
 
@@ -49,6 +56,28 @@ public final class ZombiesWeaponDefaultsCompatTest {
         require(
                 gunIds.equals(List.of("tacz:glock_17", "tacz:ak47", "tacz:m4a1")),
                 "default weapon pool should be exactly three TaCZ gun ids: " + gunIds);
+    }
+
+    private static void weaponRulesDefaultAmmoUsesScaledReserve() {
+        ZombiesRulesConfig config = new ZombiesRulesConfig();
+
+        require(
+                config.getWeaponRules().getStarterWeaponAmmunitionPerMagazineMultiple() == 10,
+                "starter weapon reserve ammo multiple should default to floor(7 * 3 / 2)");
+        require(
+                config.getWeaponRules().getWeaponPoolAmmunitionPerMagazineMultiple() == 10,
+                "weapon pool reserve ammo multiple should default to floor(7 * 3 / 2)");
+
+        config.getWeaponRules().setStarterWeaponAmmunitionPerMagazineMultiple(-1);
+        config.getWeaponRules().setWeaponPoolAmmunitionPerMagazineMultiple(-1);
+        config.normalize();
+
+        require(
+                config.getWeaponRules().getStarterWeaponAmmunitionPerMagazineMultiple() == 10,
+                "invalid starter weapon reserve ammo multiple should normalize to scaled default");
+        require(
+                config.getWeaponRules().getWeaponPoolAmmunitionPerMagazineMultiple() == 10,
+                "invalid weapon pool reserve ammo multiple should normalize to scaled default");
     }
 
     private static void armorDefaultsUseRequestedDamageReductions() {

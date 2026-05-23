@@ -64,8 +64,6 @@ import com.cdp.codpattern.app.zombies.service.ZombiesWeaponWallOfferService;
 import com.cdp.codpattern.app.zombies.validation.ZombiesValidationIssue;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.cdp.codpattern.config.path.ConfigPath;
-import com.cdp.codpattern.config.zombies.ZombiesBackpackConfig;
-import com.cdp.codpattern.config.zombies.ZombiesBackpackConfigRepository;
 import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 import com.cdp.codpattern.config.zombies.ZombiesRulesRepository;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
@@ -138,7 +136,6 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
     private boolean objectsFrozen;
     private ZombiesWaveDirector waveDirector;
     private ZombiesRulesConfig rulesConfig;
-    private ZombiesBackpackConfig backpackConfig;
     private ZombiesWeaponFilterConfig weaponFilterConfig;
     private List<ZombiesValidationIssue> rulesValidationIssues = List.of();
     private final Map<UUID, Integer> combatRegenCooldowns = new LinkedHashMap<>();
@@ -289,7 +286,6 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
                         members,
                         initialSpawnPoints(),
                         this,
-                        backpackConfig(),
                         weaponFilterConfig(),
                         List.of(new ZombiesStartupMapParticipant())));
         if (!startupResult.success()) {
@@ -737,8 +733,6 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         if (server == null) {
             rulesConfig = new ZombiesRulesConfig();
             rulesConfig.normalize();
-            backpackConfig = new ZombiesBackpackConfig();
-            backpackConfig.normalize();
             weaponFilterConfig = new ZombiesWeaponFilterConfig();
             weaponFilterConfig.normalize();
             rulesValidationIssues = List.of();
@@ -747,7 +741,6 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         String mapName = getMapName();
         rulesConfig = ZombiesRulesRepository.loadOrCreate(server, mapName);
         rulesValidationIssues = ZombiesRulesRepository.getLastValidationIssues();
-        backpackConfig = ZombiesBackpackConfigRepository.loadOrCreate(server, mapName);
         weaponFilterConfig = ZombiesWeaponFilterRepository.loadOrCreate(server, mapName);
         new ZombiesWaveConfigRepository(
                 ConfigPath.zombiesMapWaves(server, mapName),
@@ -760,14 +753,6 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
             rulesConfig.normalize();
         }
         return rulesConfig;
-    }
-
-    private ZombiesBackpackConfig backpackConfig() {
-        if (backpackConfig == null) {
-            backpackConfig = new ZombiesBackpackConfig();
-            backpackConfig.normalize();
-        }
-        return backpackConfig;
     }
 
     private ZombiesWeaponFilterConfig weaponFilterConfig() {

@@ -4,7 +4,6 @@ import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.zombies.model.ZombiesEquipmentSlot;
 import com.cdp.codpattern.app.zombies.model.ZombiesWeaponInstanceState;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
-import com.cdp.codpattern.config.zombies.ZombiesBackpackConfig;
 import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 import com.cdp.codpattern.config.zombies.ZombiesRulesRepository;
 import com.cdp.codpattern.config.zombies.ZombiesWeaponFilterConfig;
@@ -57,31 +56,26 @@ public final class ZombiesStarterKitDistributor {
 
     public ZombiesServiceResult<PreparedStarterKits> prepareStarterWeapons(
             Collection<UUID> playerIds,
-            ZombiesBackpackConfig backpackConfig,
             ZombiesWeaponFilterConfig filterConfig
     ) {
-        return prepareStarterWeapons(null, playerIds, backpackConfig, filterConfig);
+        return prepareStarterWeapons(null, playerIds, filterConfig);
     }
 
     public ZombiesServiceResult<PreparedStarterKits> prepareStarterWeapons(
             RoomId roomId,
             Collection<UUID> playerIds,
-            ZombiesBackpackConfig backpackConfig,
             ZombiesWeaponFilterConfig filterConfig
     ) {
         List<UUID> members = normalizeMembers(playerIds);
         Map<UUID, ItemStack> weapons = new LinkedHashMap<>();
         Map<UUID, ZombiesWeaponInstanceState> starterWeaponStates = new LinkedHashMap<>();
-        ZombiesBackpackConfig resolvedBackpackConfig = backpackConfig == null ? new ZombiesBackpackConfig() : backpackConfig;
+        ZombiesRulesConfig.StarterWeapon starterWeapon = rulesConfig().getStarterWeapon();
         ZombiesWeaponFilterConfig resolvedFilterConfig = filterConfig == null ? new ZombiesWeaponFilterConfig() : filterConfig;
-        resolvedBackpackConfig.normalize();
         resolvedFilterConfig.normalize();
 
         for (UUID playerId : members) {
-            ZombiesBackpackConfig.PlayerZombiesBackpackData playerData =
-                    resolvedBackpackConfig.getOrCreatePlayerData(playerId.toString());
             ZombiesServiceResult<ItemStack> weaponResult = createStarterWeapon(
-                    playerData.getWeapon(),
+                    starterWeapon,
                     resolvedFilterConfig);
             if (!weaponResult.success() || weaponResult.value().isEmpty() || weaponResult.value().get().isEmpty()) {
                 return ZombiesServiceResult.failure(
@@ -315,13 +309,19 @@ public final class ZombiesStarterKitDistributor {
     }
 
     public ZombiesServiceResult<ItemStack> createStarterWeapon(
-            ZombiesBackpackConfig.WeaponData weaponData,
+            ZombiesRulesConfig.StarterWeapon weaponData,
             ZombiesWeaponFilterConfig filterConfig
     ) {
-        ZombiesBackpackConfig.WeaponData data = weaponData == null
-                ? ZombiesBackpackConfig.defaultWeapon()
+        ZombiesRulesConfig.StarterWeapon data = weaponData == null
+                ? ZombiesRulesConfig.StarterWeapon.defaults()
                 : weaponData;
-        ResourceLocation itemId = ResourceLocation.tryParse(data.getItem());
+        String configuredItem = data.getItem();
+        if (configuredItem == null || configuredItem.trim().isEmpty()) {
+            configuredItem = ZombiesRulesConfig.DEFAULT_STARTER_GUN_ITEM;
+        } else {
+            configuredItem = configuredItem.trim();
+        }
+        ResourceLocation itemId = ResourceLocation.tryParse(configuredItem);
         if (itemId == null) {
             return starterWeaponFailure("invalid_item_id");
         }
@@ -331,9 +331,15 @@ public final class ZombiesStarterKitDistributor {
         }
 
         try {
-            ItemStack stack = new ItemStack(item, Math.max(1, data.getCount()));
-            if (data.getNbt() != null && !data.getNbt().isBlank()) {
-                stack.setTag(TagParser.parseTag(data.getNbt()));
+            int count = data.getCount() == null ? 1 : data.getCount();
+            ItemStack stack = new ItemStack(item, Math.max(1, count));
+            String configuredNbt = data.getNbt();
+            if ((configuredNbt == null || configuredNbt.isBlank())
+                    && ZombiesRulesConfig.DEFAULT_STARTER_GUN_ITEM.equals(configuredItem)) {
+                configuredNbt = ZombiesRulesConfig.DEFAULT_STARTER_WEAPON_NBT;
+            }
+            if (configuredNbt != null && !configuredNbt.isBlank()) {
+                stack.setTag(TagParser.parseTag(configuredNbt));
             }
 
             String attachmentPreset = data.getAttachmentPreset();

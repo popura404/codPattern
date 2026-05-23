@@ -5,9 +5,11 @@ import java.util.List;
 import java.util.Locale;
 
 public class ZombiesWeaponFilterConfig {
+    private static final double DEFAULT_AMMUNITION_PER_MAGAZINE_MULTIPLE =
+            ZombiesRulesConfig.WeaponRules.DEFAULT_AMMUNITION_PER_MAGAZINE_MULTIPLE;
+
     private List<String> weaponTabs = defaultWeaponTabs();
-    private ZombiesBackpackConfig.WeaponData defaultWeapon = ZombiesBackpackConfig.defaultWeapon();
-    private Double ammunitionPerMagazineMultiple = 7.0;
+    private Double ammunitionPerMagazineMultiple = DEFAULT_AMMUNITION_PER_MAGAZINE_MULTIPLE;
     private List<String> blockedItemNamespaces = defaultBlockedItemNamespaces();
     private List<String> blockedWeaponIds = defaultBlockedWeaponIds();
     private List<String> blockedAttachmentNamespaces = defaultBlockedAttachmentNamespaces();
@@ -33,17 +35,6 @@ public class ZombiesWeaponFilterConfig {
 
     public void setAllowedWeaponTabs(List<String> allowedWeaponTabs) {
         setWeaponTabs(allowedWeaponTabs);
-    }
-
-    public ZombiesBackpackConfig.WeaponData getDefaultWeapon() {
-        if (defaultWeapon == null) {
-            defaultWeapon = ZombiesBackpackConfig.defaultWeapon();
-        }
-        return defaultWeapon;
-    }
-
-    public void setDefaultWeapon(ZombiesBackpackConfig.WeaponData defaultWeapon) {
-        this.defaultWeapon = defaultWeapon == null ? ZombiesBackpackConfig.defaultWeapon() : defaultWeapon;
     }
 
     public List<String> getBlockedItemNamespaces() {
@@ -100,8 +91,6 @@ public class ZombiesWeaponFilterConfig {
 
     public void normalize() {
         setWeaponTabs(weaponTabs);
-        setDefaultWeapon(defaultWeapon);
-        defaultWeapon.normalize();
         setBlockedItemNamespaces(blockedItemNamespaces);
         setBlockedWeaponIds(blockedWeaponIds);
         setBlockedAttachmentNamespaces(blockedAttachmentNamespaces);
@@ -109,7 +98,7 @@ public class ZombiesWeaponFilterConfig {
         if (ammunitionPerMagazineMultiple == null
                 || !Double.isFinite(ammunitionPerMagazineMultiple)
                 || ammunitionPerMagazineMultiple < 0.0) {
-            ammunitionPerMagazineMultiple = 7.0;
+            ammunitionPerMagazineMultiple = DEFAULT_AMMUNITION_PER_MAGAZINE_MULTIPLE;
         }
     }
 
