@@ -252,6 +252,7 @@ public class ModeSelectScreen extends Screen {
     }
 
     private void renderModeBackground(GuiGraphics graphics, float revealFactor) {
+        renderDirtBackground(graphics);
         ModePreviewPanel.renderFullscreenBase(
                 graphics,
                 this.width,
