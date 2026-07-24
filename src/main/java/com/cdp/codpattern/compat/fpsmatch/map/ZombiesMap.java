@@ -31,6 +31,7 @@ import com.cdp.codpattern.app.zombies.service.ZombiesBuffRuntimeEffectService;
 import com.cdp.codpattern.app.zombies.service.ZombiesCleanupParticipant;
 import com.cdp.codpattern.app.zombies.service.ZombiesCleanupService;
 import com.cdp.codpattern.app.zombies.service.ZombiesConnectionStateService;
+import com.cdp.codpattern.app.zombies.service.ZombiesCrashRecoveryService;
 import com.cdp.codpattern.app.zombies.service.ZombiesDeathService;
 import com.cdp.codpattern.app.zombies.service.ZombiesEconomyService;
 import com.cdp.codpattern.app.zombies.service.ZombiesEquipmentSnapshotService;
@@ -156,7 +157,6 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         this.readyService = new ZombiesReadyService(new ZombiesReadyHooks());
         this.mobSpawnService = new ZombiesMobSpawnService(
                 ModeEntityOwnershipRegistry.instance(),
-                ZombiesMobSpawnService.DEFAULT_GLOBAL_MAX_ALIVE_ZOMBIES,
                 this::aliveSurvivorPlayers,
                 () -> rulesConfig().getSpawnPointWeighting());
         this.mobLifecycleService = new ZombiesMobLifecycleService(ModeEntityOwnershipRegistry.instance(), mobSpawnService);
@@ -1396,6 +1396,9 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
                 if (context.preflightSnapshot().isEmpty()) {
                     return ZombiesServiceResult.failure(ZombiesErrorCode.STARTUP_PREFLIGHT_FAILED);
                 }
+                ZombiesCrashRecoveryService.instance().cleanupResidualTaggedEntitiesForRoom(
+                        getServerLevel().getServer(),
+                        roomId);
                 ZombiesStartupFlow.ZombiesStartupContext startupContext = context;
                 waveDirector = new ZombiesWaveDirector(
                         startupContext.preflightSnapshot().get().waveLoadResult(),

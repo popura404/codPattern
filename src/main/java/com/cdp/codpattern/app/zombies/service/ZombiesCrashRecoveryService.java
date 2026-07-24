@@ -25,13 +25,23 @@ public final class ZombiesCrashRecoveryService {
 
     private final ModeEntityOwnershipRegistry ownershipRegistry;
     private final ZombiesMapOccupancyService occupancyService;
+    private final ZombiesActiveMobCounter activeMobCounter;
 
     public ZombiesCrashRecoveryService(
             ModeEntityOwnershipRegistry ownershipRegistry,
             ZombiesMapOccupancyService occupancyService
     ) {
+        this(ownershipRegistry, occupancyService, ZombiesActiveMobCounter.instance());
+    }
+
+    public ZombiesCrashRecoveryService(
+            ModeEntityOwnershipRegistry ownershipRegistry,
+            ZombiesMapOccupancyService occupancyService,
+            ZombiesActiveMobCounter activeMobCounter
+    ) {
         this.ownershipRegistry = ownershipRegistry == null ? ModeEntityOwnershipRegistry.instance() : ownershipRegistry;
         this.occupancyService = occupancyService == null ? ZombiesMapOccupancyService.instance() : occupancyService;
+        this.activeMobCounter = activeMobCounter == null ? ZombiesActiveMobCounter.instance() : activeMobCounter;
     }
 
     public static ZombiesCrashRecoveryService instance() {
@@ -64,6 +74,35 @@ public final class ZombiesCrashRecoveryService {
     }
 
     public ResidualEntityCleanupSummary cleanupResidualTaggedEntities(MinecraftServer server) {
+        ResidualEntityCleanupSummary summary = cleanupResidualTaggedEntities(server, null, true, true);
+        if (server != null) {
+            clearZombieOwnershipEntries();
+            activeMobCounter.clear();
+        }
+        return summary;
+    }
+
+    public ResidualEntityCleanupSummary cleanupResidualTaggedEntitiesForRoom(
+            MinecraftServer server,
+            RoomId targetRoom
+    ) {
+        if (targetRoom == null || !BuiltInGameModes.isZombies(targetRoom.gameType())) {
+            return ResidualEntityCleanupSummary.empty();
+        }
+        ResidualEntityCleanupSummary summary = cleanupResidualTaggedEntities(server, targetRoom, false, false);
+        if (server != null) {
+            ownershipRegistry.clearRoom(targetRoom);
+            activeMobCounter.clearRoom(targetRoom);
+        }
+        return summary;
+    }
+
+    private ResidualEntityCleanupSummary cleanupResidualTaggedEntities(
+            MinecraftServer server,
+            RoomId targetRoom,
+            boolean releaseOccupancy,
+            boolean clearInvalidRoomTags
+    ) {
         if (server == null) {
             return ResidualEntityCleanupSummary.empty();
         }
@@ -85,21 +124,26 @@ public final class ZombiesCrashRecoveryService {
                 String encodedRoom = entity.getPersistentData().getString(ROOM_KEY_TAG);
                 Optional<RoomId> roomId = decodeRoomId(encodedRoom);
                 if (roomId.isEmpty()) {
-                    entity.getPersistentData().remove(ROOM_KEY_TAG);
-                    invalidRoomTags++;
+                    if (clearInvalidRoomTags) {
+                        entity.getPersistentData().remove(ROOM_KEY_TAG);
+                        invalidRoomTags++;
+                    }
                     continue;
                 }
                 RoomId decodedRoom = roomId.get();
-                if (!BuiltInGameModes.isZombies(decodedRoom.gameType())) {
+                if (!shouldCleanup(decodedRoom, targetRoom)) {
                     continue;
                 }
                 zombiesTaggedEntities++;
                 ownershipRegistry.unregister(entity);
+                activeMobCounter.unregister(decodedRoom, entity.getUUID());
                 entity.getPersistentData().remove(ROOM_KEY_TAG);
                 entity.remove(Entity.RemovalReason.DISCARDED);
                 removedEntities++;
-                occupancyService.forceRelease(decodedRoom.gameType(), decodedRoom.mapName());
-                releasedRooms.add(decodedRoom);
+                if (releaseOccupancy) {
+                    occupancyService.forceRelease(decodedRoom.gameType(), decodedRoom.mapName());
+                    releasedRooms.add(decodedRoom);
+                }
             }
         }
         return new ResidualEntityCleanupSummary(
@@ -109,6 +153,30 @@ public final class ZombiesCrashRecoveryService {
                 removedEntities,
                 invalidRoomTags,
                 releasedRooms.size());
+    }
+
+    private void clearZombieOwnershipEntries() {
+        for (ModeEntityOwnershipRegistry.Entry entry : ownershipRegistry.entries()) {
+            if (entry != null && entry.roomId() != null
+                    && BuiltInGameModes.isZombies(entry.roomId().gameType())) {
+                ownershipRegistry.unregister(entry.entityId());
+            }
+        }
+    }
+
+    private static boolean shouldCleanup(RoomId decodedRoom, RoomId targetRoom) {
+        if (decodedRoom == null || !BuiltInGameModes.isZombies(decodedRoom.gameType())) {
+            return false;
+        }
+        return targetRoom == null || sameRoom(decodedRoom, targetRoom);
+    }
+
+    private static boolean sameRoom(RoomId left, RoomId right) {
+        return left != null
+                && right != null
+                && BuiltInGameModes.isZombies(left.gameType())
+                && BuiltInGameModes.isZombies(right.gameType())
+                && left.mapName().equals(right.mapName());
     }
 
     public Optional<RoomId> decodeRoomId(String encodedRoom) {

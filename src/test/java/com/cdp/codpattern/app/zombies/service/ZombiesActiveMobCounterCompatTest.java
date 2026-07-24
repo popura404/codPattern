@@ -58,7 +58,6 @@ public final class ZombiesActiveMobCounterCompatTest {
         ZombiesWaveRuntimeState waveState = new ZombiesWaveRuntimeState();
         ZombiesMobSpawnService spawnService = new ZombiesMobSpawnService(
                 ModeEntityOwnershipRegistry.instance(),
-                ZombiesMobSpawnService.DEFAULT_GLOBAL_MAX_ALIVE_ZOMBIES,
                 null,
                 null,
                 counter);

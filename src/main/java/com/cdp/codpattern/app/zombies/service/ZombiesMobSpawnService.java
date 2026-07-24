@@ -42,7 +42,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 public final class ZombiesMobSpawnService {
-    public static final int DEFAULT_GLOBAL_MAX_ALIVE_ZOMBIES = 64;
     public static final String WAVE_MOB_ID_TAG = "codpattern_zombies_wave_mob_id";
     public static final String WAVE_KILL_POINTS_TAG = "codpattern_zombies_wave_kill_points";
     public static final String WAVE_ASSIST_POINTS_TAG = "codpattern_zombies_wave_assist_points";
@@ -75,40 +74,31 @@ public final class ZombiesMobSpawnService {
 
     private final ModeEntityOwnershipRegistry ownershipRegistry;
     private final ZombiesActiveMobCounter activeMobCounter;
-    private final int globalMaxAliveZombies;
     private final Supplier<List<ServerPlayer>> survivorTargetSupplier;
     private final Supplier<ZombiesRulesConfig.SpawnPointWeighting> spawnPointWeightingSupplier;
     private final boolean roomTargetingEnabled;
 
     public ZombiesMobSpawnService() {
-        this(ModeEntityOwnershipRegistry.instance(), DEFAULT_GLOBAL_MAX_ALIVE_ZOMBIES);
-    }
-
-    public ZombiesMobSpawnService(ModeEntityOwnershipRegistry ownershipRegistry, int globalMaxAliveZombies) {
-        this(ownershipRegistry, globalMaxAliveZombies, null);
+        this(ModeEntityOwnershipRegistry.instance(), null);
     }
 
     public ZombiesMobSpawnService(
             ModeEntityOwnershipRegistry ownershipRegistry,
-            int globalMaxAliveZombies,
             Supplier<List<ServerPlayer>> survivorTargetSupplier
     ) {
         this(
                 ownershipRegistry,
-                globalMaxAliveZombies,
                 survivorTargetSupplier,
                 () -> ZombiesRulesRepository.getConfig().getSpawnPointWeighting());
     }
 
     public ZombiesMobSpawnService(
             ModeEntityOwnershipRegistry ownershipRegistry,
-            int globalMaxAliveZombies,
             Supplier<List<ServerPlayer>> survivorTargetSupplier,
             Supplier<ZombiesRulesConfig.SpawnPointWeighting> spawnPointWeightingSupplier
     ) {
         this(
                 ownershipRegistry,
-                globalMaxAliveZombies,
                 survivorTargetSupplier,
                 spawnPointWeightingSupplier,
                 ZombiesActiveMobCounter.instance());
@@ -116,14 +106,12 @@ public final class ZombiesMobSpawnService {
 
     public ZombiesMobSpawnService(
             ModeEntityOwnershipRegistry ownershipRegistry,
-            int globalMaxAliveZombies,
             Supplier<List<ServerPlayer>> survivorTargetSupplier,
             Supplier<ZombiesRulesConfig.SpawnPointWeighting> spawnPointWeightingSupplier,
             ZombiesActiveMobCounter activeMobCounter
     ) {
         this.ownershipRegistry = Objects.requireNonNull(ownershipRegistry, "ownershipRegistry");
         this.activeMobCounter = activeMobCounter == null ? ZombiesActiveMobCounter.instance() : activeMobCounter;
-        this.globalMaxAliveZombies = Math.max(1, globalMaxAliveZombies);
         this.survivorTargetSupplier = survivorTargetSupplier == null ? List::of : survivorTargetSupplier;
         this.spawnPointWeightingSupplier = spawnPointWeightingSupplier == null
                 ? () -> ZombiesRulesRepository.getConfig().getSpawnPointWeighting()
@@ -148,9 +136,6 @@ public final class ZombiesMobSpawnService {
         }
         if (waveState.activeZombies() >= safeMaxAlive(waveDefinition)) {
             return SpawnResult.failure(SpawnFailureReason.MAX_ALIVE_REACHED);
-        }
-        if (activeMobCounter.totalCount() >= globalMaxAliveZombies) {
-            return SpawnResult.failure(SpawnFailureReason.GLOBAL_CAP_REACHED);
         }
 
         Optional<String> mobId = nextSupportedMobId(waveState);
@@ -223,10 +208,6 @@ public final class ZombiesMobSpawnService {
 
     public int roomActiveZombies(RoomId roomId) {
         return activeMobCounter.roomCount(roomId);
-    }
-
-    public int globalMaxAliveZombies() {
-        return globalMaxAliveZombies;
     }
 
     public ZombiesActiveMobCounter.ReconcileSummary reconcileActiveZombies(
@@ -1169,7 +1150,6 @@ public final class ZombiesMobSpawnService {
         INVALID_CONTEXT("spawn.invalid_context"),
         NO_BUDGET("spawn.no_budget"),
         MAX_ALIVE_REACHED("spawn.max_alive_reached"),
-        GLOBAL_CAP_REACHED("spawn.global_cap_reached"),
         UNSUPPORTED_MOB_ID("spawn.unsupported_mob_id"),
         NO_AVAILABLE_SPAWN("spawn.no_available_spawn"),
         CHUNK_UNAVAILABLE("spawn.chunk_unavailable"),

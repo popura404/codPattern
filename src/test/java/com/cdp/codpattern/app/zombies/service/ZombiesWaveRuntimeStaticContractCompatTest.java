@@ -305,6 +305,12 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
         requireContains(waveDefinition,
                 "slowestSpawnIntervalTicks",
                 "wave definition should expose slowest spawn interval bound");
+        requireAbsent(spawnService,
+                "DEFAULT_GLOBAL_MAX_ALIVE_ZOMBIES",
+                "zombies spawning must not retain a global NPC cap");
+        requireAbsent(spawnService,
+                "GLOBAL_CAP_REACHED",
+                "zombies spawning must not reject spawns because of a global NPC cap");
         requireContains(phaseStateMachine,
                 "public static final int WAVE_COMPLETE_DELAY_SECONDS = 3;",
                 "wave state machine must hardcode the three-second post-completion delay");

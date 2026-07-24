@@ -217,6 +217,16 @@ public final class ZombiesMvp123CompatTestSuite {
                     "Forge entity removal path for same-room cleanup while preserving other-room entities"),
             new GameTestOnlyCoverage(
                     "com.cdp.codpattern.app.zombies.gametest.ZombiesRuntimeGameTests",
+                    "mapStartCleanupRemovesOnlyMatchingZombiesRoomNpc",
+                    "zombiesruntimegametests.mapstartcleanupremovesonlymatchingzombiesroomnpc",
+                    "map startup removes only matching zombies-room NPCs and preserves other maps and modes"),
+            new GameTestOnlyCoverage(
+                    "com.cdp.codpattern.app.zombies.gametest.ZombiesRuntimeGameTests",
+                    "serverStartCleanupRemovesAllZombiesNpcButPreservesOtherModes",
+                    "zombiesruntimegametests.serverstartcleanupremovesallzombiesnpcbutpreservesothermodes",
+                    "server startup removes all zombies-owned NPCs while preserving global ownership for other modes"),
+            new GameTestOnlyCoverage(
+                    "com.cdp.codpattern.app.zombies.gametest.ZombiesRuntimeGameTests",
                     "weaponInventoryTagsPrimaryStack",
                     "zombiesruntimegametests.weaponinventorytagsprimarystack",
                     "Forge ItemStack/NBT path for purchased zombies primary weapons"),

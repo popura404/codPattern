@@ -20,6 +20,7 @@ import com.cdp.codpattern.app.zombies.service.ZombiesBarrierMovementService;
 import com.cdp.codpattern.app.zombies.service.ZombiesBarrierService;
 import com.cdp.codpattern.app.zombies.service.ZombiesBuffCombatService;
 import com.cdp.codpattern.app.zombies.service.ZombiesBuffService;
+import com.cdp.codpattern.app.zombies.service.ZombiesCrashRecoveryService;
 import com.cdp.codpattern.app.zombies.service.ZombiesCleanupParticipant;
 import com.cdp.codpattern.app.zombies.service.ZombiesCleanupService;
 import com.cdp.codpattern.app.zombies.service.ZombiesEconomyService;
@@ -31,6 +32,7 @@ import com.cdp.codpattern.app.zombies.service.ZombiesPlayerStateService;
 import com.cdp.codpattern.app.zombies.service.ZombiesPowerService;
 import com.cdp.codpattern.app.zombies.service.ZombiesPowerSwitchBlockStateService;
 import com.cdp.codpattern.app.zombies.service.ZombiesServiceResult;
+import com.cdp.codpattern.app.zombies.service.ZombiesActiveMobCounter;
 import com.cdp.codpattern.app.zombies.service.ZombiesUltimateMachineService;
 import com.cdp.codpattern.app.zombies.service.ZombiesWeaponInventoryService;
 import com.cdp.codpattern.app.zombies.service.ZombiesWeaponInstanceService;
@@ -73,6 +75,8 @@ import java.util.UUID;
 public final class ZombiesRuntimeGameTests {
     private static final String EMPTY_TEMPLATE = "empty";
     private static final String BATCH = "zombies_runtime_smoke";
+    private static final String MAP_START_CLEANUP_BATCH = "zombies_map_start_cleanup";
+    private static final String SERVER_START_CLEANUP_BATCH = "zombies_server_start_cleanup";
 
     private ZombiesRuntimeGameTests() {
     }
@@ -146,6 +150,136 @@ public final class ZombiesRuntimeGameTests {
             }
             if (otherRoomZombie != null) {
                 otherRoomZombie.discard();
+            }
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY_TEMPLATE, batch = MAP_START_CLEANUP_BATCH, timeoutTicks = 60, required = false)
+    public static void mapStartCleanupRemovesOnlyMatchingZombiesRoomNpc(GameTestHelper helper) {
+        RoomId targetRoom = roomId("map-start-cleanup-target");
+        RoomId otherZombiesRoom = roomId("map-start-cleanup-other");
+        RoomId otherModeRoom = RoomId.of(BuiltInGameModes.TEAM_DEATHMATCH, "map-start-cleanup-tdm");
+        ModeEntityOwnershipRegistry ownershipRegistry = ModeEntityOwnershipRegistry.instance();
+        ZombiesActiveMobCounter activeMobCounter = new ZombiesActiveMobCounter();
+        Zombie targetZombie = null;
+        Zombie otherZombiesNpc = null;
+        Zombie otherModeNpc = null;
+
+        try {
+            targetZombie = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, new Vec3(2.0D, 2.0D, 2.0D));
+            otherZombiesNpc = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, new Vec3(4.0D, 2.0D, 2.0D));
+            otherModeNpc = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, new Vec3(6.0D, 2.0D, 2.0D));
+            ownershipRegistry.register(targetRoom, targetZombie);
+            ownershipRegistry.register(otherZombiesRoom, otherZombiesNpc);
+            ownershipRegistry.register(otherModeRoom, otherModeNpc);
+            activeMobCounter.register(targetRoom, targetZombie.getUUID());
+            activeMobCounter.register(otherZombiesRoom, otherZombiesNpc.getUUID());
+
+            ZombiesCrashRecoveryService recoveryService = new ZombiesCrashRecoveryService(
+                    ownershipRegistry,
+                    new ZombiesMapOccupancyService(),
+                    activeMobCounter);
+            ZombiesCrashRecoveryService.ResidualEntityCleanupSummary summary =
+                    recoveryService.cleanupResidualTaggedEntitiesForRoom(
+                            helper.getLevel().getServer(),
+                            targetRoom);
+
+            helper.assertTrue(summary.removedEntities() == 1,
+                    "map startup cleanup should remove exactly its matching zombies NPC");
+            helper.assertTrue(targetZombie.isRemoved(), "matching zombies room NPC should be removed");
+            helper.assertFalse(otherZombiesNpc.isRemoved(), "other zombies map NPC should remain");
+            helper.assertFalse(otherModeNpc.isRemoved(), "non-zombies mode NPC should remain");
+            helper.assertTrue(ownershipRegistry.entitiesInRoom(targetRoom).isEmpty(),
+                    "matching room ownership should be cleared");
+            helper.assertTrue(ownershipRegistry.entitiesInRoom(otherZombiesRoom).size() == 1,
+                    "other zombies room ownership should remain");
+            helper.assertTrue(ownershipRegistry.entitiesInRoom(otherModeRoom).size() == 1,
+                    "global ownership for another mode should remain");
+            helper.assertTrue(activeMobCounter.roomCount(targetRoom) == 0,
+                    "matching zombies active counter should be cleared");
+            helper.assertTrue(activeMobCounter.roomCount(otherZombiesRoom) == 1,
+                    "other zombies room active counter should remain");
+        } finally {
+            ownershipRegistry.clearRoom(targetRoom);
+            ownershipRegistry.clearRoom(otherZombiesRoom);
+            ownershipRegistry.clearRoom(otherModeRoom);
+            activeMobCounter.clear();
+            if (targetZombie != null) {
+                targetZombie.discard();
+            }
+            if (otherZombiesNpc != null) {
+                otherZombiesNpc.discard();
+            }
+            if (otherModeNpc != null) {
+                otherModeNpc.discard();
+            }
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY_TEMPLATE, batch = SERVER_START_CLEANUP_BATCH, timeoutTicks = 60, required = false)
+    public static void serverStartCleanupRemovesAllZombiesNpcButPreservesOtherModes(GameTestHelper helper) {
+        RoomId firstZombiesRoom = roomId("server-start-cleanup-first");
+        RoomId secondZombiesRoom = roomId("server-start-cleanup-second");
+        RoomId otherModeRoom = RoomId.of(BuiltInGameModes.TEAM_DEATHMATCH, "server-start-cleanup-tdm");
+        ModeEntityOwnershipRegistry ownershipRegistry = ModeEntityOwnershipRegistry.instance();
+        ZombiesActiveMobCounter activeMobCounter = new ZombiesActiveMobCounter();
+        ZombiesMapOccupancyService occupancyService = new ZombiesMapOccupancyService();
+        Zombie firstZombie = null;
+        Zombie secondZombie = null;
+        Zombie otherModeNpc = null;
+
+        try {
+            firstZombie = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, new Vec3(2.0D, 2.0D, 2.0D));
+            secondZombie = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, new Vec3(4.0D, 2.0D, 2.0D));
+            otherModeNpc = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, new Vec3(6.0D, 2.0D, 2.0D));
+            ownershipRegistry.register(firstZombiesRoom, firstZombie);
+            ownershipRegistry.register(secondZombiesRoom, secondZombie);
+            ownershipRegistry.register(otherModeRoom, otherModeNpc);
+            activeMobCounter.register(firstZombiesRoom, firstZombie.getUUID());
+            activeMobCounter.register(secondZombiesRoom, secondZombie.getUUID());
+            occupancyService.acquire(firstZombiesRoom);
+            occupancyService.acquire(secondZombiesRoom);
+
+            ZombiesCrashRecoveryService recoveryService = new ZombiesCrashRecoveryService(
+                    ownershipRegistry,
+                    occupancyService,
+                    activeMobCounter);
+            ZombiesCrashRecoveryService.ServerStartupRecoverySummary summary =
+                    recoveryService.recoverServerStartup(helper.getLevel().getServer());
+
+            helper.assertTrue(summary.entities().removedEntities() == 2,
+                    "server startup cleanup should remove every zombies-owned NPC in the test");
+            helper.assertTrue(firstZombie.isRemoved(), "first zombies NPC should be removed on server startup");
+            helper.assertTrue(secondZombie.isRemoved(), "second zombies NPC should be removed on server startup");
+            helper.assertFalse(otherModeNpc.isRemoved(), "non-zombies mode NPC should survive server startup cleanup");
+            helper.assertTrue(ownershipRegistry.entitiesInRoom(firstZombiesRoom).isEmpty(),
+                    "first zombies room ownership should be cleared");
+            helper.assertTrue(ownershipRegistry.entitiesInRoom(secondZombiesRoom).isEmpty(),
+                    "second zombies room ownership should be cleared");
+            helper.assertTrue(ownershipRegistry.entitiesInRoom(otherModeRoom).size() == 1,
+                    "other mode ownership should remain in the global registry");
+            helper.assertTrue(activeMobCounter.totalCount() == 0,
+                    "server startup cleanup should clear zombies active counters");
+            helper.assertFalse(occupancyService.isOccupied(firstZombiesRoom),
+                    "server startup cleanup should clear zombies map occupancy");
+            helper.assertFalse(occupancyService.isOccupied(secondZombiesRoom),
+                    "server startup cleanup should clear every zombies map occupancy");
+        } finally {
+            ownershipRegistry.clearRoom(firstZombiesRoom);
+            ownershipRegistry.clearRoom(secondZombiesRoom);
+            ownershipRegistry.clearRoom(otherModeRoom);
+            activeMobCounter.clear();
+            occupancyService.clear();
+            if (firstZombie != null) {
+                firstZombie.discard();
+            }
+            if (secondZombie != null) {
+                secondZombie.discard();
+            }
+            if (otherModeNpc != null) {
+                otherModeNpc.discard();
             }
         }
         helper.succeed();
