@@ -156,7 +156,7 @@ final class ZombiesRoomHandleFactory {
 
         @Override
         public int playerCount() {
-            return map.survivorPlayers().size();
+            return map.survivorPlayerIds().size();
         }
 
         @Override

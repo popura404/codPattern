@@ -38,6 +38,12 @@ public final class ZombiesRoomLobbyFlowStaticContractCompatTest {
         requireContains(readyWrite, "sendRosterSnapshotToSurvivors();",
                 "ready changes should immediately sync roster ready flags to survivors");
 
+        String playerCount = methodBody(roomHandle, "public int playerCount()");
+        requireContains(playerCount, "return map.survivorPlayerIds().size();",
+                "zombies room summaries should count every occupied survivor slot, including reconnect reservations");
+        requireNotContains(playerCount, "map.survivorPlayers().size()",
+                "zombies room summaries should not report only currently online survivors");
+
         String logout = methodBody(zombiesMap, "public void onPlayerLoggedOut(ServerPlayer player)");
         requireContains(logout,
                 "runtimeState.phase() == ZombiesGamePhase.WAITING || runtimeState.phase() == ZombiesGamePhase.START_VOTE",
@@ -50,6 +56,17 @@ public final class ZombiesRoomLobbyFlowStaticContractCompatTest {
                 "start votes should have an online survivor snapshot source");
         requireContains(zombiesMap, "return onlineSurvivorPlayerIds();",
                 "start-vote snapshots should exclude offline retained survivor records");
+        String resetForWaiting = methodBody(zombiesMap, "private void resetRuntimeForWaiting()");
+        requireContains(resetForWaiting, "getMapTeams().removeOfflinePlayers();",
+                "successful cleanup should release survivor slots retained for offline reconnects");
+        requireBefore(resetForWaiting, "getMapTeams().removeOfflinePlayers();", "isStart = false;",
+                "offline survivor slots should be released before zombies runtime state is reset");
+        requireBefore(resetForWaiting, "getMapTeams().removeOfflinePlayers();", "playerStateService.clear();",
+                "offline survivor slots should be released before reconnect state is cleared");
+        String beforeCleanup = methodBody(zombiesMap,
+                "public void beforeCleanup(ZombiesCleanupParticipant.ZombiesCleanupContext context)");
+        requireContains(beforeCleanup, "preparePostGameTeleportPending(context);",
+                "cleanup should record offline survivor recovery before reset releases their team slots");
         requireContains(zombiesMap, "() -> runtimeState.phase().allowsPurchases()",
                 "object interactions should be phase-gated by the zombies runtime phase");
 
@@ -114,6 +131,20 @@ public final class ZombiesRoomLobbyFlowStaticContractCompatTest {
     private static void requireContains(String content, String expected, String message) {
         if (!content.contains(expected)) {
             throw new AssertionError(message + ": missing `" + expected + "`");
+        }
+    }
+
+    private static void requireNotContains(String content, String unexpected, String message) {
+        if (content.contains(unexpected)) {
+            throw new AssertionError(message + ": found `" + unexpected + "`");
+        }
+    }
+
+    private static void requireBefore(String content, String first, String second, String message) {
+        int firstIndex = content.indexOf(first);
+        int secondIndex = content.indexOf(second);
+        if (firstIndex < 0 || secondIndex < 0 || firstIndex >= secondIndex) {
+            throw new AssertionError(message + ": expected `" + first + "` before `" + second + "`");
         }
     }
 }

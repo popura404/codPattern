@@ -1023,6 +1023,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
     }
 
     private void resetRuntimeForWaiting() {
+        getMapTeams().removeOfflinePlayers();
         isStart = false;
         waveDirector = null;
         combatRegenCooldowns.clear();
