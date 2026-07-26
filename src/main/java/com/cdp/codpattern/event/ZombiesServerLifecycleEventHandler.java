@@ -1,9 +1,10 @@
 package com.cdp.codpattern.event;
 
-import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.CodPatternConstants;
 import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.zombies.service.ZombiesCrashRecoveryService;
+import com.cdp.codpattern.app.zombies.service.ZombiesLoginRecoveryContributor;
 import com.cdp.codpattern.compat.fpsmatch.map.FpsMatchMapRegistry;
 import com.cdp.codpattern.compat.fpsmatch.map.ZombiesMap;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
@@ -18,7 +19,7 @@ import net.minecraftforge.fml.common.Mod;
 import java.util.ArrayList;
 import java.util.List;
 
-@Mod.EventBusSubscriber(modid = CodPattern.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@Mod.EventBusSubscriber(modid = CodPatternConstants.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class ZombiesServerLifecycleEventHandler {
     private ZombiesServerLifecycleEventHandler() {
     }
@@ -32,7 +33,7 @@ public final class ZombiesServerLifecycleEventHandler {
             }
         }
         for (ServerPlayer player : event.getServer().getPlayerList().getPlayers()) {
-            PlayerLoggedInEventHandler.recoverZombiesLogin(player);
+            ZombiesLoginRecoveryContributor.recover(player);
         }
     }
 

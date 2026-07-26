@@ -9,8 +9,8 @@ public final class ZombiesReconnectRecoveryStaticContractCompatTest {
             Path.of("src/main/java/com/cdp/codpattern/app/zombies/service/ZombiesReconnectRecoveryService.java");
     private static final Path PLAYER_STATE_SERVICE =
             Path.of("src/main/java/com/cdp/codpattern/app/zombies/service/ZombiesPlayerStateService.java");
-    private static final Path LOGIN_HANDLER =
-            Path.of("src/main/java/com/cdp/codpattern/event/PlayerLoggedInEventHandler.java");
+    private static final Path LOGIN_CONTRIBUTOR =
+            Path.of("src/main/java/com/cdp/codpattern/app/zombies/service/ZombiesLoginRecoveryContributor.java");
     private static final Path ZOMBIES_MAP =
             Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/map/ZombiesMap.java");
     private static final Path ROOM_HANDLE =
@@ -22,7 +22,7 @@ public final class ZombiesReconnectRecoveryStaticContractCompatTest {
     public static void main(String[] args) throws Exception {
         String recoveryService = read(RECOVERY_SERVICE);
         String playerStateService = read(PLAYER_STATE_SERVICE);
-        String loginHandler = read(LOGIN_HANDLER);
+        String loginContributor = read(LOGIN_CONTRIBUTOR);
         String zombiesMap = read(ZOMBIES_MAP);
         String roomHandle = read(ROOM_HANDLE);
 
@@ -32,9 +32,9 @@ public final class ZombiesReconnectRecoveryStaticContractCompatTest {
         requireContains(recoveryService,
                 "ACTIVE_ROUND_REJOIN",
                 "active-round member restore should expose a distinct recovery outcome");
-        requireContains(loginHandler,
+        requireContains(loginContributor,
                 ".map(map -> map.restoreActiveRoundReconnect(player))",
-                "login recovery resolver should delegate active-round restore to the owning zombies map");
+                "addon login recovery contributor should delegate active-round restore to the owning zombies map");
         requireContains(playerStateService,
                 "public boolean canRestoreActiveRoundPlayer(UUID playerId)",
                 "reconnect restore eligibility should require an existing runtime state");

@@ -24,6 +24,10 @@ public final class ZombiesDeployObjectEditorCompatTest {
         if (!bootstrapMinecraft()) {
             return;
         }
+        runAll();
+    }
+
+    public static void runAll() {
         initialSpawnsAllowFourAndRejectFifth();
         barrierAreaFieldsParseUpdateAndDuplicate();
         ammoBoxPricesByWeaponLevelParseAndUpdateFromListField();
@@ -487,7 +491,11 @@ public final class ZombiesDeployObjectEditorCompatTest {
         requireSuccess(add, "weapon_wall add should succeed");
         require(add.selectedIndex() == 0, "weapon_wall add should select the inserted object");
         ZombiesWeaponWallData added = only(add.objects().weaponWalls(), "added weapon wall");
-        requireWeaponWallBase(added, "wall-1", new BlockPos(5, 64, 6));
+        requireWeaponWallBase(
+                added,
+                "wall-1",
+                new BlockPos(5, 64, 6),
+                new BlockPos(0, 64, 0));
         requireOldWeaponWallFieldsAbsent(add.fields());
 
         Map<String, String> updateFields = new LinkedHashMap<>(add.fields());
@@ -502,7 +510,11 @@ public final class ZombiesDeployObjectEditorCompatTest {
 
         requireSuccess(update, "weapon_wall update should succeed");
         ZombiesWeaponWallData updated = only(update.objects().weaponWalls(), "updated weapon wall");
-        requireWeaponWallBase(updated, "wall-1", new BlockPos(5, 64, 6));
+        requireWeaponWallBase(
+                updated,
+                "wall-1",
+                new BlockPos(5, 64, 6),
+                new BlockPos(0, 64, 0));
         requireOldWeaponWallFieldsAbsent(update.fields());
     }
 
@@ -524,7 +536,11 @@ public final class ZombiesDeployObjectEditorCompatTest {
         ZombiesWeaponWallData copy = duplicate.objects().weaponWalls().get(2);
         require("wall-1_copy_2".equals(copy.objectId()),
                 "weapon_wall duplicate should generate a non-conflicting objectId");
-        requireWeaponWallBase(copy, "wall-1_copy_2", new BlockPos(0, 0, 0));
+        requireWeaponWallBase(
+                copy,
+                "wall-1_copy_2",
+                new BlockPos(0, 64, 0),
+                new BlockPos(0, 64, 0));
     }
 
     private static ZombiesDeployObjectEditor.EditResult addAmmoBox(ZombiesMapObjects objects, String objectId) {
@@ -579,11 +595,13 @@ public final class ZombiesDeployObjectEditorCompatTest {
     private static void requireWeaponWallBase(
             ZombiesWeaponWallData wall,
             String objectId,
-            BlockPos pos
+            BlockPos pos,
+            BlockPos interactionPos
     ) {
         require(objectId.equals(wall.objectId()), "weapon_wall objectId should match");
         require(pos.equals(wall.pos()), "weapon_wall pos should match");
-        require(wall.interactionPos().orElse(wall.pos()).equals(pos), "weapon_wall interaction should track pos");
+        require(wall.interactionPos().orElse(wall.pos()).equals(interactionPos),
+                "weapon_wall interaction position should match");
     }
 
     private static void requireOldWeaponWallFieldsAbsent(Map<String, String> fields) {

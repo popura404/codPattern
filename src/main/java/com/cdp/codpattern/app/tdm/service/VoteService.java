@@ -1,15 +1,18 @@
 package com.cdp.codpattern.app.tdm.service;
 
+import com.cdp.codpattern.app.match.runtime.vote.RoomVoteEngine;
 import com.cdp.codpattern.network.match.VoteDialogPacket;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+/** PVP presentation and prerequisite facade over the neutral room vote engine. */
 public final class VoteService {
     private static final int VOTE_TIMEOUT_TICKS = 15 * 20;
 
@@ -52,27 +55,19 @@ public final class VoteService {
         END
     }
 
-    private static final class VoteSession {
-        private final long voteId;
-        private final VoteType type;
-        private final Set<UUID> voters;
-        private final Set<UUID> accepted = new HashSet<>();
-        private final Set<UUID> rejected = new HashSet<>();
-        private int timeoutTicksRemaining = VOTE_TIMEOUT_TICKS;
-
-        private VoteSession(long voteId, VoteType type, Set<UUID> voters) {
-            this.voteId = voteId;
-            this.type = type;
-            this.voters = voters;
-        }
+    private enum ResolutionOutcome {
+        PASSED,
+        MIN_PLAYERS,
+        IMPOSSIBLE,
+        ALL_RESPONDED
     }
 
     private final Hooks hooks;
-    private VoteSession activeVoteSession;
-    private long voteSessionSequence = 0L;
+    private final RoomVoteEngine<VoteType> delegate;
 
     public VoteService(Hooks hooks) {
-        this.hooks = hooks;
+        this.hooks = java.util.Objects.requireNonNull(hooks, "hooks");
+        this.delegate = new RoomVoteEngine<>(new PvpVotePolicy(), new PvpVoteListener());
     }
 
     public boolean initiateStartVote(UUID initiator) {
@@ -84,81 +79,50 @@ public final class VoteService {
     }
 
     public boolean submitVoteResponse(UUID playerId, long voteId, boolean accepted) {
-        if (activeVoteSession == null || activeVoteSession.voteId != voteId) {
+        boolean passed = delegate.submit(playerId, voteId, accepted);
+        Optional<RoomVoteEngine.FailureReason> failure = delegate.lastFailureReason();
+        if (failure.orElse(null) == RoomVoteEngine.FailureReason.STALE_VOTE) {
             Player player = hooks.getPlayer(playerId);
             if (player != null) {
                 hooks.notifyPlayer(player, Component.translatable("message.codpattern.game.vote_expired"));
             }
-            return false;
-        }
-
-        VoteSession session = activeVoteSession;
-        if (!session.voters.contains(playerId)) {
-            return false;
-        }
-        if (session.accepted.contains(playerId) || session.rejected.contains(playerId)) {
+        } else if (failure.orElse(null) == RoomVoteEngine.FailureReason.ALREADY_VOTED) {
             Player player = hooks.getPlayer(playerId);
             if (player != null) {
                 hooks.notifyPlayer(player, Component.translatable("message.codpattern.game.already_voted"));
             }
-            return false;
         }
-
-        if (accepted) {
-            session.accepted.add(playerId);
-        } else {
-            session.rejected.add(playerId);
-        }
-
-        broadcastVoteProgress(session);
-        hooks.markRoomListDirty();
-        return resolveVoteIfReady(session);
+        return passed;
     }
 
     public void tickVoteSession() {
-        if (activeVoteSession == null) {
-            return;
-        }
-        VoteSession session = activeVoteSession;
-        session.timeoutTicksRemaining--;
-        if (session.timeoutTicksRemaining > 0) {
-            return;
-        }
+        delegate.tick();
+    }
 
-        Component timeoutMessage = session.type == VoteType.START
+    private void broadcastTimeout(VoteType type) {
+        Component timeoutMessage = type == VoteType.START
                 ? Component.translatable("message.codpattern.game.vote_timeout_start")
                 : Component.translatable("message.codpattern.game.vote_timeout_end");
         hooks.broadcastToJoinedPlayers(timeoutMessage);
-        clearActiveVoteSession();
-        hooks.markRoomListDirty();
     }
 
     public void clearActiveVoteSession() {
-        activeVoteSession = null;
+        delegate.clear();
     }
 
     public void removePlayerFromActiveVote(UUID playerId) {
-        if (activeVoteSession == null) {
-            return;
-        }
-
-        VoteSession session = activeVoteSession;
-        if (!session.voters.remove(playerId)) {
-            return;
-        }
-        session.accepted.remove(playerId);
-        session.rejected.remove(playerId);
-        resolveVoteIfReady(session);
-        hooks.markRoomListDirty();
+        delegate.memberDeparted(playerId);
     }
 
     public String getVoteStatus() {
-        if (activeVoteSession == null) {
+        Optional<RoomVoteEngine.Snapshot<VoteType>> activeVote = delegate.activeSnapshot();
+        if (activeVote.isEmpty()) {
             return "";
         }
-        int requiredVotes = getRequiredVotes(activeVoteSession.type, activeVoteSession.voters.size());
-        int acceptedVotes = activeVoteSession.accepted.size();
-        if (activeVoteSession.type == VoteType.START) {
+        RoomVoteEngine.Snapshot<VoteType> snapshot = activeVote.get();
+        int requiredVotes = snapshot.requiredVotes();
+        int acceptedVotes = snapshot.accepted().size();
+        if (snapshot.kind() == VoteType.START) {
             return Component.translatable("message.codpattern.game.status_vote_start", acceptedVotes, requiredVotes)
                     .getString();
         }
@@ -167,36 +131,40 @@ public final class VoteService {
     }
 
     private boolean initiateVote(VoteType type, UUID initiator) {
+        return delegate.initiate(type, initiator);
+    }
+
+    private RoomVoteEngine.StartDecision prepareStart(VoteType type, UUID initiator, boolean voteActive) {
         Player initiatorPlayer = hooks.getPlayer(initiator);
         if (initiatorPlayer == null) {
-            return false;
+            return RoomVoteEngine.StartDecision.rejected(RoomVoteEngine.FailureReason.INITIATOR_MISSING);
         }
 
-        if (activeVoteSession != null) {
+        if (voteActive) {
             hooks.notifyPlayer(initiatorPlayer, Component.translatable("message.codpattern.game.vote_in_progress"));
-            return false;
+            return RoomVoteEngine.StartDecision.rejected(RoomVoteEngine.FailureReason.VOTE_IN_PROGRESS);
         }
 
         if (type == VoteType.START) {
             if (!hooks.isWaitingPhase()) {
                 hooks.notifyPlayer(initiatorPlayer, Component.translatable("message.codpattern.game.already_started"));
-                return false;
+                return RoomVoteEngine.StartDecision.rejected(RoomVoteEngine.FailureReason.NOT_WAITING);
             }
         } else if (!hooks.isPlayingOrWarmupPhase()) {
             hooks.notifyPlayer(initiatorPlayer, Component.translatable("message.codpattern.game.not_started"));
-            return false;
+            return RoomVoteEngine.StartDecision.rejected(RoomVoteEngine.FailureReason.NOT_PLAYING);
         }
 
         List<ServerPlayer> joinedPlayers = hooks.getJoinedPlayers();
         if (joinedPlayers.isEmpty()) {
-            return false;
+            return RoomVoteEngine.StartDecision.rejected(RoomVoteEngine.FailureReason.EMPTY_SNAPSHOT);
         }
 
         int totalPlayers = joinedPlayers.size();
         if (type == VoteType.START && totalPlayers < hooks.getMinPlayersToStart()) {
             hooks.notifyPlayer(initiatorPlayer, Component.translatable("message.codpattern.game.min_players_warning",
                     hooks.getMinPlayersToStart(), totalPlayers));
-            return false;
+            return RoomVoteEngine.StartDecision.rejected(RoomVoteEngine.FailureReason.MIN_PLAYERS);
         }
 
         if (type == VoteType.START) {
@@ -205,122 +173,179 @@ public final class VoteService {
                     .count();
             if (unreadyCount > 0) {
                 hooks.notifyPlayer(initiatorPlayer, Component.translatable("message.codpattern.vote.players_not_ready"));
-                return false;
+                return RoomVoteEngine.StartDecision.rejected(RoomVoteEngine.FailureReason.PLAYERS_NOT_READY);
             }
             if (!hooks.hasMatchEndTeleportPoint()) {
                 hooks.notifyPlayer(initiatorPlayer, Component.translatable(
                         "message.codpattern.vote.missing_end_teleport",
                         hooks.getMapName()));
-                return false;
+                return RoomVoteEngine.StartDecision.rejected(RoomVoteEngine.FailureReason.MISSING_END_TELEPORT);
             }
         }
 
-        Set<UUID> voters = new HashSet<>();
+        Set<UUID> voters = new LinkedHashSet<>();
         for (ServerPlayer joinedPlayer : joinedPlayers) {
             voters.add(joinedPlayer.getUUID());
         }
+        return RoomVoteEngine.StartDecision.accepted(voters);
+    }
 
-        VoteSession session = new VoteSession(++voteSessionSequence, type, voters);
-        activeVoteSession = session;
-
+    private void onVoteStarted(RoomVoteEngine.Snapshot<VoteType> snapshot) {
+        Player initiatorPlayer = hooks.getPlayer(snapshot.initiator());
+        if (initiatorPlayer == null) {
+            return;
+        }
         String initiatorName = initiatorPlayer.getName().getString();
-        Component startMessage = type == VoteType.START
+        Component startMessage = snapshot.kind() == VoteType.START
                 ? Component.translatable("message.codpattern.game.vote_initiated_start", initiatorName)
                 : Component.translatable("message.codpattern.game.vote_initiated_end", initiatorName);
         hooks.broadcastToJoinedPlayers(startMessage);
 
-        int requiredVotes = getRequiredVotes(type, totalPlayers);
         VoteDialogPacket dialogPacket = new VoteDialogPacket(
-                hooks.getMapName(), session.voteId, type.name(), initiatorName, requiredVotes, totalPlayers);
-        for (ServerPlayer joinedPlayer : joinedPlayers) {
-            hooks.sendVoteDialog(dialogPacket, joinedPlayer);
+                hooks.getMapName(),
+                snapshot.voteId(),
+                snapshot.kind().name(),
+                initiatorName,
+                snapshot.requiredVotes(),
+                snapshot.totalMembers());
+        Set<UUID> members = snapshot.members();
+        for (ServerPlayer joinedPlayer : hooks.getJoinedPlayers()) {
+            if (members.contains(joinedPlayer.getUUID())) {
+                hooks.sendVoteDialog(dialogPacket, joinedPlayer);
+            }
         }
-
         hooks.markRoomListDirty();
-        return true;
     }
 
-    private boolean resolveVoteIfReady(VoteSession session) {
-        if (activeVoteSession == null || activeVoteSession != session) {
-            return false;
+    private void presentResolution(
+            RoomVoteEngine.Snapshot<VoteType> session,
+            ResolutionOutcome outcome
+    ) {
+        int totalPlayers = session.totalMembers();
+        if (outcome == ResolutionOutcome.MIN_PLAYERS) {
+            hooks.broadcastToJoinedPlayers(Component.translatable("message.codpattern.game.min_players_warning",
+                    hooks.getMinPlayersToStart(), totalPlayers));
+            hooks.broadcastToJoinedPlayers(Component.translatable("message.codpattern.game.vote_failed"));
+            return;
         }
-
-        if (session.voters.isEmpty()) {
-            clearActiveVoteSession();
-            return false;
-        }
-
-        if (session.type == VoteType.START) {
-            int totalPlayers = session.voters.size();
-            if (totalPlayers < hooks.getMinPlayersToStart()) {
-                hooks.broadcastToJoinedPlayers(Component.translatable("message.codpattern.game.min_players_warning",
-                        hooks.getMinPlayersToStart(), totalPlayers));
-                hooks.broadcastToJoinedPlayers(Component.translatable("message.codpattern.game.vote_failed"));
-                clearActiveVoteSession();
-                return false;
-            }
-        } else if (!hooks.isPlayingOrWarmupPhase()) {
-            clearActiveVoteSession();
-            return false;
-        }
-
-        int totalPlayers = session.voters.size();
-        int requiredVotes = getRequiredVotes(session.type, totalPlayers);
-        int acceptCount = session.accepted.size();
-        int rejectCount = session.rejected.size();
-        int unresolvedCount = Math.max(0, totalPlayers - acceptCount - rejectCount);
-
-        if (acceptCount >= requiredVotes) {
-            if (session.type == VoteType.START) {
+        if (outcome == ResolutionOutcome.PASSED) {
+            if (session.kind() == VoteType.START) {
                 hooks.broadcastToJoinedPlayers(Component.translatable("message.codpattern.game.vote_passed"));
-                clearActiveVoteSession();
                 hooks.onStartVotePassed();
             } else {
                 hooks.broadcastToJoinedPlayers(Component.translatable("message.codpattern.game.vote_passed_end"));
-                clearActiveVoteSession();
                 hooks.onEndVotePassed();
             }
-            return true;
+            return;
         }
-
-        if (acceptCount + unresolvedCount < requiredVotes) {
-            Component failMessage = session.type == VoteType.START
+        if (outcome == ResolutionOutcome.IMPOSSIBLE) {
+            Component failMessage = session.kind() == VoteType.START
                     ? Component.translatable("message.codpattern.game.vote_failed")
                     : Component.translatable("message.codpattern.game.vote_failed_end");
             hooks.broadcastToJoinedPlayers(failMessage);
-            clearActiveVoteSession();
-            return false;
+            return;
         }
-
-        if (acceptCount + rejectCount >= totalPlayers) {
-            Component failMessage = session.type == VoteType.START
-                    ? Component.translatable("message.codpattern.game.vote_failed")
-                    : Component.translatable("message.codpattern.game.vote_failed_end");
-            hooks.broadcastToJoinedPlayers(failMessage);
-            clearActiveVoteSession();
-            return false;
-        }
-
-        return false;
+        Component failMessage = session.kind() == VoteType.START
+                ? Component.translatable("message.codpattern.game.vote_failed")
+                : Component.translatable("message.codpattern.game.vote_failed_end");
+        hooks.broadcastToJoinedPlayers(failMessage);
     }
 
     private int getRequiredVotes(VoteType type, int totalPlayers) {
         int votePercent = type == VoteType.START ? hooks.getVotePercentageToStart() : hooks.getVotePercentageToEnd();
-        int requiredVotes = (int) Math.ceil(totalPlayers * (votePercent / 100.0));
-        return Math.max(1, Math.min(Math.max(1, totalPlayers), requiredVotes));
+        return RoomVoteEngine.ceilClampedThreshold(totalPlayers, votePercent);
     }
 
-    private void broadcastVoteProgress(VoteSession session) {
-        int totalPlayers = session.voters.size();
-        int requiredVotes = getRequiredVotes(session.type, totalPlayers);
-        int acceptCount = session.accepted.size();
-        int rejectCount = session.rejected.size();
+    private void broadcastVoteProgress(RoomVoteEngine.Snapshot<VoteType> session) {
+        int totalPlayers = session.totalMembers();
+        int requiredVotes = session.requiredVotes();
+        int acceptCount = session.accepted().size();
+        int rejectCount = session.rejected().size();
 
-        Component progressMessage = session.type == VoteType.START
+        Component progressMessage = session.kind() == VoteType.START
                 ? Component.translatable("message.codpattern.game.vote_progress_start", acceptCount, rejectCount,
                         totalPlayers, requiredVotes)
                 : Component.translatable("message.codpattern.game.vote_progress_end", acceptCount, rejectCount,
                         totalPlayers, requiredVotes);
         hooks.broadcastToJoinedPlayers(progressMessage);
+    }
+
+    private final class PvpVotePolicy implements RoomVoteEngine.Policy<VoteType> {
+        @Override
+        public RoomVoteEngine.StartDecision prepareStart(
+                VoteType kind,
+                UUID initiator,
+                boolean voteActive
+        ) {
+            return VoteService.this.prepareStart(kind, initiator, voteActive);
+        }
+
+        @Override
+        public int requiredVotes(VoteType kind, int memberCount) {
+            return getRequiredVotes(kind, memberCount);
+        }
+
+        @Override
+        public int timeoutTicks(VoteType kind) {
+            return VOTE_TIMEOUT_TICKS;
+        }
+
+        @Override
+        public RoomVoteEngine.MemberDeparturePolicy memberDeparturePolicy(VoteType kind) {
+            return RoomVoteEngine.MemberDeparturePolicy.REMOVE_AND_RECALCULATE;
+        }
+
+        @Override
+        public Optional<RoomVoteEngine.FailureReason> activeFailure(VoteType kind, Set<UUID> currentMembers) {
+            if (kind == VoteType.START && currentMembers.size() < hooks.getMinPlayersToStart()) {
+                return Optional.of(RoomVoteEngine.FailureReason.MIN_PLAYERS);
+            }
+            if (kind == VoteType.END && !hooks.isPlayingOrWarmupPhase()) {
+                return Optional.of(RoomVoteEngine.FailureReason.NOT_PLAYING);
+            }
+            return Optional.empty();
+        }
+    }
+
+    private final class PvpVoteListener implements RoomVoteEngine.Listener<VoteType> {
+        @Override
+        public void onStarted(RoomVoteEngine.Snapshot<VoteType> snapshot) {
+            onVoteStarted(snapshot);
+        }
+
+        @Override
+        public void onProgress(RoomVoteEngine.Snapshot<VoteType> snapshot) {
+            broadcastVoteProgress(snapshot);
+            hooks.markRoomListDirty();
+        }
+
+        @Override
+        public void onPassed(RoomVoteEngine.Snapshot<VoteType> snapshot) {
+            presentResolution(snapshot, ResolutionOutcome.PASSED);
+        }
+
+        @Override
+        public void onFailed(
+                RoomVoteEngine.Snapshot<VoteType> snapshot,
+                RoomVoteEngine.FailureReason reason
+        ) {
+            switch (reason) {
+                case TIMEOUT -> {
+                    broadcastTimeout(snapshot.kind());
+                    hooks.markRoomListDirty();
+                }
+                case MIN_PLAYERS -> presentResolution(snapshot, ResolutionOutcome.MIN_PLAYERS);
+                case IMPOSSIBLE_TO_PASS -> presentResolution(snapshot, ResolutionOutcome.IMPOSSIBLE);
+                case ALL_RESPONDED_WITHOUT_PASSING -> presentResolution(snapshot, ResolutionOutcome.ALL_RESPONDED);
+                default -> {
+                    // The current PVP facade intentionally presents no message for other invalidations.
+                }
+            }
+        }
+
+        @Override
+        public void onMemberDeparted(UUID playerId, boolean voteResolved) {
+            hooks.markRoomListDirty();
+        }
     }
 }

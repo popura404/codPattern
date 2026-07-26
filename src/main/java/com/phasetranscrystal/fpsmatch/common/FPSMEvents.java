@@ -1,9 +1,7 @@
 package com.phasetranscrystal.fpsmatch.common;
 
+import com.cdp.codpattern.app.match.runtime.tool.ModeHeldToolPreviewContributors;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
-import com.phasetranscrystal.fpsmatch.common.item.MapCreatorTool;
-import com.phasetranscrystal.fpsmatch.common.item.SpawnPointTool;
-import com.phasetranscrystal.fpsmatch.common.item.ZombiesDeployTool;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolAccessHelper;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -22,35 +20,7 @@ public final class FPSMEvents {
             return;
         }
 
-        if (!ToolAccessHelper.hasAdminAccess(player)) {
-            MapCreatorTool.clearHeldPreview(player);
-            SpawnPointTool.clearHeldPreview(player);
-            ZombiesDeployTool.clearHeldPreview(player);
-            return;
-        }
-
         ItemStack stack = player.getMainHandItem();
-        if (stack.getItem() instanceof MapCreatorTool mapCreatorTool) {
-            mapCreatorTool.syncHeldPreview(player, stack);
-            SpawnPointTool.clearHeldPreview(player);
-            ZombiesDeployTool.clearHeldPreview(player);
-            return;
-        }
-        if (stack.getItem() instanceof SpawnPointTool spawnPointTool) {
-            spawnPointTool.syncHeldPreview(player, stack);
-            MapCreatorTool.clearHeldPreview(player);
-            ZombiesDeployTool.clearHeldPreview(player);
-            return;
-        }
-        if (stack.getItem() instanceof ZombiesDeployTool zombiesDeployTool) {
-            zombiesDeployTool.syncHeldPreview(player, stack);
-            MapCreatorTool.clearHeldPreview(player);
-            SpawnPointTool.clearHeldPreview(player);
-            return;
-        }
-
-        MapCreatorTool.clearHeldPreview(player);
-        SpawnPointTool.clearHeldPreview(player);
-        ZombiesDeployTool.clearHeldPreview(player);
+        ModeHeldToolPreviewContributors.route(player, stack, ToolAccessHelper.hasAdminAccess(player));
     }
 }

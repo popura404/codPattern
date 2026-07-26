@@ -1,6 +1,6 @@
 package com.cdp.codpattern.event;
 
-import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.CodPatternConstants;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.TickEvent;
@@ -8,7 +8,7 @@ import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-@Mod.EventBusSubscriber(modid = CodPattern.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@Mod.EventBusSubscriber(modid = CodPatternConstants.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class ThrowableServerEvents {
     private ThrowableServerEvents() {
     }

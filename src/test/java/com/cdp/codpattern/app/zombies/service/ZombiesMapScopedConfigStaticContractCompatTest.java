@@ -6,7 +6,7 @@ import java.nio.file.Path;
 
 public final class ZombiesMapScopedConfigStaticContractCompatTest {
     private static final Path CONFIG_PATH =
-            Path.of("src/main/java/com/cdp/codpattern/config/path/ConfigPath.java");
+            Path.of("src/main/java/com/cdp/codpattern/config/zombies/ZombiesConfigPaths.java");
     private static final Path RULES_REPOSITORY =
             Path.of("src/main/java/com/cdp/codpattern/config/zombies/ZombiesRulesRepository.java");
     private static final Path FILTER_REPOSITORY =
@@ -70,10 +70,10 @@ public final class ZombiesMapScopedConfigStaticContractCompatTest {
                 "old global zombies weapon-filter path must not remain");
 
         requireContains(rulesRepository,
-                "loadOrCreate(ConfigPath.zombiesMapRulesConfig(server, mapName))",
+                "loadOrCreate(ZombiesConfigPaths.zombiesMapRulesConfig(server, mapName))",
                 "rules repository must support map-scoped config loading");
         requireAbsent(rulesRepository,
-                "loadOrCreate(MinecraftServer server) {\n        return loadOrCreate(ConfigPath.",
+                "loadOrCreate(MinecraftServer server) {\n        return loadOrCreate(ZombiesConfigPaths.",
                 "rules repository must not retain the old global server loader");
         requireContains(rulesConfig,
                 "private StarterWeapon starterWeapon = StarterWeapon.defaults();",
@@ -82,10 +82,10 @@ public final class ZombiesMapScopedConfigStaticContractCompatTest {
                 "public StarterWeapon getStarterWeapon()",
                 "rules config must expose starter weapon settings");
         requireContains(filterRepository,
-                "loadOrCreate(ConfigPath.zombiesMapWeaponFilter(server, mapName))",
+                "loadOrCreate(ZombiesConfigPaths.zombiesMapWeaponFilter(server, mapName))",
                 "weapon filter repository must support map-scoped loading");
         requireAbsent(filterRepository,
-                "loadOrCreate(MinecraftServer server) {\n        return loadOrCreate(ConfigPath.",
+                "loadOrCreate(MinecraftServer server) {\n        return loadOrCreate(ZombiesConfigPaths.",
                 "weapon filter repository must not retain the old global server loader");
 
         requireContains(zombiesMap,
@@ -101,10 +101,10 @@ public final class ZombiesMapScopedConfigStaticContractCompatTest {
                 "ZombiesWeaponFilterRepository.loadOrCreate(server, mapName)",
                 "map startup must load map-scoped weapon filters");
         requireContains(zombiesMap,
-                "ConfigPath.zombiesMapWaves(server, mapName)",
+                "ZombiesConfigPaths.zombiesMapWaves(server, mapName)",
                 "map startup must generate/load map-scoped wave files");
         requireContains(zombiesMap,
-                "new ZombiesStartupValidationService(\n                        ConfigPath.zombiesMapWaves(server, getMapName()),\n                        this::rulesConfig,\n                        this::rulesValidationIssues)",
+                "new ZombiesStartupValidationService(\n                        ZombiesConfigPaths.zombiesMapWaves(server, getMapName()),\n                        this::rulesConfig,\n                        this::rulesValidationIssues)",
                 "startup validation must read map-scoped waves and rules");
         requireContains(zombiesMap,
                 "new ZombiesStarterKitDistributor(this::rulesConfig)",

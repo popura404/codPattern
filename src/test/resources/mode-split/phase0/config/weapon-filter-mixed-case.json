@@ -1,0 +1,11 @@
+{
+  "primaryWeaponTabs": ["Rifle", "SNIPER"],
+  "secondaryWeaponTabs": ["Pistol", "MELEE"],
+  "blockedItemNamespaces": [" LegacyPack ", "legacypack", "OtherPack"],
+  "blockedWeaponIds": ["Example:Gun_A", "EXAMPLE:GUN_A", "Example:Gun_B"],
+  "blockedAttachmentNamespaces": [" AttachmentPack "],
+  "blockedAttachmentIds": ["Example:Scope_A"],
+  "throwablesEnabled": false,
+  "ammunitionPerMagazineMultiple": 9,
+  "UnknownLegacyOption": {"CaseSensitiveValue": "KeepInSourceFixture"}
+}

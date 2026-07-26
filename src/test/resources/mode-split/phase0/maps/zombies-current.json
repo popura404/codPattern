@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "gameType": "zombies",
+  "mapName": "Zombies_MixedCase_03",
+  "levelName": "minecraft:overworld",
+  "areaData": {
+    "Position1": [-40, 50, -40],
+    "Position2": [40, 110, 40]
+  },
+  "endtp": {
+    "Dimension": "minecraft:overworld",
+    "Position": [0, 96, 0],
+    "Yaw": 22.0,
+    "Pitch": -8.0
+  },
+  "initialSpawns": [
+    {
+      "dimension": "minecraft:overworld",
+      "pos": [1, 65, 1],
+      "yaw": 45.0,
+      "pitch": 2.0
+    }
+  ],
+  "zombieSpawns": [
+    {
+      "objectId": "Spawn_MixedCase",
+      "group": 2,
+      "weight": 1.75,
+      "dimension": "minecraft:overworld",
+      "pos": [20, 65, 20],
+      "yaw": 180.0,
+      "pitch": -1.0
+    }
+  ],
+  "barriers": [
+    {
+      "objectId": "Barrier_A",
+      "name": "North Gate",
+      "group": 3,
+      "cost": 1250,
+      "blocksPlayersOnly": false,
+      "dimension": "minecraft:overworld",
+      "areaFrom": [4, 64, 4],
+      "areaTo": [6, 67, 4],
+      "interactionPos": [5, 65, 3]
+    }
+  ],
+  "weaponWalls": [
+    {
+      "objectId": "Wall_A",
+      "dimension": "minecraft:overworld",
+      "pos": [7, 65, 7],
+      "interactionPos": [7, 65, 6]
+    }
+  ],
+  "ammoBoxes": [
+    {
+      "objectId": "Ammo_A",
+      "pricesByWeaponLevel": {"0": 250, "3": 900},
+      "dimension": "minecraft:overworld",
+      "pos": [8, 65, 8],
+      "interactionPos": [8, 65, 7]
+    }
+  ],
+  "armorStations": [
+    {
+      "objectId": "Armor_A",
+      "armorLevel": 2,
+      "buyCost": 1750,
+      "damageTakenMultiplier": 0.65,
+      "dimension": "minecraft:overworld",
+      "pos": [9, 65, 9],
+      "interactionPos": [9, 65, 8]
+    }
+  ],
+  "powerSwitch": {
+    "objectId": "Power_A",
+    "block": "codpattern:zombies_power_switch",
+    "cost": 2000,
+    "dimension": "minecraft:overworld",
+    "pos": [10, 65, 10],
+    "interactionPos": [10, 65, 9]
+  },
+  "sodaMachines": [
+    {
+      "objectId": "Soda_A",
+      "buffId": "speed",
+      "cost": 2250,
+      "requiresPower": true,
+      "dimension": "minecraft:overworld",
+      "pos": [11, 65, 11],
+      "interactionPos": [11, 65, 10]
+    }
+  ],
+  "ultimateMachines": [
+    {
+      "objectId": "Ultimate_A",
+      "maxUpgradeLevel": 2,
+      "levels": {
+        "1": {"cost": 5000, "damageMultiplier": 1.5},
+        "2": {"cost": 10000, "damageMultiplier": 2.0}
+      },
+      "requiresPower": true,
+      "dimension": "minecraft:overworld",
+      "pos": [12, 65, 12],
+      "interactionPos": [12, 65, 11]
+    }
+  ],
+  "mysteryBoxes": [
+    {
+      "objectId": "Mystery_A",
+      "cost": 950,
+      "weaponPool": ["tacz:m4a1", "tacz:glock_17"],
+      "dimension": "minecraft:overworld",
+      "pos": [13, 65, 13],
+      "interactionPos": [13, 65, 12]
+    }
+  ],
+  "windows": [
+    {
+      "objectId": "Window_A",
+      "dimension": "minecraft:overworld",
+      "areaFrom": [14, 64, 14],
+      "areaTo": [16, 67, 14],
+      "interactionPos": [15, 65, 13]
+    }
+  ],
+  "unknownTopLevel": {
+    "LegacyCase": "KeepInSourceFixture"
+  }
+}

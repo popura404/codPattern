@@ -1,6 +1,6 @@
 package com.cdp.codpattern.event.client;
 
-import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.CodPatternConstants;
 import com.cdp.codpattern.client.render.CombatMarkerWorldRenderer;
 import com.cdp.codpattern.client.zombies.ClientZombiesState;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -22,7 +22,7 @@ import net.minecraftforge.fml.common.Mod;
 import java.util.Set;
 import java.util.UUID;
 
-@Mod.EventBusSubscriber(modid = CodPattern.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@Mod.EventBusSubscriber(modid = CodPatternConstants.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class ZombiesCombatMarkerWorldRenderer {
     private static final double MIN_RENDER_DEPTH = 0.05D;
 

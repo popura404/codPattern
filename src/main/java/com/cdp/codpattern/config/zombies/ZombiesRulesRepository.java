@@ -1,6 +1,5 @@
 package com.cdp.codpattern.config.zombies;
 
-import com.cdp.codpattern.config.path.ConfigPath;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
@@ -29,7 +28,7 @@ public final class ZombiesRulesRepository {
     }
 
     public static ZombiesRulesConfig loadOrCreate(MinecraftServer server, String mapName) {
-        return loadOrCreate(ConfigPath.zombiesMapRulesConfig(server, mapName));
+        return loadOrCreate(ZombiesConfigPaths.zombiesMapRulesConfig(server, mapName));
     }
 
     public static ZombiesRulesConfig loadOrCreate(Path path) {

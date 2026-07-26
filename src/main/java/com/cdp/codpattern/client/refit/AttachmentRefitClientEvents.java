@@ -1,6 +1,6 @@
 package com.cdp.codpattern.client.refit;
 
-import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.CodPatternConstants;
 import com.cdp.codpattern.compat.tacz.client.CodGunRefitScreen;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ScreenEvent;
@@ -8,7 +8,7 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-@Mod.EventBusSubscriber(modid = CodPattern.MODID, value = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = CodPatternConstants.MOD_ID, value = Dist.CLIENT)
 public class AttachmentRefitClientEvents {
 
     @SubscribeEvent

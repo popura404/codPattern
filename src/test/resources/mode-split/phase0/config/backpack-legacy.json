@@ -1,0 +1,30 @@
+{
+  "playerData": {
+    "00000000-0000-0000-0000-000000000042": {
+      "selectedBackpack": 7,
+      "backpacks_MAP": {
+        "7": {
+          "name": "Legacy MixedCase Loadout",
+          "item_MAP": {
+            "secondary": {
+              "item": "tacz:modern_kinetic_gun",
+              "count": 1,
+              "nbt": "{GunId:\"tacz:glock_17\",GunFireMode:\"SEMI\",UnknownTaCZField:\"MixedCase\"}"
+            },
+            "primary": {
+              "item": "tacz:modern_kinetic_gun",
+              "count": 1,
+              "nbt": "{GunId:\"tacz:m4a1\",GunFireMode:\"AUTO\",UnknownTaCZField:\"MixedCase\"}",
+              "attachmentPreset": "{scope:\"tacz:scope_mixedCase\"}"
+            }
+          },
+          "UnknownBackpackField": "KeepInSourceFixture"
+        }
+      },
+      "UnknownPlayerField": 42
+    }
+  },
+  "UnknownRootField": {
+    "LegacyOrder": ["Second", "First"]
+  }
+}

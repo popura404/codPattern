@@ -1,5 +1,7 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.tactical.port.CodTacticalTdmActionPort;
+import com.cdp.codpattern.app.teammatch.TeamMatchPolicy;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
@@ -15,6 +17,7 @@ final class CodTdmMapActions {
     }
 
     static CodTdmActionPort fromRuntimes(
+            TeamMatchPolicy policy,
             CodTdmCombatRuntime combatRuntime,
             CodTdmTeamMembershipCoordinator teamMembershipCoordinator,
             CodTdmMapMutationRuntime mapMutationRuntime,
@@ -25,7 +28,22 @@ final class CodTdmMapActions {
             Consumer<ServerPlayer> requestRosterPreviewAction,
             Supplier<String> mapNameSupplier
     ) {
+        if (policy.tacticalCompatibilityPorts()) {
+            return new TacticalMapActionPort(
+                    policy,
+                    combatRuntime,
+                    teamMembershipCoordinator,
+                    mapMutationRuntime,
+                    endTeleportRuntime,
+                    voteRuntime,
+                    respawnRuntime,
+                    requestRosterResyncAction,
+                    requestRosterPreviewAction,
+                    mapNameSupplier
+            );
+        }
         return new MapActionPort(
+                policy,
                 combatRuntime,
                 teamMembershipCoordinator,
                 mapMutationRuntime,
@@ -38,17 +56,46 @@ final class CodTdmMapActions {
         );
     }
 
-    private record MapActionPort(
-            CodTdmCombatRuntime combatRuntime,
-            CodTdmTeamMembershipCoordinator teamMembershipCoordinator,
-            CodTdmMapMutationRuntime mapMutationRuntime,
-            CodTdmEndTeleportRuntime endTeleportRuntime,
-            CodTdmVoteRuntime voteRuntime,
-            CodTdmRespawnRuntime respawnRuntime,
-            Consumer<ServerPlayer> requestRosterResyncAction,
-            Consumer<ServerPlayer> requestRosterPreviewAction,
-            Supplier<String> mapNameSupplier
-    ) implements CodTdmActionPort {
+    private static class MapActionPort implements CodTdmActionPort {
+        private final TeamMatchPolicy policy;
+        private final CodTdmCombatRuntime combatRuntime;
+        private final CodTdmTeamMembershipCoordinator teamMembershipCoordinator;
+        private final CodTdmMapMutationRuntime mapMutationRuntime;
+        private final CodTdmEndTeleportRuntime endTeleportRuntime;
+        private final CodTdmVoteRuntime voteRuntime;
+        private final CodTdmRespawnRuntime respawnRuntime;
+        private final Consumer<ServerPlayer> requestRosterResyncAction;
+        private final Consumer<ServerPlayer> requestRosterPreviewAction;
+        private final Supplier<String> mapNameSupplier;
+
+        private MapActionPort(
+                TeamMatchPolicy policy,
+                CodTdmCombatRuntime combatRuntime,
+                CodTdmTeamMembershipCoordinator teamMembershipCoordinator,
+                CodTdmMapMutationRuntime mapMutationRuntime,
+                CodTdmEndTeleportRuntime endTeleportRuntime,
+                CodTdmVoteRuntime voteRuntime,
+                CodTdmRespawnRuntime respawnRuntime,
+                Consumer<ServerPlayer> requestRosterResyncAction,
+                Consumer<ServerPlayer> requestRosterPreviewAction,
+                Supplier<String> mapNameSupplier
+        ) {
+            this.policy = policy;
+            this.combatRuntime = combatRuntime;
+            this.teamMembershipCoordinator = teamMembershipCoordinator;
+            this.mapMutationRuntime = mapMutationRuntime;
+            this.endTeleportRuntime = endTeleportRuntime;
+            this.voteRuntime = voteRuntime;
+            this.respawnRuntime = respawnRuntime;
+            this.requestRosterResyncAction = requestRosterResyncAction;
+            this.requestRosterPreviewAction = requestRosterPreviewAction;
+            this.mapNameSupplier = mapNameSupplier;
+        }
+
+        @Override
+        public String gameType() {
+            return policy.gameType();
+        }
 
         @Override
         public String mapName() {
@@ -153,6 +200,33 @@ final class CodTdmMapActions {
         @Override
         public void requestRosterPreview(ServerPlayer player) {
             requestRosterPreviewAction.accept(player);
+        }
+    }
+
+    private static final class TacticalMapActionPort extends MapActionPort implements CodTacticalTdmActionPort {
+        private TacticalMapActionPort(
+                TeamMatchPolicy policy,
+                CodTdmCombatRuntime combatRuntime,
+                CodTdmTeamMembershipCoordinator teamMembershipCoordinator,
+                CodTdmMapMutationRuntime mapMutationRuntime,
+                CodTdmEndTeleportRuntime endTeleportRuntime,
+                CodTdmVoteRuntime voteRuntime,
+                CodTdmRespawnRuntime respawnRuntime,
+                Consumer<ServerPlayer> requestRosterResyncAction,
+                Consumer<ServerPlayer> requestRosterPreviewAction,
+                Supplier<String> mapNameSupplier
+        ) {
+            super(
+                    policy,
+                    combatRuntime,
+                    teamMembershipCoordinator,
+                    mapMutationRuntime,
+                    endTeleportRuntime,
+                    voteRuntime,
+                    respawnRuntime,
+                    requestRosterResyncAction,
+                    requestRosterPreviewAction,
+                    mapNameSupplier);
         }
     }
 }

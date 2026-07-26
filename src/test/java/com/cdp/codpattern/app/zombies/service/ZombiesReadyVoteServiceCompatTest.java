@@ -18,6 +18,7 @@ public final class ZombiesReadyVoteServiceCompatTest {
 
     public static void main(String[] args) {
         readyCanOnlyToggleWhileWaiting();
+        acceptedIdempotentReadyWriteDoesNotMarkDirtyAgain();
         allReadyReturnsFalseForEmptyCollection();
         startVoteRequiresEverySnapshotMemberReady();
         requiredVotesCeilsAndClamps();
@@ -47,6 +48,23 @@ public final class ZombiesReadyVoteServiceCompatTest {
         require(readyService.setPlayerReady(PLAYER_ONE, false), "unready change while waiting should succeed");
         require(!readyService.isPlayerReady(PLAYER_ONE), "player should become unready while waiting");
         require(hooks.dirtyCount == 2, "changed unready state should mark room dirty");
+    }
+
+    private static void acceptedIdempotentReadyWriteDoesNotMarkDirtyAgain() {
+        ReadyHooks hooks = new ReadyHooks();
+        ZombiesReadyService readyService = new ZombiesReadyService(hooks);
+
+        require(readyService.setPlayerReady(PLAYER_ONE, true),
+                "first ready write while waiting should be accepted");
+        require(hooks.dirtyCount == 1,
+                "first ready write should mark the room dirty after mutation");
+
+        require(readyService.setPlayerReady(PLAYER_ONE, true),
+                "idempotent ready write while waiting should still report accepted");
+        require(readyService.isPlayerReady(PLAYER_ONE),
+                "idempotent ready write should preserve the stored state");
+        require(hooks.dirtyCount == 1,
+                "idempotent accepted write must not mark the room dirty without mutation");
     }
 
     private static void allReadyReturnsFalseForEmptyCollection() {

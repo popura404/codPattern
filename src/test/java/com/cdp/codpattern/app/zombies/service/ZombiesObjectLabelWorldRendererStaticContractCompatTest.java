@@ -15,7 +15,7 @@ public final class ZombiesObjectLabelWorldRendererStaticContractCompatTest {
         String renderer = Files.readString(RENDERER);
 
         requireContains(renderer,
-                "@Mod.EventBusSubscriber(modid = CodPattern.MODID, value = Dist.CLIENT",
+                "@Mod.EventBusSubscriber(modid = CodPatternConstants.MOD_ID, value = Dist.CLIENT",
                 "object labels must be a client-only Forge event renderer");
         requireContains(renderer,
                 "RenderLevelStageEvent.Stage.AFTER_PARTICLES",

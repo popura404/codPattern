@@ -14,6 +14,7 @@ import com.cdp.codpattern.app.match.model.ModeRuntimeStateSnapshot;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.model.RoomSummaryMetric;
 import com.cdp.codpattern.app.match.runtime.ModeEntityOwnershipRegistry;
+import com.cdp.codpattern.app.match.runtime.roster.RoomRosterSyncCoordinator;
 import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
 import com.cdp.codpattern.app.match.port.ModeRosterPort;
@@ -31,6 +32,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.GameType;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -91,32 +93,32 @@ final class ZombiesRoomHandleFactory {
                         map.runtimeState().waveState()));
         ZombiesRespawnPolicy respawnPolicy = new ZombiesRespawnPolicy(map.roomId(), null, (player, context) -> {
         });
-        return new ModeRoomHandle(
-                map.roomId(),
-                ports,
-                ports,
-                Optional.empty(),
-                Optional.empty(),
-                Optional.of(ports),
-                Optional.of(map.startVoteService()),
-                Optional.of(playerCombatPort),
-                Optional.of(ports),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.of(entityCombatPort),
-                Optional.of(entityLifecyclePort),
-                Optional.empty(),
-                Optional.of(ports),
-                Optional.of(map.objectInteractionService()),
-                Optional.empty(),
-                Optional.of(respawnPolicy));
+        return ModeRoomHandle.builder(map.roomId(), ports, ports)
+                .withReady(ports)
+                .withVote(map.startVoteService())
+                .withCombatEvents(playerCombatPort)
+                .withRoster(ports)
+                .withEntityCombatEvents(entityCombatPort)
+                .withEntityLifecycle(entityLifecyclePort)
+                .withRuntimeState(ports)
+                .withInteractableObjects(map.objectInteractionService())
+                .withRespawnPolicy(respawnPolicy)
+                .build();
     }
 
     private static final class ZombiesPorts implements ModeRoomSummaryPort, ModeRoomLifecyclePort, ModeRosterPort, ModeRuntimeStatePort, ReadyStatePort {
         private final ZombiesMap map;
+        private final RoomRosterSyncCoordinator<ServerPlayer> rosterCoordinator;
 
         private ZombiesPorts(ZombiesMap map) {
             this.map = map;
+            this.rosterCoordinator = new RoomRosterSyncCoordinator<>(
+                    new ZombiesRosterSource(),
+                    new ZombiesRosterPublisher(),
+                    RoomRosterSyncCoordinator.Settings.fullSnapshotOnly(
+                            RoomRosterSyncCoordinator.ResyncDelivery.REQUESTER_ONLY,
+                            map::rosterVersion),
+                    System::currentTimeMillis);
         }
 
         @Override
@@ -209,7 +211,7 @@ final class ZombiesRoomHandleFactory {
             }
 
             map.onSurvivorJoined(player);
-            sendRosterSnapshotToSurvivors();
+            rosterCoordinator.broadcastFullSnapshot();
             return JoinRoomResult.success(roomId(), CODE_OK);
         }
 
@@ -219,7 +221,7 @@ final class ZombiesRoomHandleFactory {
                 return LeaveRoomResult.failure(roomId(), CODE_PLAYER_MISSING, "");
             }
             map.leaveRoomPlayer(player);
-            sendRosterSnapshotToSurvivors();
+            rosterCoordinator.broadcastFullSnapshot();
             return LeaveRoomResult.success(roomId(), CODE_OK);
         }
 
@@ -230,11 +232,11 @@ final class ZombiesRoomHandleFactory {
 
         @Override
         public boolean setPlayerReady(ServerPlayer player, boolean ready) {
-            boolean changed = map.readyService().setPlayerReady(player, ready);
-            if (changed) {
-                sendRosterSnapshotToSurvivors();
+            boolean accepted = map.readyService().setPlayerReady(player, ready);
+            if (accepted) {
+                rosterCoordinator.broadcastFullSnapshot();
             }
-            return changed;
+            return accepted;
         }
 
         @Override
@@ -244,18 +246,12 @@ final class ZombiesRoomHandleFactory {
 
         @Override
         public void requestRosterResync(ServerPlayer player) {
-            if (player == null || !map.hasSurvivor(player.getUUID())) {
-                return;
-            }
-            sendRosterSnapshot(player, false);
+            rosterCoordinator.requestResync(player);
         }
 
         @Override
         public void requestRosterPreview(ServerPlayer player) {
-            if (player == null) {
-                return;
-            }
-            sendRosterSnapshot(player, true);
+            rosterCoordinator.requestPreview(player);
         }
 
         @Override
@@ -283,33 +279,6 @@ final class ZombiesRoomHandleFactory {
                     map.runtimeState().revision());
         }
 
-        private void sendRosterSnapshot(ServerPlayer player, boolean preview) {
-            Map<String, List<PlayerInfo>> teamPlayers = buildTeamPlayers(map);
-            int rosterVersion = map.rosterVersion();
-            if (preview) {
-                ModNetworkChannel.sendToPlayer(
-                        new RoomPreviewRosterPacket(roomId().encode(), rosterVersion, teamPlayers),
-                        player);
-                return;
-            }
-            ModNetworkChannel.sendToPlayer(
-                    new TeamPlayerListPacket(roomId().encode(), rosterVersion, teamPlayers),
-                    player);
-        }
-
-        private void sendRosterSnapshotToSurvivors() {
-            Map<String, List<PlayerInfo>> teamPlayers = buildTeamPlayers(map);
-            int rosterVersion = map.rosterVersion();
-            String roomKey = roomId().encode();
-            for (ServerPlayer survivor : map.survivorPlayers()) {
-                if (survivor != null) {
-                    ModNetworkChannel.sendToPlayer(
-                            new TeamPlayerListPacket(roomKey, rosterVersion, teamPlayers),
-                            survivor);
-                }
-            }
-        }
-
         private void appendSurvivorHealthValues(ZombiesMap map, Map<String, ModePlayerValue> playerValues) {
             for (ServerPlayer player : map.survivorPlayers()) {
                 if (player == null) {
@@ -322,6 +291,73 @@ final class ZombiesRoomHandleFactory {
                 playerValues.put(
                         ZombiesRuntimeStateKeys.survivorMaxHealth(playerId),
                         ModePlayerValue.ofDouble(Math.max(1.0D, player.getMaxHealth())));
+            }
+        }
+
+        private final class ZombiesRosterSource implements RoomRosterSyncCoordinator.Source<ServerPlayer> {
+            @Override
+            public String roomKey() {
+                return roomId().encode();
+            }
+
+            @Override
+            public Map<String, List<PlayerInfo>> rosterSnapshot() {
+                return buildTeamPlayers(map);
+            }
+
+            @Override
+            public Collection<ServerPlayer> liveRecipients() {
+                return map.survivorPlayers();
+            }
+
+            @Override
+            public UUID recipientId(ServerPlayer recipient) {
+                return recipient.getUUID();
+            }
+
+            @Override
+            public boolean canRequestResync(ServerPlayer requester) {
+                return requester != null && map.hasSurvivor(requester.getUUID());
+            }
+        }
+
+        private static final class ZombiesRosterPublisher
+                implements RoomRosterSyncCoordinator.Publisher<ServerPlayer> {
+            @Override
+            public void publishFull(
+                    String roomKey,
+                    int version,
+                    Map<String, List<PlayerInfo>> snapshot,
+                    Collection<ServerPlayer> recipients
+            ) {
+                TeamPlayerListPacket packet = new TeamPlayerListPacket(roomKey, version, snapshot);
+                for (ServerPlayer survivor : recipients) {
+                    if (survivor != null) {
+                        ModNetworkChannel.sendToPlayer(packet, survivor);
+                    }
+                }
+            }
+
+            @Override
+            public void publishDelta(
+                    String roomKey,
+                    int version,
+                    List<com.cdp.codpattern.network.match.RoomRosterDelta> updates,
+                    Collection<ServerPlayer> recipients
+            ) {
+                throw new IllegalStateException("Zombies roster deltas are disabled during mode-split preparation");
+            }
+
+            @Override
+            public void publishPreview(
+                    String roomKey,
+                    int version,
+                    Map<String, List<PlayerInfo>> snapshot,
+                    ServerPlayer requester
+            ) {
+                ModNetworkChannel.sendToPlayer(
+                        new RoomPreviewRosterPacket(roomKey, version, snapshot),
+                        requester);
             }
         }
     }

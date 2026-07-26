@@ -2,6 +2,7 @@ package com.cdp.codpattern.compat.fpsmatch.map;
 
 import com.cdp.codpattern.app.tdm.model.TdmGamePhase;
 
+import com.cdp.codpattern.app.match.runtime.ready.DefaultReadyStateService;
 import com.cdp.codpattern.app.tdm.service.VoteService;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -11,11 +12,8 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 final class CodTdmVoteCoordinator {
-    private final Map<UUID, Boolean> readyStates;
+    private final DefaultReadyStateService readyStateService;
     private final VoteService voteService;
-    private final Supplier<TdmGamePhase> phaseSupplier;
-    private final Predicate<UUID> joinedPlayerChecker;
-    private final Runnable syncAction;
 
     CodTdmVoteCoordinator(
             Map<UUID, Boolean> readyStates,
@@ -24,32 +22,39 @@ final class CodTdmVoteCoordinator {
             Predicate<UUID> joinedPlayerChecker,
             Runnable syncAction
     ) {
-        this.readyStates = readyStates;
         this.voteService = voteService;
-        this.phaseSupplier = phaseSupplier;
-        this.joinedPlayerChecker = joinedPlayerChecker;
-        this.syncAction = syncAction;
+        this.readyStateService = new DefaultReadyStateService(
+                readyStates,
+                new DefaultReadyStateService.Policy() {
+                    @Override
+                    public boolean canMutate(UUID playerId) {
+                        return phaseSupplier.get() == TdmGamePhase.WAITING
+                                && joinedPlayerChecker.test(playerId);
+                    }
+
+                    @Override
+                    public void onMutation(
+                            UUID playerId,
+                            boolean ready,
+                            DefaultReadyStateService.OperationResult result
+                    ) {
+                        if (result.accepted()) {
+                            syncAction.run();
+                        }
+                    }
+                });
     }
 
     void initializeReadyState(ServerPlayer player) {
-        readyStates.put(player.getUUID(), false);
+        readyStateService.initialize(player.getUUID());
     }
 
     boolean setPlayerReady(ServerPlayer player, boolean ready) {
-        if (phaseSupplier.get() != TdmGamePhase.WAITING) {
-            return false;
-        }
-        UUID playerId = player.getUUID();
-        if (!joinedPlayerChecker.test(playerId)) {
-            return false;
-        }
-        readyStates.put(playerId, ready);
-        syncAction.run();
-        return true;
+        return readyStateService.setReady(player.getUUID(), ready).accepted();
     }
 
     boolean isPlayerReady(UUID playerId) {
-        return readyStates.getOrDefault(playerId, false);
+        return readyStateService.isReady(playerId);
     }
 
     boolean initiateStartVote(UUID initiator) {
@@ -69,12 +74,12 @@ final class CodTdmVoteCoordinator {
     }
 
     void removePlayer(UUID playerId) {
-        readyStates.remove(playerId);
+        readyStateService.remove(playerId);
         voteService.removePlayerFromActiveVote(playerId);
     }
 
     void clearAll() {
-        readyStates.clear();
+        readyStateService.clear();
         voteService.clearActiveVoteSession();
     }
 }

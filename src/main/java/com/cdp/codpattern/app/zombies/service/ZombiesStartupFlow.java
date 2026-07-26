@@ -2,16 +2,15 @@ package com.cdp.codpattern.app.zombies.service;
 
 import com.cdp.codpattern.app.match.model.ModePlayerValue;
 import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.runtime.transaction.RollbackStack;
 import com.cdp.codpattern.app.zombies.map.ZombiesMapSnapshot;
 import com.cdp.codpattern.config.zombies.ZombiesWeaponFilterConfig;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
 import net.minecraft.server.level.ServerLevel;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -230,25 +229,21 @@ public final class ZombiesStartupFlow {
     }
 
     private ZombiesStartupRollbackReport rollback(StartupWork work, ZombiesErrorCode failureCode) {
-        List<ZombiesStartupRollbackReport.Step> steps = new ArrayList<>();
         ZombiesStartupRollbackContext context = work.context(failureCode);
-        while (!work.rollbackActions.isEmpty()) {
-            ZombiesStartupRollbackAction action = work.rollbackActions.pop();
-            try {
-                ZombiesServiceResult<Void> result = action.rollback(context);
-                steps.add(new ZombiesStartupRollbackReport.Step(
-                        action.name(),
-                        result.success(),
-                        result.code(),
-                        result.logMessage()));
-            } catch (RuntimeException exception) {
-                steps.add(new ZombiesStartupRollbackReport.Step(
-                        action.name(),
-                        false,
+        RollbackStack.Report<ZombiesServiceResult<Void>> report = work.rollbackActions.rollback(
+                context,
+                result -> result != null && result.success(),
+                exception -> ZombiesServiceResult.failure(
                         ZombiesErrorCode.of("startup.rollback_failed"),
+                        Map.of(),
                         exception.getClass().getName()));
-            }
-        }
+        List<ZombiesStartupRollbackReport.Step> steps = report.steps().stream()
+                .map(step -> new ZombiesStartupRollbackReport.Step(
+                        step.actionName(),
+                        step.success(),
+                        step.result() == null ? ZombiesErrorCode.of("startup.rollback_failed") : step.result().code(),
+                        step.result() == null ? NullPointerException.class.getName() : step.result().logMessage()))
+                .toList();
         return new ZombiesStartupRollbackReport(steps);
     }
 
@@ -411,10 +406,8 @@ public final class ZombiesStartupFlow {
         }
     }
 
-    public interface ZombiesStartupRollbackAction {
-        String name();
-
-        ZombiesServiceResult<Void> rollback(ZombiesStartupRollbackContext context);
+    public interface ZombiesStartupRollbackAction
+            extends RollbackStack.Action<ZombiesStartupRollbackContext, ZombiesServiceResult<Void>> {
     }
 
     public record ZombiesStartupContext(
@@ -504,7 +497,8 @@ public final class ZombiesStartupFlow {
 
     private static final class StartupWork {
         private final StartupRequest request;
-        private final Deque<ZombiesStartupRollbackAction> rollbackActions = new ArrayDeque<>();
+        private final RollbackStack<ZombiesStartupRollbackContext, ZombiesServiceResult<Void>> rollbackActions =
+                new RollbackStack<>();
         private ZombiesStartupPreflightSnapshot preflightSnapshot;
         private ZombiesStarterKitDistributor.PreparedStarterKits starterKits;
         private ZombiesSpawnAssignmentService.ZombiesSpawnAssignmentPlan assignmentPlan;

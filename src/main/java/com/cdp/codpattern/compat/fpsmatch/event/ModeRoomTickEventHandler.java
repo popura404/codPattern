@@ -1,8 +1,7 @@
 package com.cdp.codpattern.compat.fpsmatch.event;
 
-import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.CodPatternConstants;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
-import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.match.model.EntityLifecycleContext;
 import com.cdp.codpattern.app.match.model.ModeRoomTickContext;
 import com.cdp.codpattern.app.match.model.ModeRuntimeStateSnapshot;
@@ -11,7 +10,7 @@ import com.cdp.codpattern.app.match.port.ModeEntityLifecyclePort;
 import com.cdp.codpattern.app.match.port.ModePlayerRuntimeStatePort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
 import com.cdp.codpattern.app.match.runtime.ModeEntityOwnershipRegistry;
-import com.cdp.codpattern.app.zombies.service.ZombiesActiveMobCounter;
+import com.cdp.codpattern.app.match.runtime.entity.ModeEntityReconciliationContributors;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGateway;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.cdp.codpattern.network.match.ModeObjectStateSyncPacket;
@@ -29,7 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Mod.EventBusSubscriber(modid = CodPattern.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@Mod.EventBusSubscriber(modid = CodPatternConstants.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class ModeRoomTickEventHandler {
     private static final int STATE_SYNC_INTERVAL_TICKS = 10;
     private static final Map<String, String> LAST_LIFECYCLE_STATE_BY_ROOM = new ConcurrentHashMap<>();
@@ -78,9 +77,7 @@ public final class ModeRoomTickEventHandler {
             boolean handled = lifecyclePort != null
                     && lifecyclePort.onRoomEntityMissing(entry, new EntityLifecycleContext(entry.roomId()));
             if (!handled) {
-                if (BuiltInGameModes.isZombies(entry.roomId().gameType())) {
-                    ZombiesActiveMobCounter.instance().unregister(entry.roomId(), entry.entityId());
-                }
+                ModeEntityReconciliationContributors.onMissingEntity(entry);
                 ownershipRegistry.unregister(entry.entityId());
             }
         }

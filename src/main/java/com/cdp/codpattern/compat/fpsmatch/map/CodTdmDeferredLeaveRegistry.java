@@ -1,16 +1,15 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.match.runtime.player.DeferredPlayerActionRegistry;
 import com.cdp.codpattern.app.tdm.service.WarmupMovementLockService;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.GameType;
 
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class CodTdmDeferredLeaveRegistry {
-    private static final Set<UUID> PENDING = ConcurrentHashMap.newKeySet();
+    private static final DeferredPlayerActionRegistry<Boolean> PENDING = new DeferredPlayerActionRegistry<>();
 
     private CodTdmDeferredLeaveRegistry() {
     }
@@ -19,11 +18,11 @@ public final class CodTdmDeferredLeaveRegistry {
         if (playerId == null) {
             return;
         }
-        PENDING.add(playerId);
+        PENDING.put(playerId, Boolean.TRUE);
     }
 
     public static boolean applyIfPresent(ServerPlayer player) {
-        if (player == null || !PENDING.remove(player.getUUID())) {
+        if (player == null || PENDING.consume(player.getUUID()).isEmpty()) {
             return false;
         }
         player.setGameMode(GameType.ADVENTURE);

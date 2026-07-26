@@ -1,6 +1,6 @@
 package com.cdp.codpattern.event.client;
 
-import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.CodPatternConstants;
 import com.cdp.codpattern.client.ClientTdmState;
 import com.cdp.codpattern.client.TdmCombatMarkerTracker;
 import com.cdp.codpattern.client.render.CombatMarkerWorldRenderer;
@@ -22,7 +22,7 @@ import net.minecraftforge.fml.common.Mod;
 import java.util.Map;
 import java.util.UUID;
 
-@Mod.EventBusSubscriber(modid = CodPattern.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@Mod.EventBusSubscriber(modid = CodPatternConstants.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class TdmCombatMarkerWorldRenderer {
     private static final double MIN_RENDER_DEPTH = 0.05D;
 

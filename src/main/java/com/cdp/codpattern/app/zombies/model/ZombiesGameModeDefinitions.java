@@ -1,7 +1,8 @@
 package com.cdp.codpattern.app.zombies.model;
 
 import com.cdp.codpattern.app.match.BuiltInGameModes;
-import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.extension.ModeDefinitionContributions;
+import com.cdp.codpattern.app.match.extension.ModeDefinitionContributor;
 import com.cdp.codpattern.app.match.model.GameModeDefinition;
 import com.cdp.codpattern.app.match.model.JoinPolicy;
 import com.cdp.codpattern.app.match.model.LifecycleKind;
@@ -22,7 +23,11 @@ public final class ZombiesGameModeDefinitions {
     }
 
     public static void registerDefaults() {
-        definitions().forEach(GameModeRegistry::registerDefinition);
+        ModeDefinitionContributions.register(contributor());
+    }
+
+    public static ModeDefinitionContributor contributor() {
+        return registrar -> definitions().forEach(registrar::register);
     }
 
     public static List<GameModeDefinition> definitions() {

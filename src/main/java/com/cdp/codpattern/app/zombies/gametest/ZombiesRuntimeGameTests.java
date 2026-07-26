@@ -1,6 +1,6 @@
 package com.cdp.codpattern.app.zombies.gametest;
 
-import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.CodPatternConstants;
 import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.match.model.ModeObjectInteractionContext;
 import com.cdp.codpattern.app.match.model.RoomId;
@@ -70,7 +70,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-@GameTestHolder(CodPattern.MODID)
+@GameTestHolder(CodPatternConstants.MOD_ID)
 @PrefixGameTestTemplate(false)
 public final class ZombiesRuntimeGameTests {
     private static final String EMPTY_TEMPLATE = "empty";

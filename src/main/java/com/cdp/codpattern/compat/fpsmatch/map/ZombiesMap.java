@@ -65,7 +65,7 @@ import com.cdp.codpattern.app.zombies.service.ZombiesWeaponInstanceService;
 import com.cdp.codpattern.app.zombies.service.ZombiesWeaponWallOfferService;
 import com.cdp.codpattern.app.zombies.validation.ZombiesValidationIssue;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
-import com.cdp.codpattern.config.path.ConfigPath;
+import com.cdp.codpattern.config.zombies.ZombiesConfigPaths;
 import com.cdp.codpattern.config.zombies.ZombiesRulesConfig;
 import com.cdp.codpattern.config.zombies.ZombiesRulesRepository;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
@@ -278,7 +278,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         reconcileActiveMobCounter();
         ZombiesStartupFlow startupFlow = new ZombiesStartupFlow(
                 new ZombiesStartupValidationService(
-                        ConfigPath.zombiesMapWaves(server, getMapName()),
+                        ZombiesConfigPaths.zombiesMapWaves(server, getMapName()),
                         this::rulesConfig,
                         this::rulesValidationIssues),
                 new ZombiesStarterKitDistributor(this::rulesConfig),
@@ -759,7 +759,7 @@ public class ZombiesMap extends BaseMap implements EndTeleportMap<ZombiesMap> {
         rulesValidationIssues = ZombiesRulesRepository.getLastValidationIssues();
         weaponFilterConfig = ZombiesWeaponFilterRepository.loadOrCreate(server, mapName);
         new ZombiesWaveConfigRepository(
-                ConfigPath.zombiesMapWaves(server, mapName),
+                ZombiesConfigPaths.zombiesMapWaves(server, mapName),
                 rulesConfig().getDefaults()).load();
     }
 

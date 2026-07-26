@@ -6,6 +6,9 @@ import com.cdp.codpattern.app.match.model.ModeObjectInteractionContext;
 import com.cdp.codpattern.app.match.model.ModeObjectState;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.port.ModeInteractableObjectPort;
+import com.cdp.codpattern.app.match.runtime.object.ModeObjectInteractionDeduplicator;
+import com.cdp.codpattern.app.match.runtime.object.ModeObjectInteractionDispatcher;
+import com.cdp.codpattern.app.match.runtime.object.ModeObjectTargetResolver;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesAmmoBoxData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesArmorStationData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesBarrierData;
@@ -29,14 +32,11 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
@@ -95,7 +95,10 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
     private final ZombiesRoomAnnouncementService announcementService;
     private final Supplier<ZombiesRulesConfig> rulesSupplier;
     private final BooleanSupplier purchasesAllowedSupplier;
-    private final ConcurrentMap<InteractionKey, Long> recentInteractions = new ConcurrentHashMap<>();
+    private final ModeObjectInteractionDeduplicator interactionDeduplicator =
+            new ModeObjectInteractionDeduplicator(20L);
+    private final ModeObjectInteractionDispatcher<InteractionType, InteractionDispatchContext, InteractionResult>
+            interactionDispatcher = new ModeObjectInteractionDispatcher<>();
 
     public ZombiesObjectInteractionService(
             RoomId roomId,
@@ -487,6 +490,7 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
                 : announcementService;
         this.rulesSupplier = rulesSupplier == null ? ZombiesRulesConfig::new : rulesSupplier;
         this.purchasesAllowedSupplier = purchasesAllowedSupplier == null ? () -> true : purchasesAllowedSupplier;
+        registerInteractionHandlers();
     }
 
     @Override
@@ -536,28 +540,14 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         }
 
         long gameTime = Math.max(0L, player.level().getGameTime());
-        cleanupRecentInteractions(gameTime);
-        InteractionKey key = new InteractionKey(
-                player.getUUID(),
-                target.objectId(),
-                gameTime);
-        if (recentInteractions.putIfAbsent(key, gameTime) != null) {
+        if (!interactionDeduplicator.tryAcquire(player.getUUID(), target.objectId(), gameTime)) {
             return InteractionResult.SUCCESS;
         }
 
-        return switch (target.type()) {
-            case BARRIER -> purchaseBarrier(player, target, (ZombiesBarrierData) target.data());
-            case WEAPON_WALL -> purchaseWeaponWall(player, target, (ZombiesWeaponWallData) target.data());
-            case AMMO_BOX -> refillAmmoBox(player, target, (ZombiesAmmoBoxData) target.data(), context);
-            case ARMOR_STATION -> purchaseArmor(player, target, (ZombiesArmorStationData) target.data());
-            case POWER_SWITCH -> purchasePowerSwitch(player, target, (ZombiesPowerSwitchData) target.data());
-            case SODA_MACHINE -> purchaseSodaMachine(player, target, (ZombiesSodaMachineData) target.data());
-            case ULTIMATE_MACHINE -> useUltimateMachine(
-                    player,
-                    target,
-                    (ZombiesUltimateMachineData) target.data(),
-                    context.itemStack());
-        };
+        return interactionDispatcher.dispatch(
+                        target.type(),
+                        new InteractionDispatchContext(player, target, context))
+                .orElseThrow(() -> new IllegalStateException("Missing object interaction handler: " + target.type()));
     }
 
     @Override
@@ -594,6 +584,39 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
                 target.position(),
                 promptDisplayKey(target.type()),
                 interactable));
+    }
+
+    private void registerInteractionHandlers() {
+        interactionDispatcher.register(InteractionType.BARRIER, dispatch -> purchaseBarrier(
+                dispatch.player(),
+                dispatch.target(),
+                (ZombiesBarrierData) dispatch.target().data()));
+        interactionDispatcher.register(InteractionType.WEAPON_WALL, dispatch -> purchaseWeaponWall(
+                dispatch.player(),
+                dispatch.target(),
+                (ZombiesWeaponWallData) dispatch.target().data()));
+        interactionDispatcher.register(InteractionType.AMMO_BOX, dispatch -> refillAmmoBox(
+                dispatch.player(),
+                dispatch.target(),
+                (ZombiesAmmoBoxData) dispatch.target().data(),
+                dispatch.context()));
+        interactionDispatcher.register(InteractionType.ARMOR_STATION, dispatch -> purchaseArmor(
+                dispatch.player(),
+                dispatch.target(),
+                (ZombiesArmorStationData) dispatch.target().data()));
+        interactionDispatcher.register(InteractionType.POWER_SWITCH, dispatch -> purchasePowerSwitch(
+                dispatch.player(),
+                dispatch.target(),
+                (ZombiesPowerSwitchData) dispatch.target().data()));
+        interactionDispatcher.register(InteractionType.SODA_MACHINE, dispatch -> purchaseSodaMachine(
+                dispatch.player(),
+                dispatch.target(),
+                (ZombiesSodaMachineData) dispatch.target().data()));
+        interactionDispatcher.register(InteractionType.ULTIMATE_MACHINE, dispatch -> useUltimateMachine(
+                dispatch.player(),
+                dispatch.target(),
+                (ZombiesUltimateMachineData) dispatch.target().data(),
+                dispatch.context().itemStack()));
     }
 
     private InteractionResult purchaseBarrier(ServerPlayer player, InteractionTarget target, ZombiesBarrierData barrier) {
@@ -1025,14 +1048,15 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
                             barrier));
             if (blockBarrierTarget.isPresent()) {
                 InteractionTarget target = blockBarrierTarget.orElseThrow();
-                if (distanceToInteractionSqr(playerPos, target) > maxDistanceSqr) {
+                if (!ModeObjectTargetResolver.within(distanceToInteractionSqr(playerPos, target), maxDistanceSqr)) {
                     return TargetLookup.failure(ZombiesErrorCode.OBJECT_OUT_OF_RANGE, target.objectId(), target.position());
                 }
                 return TargetLookup.target(target);
             }
-            Optional<InteractionTarget> clickedTarget = candidates.stream()
-                    .filter(candidate -> clickedPos.equals(candidate.position()))
-                    .findFirst();
+            Optional<InteractionTarget> clickedTarget = ModeObjectTargetResolver.exact(
+                    candidates,
+                    InteractionTarget::position,
+                    clickedPos);
             if (clickedTarget.isEmpty()) {
                 if (isAnyBoxStyleBlock(player, clickedPos)) {
                     return TargetLookup.empty();
@@ -1040,7 +1064,7 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
                 return TargetLookup.failure(ZombiesErrorCode.OBJECT_NOT_FOUND, "", clickedPos);
             }
             InteractionTarget target = clickedTarget.orElseThrow();
-            if (distanceToInteractionSqr(playerPos, target) > maxDistanceSqr) {
+            if (!ModeObjectTargetResolver.within(distanceToInteractionSqr(playerPos, target), maxDistanceSqr)) {
                 return TargetLookup.failure(ZombiesErrorCode.OBJECT_OUT_OF_RANGE, target.objectId(), target.position());
             }
             return TargetLookup.target(target);
@@ -1048,10 +1072,11 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
 
         double maxDistance = Math.min(DEFAULT_INTERACTION_DISTANCE, MAX_INTERACTION_DISTANCE);
         double maxDistanceSqr = maxDistance * maxDistance;
-        return candidates.stream()
-                .filter(candidate -> !isBoxStyleObject(candidate.type()))
-                .filter(candidate -> distanceToInteractionSqr(playerPos, candidate) <= maxDistanceSqr)
-                .min(Comparator.comparingDouble(candidate -> distanceToInteractionSqr(playerPos, candidate)))
+        return ModeObjectTargetResolver.nearestWithin(
+                        candidates,
+                        candidate -> !isBoxStyleObject(candidate.type()),
+                        candidate -> distanceToInteractionSqr(playerPos, candidate),
+                        maxDistanceSqr)
                 .map(TargetLookup::target)
                 .orElseGet(TargetLookup::empty);
     }
@@ -1498,14 +1523,6 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         return (rules == null ? new ZombiesRulesConfig() : rules).getUltimateMachine();
     }
 
-    private void cleanupRecentInteractions(long gameTime) {
-        if (gameTime % 200L != 0L) {
-            return;
-        }
-        long cutoff = Math.max(0L, gameTime - 20L);
-        recentInteractions.entrySet().removeIf(entry -> entry.getValue() < cutoff);
-    }
-
     private static <T> Collection<T> safeCollection(Supplier<Collection<T>> supplier) {
         Collection<T> values = supplier == null ? null : supplier.get();
         return values == null ? List.of() : values;
@@ -1564,6 +1581,18 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         }
     }
 
+    private record InteractionDispatchContext(
+            ServerPlayer player,
+            InteractionTarget target,
+            ModeObjectInteractionContext context
+    ) {
+        private InteractionDispatchContext {
+            Objects.requireNonNull(player, "player");
+            Objects.requireNonNull(target, "target");
+            Objects.requireNonNull(context, "context");
+        }
+    }
+
     private record TargetLookup(
             Optional<InteractionTarget> target,
             Optional<TargetFailure> failure
@@ -1598,10 +1627,4 @@ public final class ZombiesObjectInteractionService implements ModeInteractableOb
         }
     }
 
-    private record InteractionKey(
-            UUID playerId,
-            String objectId,
-            long gameTime
-    ) {
-    }
 }

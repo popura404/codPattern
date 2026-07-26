@@ -1,6 +1,6 @@
 package com.cdp.codpattern.common.block;
 
-import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.CodPatternConstants;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
@@ -15,9 +15,9 @@ import net.minecraftforge.registries.RegistryObject;
 
 public final class CodPatternBlockRegister {
     public static final DeferredRegister<Block> BLOCKS =
-            DeferredRegister.create(ForgeRegistries.BLOCKS, CodPattern.MODID);
+            DeferredRegister.create(ForgeRegistries.BLOCKS, CodPatternConstants.MOD_ID);
     public static final DeferredRegister<Item> ITEMS =
-            DeferredRegister.create(ForgeRegistries.ITEMS, CodPattern.MODID);
+            DeferredRegister.create(ForgeRegistries.ITEMS, CodPatternConstants.MOD_ID);
 
     public static final RegistryObject<ZombiesPowerSwitchBlock> ZOMBIES_POWER_SWITCH = BLOCKS.register(
             "zombies_power_switch",

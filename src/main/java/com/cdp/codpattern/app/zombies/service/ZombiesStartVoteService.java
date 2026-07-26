@@ -1,6 +1,7 @@
 package com.cdp.codpattern.app.zombies.service;
 
 import com.cdp.codpattern.app.match.port.VoteControlPort;
+import com.cdp.codpattern.app.match.runtime.vote.RoomVoteEngine;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -9,9 +10,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Start-vote state machine for zombies rooms. The active vote uses a fixed member snapshot.
- */
+/** Zombies start-vote compatibility facade over the neutral room vote engine. */
 public final class ZombiesStartVoteService implements VoteControlPort {
     public static final int DEFAULT_TIMEOUT_TICKS = 15 * 20;
 
@@ -86,76 +85,23 @@ public final class ZombiesStartVoteService implements VoteControlPort {
         }
     }
 
-    private static final class VoteSession {
-        private final long voteId;
-        private final UUID initiator;
-        private final Set<UUID> members;
-        private final int totalMembers;
-        private final int requiredVotes;
-        private final Set<UUID> accepted = new LinkedHashSet<>();
-        private final Set<UUID> rejected = new LinkedHashSet<>();
-        private int timeoutTicksRemaining;
-
-        private VoteSession(long voteId, UUID initiator, Set<UUID> members, int requiredVotes, int timeoutTicks) {
-            this.voteId = voteId;
-            this.initiator = initiator;
-            this.members = Set.copyOf(new LinkedHashSet<>(members));
-            this.totalMembers = this.members.size();
-            this.requiredVotes = requiredVotes;
-            this.timeoutTicksRemaining = Math.max(1, timeoutTicks);
-        }
+    private enum VoteKind {
+        START
     }
 
     private final Hooks hooks;
-    private VoteSession activeVoteSession;
-    private long voteSessionSequence = 0L;
+    private final RoomVoteEngine<VoteKind> delegate;
     private FailureReason lastFailureReason;
 
     public ZombiesStartVoteService(Hooks hooks) {
         this.hooks = Objects.requireNonNull(hooks, "hooks");
+        this.delegate = new RoomVoteEngine<>(new VotePolicy(), new VoteListener());
     }
 
     @Override
     public boolean initiateStartVote(UUID initiator) {
         lastFailureReason = null;
-        if (initiator == null) {
-            return failToStart(null, FailureReason.INITIATOR_NOT_MEMBER);
-        }
-        if (activeVoteSession != null) {
-            return failToStart(initiator, FailureReason.VOTE_IN_PROGRESS);
-        }
-        if (!hooks.isWaitingPhase()) {
-            return failToStart(initiator, FailureReason.NOT_WAITING);
-        }
-
-        Set<UUID> members = snapshotMembers(hooks.currentMembers());
-        if (members.isEmpty()) {
-            return failToStart(initiator, FailureReason.EMPTY_SNAPSHOT);
-        }
-        if (!members.contains(initiator)) {
-            return failToStart(initiator, FailureReason.INITIATOR_NOT_MEMBER);
-        }
-        if (members.size() < hooks.minPlayersToStart()) {
-            return failToStart(initiator, FailureReason.MIN_PLAYERS);
-        }
-        for (UUID member : members) {
-            if (!hooks.isPlayerReady(member)) {
-                return failToStart(initiator, FailureReason.PLAYERS_NOT_READY);
-            }
-        }
-
-        int requiredVotes = requiredVotes(members.size(), hooks.votePercentageToStart());
-        VoteSession session = new VoteSession(
-                ++voteSessionSequence,
-                initiator,
-                members,
-                requiredVotes,
-                hooks.voteTimeoutTicks()
-        );
-        activeVoteSession = session;
-        hooks.onVoteStarted(snapshot(session));
-        hooks.markRoomListDirty();
-        return true;
+        return delegate.initiate(VoteKind.START, initiator);
     }
 
     @Override
@@ -167,48 +113,15 @@ public final class ZombiesStartVoteService implements VoteControlPort {
     @Override
     public boolean submitVoteResponse(UUID playerId, long voteId, boolean accepted) {
         lastFailureReason = null;
-        VoteSession session = activeVoteSession;
-        if (session == null || session.voteId != voteId) {
-            lastFailureReason = FailureReason.STALE_VOTE;
-            return false;
-        }
-        if (!session.members.contains(playerId)) {
-            lastFailureReason = FailureReason.PLAYER_NOT_IN_SNAPSHOT;
-            return false;
-        }
-        if (session.accepted.contains(playerId) || session.rejected.contains(playerId)) {
-            lastFailureReason = FailureReason.ALREADY_VOTED;
-            return false;
-        }
-
-        if (accepted) {
-            session.accepted.add(playerId);
-        } else {
-            session.rejected.add(playerId);
-        }
-
-        VoteSnapshot progress = snapshot(session);
-        hooks.onVoteProgress(progress);
-        hooks.markRoomListDirty();
-        return resolveVote(session);
+        return delegate.submit(playerId, voteId, accepted);
     }
 
     public void tickVoteSession() {
-        VoteSession session = activeVoteSession;
-        if (session == null) {
-            return;
-        }
-        session.timeoutTicksRemaining--;
-        if (session.timeoutTicksRemaining <= 0) {
-            failActiveVote(session, FailureReason.TIMEOUT);
-        }
+        delegate.tick();
     }
 
     public void onSnapshotMemberLeft(UUID playerId) {
-        VoteSession session = activeVoteSession;
-        if (session != null && session.members.contains(playerId)) {
-            failActiveVote(session, FailureReason.PLAYER_LEFT);
-        }
+        delegate.memberDeparted(playerId);
     }
 
     public void onPlayerJoined(UUID playerId) {
@@ -216,7 +129,7 @@ public final class ZombiesStartVoteService implements VoteControlPort {
     }
 
     public Optional<VoteSnapshot> activeVoteSnapshot() {
-        return activeVoteSession == null ? Optional.empty() : Optional.of(snapshot(activeVoteSession));
+        return delegate.activeSnapshot().map(ZombiesStartVoteService::toFacadeSnapshot);
     }
 
     public Optional<FailureReason> lastFailureReason() {
@@ -224,62 +137,153 @@ public final class ZombiesStartVoteService implements VoteControlPort {
     }
 
     public void clearActiveVoteSession() {
-        activeVoteSession = null;
-        hooks.markRoomListDirty();
+        delegate.clear();
     }
 
     public static int requiredVotes(int totalMembers, int votePercent) {
-        if (totalMembers <= 0) {
-            return 0;
-        }
-        int required = (int) Math.ceil(totalMembers * (votePercent / 100.0));
-        return Math.max(1, Math.min(totalMembers, required));
+        return RoomVoteEngine.ceilClampedThreshold(totalMembers, votePercent);
     }
 
-    private boolean resolveVote(VoteSession session) {
-        if (activeVoteSession != session) {
-            return false;
+    private final class VotePolicy implements RoomVoteEngine.Policy<VoteKind> {
+        @Override
+        public RoomVoteEngine.StartDecision prepareStart(
+                VoteKind kind,
+                UUID initiator,
+                boolean voteActive
+        ) {
+            if (initiator == null) {
+                return RoomVoteEngine.StartDecision.rejected(
+                        RoomVoteEngine.FailureReason.INITIATOR_NOT_MEMBER);
+            }
+            if (voteActive) {
+                return RoomVoteEngine.StartDecision.rejected(RoomVoteEngine.FailureReason.VOTE_IN_PROGRESS);
+            }
+            if (!hooks.isWaitingPhase()) {
+                return RoomVoteEngine.StartDecision.rejected(RoomVoteEngine.FailureReason.NOT_WAITING);
+            }
+
+            Set<UUID> members = snapshotMembers(hooks.currentMembers());
+            if (members.isEmpty()) {
+                return RoomVoteEngine.StartDecision.rejected(RoomVoteEngine.FailureReason.EMPTY_SNAPSHOT);
+            }
+            if (!members.contains(initiator)) {
+                return RoomVoteEngine.StartDecision.rejected(
+                        RoomVoteEngine.FailureReason.INITIATOR_NOT_MEMBER);
+            }
+            if (members.size() < hooks.minPlayersToStart()) {
+                return RoomVoteEngine.StartDecision.rejected(RoomVoteEngine.FailureReason.MIN_PLAYERS);
+            }
+            for (UUID member : members) {
+                if (!hooks.isPlayerReady(member)) {
+                    return RoomVoteEngine.StartDecision.rejected(
+                            RoomVoteEngine.FailureReason.PLAYERS_NOT_READY);
+                }
+            }
+            return RoomVoteEngine.StartDecision.accepted(members);
         }
 
-        int acceptCount = session.accepted.size();
-        int rejectCount = session.rejected.size();
-        int unresolvedCount = Math.max(0, session.totalMembers - acceptCount - rejectCount);
+        @Override
+        public int requiredVotes(VoteKind kind, int memberCount) {
+            return ZombiesStartVoteService.requiredVotes(memberCount, hooks.votePercentageToStart());
+        }
 
-        if (acceptCount >= session.requiredVotes) {
-            VoteSnapshot passed = snapshot(session);
-            activeVoteSession = null;
-            hooks.onVotePassed(passed);
-            hooks.markRoomListDirty();
+        @Override
+        public int timeoutTicks(VoteKind kind) {
+            return hooks.voteTimeoutTicks();
+        }
+
+        @Override
+        public RoomVoteEngine.MemberDeparturePolicy memberDeparturePolicy(VoteKind kind) {
+            return RoomVoteEngine.MemberDeparturePolicy.FAIL_ACTIVE_VOTE;
+        }
+
+        @Override
+        public boolean freezeThresholdAtStart(VoteKind kind) {
             return true;
         }
-
-        if (acceptCount + unresolvedCount < session.requiredVotes) {
-            failActiveVote(session, FailureReason.IMPOSSIBLE_TO_PASS);
-            return false;
-        }
-
-        if (acceptCount + rejectCount >= session.totalMembers) {
-            failActiveVote(session, FailureReason.ALL_RESPONDED_WITHOUT_PASSING);
-        }
-        return false;
     }
 
-    private boolean failToStart(UUID initiator, FailureReason reason) {
-        lastFailureReason = reason;
-        hooks.onVoteStartRejected(initiator, reason);
-        hooks.markRoomListDirty();
-        return false;
+    private final class VoteListener implements RoomVoteEngine.Listener<VoteKind> {
+        @Override
+        public void onStartRejected(
+                VoteKind kind,
+                UUID initiator,
+                RoomVoteEngine.FailureReason reason
+        ) {
+            FailureReason facadeReason = toFacadeReason(reason);
+            lastFailureReason = facadeReason;
+            hooks.onVoteStartRejected(initiator, facadeReason);
+            hooks.markRoomListDirty();
+        }
+
+        @Override
+        public void onStarted(RoomVoteEngine.Snapshot<VoteKind> snapshot) {
+            hooks.onVoteStarted(toFacadeSnapshot(snapshot));
+            hooks.markRoomListDirty();
+        }
+
+        @Override
+        public void onProgress(RoomVoteEngine.Snapshot<VoteKind> snapshot) {
+            hooks.onVoteProgress(toFacadeSnapshot(snapshot));
+            hooks.markRoomListDirty();
+        }
+
+        @Override
+        public void onPassed(RoomVoteEngine.Snapshot<VoteKind> snapshot) {
+            hooks.onVotePassed(toFacadeSnapshot(snapshot));
+            hooks.markRoomListDirty();
+        }
+
+        @Override
+        public void onFailed(
+                RoomVoteEngine.Snapshot<VoteKind> snapshot,
+                RoomVoteEngine.FailureReason reason
+        ) {
+            FailureReason facadeReason = toFacadeReason(reason);
+            lastFailureReason = facadeReason;
+            hooks.onVoteFailed(toFacadeSnapshot(snapshot), facadeReason);
+            hooks.markRoomListDirty();
+        }
+
+        @Override
+        public void onResponseRejected(UUID playerId, long voteId, RoomVoteEngine.FailureReason reason) {
+            lastFailureReason = toFacadeReason(reason);
+        }
+
+        @Override
+        public void onCleared(boolean hadActiveVote) {
+            hooks.markRoomListDirty();
+        }
     }
 
-    private void failActiveVote(VoteSession session, FailureReason reason) {
-        if (activeVoteSession != session) {
-            return;
-        }
-        VoteSnapshot failed = snapshot(session);
-        activeVoteSession = null;
-        lastFailureReason = reason;
-        hooks.onVoteFailed(failed, reason);
-        hooks.markRoomListDirty();
+    private static VoteSnapshot toFacadeSnapshot(RoomVoteEngine.Snapshot<VoteKind> snapshot) {
+        return new VoteSnapshot(
+                snapshot.voteId(),
+                snapshot.initiator(),
+                snapshot.members(),
+                snapshot.accepted(),
+                snapshot.rejected(),
+                snapshot.requiredVotes(),
+                snapshot.timeoutTicksRemaining());
+    }
+
+    private static FailureReason toFacadeReason(RoomVoteEngine.FailureReason reason) {
+        return switch (reason) {
+            case NOT_WAITING -> FailureReason.NOT_WAITING;
+            case VOTE_IN_PROGRESS -> FailureReason.VOTE_IN_PROGRESS;
+            case EMPTY_SNAPSHOT -> FailureReason.EMPTY_SNAPSHOT;
+            case MIN_PLAYERS -> FailureReason.MIN_PLAYERS;
+            case PLAYERS_NOT_READY -> FailureReason.PLAYERS_NOT_READY;
+            case INITIATOR_MISSING, INITIATOR_NOT_MEMBER -> FailureReason.INITIATOR_NOT_MEMBER;
+            case MEMBER_LEFT -> FailureReason.PLAYER_LEFT;
+            case IMPOSSIBLE_TO_PASS -> FailureReason.IMPOSSIBLE_TO_PASS;
+            case ALL_RESPONDED_WITHOUT_PASSING -> FailureReason.ALL_RESPONDED_WITHOUT_PASSING;
+            case TIMEOUT -> FailureReason.TIMEOUT;
+            case STALE_VOTE -> FailureReason.STALE_VOTE;
+            case PLAYER_NOT_IN_SNAPSHOT -> FailureReason.PLAYER_NOT_IN_SNAPSHOT;
+            case ALREADY_VOTED -> FailureReason.ALREADY_VOTED;
+            case UNSUPPORTED_KIND, NOT_PLAYING, MISSING_END_TELEPORT -> FailureReason.NOT_WAITING;
+        };
     }
 
     private static Set<UUID> snapshotMembers(Collection<UUID> members) {
@@ -293,17 +297,5 @@ public final class ZombiesStartVoteService implements VoteControlPort {
             }
         }
         return Set.copyOf(snapshot);
-    }
-
-    private static VoteSnapshot snapshot(VoteSession session) {
-        return new VoteSnapshot(
-                session.voteId,
-                session.initiator,
-                session.members,
-                session.accepted,
-                session.rejected,
-                session.requiredVotes,
-                session.timeoutTicksRemaining
-        );
     }
 }

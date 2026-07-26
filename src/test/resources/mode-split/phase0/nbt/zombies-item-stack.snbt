@@ -1,0 +1,19 @@
+{
+  "id": "minecraft:crossbow",
+  "Count": 1b,
+  "tag": {
+    "GunId": "tacz:m4a1",
+    "UnknownTaCZField": {"MixedCaseKey": "KeepMe"},
+    "codpattern.zombies.roomId": "zombies|Zombies_MixedCase_03",
+    "codpattern.zombies.instanceId": "fixture-instance-01",
+    "codpattern.zombies.slot": "primary",
+    "codpattern.zombies.gunId": "tacz:m4a1",
+    "codpattern.zombies.rarityId": "Epic_MixedCase",
+    "codpattern.zombies.weaponLevel": 3,
+    "codpattern.zombies.levelDamageMultiplier": 1.4f,
+    "codpattern.zombies.upgradeLevel": 2,
+    "codpattern.zombies.upgradeDamageMultiplier": 2.25f,
+    "codpattern.zombies.reserveAmmo": 77,
+    "codpattern.zombies.maxReserveAmmo": 140
+  }
+}

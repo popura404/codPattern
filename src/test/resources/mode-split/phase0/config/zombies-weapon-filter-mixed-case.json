@@ -1,0 +1,9 @@
+{
+  "weaponTabs": [" Pistol ", "PISTOL", "Rifle"],
+  "ammunitionPerMagazineMultiple": 12.5,
+  "blockedItemNamespaces": [" LegacyPack ", "legacypack"],
+  "blockedWeaponIds": ["Example:Gun_A"],
+  "blockedAttachmentNamespaces": [" AttachmentPack "],
+  "blockedAttachmentIds": ["Example:Scope_A"],
+  "UnknownLegacyOption": "KeepInSourceFixture"
+}

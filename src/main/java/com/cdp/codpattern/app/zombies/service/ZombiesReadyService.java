@@ -1,10 +1,10 @@
 package com.cdp.codpattern.app.zombies.service;
 
+import com.cdp.codpattern.app.match.runtime.ready.DefaultReadyStateService;
 import com.cdp.codpattern.app.match.port.ReadyStatePort;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.Collection;
-import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -24,8 +24,7 @@ public final class ZombiesReadyService implements ReadyStatePort {
     private static final Hooks ALWAYS_WAITING_HOOKS = () -> true;
 
     private final Hooks hooks;
-    private final Set<UUID> readyPlayers = ConcurrentHashMap.newKeySet();
-    private final Set<UUID> knownPlayers = ConcurrentHashMap.newKeySet();
+    private final DefaultReadyStateService delegate;
 
     public ZombiesReadyService() {
         this(ALWAYS_WAITING_HOOKS);
@@ -33,6 +32,42 @@ public final class ZombiesReadyService implements ReadyStatePort {
 
     public ZombiesReadyService(Hooks hooks) {
         this.hooks = Objects.requireNonNull(hooks, "hooks");
+        this.delegate = new DefaultReadyStateService(
+                new ConcurrentHashMap<>(),
+                new DefaultReadyStateService.Policy() {
+                    @Override
+                    public boolean canMutate(UUID playerId) {
+                        return ZombiesReadyService.this.hooks.isWaitingPhase();
+                    }
+
+                    @Override
+                    public void onInitialized(UUID playerId, DefaultReadyStateService.OperationResult result) {
+                        ZombiesReadyService.this.hooks.markRoomListDirty();
+                    }
+
+                    @Override
+                    public void onMutation(
+                            UUID playerId,
+                            boolean ready,
+                            DefaultReadyStateService.OperationResult result
+                    ) {
+                        if (result.changed()) {
+                            ZombiesReadyService.this.hooks.markRoomListDirty();
+                        }
+                    }
+
+                    @Override
+                    public void onRemoved(UUID playerId, DefaultReadyStateService.OperationResult result) {
+                        if (result.changed()) {
+                            ZombiesReadyService.this.hooks.markRoomListDirty();
+                        }
+                    }
+
+                    @Override
+                    public void onCleared(DefaultReadyStateService.OperationResult result) {
+                        ZombiesReadyService.this.hooks.markRoomListDirty();
+                    }
+                });
     }
 
     @Override
@@ -43,12 +78,7 @@ public final class ZombiesReadyService implements ReadyStatePort {
     }
 
     public void initializeReadyState(UUID playerId) {
-        if (playerId == null) {
-            return;
-        }
-        knownPlayers.add(playerId);
-        readyPlayers.remove(playerId);
-        hooks.markRoomListDirty();
+        delegate.initialize(playerId);
     }
 
     @Override
@@ -57,68 +87,34 @@ public final class ZombiesReadyService implements ReadyStatePort {
     }
 
     public boolean setPlayerReady(UUID playerId, boolean ready) {
-        if (playerId == null || !hooks.isWaitingPhase()) {
-            return false;
-        }
-        knownPlayers.add(playerId);
-        boolean changed = ready ? readyPlayers.add(playerId) : readyPlayers.remove(playerId);
-        if (changed) {
-            hooks.markRoomListDirty();
-        }
-        return true;
+        return delegate.setReady(playerId, ready).accepted();
     }
 
     public boolean isPlayerReady(UUID playerId) {
-        return playerId != null && readyPlayers.contains(playerId);
+        return delegate.isReady(playerId);
     }
 
     public boolean areAllReady(Collection<UUID> playerIds) {
-        if (playerIds == null || playerIds.isEmpty()) {
-            return false;
-        }
-        for (UUID playerId : playerIds) {
-            if (!isPlayerReady(playerId)) {
-                return false;
-            }
-        }
-        return true;
+        return delegate.areAllReady(playerIds);
     }
 
     public void removePlayer(UUID playerId) {
-        if (playerId == null) {
-            return;
-        }
-        boolean changed = knownPlayers.remove(playerId);
-        changed |= readyPlayers.remove(playerId);
-        if (changed) {
-            hooks.markRoomListDirty();
-        }
+        delegate.remove(playerId);
     }
 
     public Set<UUID> readyPlayers() {
-        return Set.copyOf(readyPlayers);
+        return delegate.readyPlayers();
     }
 
     public Set<UUID> knownPlayers() {
-        return Set.copyOf(knownPlayers);
+        return delegate.knownPlayers();
     }
 
     public Set<UUID> snapshotReadyPlayers(Collection<UUID> playerIds) {
-        Set<UUID> snapshot = new LinkedHashSet<>();
-        if (playerIds == null) {
-            return snapshot;
-        }
-        for (UUID playerId : playerIds) {
-            if (isPlayerReady(playerId)) {
-                snapshot.add(playerId);
-            }
-        }
-        return Set.copyOf(snapshot);
+        return delegate.snapshotReadyPlayers(playerIds);
     }
 
     public void clear() {
-        knownPlayers.clear();
-        readyPlayers.clear();
-        hooks.markRoomListDirty();
+        delegate.clear();
     }
 }

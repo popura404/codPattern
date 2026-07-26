@@ -2,6 +2,7 @@ package com.phasetranscrystal.fpsmatch.common.packet;
 
 import com.cdp.codpattern.app.zombies.deploy.ZombiesDeployFieldSchema;
 import com.cdp.codpattern.app.zombies.deploy.ZombiesDeploySnapshot;
+import com.cdp.codpattern.client.runtime.ModeClientActionHandlers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkEvent;
@@ -11,6 +12,8 @@ import java.util.List;
 import java.util.function.Supplier;
 
 public class OpenZombiesDeployToolScreenS2CPacket {
+    public static final String CLIENT_ACTION_ID = "codpattern:zombies_deploy_tool_screen";
+
     private final ZombiesDeploySnapshot snapshot;
 
     public OpenZombiesDeployToolScreenS2CPacket(ZombiesDeploySnapshot snapshot) {
@@ -236,7 +239,7 @@ public class OpenZombiesDeployToolScreenS2CPacket {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> FpsmClientPacketBridge.openZombiesDeployToolScreen(this));
+        ctx.get().enqueueWork(() -> ModeClientActionHandlers.dispatch(CLIENT_ACTION_ID, this));
         ctx.get().setPacketHandled(true);
     }
 

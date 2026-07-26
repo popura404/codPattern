@@ -8,6 +8,8 @@ public final class ZombiesBoxBlockEntryStaticContractCompatTest {
     private static final Path BLOCK = Path.of("src/main/java/com/cdp/codpattern/common/block/ZombiesBoxInteractionBlock.java");
     private static final Path REGISTRY = Path.of("src/main/java/com/cdp/codpattern/common/block/CodPatternBlockRegister.java");
     private static final Path EVENT_HANDLER = Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/event/ModeObjectInteractionEventHandler.java");
+    private static final Path BYPASS_CONTRIBUTOR = Path.of(
+            "src/main/java/com/cdp/codpattern/app/zombies/bootstrap/ZombiesObjectInteractionBypassContributor.java");
     private static final Path SERVICE = Path.of("src/main/java/com/cdp/codpattern/app/zombies/service/ZombiesObjectInteractionService.java");
     private static final Path TACZ_INTERACT_WHITELIST = Path.of("src/main/resources/data/tacz/tags/blocks/interact_key/whitelist.json");
 
@@ -18,6 +20,7 @@ public final class ZombiesBoxBlockEntryStaticContractCompatTest {
         String block = Files.readString(BLOCK);
         String registry = Files.readString(REGISTRY);
         String handler = Files.readString(EVENT_HANDLER);
+        String bypassContributor = Files.readString(BYPASS_CONTRIBUTOR);
         String service = Files.readString(SERVICE);
         String taczInteractWhitelist = Files.readString(TACZ_INTERACT_WHITELIST);
 
@@ -86,8 +89,10 @@ public final class ZombiesBoxBlockEntryStaticContractCompatTest {
         String onRightClickBlock = methodBody(handler, "public static void onRightClickBlock");
         requireContains(onRightClickBlock, "if (isBlockHandledByOwnUse(event)) {\n            return;\n        }",
                 "global RightClickBlock handler must skip box blocks handled by Block.use");
-        requireContains(handler, "instanceof ZombiesBoxInteractionBlock",
-                "global RightClickBlock skip must be scoped to the new box block class");
+        requireContains(handler, "ModeObjectInteractionBypassContributors.handlesOwnUse(",
+                "global RightClickBlock skip must route through installed block-use contributors");
+        requireContains(bypassContributor, "state.getBlock() instanceof ZombiesBoxInteractionBlock",
+                "Zombies bypass contribution must remain scoped to the box block class");
         requireContains(handler, "public static void onRightClickItem",
                 "RightClickItem handler must remain separate for non-block fallback behavior");
         requireContains(handler, "public static void onEntityInteract",
@@ -99,7 +104,9 @@ public final class ZombiesBoxBlockEntryStaticContractCompatTest {
                 "general object interactions must not reject held TaCZ guns by zombies weapon tag");
         requireAbsent(service, "currentWeaponTag(roomId, context.itemStack())",
                 "barrier, armor station, soda, and power interactions must not require a held zombies weapon tag");
-        requireContains(service, ".filter(candidate -> !isBoxStyleObject(candidate.type()))",
+        requireContains(service, "ModeObjectTargetResolver.nearestWithin(",
+                "no-block-position fallback must keep using the neutral nearest-target resolver");
+        requireContains(service, "candidate -> !isBoxStyleObject(candidate.type())",
                 "no-block-position fallback must keep excluding box-style objects");
         String boxGate = methodBody(service, "private InteractionResult gateBoxStyleInteraction");
         requireContains(boxGate, "target.type() == InteractionType.AMMO_BOX || target.type() == InteractionType.ULTIMATE_MACHINE",

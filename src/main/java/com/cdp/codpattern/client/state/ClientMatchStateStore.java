@@ -1,6 +1,6 @@
 package com.cdp.codpattern.client.state;
 
-import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.CodPatternConstants;
 import com.cdp.codpattern.client.ClientMatchState;
 import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
@@ -28,7 +28,7 @@ public final class ClientMatchStateStore {
     private static final int MAX_KILL_FEED_ENTRIES = 6;
     private static final int BLACKOUT_INFO_FADE_IN_TICKS = 50;
     private static final SoundEvent COUNTDOWN_20S_SOUND = SoundEvent.createVariableRangeEvent(
-            ResourceLocation.fromNamespaceAndPath(CodPattern.MODID, "tdm.countdown_20s"));
+            ResourceLocation.fromNamespaceAndPath(CodPatternConstants.MOD_ID, "tdm.countdown_20s"));
 
     private String currentPhase = "WAITING";
     private int remainingTimeTicks = 0;

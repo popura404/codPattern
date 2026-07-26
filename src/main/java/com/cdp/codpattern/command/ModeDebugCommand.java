@@ -1,6 +1,5 @@
 package com.cdp.codpattern.command;
 
-import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.ModeRoomBackedMap;
 import com.cdp.codpattern.app.match.ModeRoomHandle;
@@ -11,7 +10,7 @@ import com.cdp.codpattern.app.match.port.ModeMapEditPort;
 import com.cdp.codpattern.app.match.port.ModeRoomLifecyclePort;
 import com.cdp.codpattern.app.match.port.ModeRoomSummaryPort;
 import com.cdp.codpattern.app.match.runtime.ModeEntityOwnershipRegistry;
-import com.cdp.codpattern.app.zombies.service.ZombiesDebugSnapshotService;
+import com.cdp.codpattern.app.match.runtime.debug.ModeDebugSnapshotContributors;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGateway;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -143,13 +142,11 @@ public final class ModeDebugCommand {
                 + ", metrics=" + state.metrics().size()
                 + ", playerValues=" + state.playerValues().size()
                 + ", prompts=" + state.prompts().size()), false);
-        if (BuiltInGameModes.isZombies(roomId.gameType())) {
-            ZombiesDebugSnapshotService.ZombiesDebugSnapshot zombiesSnapshot = new ZombiesDebugSnapshotService().create(
-                    state,
-                    FpsMatchGatewayProvider.gateway().entityOwnershipRegistry().entitiesInRoom(roomId));
-            zombiesSnapshot.lines().forEach(line ->
-                    source.sendSuccess(() -> Component.literal(line), false));
-        }
+        ModeDebugSnapshotContributors.lines(
+                        roomId.gameType(),
+                        state,
+                        FpsMatchGatewayProvider.gateway().entityOwnershipRegistry().entitiesInRoom(roomId))
+                .forEach(line -> source.sendSuccess(() -> Component.literal(line), false));
         return 1;
     }
 

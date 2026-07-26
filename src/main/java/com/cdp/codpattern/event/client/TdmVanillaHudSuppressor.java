@@ -1,8 +1,7 @@
 package com.cdp.codpattern.event.client;
 
-import com.cdp.codpattern.CodPattern;
-import com.cdp.codpattern.client.gui.overlay.TdmHudOverlay;
-import com.cdp.codpattern.client.zombies.ClientZombiesState;
+import com.cdp.codpattern.CodPatternConstants;
+import com.cdp.codpattern.client.runtime.ModeHudReplacementPolicies;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
@@ -12,7 +11,7 @@ import net.minecraftforge.fml.common.Mod;
 
 import java.util.Set;
 
-@Mod.EventBusSubscriber(modid = CodPattern.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@Mod.EventBusSubscriber(modid = CodPatternConstants.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class TdmVanillaHudSuppressor {
     private static final Set<ResourceLocation> SUPPRESSED_OVERLAY_IDS = Set.of(
             VanillaGuiOverlay.HOTBAR.id(),
@@ -25,8 +24,7 @@ public final class TdmVanillaHudSuppressor {
 
     @SubscribeEvent
     public static void onRenderGuiOverlay(RenderGuiOverlayEvent.Pre event) {
-        if (!TdmHudOverlay.shouldReplaceVanillaPlayerHud()
-                && !ClientZombiesState.shouldReplaceVanillaPlayerHud()) {
+        if (!ModeHudReplacementPolicies.shouldReplaceVanillaPlayerHud()) {
             return;
         }
         if (SUPPRESSED_OVERLAY_IDS.contains(event.getOverlay().id())) {

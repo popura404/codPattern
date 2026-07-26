@@ -25,8 +25,12 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
             Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/map/ZombiesMap.java");
     private static final Path MODE_ROOM_TICK_EVENT_HANDLER =
             Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/event/ModeRoomTickEventHandler.java");
+    private static final Path ENTITY_RECONCILIATION_CONTRIBUTOR =
+            Path.of("src/main/java/com/cdp/codpattern/app/zombies/service/ZombiesEntityReconciliationContributor.java");
     private static final Path COD_TDM_EVENT_HANDLER =
             Path.of("src/main/java/com/cdp/codpattern/compat/fpsmatch/event/CodTdmEventHandler.java");
+    private static final Path AREA_PROTECTION_CONTRIBUTOR =
+            Path.of("src/main/java/com/cdp/codpattern/app/zombies/bootstrap/ZombiesAreaProtectionContributor.java");
     private static final Path CLIENT_STATE =
             Path.of("src/main/java/com/cdp/codpattern/client/zombies/ClientZombiesState.java");
     private static final Path ZOMBIES_MARKER_RENDERER =
@@ -46,7 +50,9 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
         String roomHandle = read(ROOM_HANDLE);
         String zombiesMap = read(ZOMBIES_MAP);
         String modeRoomTickEventHandler = read(MODE_ROOM_TICK_EVENT_HANDLER);
+        String entityReconciliationContributor = read(ENTITY_RECONCILIATION_CONTRIBUTOR);
         String codTdmEventHandler = read(COD_TDM_EVENT_HANDLER);
+        String areaProtectionContributor = read(AREA_PROTECTION_CONTRIBUTOR);
         String clientState = read(CLIENT_STATE);
         String zombiesMarkerRenderer = read(ZOMBIES_MARKER_RENDERER);
 
@@ -351,8 +357,11 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
                 "mobRecycleService.reset();",
                 "zombies map should reset recycle monitor state during cleanup/runtime reset");
         requireContains(modeRoomTickEventHandler,
+                "ModeEntityReconciliationContributors.onMissingEntity(entry);",
+                "missing entities should dispatch through a mode-owned reconciliation contributor");
+        requireContains(entityReconciliationContributor,
                 "ZombiesActiveMobCounter.instance().unregister(entry.roomId(), entry.entityId());",
-                "missing zombies entities must clear active mob counters even when no lifecycle port handles them");
+                "missing zombies entities must still clear active mob counters when no live room port handles them");
         requireContains(codTdmEventHandler,
                 "public static void onExplosionDetonate(ExplosionEvent.Detonate event)",
                 "owned creeper explosions should be handled by the Forge explosion event");
@@ -381,12 +390,15 @@ public final class ZombiesWaveRuntimeStaticContractCompatTest {
                 "public static void onEntityJoinLevel(EntityJoinLevelEvent event)",
                 "zombies rooms should reject any item or experience entity that reaches the world join path");
         requireContains(codTdmEventHandler,
+                "ModeAreaProtectionContributors.suppressEntitySpawn(",
+                "the shared Forge join hook should delegate room-area protection to mode contributors");
+        requireContains(areaProtectionContributor,
                 "entity instanceof ItemEntity || entity instanceof ExperienceOrb",
                 "zombies room drop suppression should include experience orbs");
         requireContains(codTdmEventHandler,
                 "event.getEntity().discard();",
                 "zombies room drop entities should be discarded when blocked");
-        requireContains(codTdmEventHandler,
+        requireContains(areaProtectionContributor,
                 "FpsMatchMapRegistry.listMaps(BuiltInGameModes.ZOMBIES)",
                 "item-drop suppression should be scoped to zombies map areas");
         requireContains(clientState,

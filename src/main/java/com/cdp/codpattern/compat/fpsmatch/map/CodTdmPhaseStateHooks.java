@@ -1,6 +1,7 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
 import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.tdm.model.TdmTeamMatchPolicies;
 import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 import com.cdp.codpattern.config.tdm.CodTdmConfig;
@@ -133,7 +134,8 @@ final class CodTdmPhaseStateHooks implements PhaseStateMachine.Hooks {
     @Override
     public void showPlayingIntro() {
         Component title = Component.translatable(GameModeRegistry.getOrDefault(port.gameType()).displayNameKey());
-        Component subtitle = Component.translatable(resolveObjectiveKey(port.gameType()),
+        Component subtitle = Component.translatable(
+                TdmTeamMatchPolicies.forGameType(port.gameType()).introObjectiveKey(),
                 CodTdmConfig.getConfig().getScoreLimit());
         ClientboundSetTitlesAnimationPacket animationPacket = new ClientboundSetTitlesAnimationPacket(4, 42, 16);
         ClientboundSetTitleTextPacket titlePacket = new ClientboundSetTitleTextPacket(title);
@@ -152,10 +154,4 @@ final class CodTdmPhaseStateHooks implements PhaseStateMachine.Hooks {
         port.resetGame();
     }
 
-    private String resolveObjectiveKey(String gameType) {
-        if (BuiltInGameModes.isTeamDeathMatch(gameType)) {
-            return "hud.codpattern.tdm.intro.teamdeathmatch.objective";
-        }
-        return "hud.codpattern.tdm.intro.frontline.objective";
-    }
 }

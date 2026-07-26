@@ -1,6 +1,5 @@
 package com.cdp.codpattern.config.zombies;
 
-import com.cdp.codpattern.config.path.ConfigPath;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
@@ -24,7 +23,7 @@ public final class ZombiesWeaponFilterRepository {
     }
 
     public static ZombiesWeaponFilterConfig loadOrCreate(MinecraftServer server, String mapName) {
-        return loadOrCreate(ConfigPath.zombiesMapWeaponFilter(server, mapName));
+        return loadOrCreate(ZombiesConfigPaths.zombiesMapWeaponFilter(server, mapName));
     }
 
     public static ZombiesWeaponFilterConfig loadOrCreate(Path path) {

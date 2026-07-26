@@ -65,10 +65,6 @@ public final class CodTdmMapAccess {
     }
 
     public static void leaveMap(BaseMap map, ServerPlayer player) {
-        if (map instanceof CodTacticalTdmMap tacticalMap) {
-            tacticalMap.tacticalActionPort().leaveRoom(player);
-            return;
-        }
         if (map instanceof CodTdmMap tdmMap) {
             tdmMap.actionPort().leaveRoom(player);
             return;

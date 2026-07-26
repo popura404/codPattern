@@ -1,6 +1,6 @@
 package com.cdp.codpattern.fpsmatch.room;
 
-import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.CodPatternConstants;
 import com.cdp.codpattern.app.match.model.RoomSummarySnapshot;
 import com.cdp.codpattern.app.match.model.RoomSummarySnapshots;
 import com.cdp.codpattern.app.match.port.ModeRoomReadPort;
@@ -26,7 +26,7 @@ import java.util.UUID;
  * 房间管理器（单例）
  * 从 FPSMCore 获取已注册模式的房间摘要
  */
-@Mod.EventBusSubscriber(modid = CodPattern.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@Mod.EventBusSubscriber(modid = CodPatternConstants.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class CodTdmRoomManager {
     private static final long ROOM_PUSH_DIRTY_THROTTLE_MS = 350L;
     private static final long ROOM_PUSH_STEADY_REFRESH_MS = 1000L;

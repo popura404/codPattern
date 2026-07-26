@@ -148,7 +148,10 @@ tasks.register('syncGameTestModClasses', Sync) {
     from(sourceSets.main.output.classesDirs) {
         into '.'
     }
-    dependsOn tasks.named('classes')
+    from(sourceSets.test.output.classesDirs) {
+        into '.'
+    }
+    dependsOn tasks.named('testClasses')
 }
 
 tasks.matching { it.name == 'runGameTestServer' }.configureEach {
@@ -196,6 +199,16 @@ tasks.register('runZombiesMvp123CompatSuite', JavaExec) {
     mainClass = 'com.cdp.codpattern.app.zombies.service.ZombiesMvp123CompatTestSuite'
     dependsOn tasks.named('testClasses')
 }
+
+apply from: 'gradle/mode-split-dependency-ratchet.gradle'
+apply from: 'gradle/mode-split-test-ledger.gradle'
+apply from: 'gradle/mode-split-compatibility-manifest.gradle'
+apply from: 'gradle/mode-split-packet-codec.gradle'
+apply from: 'gradle/mode-split-send-route.gradle'
+apply from: 'gradle/mode-split-translation-calls.gradle'
+apply from: 'gradle/mode-split-phase0.gradle'
+apply from: 'gradle/mode-split-phase6.gradle'
+apply from: 'gradle/mode-split-phase7.gradle'
 
 // 提取依赖到 libs-extracted，便于 Agent 和 IDE 访问
 // 运行: gradlew extractDependencyLibs

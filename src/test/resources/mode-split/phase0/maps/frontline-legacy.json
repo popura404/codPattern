@@ -1,0 +1,54 @@
+{
+  "mapName": "LegacyCase_Map-01",
+  "levelName": "minecraft:overworld",
+  "areaData": {
+    "Position1": [-10, 64, -5],
+    "Position2": [25, 90, 30],
+    "legacyAreaNote": "keep-in-source-fixture"
+  },
+  "teams": {
+    "RedTeam": {
+      "name": "RedTeam",
+      "playerLimit": 6,
+      "spawnPoints": [
+        {
+          "Dimension": "minecraft:overworld",
+          "Position": [1, 65, 2],
+          "Yaw": 90.0,
+          "Pitch": -12.5,
+          "legacySpawnNote": "keep-in-source-fixture"
+        }
+      ]
+    },
+    "BLUE_team": {
+      "name": "BLUE_team",
+      "playerLimit": 5,
+      "initialSpawnPoints": [
+        {
+          "Dimension": "minecraft:overworld",
+          "Position": [8, 66, 9],
+          "Yaw": 180.0,
+          "Pitch": 3.5
+        }
+      ],
+      "dynamicSpawnCandidates": [
+        {
+          "Dimension": "minecraft:overworld",
+          "Position": [12, 67, 14],
+          "Yaw": 45.0,
+          "Pitch": 0.0,
+          "Kind": "DYNAMIC_CANDIDATE"
+        }
+      ]
+    }
+  },
+  "matchEndTeleportPoint": {
+    "Dimension": "minecraft:overworld",
+    "Position": [0, 80, 0],
+    "Yaw": 12.0,
+    "Pitch": -4.0
+  },
+  "unknownTopLevel": {
+    "CaseSensitiveKey": "LegacyValue"
+  }
+}

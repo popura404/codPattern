@@ -2,13 +2,13 @@ package com.cdp.codpattern.app.zombies.service;
 
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.app.match.runtime.ModeEntityOwnershipRegistry;
+import com.cdp.codpattern.app.match.runtime.lifecycle.CleanupCoordinator;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -21,7 +21,7 @@ public class ZombiesCleanupService {
     private final ModeEntityOwnershipRegistry ownershipRegistry;
     private final ZombiesMapOccupancyService occupancyService;
     private final Hooks hooks;
-    private final List<ZombiesCleanupParticipant> participants;
+    private final CleanupCoordinator<CleanupWork, ZombiesServiceResult<Void>, CleanupSummary> coordinator;
     private long cleanupRevision;
 
     public ZombiesCleanupService(
@@ -37,8 +37,11 @@ public class ZombiesCleanupService {
                 ? ZombiesMapOccupancyService.instance()
                 : occupancyService;
         this.hooks = hooks == null ? Hooks.noop() : hooks;
-        this.participants = new ArrayList<>(participants == null ? List.of() : participants);
-        this.participants.sort(Comparator.comparingInt(ZombiesCleanupParticipant::order));
+        this.coordinator = new CleanupCoordinator<>(
+                adaptParticipants(participants),
+                (work, participantName, failure, completedParticipants) ->
+                        this.hooks.onParticipantFailure(work.context(), participantName, failure),
+                this::finishCleanup);
     }
 
     public ZombiesServiceResult<CleanupSummary> cleanup(RoomId roomId, String reason, LevelResolver levelResolver) {
@@ -49,25 +52,20 @@ public class ZombiesCleanupService {
 
         hooks.beforeCleanup(context);
         EntityCleanupSummary entitySummary = cleanupEntities(roomId, levelResolver);
-        ZombiesServiceResult<Void> participantResult = runParticipants(context);
-        if (!participantResult.success()) {
+        CleanupCoordinator.Result<ZombiesServiceResult<Void>, CleanupSummary> result =
+                coordinator.execute(new CleanupWork(context, entitySummary));
+        if (!result.success()) {
+            ZombiesServiceResult<Void> participantResult = result.failure().orElseGet(() ->
+                    ZombiesServiceResult.failure(
+                            ZombiesErrorCode.of("cleanup.participant_failed"),
+                            java.util.Map.of(),
+                            "Cleanup participant failed without a result"));
             return ZombiesServiceResult.failure(
                     participantResult.code(),
                     participantResult.params(),
                     participantResult.logMessage());
         }
-
-        hooks.clearObjectRuntime(context);
-        hooks.clearPlayerRuntime(context);
-        hooks.clearReadyState(context);
-        hooks.clearStartVote(context);
-        hooks.clearLifecycleRuntime(context);
-        hooks.clearHudState(context);
-        boolean occupancyReleased = occupancyService.release(roomId);
-        hooks.afterOccupancyReleased(context, occupancyReleased);
-        hooks.afterCleanup(context);
-
-        return ZombiesServiceResult.success(new CleanupSummary(revision, entitySummary, occupancyReleased));
+        return ZombiesServiceResult.success(result.summary().orElseThrow());
     }
 
     public EntityCleanupSummary cleanupEntities(RoomId roomId, LevelResolver levelResolver) {
@@ -106,17 +104,52 @@ public class ZombiesCleanupService {
         return new EntityCleanupSummary(1, 0, 1);
     }
 
-    private ZombiesServiceResult<Void> runParticipants(ZombiesCleanupParticipant.ZombiesCleanupContext context) {
+    private CleanupSummary finishCleanup(CleanupWork work) {
+        ZombiesCleanupParticipant.ZombiesCleanupContext context = work.context();
+        hooks.clearObjectRuntime(context);
+        hooks.clearPlayerRuntime(context);
+        hooks.clearReadyState(context);
+        hooks.clearStartVote(context);
+        hooks.clearLifecycleRuntime(context);
+        hooks.clearHudState(context);
+        boolean occupancyReleased = occupancyService.release(context.roomId());
+        hooks.afterOccupancyReleased(context, occupancyReleased);
+        hooks.afterCleanup(context);
+        return new CleanupSummary(context.cleanupRevision(), work.entitySummary(), occupancyReleased);
+    }
+
+    private static List<CleanupCoordinator.Participant<CleanupWork, ZombiesServiceResult<Void>>> adaptParticipants(
+            Collection<ZombiesCleanupParticipant> participants
+    ) {
+        List<CleanupCoordinator.Participant<CleanupWork, ZombiesServiceResult<Void>>> adapted = new ArrayList<>();
+        if (participants == null) {
+            return adapted;
+        }
         for (ZombiesCleanupParticipant participant : participants) {
             if (participant == null) {
                 continue;
             }
-            ZombiesServiceResult<Void> result = participant.cleanup(context);
-            if (result != null && !result.success()) {
-                return result;
-            }
+            adapted.add(new CleanupCoordinator.Participant<>() {
+                @Override
+                public String name() {
+                    return participant.getClass().getName();
+                }
+
+                @Override
+                public int order() {
+                    return participant.order();
+                }
+
+                @Override
+                public CleanupCoordinator.ParticipantResult<ZombiesServiceResult<Void>> cleanup(CleanupWork work) {
+                    ZombiesServiceResult<Void> result = participant.cleanup(work.context());
+                    return result == null || result.success()
+                            ? CleanupCoordinator.ParticipantResult.completed()
+                            : CleanupCoordinator.ParticipantResult.failed(result);
+                }
+            });
         }
-        return ZombiesServiceResult.ok();
+        return adapted;
     }
 
     private static boolean sameRoom(RoomId left, RoomId right) {
@@ -154,6 +187,13 @@ public class ZombiesCleanupService {
         default void onMissingEntityCleanup(ModeEntityOwnershipRegistry.Entry entry) {
         }
 
+        default void onParticipantFailure(
+                ZombiesCleanupParticipant.ZombiesCleanupContext context,
+                String participantName,
+                ZombiesServiceResult<Void> failure
+        ) {
+        }
+
         default void afterOccupancyReleased(ZombiesCleanupParticipant.ZombiesCleanupContext context, boolean released) {
         }
 
@@ -182,6 +222,12 @@ public class ZombiesCleanupService {
             int registeredEntries,
             int removedEntities,
             int missingEntities
+    ) {
+    }
+
+    private record CleanupWork(
+            ZombiesCleanupParticipant.ZombiesCleanupContext context,
+            EntityCleanupSummary entitySummary
     ) {
     }
 }

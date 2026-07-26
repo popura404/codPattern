@@ -20,8 +20,12 @@ public final class ModNetworkChannel {
     private ModNetworkChannel() {
     }
 
-    static int nextMessageId() {
+    public static int nextMessageId() {
         return packetId++;
+    }
+
+    public static SimpleChannel channel() {
+        return CHANNEL;
     }
 
     public static void register() {

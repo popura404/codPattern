@@ -1,5 +1,7 @@
 package com.cdp.codpattern.app.zombies.service;
 
+import com.cdp.codpattern.app.match.model.result.ModeErrorCode;
+
 import java.util.Objects;
 
 /**
@@ -58,6 +60,14 @@ public final class ZombiesErrorCode {
 
     public String key() {
         return key;
+    }
+
+    public ModeErrorCode toModeErrorCode() {
+        return ModeErrorCode.of(key);
+    }
+
+    public static ZombiesErrorCode fromModeErrorCode(ModeErrorCode code) {
+        return of(code == null ? null : code.key());
     }
 
     @Override

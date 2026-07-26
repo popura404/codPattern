@@ -1,5 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.match.runtime.player.PlayerGracePeriodRegistry;
 import com.cdp.codpattern.app.tdm.model.DeathCamData;
 
 import java.util.HashMap;
@@ -22,7 +23,7 @@ final class CodTdmPlayerRuntimeState {
     private final Map<UUID, Integer> respawnRetryCounts = new HashMap<>();
     private final Map<UUID, Boolean> readyStates = new HashMap<>();
     private final Map<UUID, String> spectatorPreferredJoinTeams = new HashMap<>();
-    private final Map<UUID, Integer> disconnectedGraceTimers = new HashMap<>();
+    private final PlayerGracePeriodRegistry disconnectedGrace = new PlayerGracePeriodRegistry();
 
     Map<UUID, Integer> respawnTimers() {
         return respawnTimers;
@@ -79,21 +80,21 @@ final class CodTdmPlayerRuntimeState {
     }
 
     Map<UUID, Integer> disconnectedGraceTimers() {
-        return disconnectedGraceTimers;
+        return disconnectedGrace.mutableTimers();
     }
 
     void markDisconnected(UUID playerId, int graceTicks) {
         if (playerId == null) {
             return;
         }
-        disconnectedGraceTimers.put(playerId, Math.max(1, graceTicks));
+        disconnectedGrace.start(playerId, graceTicks);
     }
 
     void clearDisconnected(UUID playerId) {
         if (playerId == null) {
             return;
         }
-        disconnectedGraceTimers.remove(playerId);
+        disconnectedGrace.clear(playerId);
     }
 
     void setSpectatorPreferredJoinTeam(UUID playerId, String teamName) {
@@ -134,7 +135,7 @@ final class CodTdmPlayerRuntimeState {
         maxKillStreaks.clear();
         readyStates.clear();
         spectatorPreferredJoinTeams.clear();
-        disconnectedGraceTimers.clear();
+        disconnectedGrace.clearAll();
     }
 
     void clearTransientPlayerState(UUID playerId) {
@@ -145,7 +146,7 @@ final class CodTdmPlayerRuntimeState {
         combatRegenCooldowns.remove(playerId);
         respawnRetryCounts.remove(playerId);
         spectatorPreferredJoinTeams.remove(playerId);
-        disconnectedGraceTimers.remove(playerId);
+        disconnectedGrace.clear(playerId);
     }
 
     void removePlayerCombatStats(UUID playerId) {

@@ -1,6 +1,5 @@
 package com.cdp.codpattern.client.gui.screen.match;
 
-import com.cdp.codpattern.CodPattern;
 import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.model.ClientModePresentation;
@@ -15,7 +14,7 @@ import net.minecraft.resources.ResourceLocation;
 
 public final class ModePreviewPanel {
     private static final PreviewTexture SHARED_PREVIEW = new PreviewTexture(
-            ResourceLocation.fromNamespaceAndPath(CodPattern.MODID, "textures/gui/modes/shared_preview.png"),
+            new ResourceLocation("codpattern", "textures/gui/modes/shared_preview.png"),
             3840,
             2160);
     private static final float MODE_OVERLAY_ALPHA_FACTOR = 0.40f;
@@ -222,11 +221,11 @@ public final class ModePreviewPanel {
 
     private static PreviewTexture resolvePreviewTexture(String gameType) {
         ClientModePresentation presentation = resolvePresentation(gameType);
-        if (presentation.previewTexturePath().isBlank()) {
+        if (presentation.previewTexture() == null) {
             return SHARED_PREVIEW;
         }
         return new PreviewTexture(
-                ResourceLocation.fromNamespaceAndPath(CodPattern.MODID, presentation.previewTexturePath()),
+                presentation.previewTexture(),
                 presentation.textureWidth(),
                 presentation.textureHeight());
     }
@@ -240,7 +239,7 @@ public final class ModePreviewPanel {
         String canonical = GameModeRegistry.canonicalize(gameType);
         int accent = FALLBACK_ACCENTS[Math.floorMod(canonical.hashCode(), FALLBACK_ACCENTS.length)];
         return new ClientModePresentation(
-                "",
+                (ResourceLocation) null,
                 SHARED_PREVIEW.width(),
                 SHARED_PREVIEW.height(),
                 accent,

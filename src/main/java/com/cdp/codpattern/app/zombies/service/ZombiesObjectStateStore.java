@@ -1,6 +1,9 @@
 package com.cdp.codpattern.app.zombies.service;
 
 import com.cdp.codpattern.app.match.model.ModeObjectState;
+import com.cdp.codpattern.app.match.runtime.object.ModeObjectIndex;
+import com.cdp.codpattern.app.match.runtime.object.ModeObjectRevisionClock;
+import com.cdp.codpattern.app.match.runtime.object.ModeObjectRevisionIndex;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesAmmoBoxData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesArmorStationData;
 import com.cdp.codpattern.app.zombies.map.object.ZombiesBarrierData;
@@ -52,17 +55,17 @@ public final class ZombiesObjectStateStore {
     private static final String PAYLOAD_BUFF_ID = "buffId";
     private static final String PAYLOAD_MAX_UPGRADE_LEVEL = "maxUpgradeLevel";
 
-    private final Map<String, BarrierRuntimeState> barriersByObjectId = new LinkedHashMap<>();
-    private final Map<String, WeaponWallRuntimeState> weaponWallsByObjectId = new LinkedHashMap<>();
-    private final Map<String, Long> ammoBoxRevisionsByObjectId = new LinkedHashMap<>();
-    private final Map<String, Long> armorStationRevisionsByObjectId = new LinkedHashMap<>();
-    private final Map<String, Long> powerSwitchRevisionsByObjectId = new LinkedHashMap<>();
-    private final Map<String, Long> sodaMachineRevisionsByObjectId = new LinkedHashMap<>();
-    private final Map<String, Long> ultimateMachineRevisionsByObjectId = new LinkedHashMap<>();
+    private final ModeObjectIndex<BarrierRuntimeState> barriersByObjectId = new ModeObjectIndex<>();
+    private final ModeObjectIndex<WeaponWallRuntimeState> weaponWallsByObjectId = new ModeObjectIndex<>();
+    private final ModeObjectRevisionIndex ammoBoxRevisionsByObjectId = new ModeObjectRevisionIndex();
+    private final ModeObjectRevisionIndex armorStationRevisionsByObjectId = new ModeObjectRevisionIndex();
+    private final ModeObjectRevisionIndex powerSwitchRevisionsByObjectId = new ModeObjectRevisionIndex();
+    private final ModeObjectRevisionIndex sodaMachineRevisionsByObjectId = new ModeObjectRevisionIndex();
+    private final ModeObjectRevisionIndex ultimateMachineRevisionsByObjectId = new ModeObjectRevisionIndex();
     private final BooleanSupplier powerOnSupplier;
     private final ZombiesWeaponWallOfferService weaponWallOfferService;
     private final Supplier<ZombiesRulesConfig> rulesSupplier;
-    private long revision;
+    private final ModeObjectRevisionClock revisionClock = new ModeObjectRevisionClock();
 
     public ZombiesObjectStateStore() {
         this(() -> false);
@@ -132,8 +135,7 @@ public final class ZombiesObjectStateStore {
             String objectId = objectKey(barrier);
             next.put(objectId, new BarrierRuntimeState(barrier.group(), false, nextRevision()));
         }
-        barriersByObjectId.clear();
-        barriersByObjectId.putAll(next);
+        barriersByObjectId.reset(next);
         resetWeaponWallStates(safeWeaponWalls(weaponWalls), currentWave, maxWave);
         resetStableRevisions(ammoBoxRevisionsByObjectId, safeAmmoBoxes(ammoBoxes));
         resetStableRevisions(armorStationRevisionsByObjectId, safeArmorStations(armorStations));
@@ -169,7 +171,7 @@ public final class ZombiesObjectStateStore {
             return ZombiesServiceResult.failure(ZombiesErrorCode.of("barrier.already_cleared"));
         }
 
-        long updateRevision = revision;
+        long updateRevision = revisionClock.current();
         List<String> objectIds = new ArrayList<>();
         for (ZombiesBarrierData barrier : groupBarriers) {
             String objectId = objectKey(barrier);
@@ -251,7 +253,7 @@ public final class ZombiesObjectStateStore {
 
     public synchronized long markWeaponWallPurchased(ZombiesWeaponWallData weaponWall) {
         if (weaponWall == null) {
-            return revision;
+            return revisionClock.current();
         }
         long nextRevision = nextRevision();
         WeaponWallRuntimeState state = ensureWeaponWallState(weaponWall);
@@ -272,9 +274,9 @@ public final class ZombiesObjectStateStore {
             int maxWave
     ) {
         if (targetWave < 1) {
-            return revision;
+            return revisionClock.current();
         }
-        long updateRevision = revision;
+        long updateRevision = revisionClock.current();
         for (ZombiesWeaponWallData weaponWall : safeWeaponWalls(weaponWalls)) {
             String objectId = objectKey(weaponWall);
             WeaponWallRuntimeState currentState = ensureWeaponWallState(weaponWall);
@@ -294,7 +296,7 @@ public final class ZombiesObjectStateStore {
 
     public synchronized long markAmmoBoxUsed(ZombiesAmmoBoxData ammoBox) {
         if (ammoBox == null) {
-            return revision;
+            return revisionClock.current();
         }
         long nextRevision = nextRevision();
         ammoBoxRevisionsByObjectId.put(objectKey(ammoBox), nextRevision);
@@ -303,7 +305,7 @@ public final class ZombiesObjectStateStore {
 
     public synchronized long markArmorStationPurchased(ZombiesArmorStationData armorStation) {
         if (armorStation == null) {
-            return revision;
+            return revisionClock.current();
         }
         long nextRevision = nextRevision();
         armorStationRevisionsByObjectId.put(objectKey(armorStation), nextRevision);
@@ -312,17 +314,17 @@ public final class ZombiesObjectStateStore {
 
     public synchronized long markPowerSwitchTurnedOn(ZombiesPowerSwitchData powerSwitch) {
         if (powerSwitch == null) {
-            return revision;
+            return revisionClock.current();
         }
         long nextRevision = nextRevision();
         powerSwitchRevisionsByObjectId.put(objectKey(powerSwitch), nextRevision);
         bumpRequiresPowerObjectRevisions();
-        return revision;
+        return revisionClock.current();
     }
 
     public synchronized long markSodaMachinePurchased(ZombiesSodaMachineData sodaMachine) {
         if (sodaMachine == null) {
-            return revision;
+            return revisionClock.current();
         }
         long nextRevision = nextRevision();
         sodaMachineRevisionsByObjectId.put(objectKey(sodaMachine), nextRevision);
@@ -331,7 +333,7 @@ public final class ZombiesObjectStateStore {
 
     public synchronized long markUltimateMachineUsed(ZombiesUltimateMachineData ultimateMachine) {
         if (ultimateMachine == null) {
-            return revision;
+            return revisionClock.current();
         }
         long nextRevision = nextRevision();
         ultimateMachineRevisionsByObjectId.put(objectKey(ultimateMachine), nextRevision);
@@ -339,12 +341,12 @@ public final class ZombiesObjectStateStore {
     }
 
     public synchronized long revision() {
-        return revision;
+        return revisionClock.current();
     }
 
     private BarrierRuntimeState ensureBarrierState(ZombiesBarrierData barrier) {
         String objectId = objectKey(barrier);
-        BarrierRuntimeState state = barriersByObjectId.get(objectId);
+        BarrierRuntimeState state = barriersByObjectId.get(objectId).orElse(null);
         if (state == null || state.group() != barrier.group()) {
             state = new BarrierRuntimeState(barrier.group(), false, nextRevision());
             barriersByObjectId.put(objectId, state);
@@ -354,7 +356,7 @@ public final class ZombiesObjectStateStore {
 
     private WeaponWallRuntimeState ensureWeaponWallState(ZombiesWeaponWallData weaponWall) {
         String objectId = objectKey(weaponWall);
-        WeaponWallRuntimeState state = weaponWallsByObjectId.get(objectId);
+        WeaponWallRuntimeState state = weaponWallsByObjectId.get(objectId).orElse(null);
         if (state == null) {
             state = new WeaponWallRuntimeState(selectOffer(weaponWall, 1), 0L, 0);
             weaponWallsByObjectId.put(objectId, state);
@@ -538,31 +540,28 @@ public final class ZombiesObjectStateStore {
     }
 
     private long nextRevision() {
-        revision = revision == Long.MAX_VALUE ? 1L : revision + 1L;
-        return revision;
+        return revisionClock.next();
     }
 
-    private <T> void resetStableRevisions(Map<String, Long> revisionsByObjectId, List<T> objects) {
+    private <T> void resetStableRevisions(ModeObjectRevisionIndex revisionsByObjectId, List<T> objects) {
         Map<String, Long> next = new LinkedHashMap<>();
         for (T object : objects) {
             next.put(objectKey(object), nextRevision());
         }
-        revisionsByObjectId.clear();
-        revisionsByObjectId.putAll(next);
+        revisionsByObjectId.reset(next);
     }
 
     private void resetPowerSwitchRevision(Optional<ZombiesPowerSwitchData> powerSwitch) {
         Map<String, Long> next = new LinkedHashMap<>();
         safePowerSwitch(powerSwitch).forEach(value -> next.put(objectKey(value), nextRevision()));
-        powerSwitchRevisionsByObjectId.clear();
-        powerSwitchRevisionsByObjectId.putAll(next);
+        powerSwitchRevisionsByObjectId.reset(next);
     }
 
     private void bumpRequiresPowerObjectRevisions() {
-        for (String objectId : new ArrayList<>(sodaMachineRevisionsByObjectId.keySet())) {
+        for (String objectId : sodaMachineRevisionsByObjectId.objectIds()) {
             sodaMachineRevisionsByObjectId.put(objectId, nextRevision());
         }
-        for (String objectId : new ArrayList<>(ultimateMachineRevisionsByObjectId.keySet())) {
+        for (String objectId : ultimateMachineRevisionsByObjectId.objectIds()) {
             ultimateMachineRevisionsByObjectId.put(objectId, nextRevision());
         }
     }
@@ -575,17 +574,11 @@ public final class ZombiesObjectStateStore {
                     objectKey(weaponWall),
                     new WeaponWallRuntimeState(selectOffer(weaponWall, offerWave), nextRevision(), offerWave));
         }
-        weaponWallsByObjectId.clear();
-        weaponWallsByObjectId.putAll(next);
+        weaponWallsByObjectId.reset(next);
     }
 
-    private static long ensureStableRevision(Map<String, Long> revisionsByObjectId, String objectId) {
-        Long objectRevision = revisionsByObjectId.get(objectId);
-        if (objectRevision == null) {
-            revisionsByObjectId.put(objectId, 0L);
-            return 0L;
-        }
-        return Math.max(0L, objectRevision);
+    private static long ensureStableRevision(ModeObjectRevisionIndex revisionsByObjectId, String objectId) {
+        return revisionsByObjectId.ensure(objectId);
     }
 
     private static List<ZombiesBarrierData> safeBarriers(Collection<ZombiesBarrierData> barriers) {

@@ -1,5 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.teammatch.TeamMatchPolicy;
 import com.cdp.codpattern.app.tdm.model.TdmTeamDefaults;
 import com.cdp.codpattern.app.tdm.model.TdmTeamNames;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
@@ -26,6 +27,7 @@ final class CodTdmMapRuntimeAssembly {
     }
 
     static BootstrapResult bootstrap(
+            TeamMatchPolicy policy,
             CodTdmMap map,
             Consumer<ServerPlayer> leaveFromBaseMapAction,
             Supplier<String> mapNameSupplier,
@@ -43,10 +45,11 @@ final class CodTdmMapRuntimeAssembly {
                 map::getServerLevel,
                 map::teleportPlayerToReSpawnPoint,
                 map::givePlayerKits,
-                () -> Math.max(1, CodTdmConfig.getConfig().getRespawnDelayTicks()),
-                () -> Math.max(0, CodTdmConfig.getConfig().getInvincibilityTicks())
+                () -> Math.max(1, policy.configuration().respawnDelayTicks()),
+                () -> Math.max(0, policy.configuration().invincibilityTicks())
         );
         CodTdmMapAssemblyOutput assemblyResult = assemble(
+                policy,
                 map,
                 playerState,
                 matchState,
@@ -67,6 +70,7 @@ final class CodTdmMapRuntimeAssembly {
     }
 
     private static CodTdmMapAssemblyOutput assemble(
+            TeamMatchPolicy policy,
             CodTdmMap map,
             CodTdmPlayerRuntimeState playerState,
             CodTdmMatchRuntimeState matchState,
@@ -96,6 +100,7 @@ final class CodTdmMapRuntimeAssembly {
         );
         initializeDefaultTeamsAndScores(map, matchState);
         return CodTdmMapAssemblyOutputBuilder.build(
+                policy,
                 map,
                 matchState,
                 respawnRuntime,

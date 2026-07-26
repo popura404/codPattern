@@ -1,5 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.teammatch.TeamMatchPolicy;
 import com.cdp.codpattern.app.tdm.port.CodTdmActionPort;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
 
@@ -11,6 +12,7 @@ final class CodTdmMapAssemblyOutputBuilder {
     }
 
     static CodTdmMapAssemblyOutput build(
+            TeamMatchPolicy policy,
             CodTdmMap map,
             CodTdmMatchRuntimeState matchState,
             CodTdmRespawnRuntime respawnRuntime,
@@ -35,6 +37,7 @@ final class CodTdmMapAssemblyOutputBuilder {
                 markStoppedAction
         );
         CodTdmActionPort actionPort = CodTdmMapActions.fromRuntimes(
+                policy,
                 runtimeBundle.combatRuntime(),
                 runtimeBundle.teamMembershipCoordinator(),
                 runtimeBundle.mapMutationRuntime(),
@@ -53,6 +56,7 @@ final class CodTdmMapAssemblyOutputBuilder {
                 runtimeBundle.matchProgressRuntime()
         );
         CodTdmReadPort readPort = CodTdmMapReadPortAdapter.fromMap(
+                policy,
                 map,
                 readRuntime,
                 mapNameSupplier,

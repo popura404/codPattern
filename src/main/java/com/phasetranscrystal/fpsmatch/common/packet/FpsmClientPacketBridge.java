@@ -21,18 +21,11 @@ public final class FpsmClientPacketBridge {
         handler.openSpawnPointToolScreen(packet);
     }
 
-    public static void openZombiesDeployToolScreen(OpenZombiesDeployToolScreenS2CPacket packet) {
-        handler.openZombiesDeployToolScreen(packet);
-    }
-
     public interface Handler {
         default void openMapCreatorToolScreen(OpenMapCreatorToolScreenS2CPacket packet) {
         }
 
         default void openSpawnPointToolScreen(OpenSpawnPointToolScreenS2CPacket packet) {
-        }
-
-        default void openZombiesDeployToolScreen(OpenZombiesDeployToolScreenS2CPacket packet) {
         }
     }
 }

@@ -11,7 +11,6 @@ import com.phasetranscrystal.fpsmatch.common.client.FpsmClientPacketHandler;
 import com.phasetranscrystal.fpsmatch.common.packet.FpsmClientPacketBridge;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenMapCreatorToolScreenS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenSpawnPointToolScreenS2CPacket;
-import com.phasetranscrystal.fpsmatch.common.packet.OpenZombiesDeployToolScreenS2CPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
@@ -171,11 +170,6 @@ public final class ClientPacketBridgeInstaller {
             @Override
             public void openSpawnPointToolScreen(OpenSpawnPointToolScreenS2CPacket packet) {
                 FpsmClientPacketHandler.handleOpenSpawnPointToolScreen(packet);
-            }
-
-            @Override
-            public void openZombiesDeployToolScreen(OpenZombiesDeployToolScreenS2CPacket packet) {
-                FpsmClientPacketHandler.handleOpenZombiesDeployToolScreen(packet);
             }
         });
     }

@@ -2,6 +2,7 @@ package com.cdp.codpattern.app.tdm.model;
 
 import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.model.ClientModePresentation;
+import net.minecraft.resources.ResourceLocation;
 
 public final class TdmClientModePresentations {
     private TdmClientModePresentations() {
@@ -13,7 +14,7 @@ public final class TdmClientModePresentations {
 
     public static ClientModePresentation frontlinePresentation() {
         return new ClientModePresentation(
-                "textures/gui/modes/frontline_preview.png",
+                new ResourceLocation("codpattern", "textures/gui/modes/frontline_preview.png"),
                 16001,
                 9001,
                 0xFF62F08A,
@@ -23,7 +24,7 @@ public final class TdmClientModePresentations {
 
     public static ClientModePresentation teamDeathmatchPresentation() {
         return new ClientModePresentation(
-                "textures/gui/modes/team_death_match_preview.png",
+                new ResourceLocation("codpattern", "textures/gui/modes/team_death_match_preview.png"),
                 16047,
                 9001,
                 0xFF5FC7C3,

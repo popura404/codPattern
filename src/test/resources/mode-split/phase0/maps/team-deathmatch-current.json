@@ -1,0 +1,44 @@
+{
+  "mapName": "TDM_MixedCase_02",
+  "levelName": "minecraft:the_nether",
+  "areaData": {
+    "Position1": [100, 20, 100],
+    "Position2": [140, 70, 150]
+  },
+  "teams": {
+    "SAS": {
+      "name": "SAS",
+      "playerLimit": 8,
+      "initialSpawnPoints": [
+        {
+          "Dimension": "minecraft:the_nether",
+          "Position": [105, 25, 105],
+          "Yaw": 0.0,
+          "Pitch": 7.25
+        }
+      ],
+      "dynamicSpawnCandidates": []
+    },
+    "Spetsnaz": {
+      "name": "Spetsnaz",
+      "playerLimit": 8,
+      "initialSpawnPoints": [],
+      "dynamicSpawnCandidates": [
+        {
+          "Dimension": "minecraft:the_nether",
+          "Position": [135, 25, 145],
+          "Yaw": 180.0,
+          "Pitch": -6.5,
+          "Kind": "dynamic_candidate"
+        }
+      ]
+    }
+  },
+  "matchEndTeleportPoint": {
+    "Dimension": "minecraft:overworld",
+    "Position": [3, 90, 4],
+    "Yaw": 30.0,
+    "Pitch": 11.0
+  },
+  "unknownTopLevel": "tdm-source-only"
+}

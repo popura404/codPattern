@@ -1,6 +1,7 @@
 package com.cdp.codpattern.app.zombies.service;
 
 import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.runtime.player.ModePlayerSessionMarker;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.mojang.logging.LogUtils;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
@@ -74,10 +75,10 @@ public final class ZombiesPlayerRuntimeMarkerService {
             return Optional.empty();
         }
         try {
-            return Optional.of(new PlayerMarker(
+            return Optional.of(PlayerMarker.fromNeutral(new ModePlayerSessionMarker<>(
                     RoomId.decode(roomKey),
                     state,
-                    readTarget(root)));
+                    readTarget(root))));
         } catch (IllegalArgumentException exception) {
             LOGGER.warn("Ignoring invalid zombies player marker room id {}", roomKey);
             return Optional.empty();
@@ -253,6 +254,17 @@ public final class ZombiesPlayerRuntimeMarkerService {
 
         public boolean isPendingEndTeleport() {
             return STATE_PENDING_ENDTP.equals(state);
+        }
+
+        public ModePlayerSessionMarker<ZombiesPostGameTeleportService.TeleportTarget> toNeutral() {
+            return new ModePlayerSessionMarker<>(roomId, state, endTeleport);
+        }
+
+        public static PlayerMarker fromNeutral(
+                ModePlayerSessionMarker<ZombiesPostGameTeleportService.TeleportTarget> marker
+        ) {
+            Objects.requireNonNull(marker, "marker");
+            return new PlayerMarker(marker.roomId(), marker.state(), marker.recoveryTarget());
         }
     }
 }

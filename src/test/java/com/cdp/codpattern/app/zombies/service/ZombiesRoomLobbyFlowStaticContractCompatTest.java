@@ -27,16 +27,26 @@ public final class ZombiesRoomLobbyFlowStaticContractCompatTest {
         String objectInteractionService = read(OBJECT_INTERACTION_SERVICE);
         String clientPacketHandler = read(CLIENT_PACKET_HANDLER);
 
-        requireContains(roomHandle, "Optional.of(ports)",
+        requireContains(roomHandle, ".withReady(ports)",
                 "zombies room handle should route ready-state writes through its ports");
+        requireContains(roomHandle, ".withRoster(ports)",
+                "zombies room handle should route roster snapshots through its ports");
+        requireContains(roomHandle, ".withRuntimeState(ports)",
+                "zombies room handle should route runtime snapshots through its ports");
         requireContains(roomHandle,
                 "ZombiesPorts implements ModeRoomSummaryPort, ModeRoomLifecyclePort, ModeRosterPort, ModeRuntimeStatePort, ReadyStatePort",
                 "zombies room ports should implement ReadyStatePort");
         String readyWrite = methodBody(roomHandle, "public boolean setPlayerReady(ServerPlayer player, boolean ready)");
-        requireContains(readyWrite, "boolean changed = map.readyService().setPlayerReady(player, ready);",
+        requireContains(readyWrite, "boolean accepted = map.readyService().setPlayerReady(player, ready);",
                 "ready writes should still delegate to the ready service");
-        requireContains(readyWrite, "sendRosterSnapshotToSurvivors();",
-                "ready changes should immediately sync roster ready flags to survivors");
+        requireContains(readyWrite, "if (accepted)",
+                "ready synchronization should follow accepted writes, not only stored-value mutations");
+        requireContains(readyWrite, "rosterCoordinator.broadcastFullSnapshot();",
+                "accepted ready writes should immediately sync roster ready flags to survivors");
+        requireContains(roomHandle, "RoomRosterSyncCoordinator.Settings.fullSnapshotOnly(",
+                "zombies roster migration should keep full-snapshot-only delivery");
+        requireContains(roomHandle, "RoomRosterSyncCoordinator.ResyncDelivery.REQUESTER_ONLY",
+                "zombies explicit resync should remain requester-only");
 
         String playerCount = methodBody(roomHandle, "public int playerCount()");
         requireContains(playerCount, "return map.survivorPlayerIds().size();",

@@ -1,0 +1,15 @@
+{
+  "UnrelatedSibling": {"MixedCaseKey": "KeepMe"},
+  "codpattern.zombies": {
+    "roomId": "zombies|Zombies_MixedCase_03",
+    "state": "pending_endtp",
+    "endtp": {
+      "dimension": "minecraft:overworld",
+      "x": 17,
+      "y": 88,
+      "z": -9,
+      "yaw": 12.5f,
+      "pitch": -3.25f
+    }
+  }
+}

@@ -1,8 +1,8 @@
 package com.cdp.codpattern.compat.fpsmatch.event;
 
-import com.cdp.codpattern.CodPattern;
+import com.cdp.codpattern.CodPatternConstants;
 import com.cdp.codpattern.app.match.model.ModeObjectInteractionContext;
-import com.cdp.codpattern.common.block.ZombiesBoxInteractionBlock;
+import com.cdp.codpattern.app.match.runtime.object.ModeObjectInteractionBypassContributors;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGateway;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import net.minecraft.server.level.ServerPlayer;
@@ -12,7 +12,7 @@ import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-@Mod.EventBusSubscriber(modid = CodPattern.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@Mod.EventBusSubscriber(modid = CodPatternConstants.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class ModeObjectInteractionEventHandler {
     private ModeObjectInteractionEventHandler() {
     }
@@ -76,7 +76,8 @@ public final class ModeObjectInteractionEventHandler {
     }
 
     private static boolean isBlockHandledByOwnUse(PlayerInteractEvent.RightClickBlock event) {
-        return event.getLevel().getBlockState(event.getPos()).getBlock() instanceof ZombiesBoxInteractionBlock;
+        return ModeObjectInteractionBypassContributors.handlesOwnUse(
+                event.getLevel().getBlockState(event.getPos()));
     }
 
     private static void applyResult(PlayerInteractEvent event, InteractionResult result) {

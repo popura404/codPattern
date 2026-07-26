@@ -1,6 +1,7 @@
 package com.cdp.codpattern.event.client;
 
 import com.cdp.codpattern.client.network.ClientPacketBridgeInstaller;
+import com.cdp.codpattern.client.runtime.ModeGuiOverlayContributors;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.api.distmarker.Dist;
@@ -24,7 +25,6 @@ public class ClientModEvents {
 
     @SubscribeEvent
     public static void registerGuiOverlays(net.minecraftforge.client.event.RegisterGuiOverlaysEvent event) {
-        event.registerAboveAll("tdm_hud", com.cdp.codpattern.client.gui.overlay.TdmHudOverlay.INSTANCE);
-        event.registerAboveAll("zombies_hud", com.cdp.codpattern.client.gui.overlay.ZombiesHudOverlay.INSTANCE);
+        ModeGuiOverlayContributors.registerAll(event);
     }
 }

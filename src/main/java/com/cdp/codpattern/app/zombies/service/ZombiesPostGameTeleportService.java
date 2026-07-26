@@ -1,6 +1,7 @@
 package com.cdp.codpattern.app.zombies.service;
 
 import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.runtime.player.DeferredPlayerActionRegistry;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -9,8 +10,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 /**
  * Stores post-game end teleport work for members that were offline when a zombies
@@ -20,7 +19,8 @@ import java.util.concurrent.ConcurrentMap;
 public final class ZombiesPostGameTeleportService {
     private static final ZombiesPostGameTeleportService INSTANCE = new ZombiesPostGameTeleportService();
 
-    private final ConcurrentMap<UUID, PendingEndTeleport> pendingByPlayer = new ConcurrentHashMap<>();
+    private final DeferredPlayerActionRegistry<PendingEndTeleport> pendingByPlayer =
+            new DeferredPlayerActionRegistry<>();
 
     public static ZombiesPostGameTeleportService instance() {
         return INSTANCE;
@@ -48,7 +48,7 @@ public final class ZombiesPostGameTeleportService {
                 }
                 memberCount++;
                 if (onlineIds.contains(playerId)) {
-                    if (pendingByPlayer.remove(playerId) != null) {
+                    if (pendingByPlayer.remove(playerId)) {
                         pendingCleared++;
                     }
                     continue;
@@ -73,11 +73,11 @@ public final class ZombiesPostGameTeleportService {
     }
 
     public Optional<PendingEndTeleport> peekPending(UUID playerId) {
-        return Optional.ofNullable(playerId == null ? null : pendingByPlayer.get(playerId));
+        return pendingByPlayer.peek(playerId);
     }
 
     public Optional<PendingEndTeleport> consumePending(UUID playerId) {
-        return Optional.ofNullable(playerId == null ? null : pendingByPlayer.remove(playerId));
+        return pendingByPlayer.consume(playerId);
     }
 
     public void clearPending(UUID playerId) {

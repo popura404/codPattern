@@ -1,5 +1,7 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.tactical.port.CodTacticalTdmReadPort;
+import com.cdp.codpattern.app.teammatch.TeamMatchPolicy;
 import com.cdp.codpattern.app.tdm.model.CodTdmTeamPersistenceSnapshot;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
@@ -13,12 +15,23 @@ import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
-final record CodTdmMapReadPortAdapter(
-        CodTdmMapReadViews readViews,
-        CodTdmMapReadRuntime readRuntime
-) implements CodTdmReadPort {
+class CodTdmMapReadPortAdapter implements CodTdmReadPort {
+    private final TeamMatchPolicy policy;
+    private final CodTdmMapReadViews readViews;
+    private final CodTdmMapReadRuntime readRuntime;
+
+    protected CodTdmMapReadPortAdapter(
+            TeamMatchPolicy policy,
+            CodTdmMapReadViews readViews,
+            CodTdmMapReadRuntime readRuntime
+    ) {
+        this.policy = policy;
+        this.readViews = readViews;
+        this.readRuntime = readRuntime;
+    }
 
     static CodTdmReadPort fromMap(
+            TeamMatchPolicy policy,
             CodTdmMap map,
             CodTdmMapReadRuntime readRuntime,
             Supplier<String> mapNameSupplier,
@@ -39,7 +52,15 @@ final record CodTdmMapReadPortAdapter(
                 () -> map.getServerLevel().dimension().location().toString(),
                 () -> CodTdmMapTeamViews.teamPersistenceSnapshots(map)
         );
-        return new CodTdmMapReadPortAdapter(readViews, readRuntime);
+        if (policy.tacticalCompatibilityPorts()) {
+            return new TacticalReadPortAdapter(policy, readViews, readRuntime);
+        }
+        return new CodTdmMapReadPortAdapter(policy, readViews, readRuntime);
+    }
+
+    @Override
+    public String gameType() {
+        return policy.gameType();
     }
 
     @Override
@@ -155,5 +176,16 @@ final record CodTdmMapReadPortAdapter(
     @Override
     public Optional<SpawnPointData> matchEndTeleportPoint() {
         return readRuntime.matchEndTeleportPoint();
+    }
+
+    private static final class TacticalReadPortAdapter extends CodTdmMapReadPortAdapter
+            implements CodTacticalTdmReadPort {
+        private TacticalReadPortAdapter(
+                TeamMatchPolicy policy,
+                CodTdmMapReadViews readViews,
+                CodTdmMapReadRuntime readRuntime
+        ) {
+            super(policy, readViews, readRuntime);
+        }
     }
 }
