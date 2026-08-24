@@ -19,7 +19,7 @@ public final class Phase5ContributionPrimitivesCompatTest {
         opaqueClientActionsDoNotTypeAddonPayloadsInTheCommonBridge();
         clientPresentationsCarryTheirCompleteNamespace();
         futureMainBlockersContainNoZombiesImplementationReferences();
-        combinedEntrypointIsOnlyOrderedBootstrapWiring();
+        splitEntrypointsContainOnlyTheirOwnedBootstrapWiring();
         System.out.println("PASS phase5 contribution primitives compat");
     }
 
@@ -86,13 +86,21 @@ public final class Phase5ContributionPrimitivesCompatTest {
         }
     }
 
-    private static void combinedEntrypointIsOnlyOrderedBootstrapWiring() throws Exception {
-        String source = Files.readString(Path.of("src/main/java/com/cdp/codpattern/CodPattern.java"));
-        int core = source.indexOf("CoreBootstrap.install(modEventBus);");
-        int zombies = source.indexOf("ZombiesBootstrap.install(modEventBus);");
-        require(core >= 0 && zombies > core, "combined entrypoint should install core before Zombies");
-        require(!source.contains("@SubscribeEvent") && !source.contains("ModNetworkChannel.register()"),
-                "combined entrypoint should contain no lifecycle implementation beyond ordered wiring");
+    private static void splitEntrypointsContainOnlyTheirOwnedBootstrapWiring() throws Exception {
+        String mainSource = Files.readString(Path.of("src/main/java/com/cdp/codpattern/CodPattern.java"));
+        String addonSource = Files.readString(Path.of(
+                "../zombies-addon/src/main/java/com/cdp/codpattern/zombiesaddon/ZombiesAddon.java"));
+        require(mainSource.contains("CoreBootstrap.install(modEventBus);")
+                        && !mainSource.contains("ZombiesBootstrap"),
+                "main entrypoint should install only the core bootstrap");
+        int compatibility = addonSource.indexOf("ZombiesAddonCompatibility.install(localVersion);");
+        int zombies = addonSource.indexOf("ZombiesBootstrap.install(modEventBus);");
+        require(compatibility >= 0 && zombies > compatibility && !addonSource.contains("CoreBootstrap"),
+                "addon entrypoint should enforce compatibility before installing only Zombies");
+        require(!mainSource.contains("@SubscribeEvent") && !mainSource.contains("ModNetworkChannel.register()")
+                        && !addonSource.contains("@SubscribeEvent")
+                        && !addonSource.contains("ModNetworkChannel.register()"),
+                "split entrypoints should contain no lifecycle implementation beyond owned wiring");
     }
 
     private static void require(boolean condition, String message) {

@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -36,24 +35,33 @@ public final class ModeSplitDependencyRatchetCompatTest {
             "docs/mode-split/phase0/dependency-ratchet-allowlist.tsv";
     private static final String IDENTITY_ALLOWLIST =
             "docs/mode-split/phase0/zombies-identity-ratchet.tsv";
+    private static final String PACKAGE_RELOCATION_MAP =
+            "docs/mode-split/physical/round2/SPLIT_PACKAGE_RELOCATION_PROPOSAL.tsv";
     private static final String MAIN_SOURCE_PREFIX = "src/main/java/";
 
     private ModeSplitDependencyRatchetCompatTest() {
     }
 
     public static void main(String[] args) throws Exception {
-        Path root = findRepositoryRoot();
+        Path root = ModeSplitVerificationRoots.repositoryRoot();
         OwnershipManifest ownership = OwnershipManifest.read(root.resolve(OWNERSHIP_MANIFEST));
 
-        List<String> productionSources = listRelativeFiles(root, "src/main/java", ".java");
+        List<ModeSplitVerificationRoots.LocatedFile> productionFiles =
+                ModeSplitVerificationRoots.productionJavaFiles();
+        List<String> productionSources = productionFiles.stream()
+                .map(source -> MAIN_SOURCE_PREFIX + source.relativePath())
+                .toList();
         if (productionSources.isEmpty()) {
             throw new AssertionError("No production Java sources found under src/main/java");
         }
 
         EnumMap<Owner, Integer> ownerCounts = new EnumMap<>(Owner.class);
         Map<String, Owner> sourceOwners = new LinkedHashMap<>();
-        for (String source : productionSources) {
-            Owner owner = ownership.ownerOf(source);
+        for (int index = 0; index < productionSources.size(); index++) {
+            String source = productionSources.get(index);
+            Owner owner = isPhysicalAddonSource(productionFiles.get(index).path())
+                    ? Owner.ZOMBIES_ADDON
+                    : ownership.ownerOf(source);
             if (owner == null) {
                 throw new AssertionError("Ownership manifest does not classify " + source);
             }
@@ -146,7 +154,9 @@ public final class ModeSplitDependencyRatchetCompatTest {
                     || entry.getKey().endsWith("/BuiltInGameModes.java")) {
                 continue;
             }
-            String text = Files.readString(root.resolve(entry.getKey()), StandardCharsets.UTF_8);
+            String text = Files.readString(
+                    ModeSplitVerificationRoots.resolveRepositoryPath(Path.of(entry.getKey())),
+                    StandardCharsets.UTF_8);
             for (String token : tokens) {
                 int count = countOccurrences(text, token);
                 if (count > 0) {
@@ -176,37 +186,39 @@ public final class ModeSplitDependencyRatchetCompatTest {
             Set<String> addonTypes,
             Map<Edge, Set<String>> evidence
     ) throws IOException {
-        Path classesRoot = root.resolve("build/classes/java/main");
-        if (!Files.isDirectory(classesRoot)) {
-            throw new AssertionError("Compiled main classes are missing: " + classesRoot
-                    + ". Run through the Gradle task so testClasses executes first.");
-        }
-
         int inspected = 0;
-        try (Stream<Path> paths = Files.walk(classesRoot)) {
-            for (Path classFile : paths.filter(path -> path.toString().endsWith(".class")).sorted().toList()) {
-                String internalName = normalize(classesRoot.relativize(classFile).toString());
-                internalName = internalName.substring(0, internalName.length() - ".class".length());
-                String topLevelInternalName = stripNestedClassSuffix(internalName);
-                String source = MAIN_SOURCE_PREFIX + topLevelInternalName + ".java";
-                Owner owner = sourceOwners.get(source);
-                if (owner != Owner.FUTURE_MAIN) {
-                    continue;
-                }
-                inspected++;
-                String origin = internalToDotted(topLevelInternalName);
-                Set<String> constants = readClassUtf8Constants(classFile);
-                for (String target : addonTypes) {
-                    String internalTarget = dottedToInternal(target);
-                    if (containsTypeReference(constants, internalTarget, target)) {
-                        record(evidence, new Edge(origin, target),
-                                "bytecode:" + normalize(root.relativize(classFile).toString()));
+        for (Path classesRoot : ModeSplitVerificationRoots.mainClassRoots()) {
+            if (!Files.isDirectory(classesRoot)) {
+                continue;
+            }
+            try (Stream<Path> paths = Files.walk(classesRoot)) {
+                for (Path classFile : paths.filter(path -> path.toString().endsWith(".class")).sorted().toList()) {
+                    String internalName = normalize(classesRoot.relativize(classFile).toString());
+                    internalName = internalName.substring(0, internalName.length() - ".class".length());
+                    String topLevelInternalName = stripNestedClassSuffix(internalName);
+                    String source = MAIN_SOURCE_PREFIX + topLevelInternalName + ".java";
+                    Owner owner = sourceOwners.get(source);
+                    if (owner != Owner.FUTURE_MAIN) {
+                        continue;
+                    }
+                    inspected++;
+                    String origin = internalToDotted(topLevelInternalName);
+                    Set<String> constants = readClassUtf8Constants(classFile);
+                    for (String target : addonTypes) {
+                        String internalTarget = dottedToInternal(target);
+                        if (containsTypeReference(constants, internalTarget, target)) {
+                            String evidencePath = classFile.startsWith(root)
+                                    ? normalize(root.relativize(classFile).toString())
+                                    : normalize(classFile.toString());
+                            record(evidence, new Edge(origin, target), "bytecode:" + evidencePath);
+                        }
                     }
                 }
             }
         }
         if (inspected == 0) {
-            throw new AssertionError("No FUTURE_MAIN class files were inspected under " + classesRoot);
+            throw new AssertionError("No FUTURE_MAIN class files were inspected under "
+                    + ModeSplitVerificationRoots.mainClassRoots());
         }
     }
 
@@ -222,7 +234,9 @@ public final class ModeSplitDependencyRatchetCompatTest {
             }
             String source = entry.getKey();
             String origin = sourcePathToTopLevelType(source);
-            String text = Files.readString(root.resolve(source), StandardCharsets.UTF_8);
+            String text = Files.readString(
+                    ModeSplitVerificationRoots.resolveRepositoryPath(Path.of(source)),
+                    StandardCharsets.UTF_8);
             for (String target : addonTypes) {
                 if (containsTypeName(text, target)) {
                     record(evidence, new Edge(origin, target), "source-fq:" + source);
@@ -237,21 +251,17 @@ public final class ModeSplitDependencyRatchetCompatTest {
             Set<String> addonTypes,
             Map<Edge, Set<String>> evidence
     ) throws IOException {
-        Path resources = root.resolve("src/main/resources");
-        if (!Files.isDirectory(resources)) {
-            return;
-        }
-        try (Stream<Path> paths = Files.walk(resources)) {
-            for (Path path : paths.filter(Files::isRegularFile).sorted().toList()) {
-                String relative = normalize(root.relativize(path).toString());
-                if (ownership.ownerOf(relative) != Owner.FUTURE_MAIN || !isClassBearingMetadata(relative)) {
-                    continue;
-                }
-                String text = Files.readString(path, StandardCharsets.UTF_8);
-                for (String target : addonTypes) {
-                    if (containsTypeName(text, target)) {
-                        record(evidence, new Edge("resource:" + relative, target), "resource:" + relative);
-                    }
+        for (ModeSplitVerificationRoots.LocatedFile resource
+                : ModeSplitVerificationRoots.productionResourceFiles()) {
+            Path path = resource.path();
+            String relative = "src/main/resources/" + resource.relativePath();
+            if (ownership.ownerOf(relative) != Owner.FUTURE_MAIN || !isClassBearingMetadata(relative)) {
+                continue;
+            }
+            String text = Files.readString(path, StandardCharsets.UTF_8);
+            for (String target : addonTypes) {
+                if (containsTypeName(text, target)) {
+                    record(evidence, new Edge("resource:" + relative, target), "resource:" + relative);
                 }
             }
         }
@@ -414,22 +424,6 @@ public final class ModeSplitDependencyRatchetCompatTest {
         evidence.computeIfAbsent(edge, ignored -> new TreeSet<>()).add(detail);
     }
 
-    private static List<String> listRelativeFiles(Path root, String directory, String suffix) throws IOException {
-        Path start = root.resolve(directory);
-        if (!Files.isDirectory(start)) {
-            return List.of();
-        }
-        try (Stream<Path> paths = Files.walk(start)) {
-            return paths.filter(Files::isRegularFile)
-                    .map(root::relativize)
-                    .map(Path::toString)
-                    .map(ModeSplitDependencyRatchetCompatTest::normalize)
-                    .filter(path -> path.endsWith(suffix))
-                    .sorted()
-                    .toList();
-        }
-    }
-
     private static String sourcePathToTopLevelType(String sourcePath) {
         if (!sourcePath.startsWith(MAIN_SOURCE_PREFIX) || !sourcePath.endsWith(".java")) {
             throw new IllegalArgumentException("Not a production Java source path: " + sourcePath);
@@ -457,16 +451,40 @@ public final class ModeSplitDependencyRatchetCompatTest {
         return path.replace('\\', '/');
     }
 
-    private static Path findRepositoryRoot() {
-        Path current = Paths.get("").toAbsolutePath().normalize();
-        while (current != null) {
-            if (Files.isRegularFile(current.resolve(OWNERSHIP_MANIFEST))
-                    && Files.isRegularFile(current.resolve("build.gradle"))) {
-                return current;
-            }
-            current = current.getParent();
+    private static boolean isPhysicalAddonSource(Path path) {
+        return normalize(path.toAbsolutePath().normalize().toString())
+                .contains("/zombies-addon/src/main/java/");
+    }
+
+    private static List<String> authorizedBaselineSourceAliases(Path root) throws IOException {
+        Path relocationMap = root.resolve(PACKAGE_RELOCATION_MAP);
+        if (!Files.isRegularFile(relocationMap)) {
+            throw new AssertionError("Missing authorized Round 2 package relocation map: " + relocationMap);
         }
-        throw new AssertionError("Could not locate repository root containing " + OWNERSHIP_MANIFEST);
+        List<String> aliases = new ArrayList<>();
+        int lineNumber = 0;
+        for (String rawLine : Files.readAllLines(relocationMap, StandardCharsets.UTF_8)) {
+            lineNumber++;
+            if (rawLine.isBlank() || rawLine.startsWith("#")) {
+                continue;
+            }
+            String[] fields = rawLine.split("\\t", -1);
+            if (fields.length != 3 || fields[0].isBlank() || fields[1].isBlank()) {
+                throw new AssertionError(
+                        "Invalid authorized package relocation row " + relocationMap + ":" + lineNumber);
+            }
+            String relocatedPath = "../zombies-addon/src/main/java/"
+                    + fields[1].replace('.', '/') + ".java";
+            if (!Files.isRegularFile(root.resolve(relocatedPath))) {
+                throw new AssertionError("Authorized relocated source is missing: " + relocatedPath);
+            }
+            aliases.add(MAIN_SOURCE_PREFIX + fields[0].replace('.', '/') + ".java");
+        }
+        if (aliases.size() != 18) {
+            throw new AssertionError("Expected 18 authorized package relocation aliases, found "
+                    + aliases.size());
+        }
+        return List.copyOf(aliases);
     }
 
     private enum Owner {
@@ -570,16 +588,10 @@ public final class ModeSplitDependencyRatchetCompatTest {
 
         private void assertEveryRuleMatched(List<String> productionSources, Path root) throws IOException {
             List<String> candidates = new ArrayList<>(productionSources);
-            Path resources = root.resolve("src/main/resources");
-            if (Files.isDirectory(resources)) {
-                try (Stream<Path> paths = Files.walk(resources)) {
-                    candidates.addAll(paths.filter(Files::isRegularFile)
-                            .map(root::relativize)
-                            .map(Path::toString)
-                            .map(ModeSplitDependencyRatchetCompatTest::normalize)
-                            .toList());
-                }
-            }
+            candidates.addAll(authorizedBaselineSourceAliases(root));
+            candidates.addAll(ModeSplitVerificationRoots.productionResourceFiles().stream()
+                    .map(resource -> "src/main/resources/" + resource.relativePath())
+                    .toList());
             for (OwnershipRule rule : rules) {
                 boolean matched = candidates.stream().anyMatch(rule::matches);
                 if (!matched) {

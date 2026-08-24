@@ -10,13 +10,13 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
 /** Snapshots ordered Java-side arguments to every Component.translatable call. */
 public final class ModeSplitTranslationCallCompatTest {
-    private static final Path MAIN_JAVA = Path.of("src/main/java");
     private static final Path BASELINE =
             Path.of("docs/mode-split/phase0/translation-call-baseline.tsv");
+    private static final Path PACKAGE_RELOCATIONS =
+            Path.of("docs/mode-split/physical/round2/SPLIT_PACKAGE_RELOCATION_PROPOSAL.tsv");
     private static final String CALL_PREFIX = "Component.translatable(";
 
     private ModeSplitTranslationCallCompatTest() {
@@ -44,20 +44,48 @@ public final class ModeSplitTranslationCallCompatTest {
 
     private static Map<String, CallSnapshot> scanCalls() throws Exception {
         Map<String, CallSnapshot> snapshots = new LinkedHashMap<>();
-        try (Stream<Path> paths = Files.walk(MAIN_JAVA)) {
-            for (Path path : paths.filter(file -> file.getFileName().toString().endsWith(".java"))
-                    .sorted()
-                    .toList()) {
-                String source = Files.readString(path, StandardCharsets.UTF_8);
-                List<String> calls = extractCalls(source, path);
-                if (calls.isEmpty()) {
-                    continue;
-                }
-                String relative = MAIN_JAVA.relativize(path).toString().replace('\\', '/');
-                snapshots.put(relative, new CallSnapshot(calls.size(), sha256(String.join("\n", calls))));
+        Map<String, String> relocatedToBaselinePaths = readAuthorizedBaselinePaths();
+        for (ModeSplitVerificationRoots.LocatedFile located
+                : ModeSplitVerificationRoots.productionJavaFiles()) {
+            Path path = located.path();
+            String source = Files.readString(path, StandardCharsets.UTF_8);
+            List<String> calls = extractCalls(source, path);
+            if (calls.isEmpty()) {
+                continue;
             }
+            String baselinePath = relocatedToBaselinePaths.getOrDefault(
+                    located.relativePath(), located.relativePath());
+            CallSnapshot previous = snapshots.put(baselinePath,
+                    new CallSnapshot(calls.size(), sha256(String.join("\n", calls))));
+            require(previous == null, "duplicate translation baseline source after authorized relocation: "
+                    + baselinePath);
         }
         return snapshots;
+    }
+
+    private static Map<String, String> readAuthorizedBaselinePaths() throws IOException {
+        require(Files.isRegularFile(PACKAGE_RELOCATIONS),
+                "authorized Round 2 package relocation map is missing");
+        Map<String, String> relocatedToBaseline = new LinkedHashMap<>();
+        int lineNumber = 0;
+        for (String rawLine : Files.readAllLines(PACKAGE_RELOCATIONS, StandardCharsets.UTF_8)) {
+            lineNumber++;
+            if (rawLine.isBlank() || rawLine.startsWith("#")) {
+                continue;
+            }
+            String[] fields = rawLine.split("\\t", -1);
+            require(fields.length == 3 && !fields[0].isBlank() && !fields[1].isBlank(),
+                    "invalid authorized package relocation row at "
+                            + PACKAGE_RELOCATIONS + ":" + lineNumber);
+            String baselinePath = fields[0].replace('.', '/') + ".java";
+            String relocatedPath = fields[1].replace('.', '/') + ".java";
+            require(relocatedToBaseline.put(relocatedPath, baselinePath) == null,
+                    "duplicate authorized package relocation target at "
+                            + PACKAGE_RELOCATIONS + ":" + lineNumber);
+        }
+        require(relocatedToBaseline.size() == 18,
+                "authorized Round 2 package relocation count drifted: " + relocatedToBaseline.size());
+        return Map.copyOf(relocatedToBaseline);
     }
 
     private static List<String> extractCalls(String source, Path path) {

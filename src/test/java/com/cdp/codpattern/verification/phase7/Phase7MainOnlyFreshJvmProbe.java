@@ -46,8 +46,12 @@ public final class Phase7MainOnlyFreshJvmProbe {
     private static void addonAndShimClassesAreAbsent() throws Exception {
         requireClassAbsent("com.cdp.codpattern.app.zombies.bootstrap.ZombiesBootstrap");
         requireClassAbsent("com.cdp.codpattern.app.zombies.model.ZombiesGameModeDefinitions");
-        requireClassAbsent("com.cdp.codpattern.compat.fpsmatch.map.ZombiesRuntimeProvider");
-        requireClassAbsent("com.cdp.codpattern.CodPattern");
+        requireClassAbsent("com.cdp.codpattern.compat.fpsmatch.map.zombies.ZombiesRuntimeProvider");
+        if (Boolean.getBoolean("modeSplit.allowMainEntrypoint")) {
+            requireClassPresent("com.cdp.codpattern.CodPattern");
+        } else {
+            requireClassAbsent("com.cdp.codpattern.CodPattern");
+        }
     }
 
     private static void mainOnlyBootstrapHasNoRetainedZombiesState() {
@@ -152,6 +156,13 @@ public final class Phase7MainOnlyFreshJvmProbe {
         } catch (ClassNotFoundException expected) {
             // Expected: this process deliberately has no addon or composition-shim output.
         }
+    }
+
+    private static void requireClassPresent(String className) throws Exception {
+        String resourceName = className.replace('.', '/') + ".class";
+        require(Phase7MainOnlyFreshJvmProbe.class.getClassLoader().getResource(resourceName) != null,
+                "required main entrypoint resource is absent from the physical main JAR: " + className);
+        Class.forName(className, false, Phase7MainOnlyFreshJvmProbe.class.getClassLoader());
     }
 
     private static void require(boolean condition, String message) {

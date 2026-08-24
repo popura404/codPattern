@@ -18,3 +18,4 @@ LR Tactical 0.3.0+ 是可选联动；未安装时，LR 近战、投掷物选择�
 - [常见问题 Q&A](docs/QANDA.md)
 - [英文说明](docs/README.en.md)
 - [更新日志](docs/CHANGES.md)
+- [主模组 / Zombies addon 构建与安装说明](docs/mode-split/physical/SPLIT_INSTALLATION_AND_UPGRADE.md)

@@ -12,11 +12,12 @@ import java.util.Map;
 
 /** Executable source-level characterization of packet authorization, threading, and recipients. */
 public final class ModeSplitPacketSendRouteCompatTest {
-    private static final Path MAIN_JAVA = Path.of("src/main/java");
     private static final Path REGISTRATION =
             Path.of("docs/mode-split/phase0/packet-registration-baseline.tsv");
     private static final Path ROUTES =
             Path.of("docs/mode-split/phase0/packet-send-route-baseline.tsv");
+    private static final Path PACKAGE_RELOCATIONS =
+            Path.of("docs/mode-split/physical/round2/SPLIT_PACKAGE_RELOCATION_PROPOSAL.tsv");
 
     private ModeSplitPacketSendRouteCompatTest() {
     }
@@ -35,9 +36,10 @@ public final class ModeSplitPacketSendRouteCompatTest {
     private static void verifyEveryPacketHandlerThreadContract(Map<String, PacketRegistration> packets)
             throws IOException {
         require(packets.size() == 58, "packet registration baseline must contain 58 classes");
+        Map<String, String> runtimeClassNames = readAuthorizedRuntimeClassNames();
         long c2s = 0;
         for (PacketRegistration packet : packets.values()) {
-            String source = source(packet.className());
+            String source = source(runtimeClassNames.getOrDefault(packet.className(), packet.className()));
             require(source.contains("enqueueWork("),
                     packet.className() + " must continue scheduling handler work");
             require(source.contains("setPacketHandled(true)"),
@@ -135,7 +137,7 @@ public final class ModeSplitPacketSendRouteCompatTest {
     }
 
     private static void verifyZombiesRosterRoutes() throws IOException {
-        String factory = source("com.cdp.codpattern.compat.fpsmatch.map.ZombiesRoomHandleFactory");
+        String factory = source("com.cdp.codpattern.compat.fpsmatch.map.zombies.ZombiesRoomHandleFactory");
         requireTokens(factory,
                 "return requester != null && map.hasSurvivor(requester.getUUID());",
                 "rosterCoordinator.requestResync(player);",
@@ -155,7 +157,7 @@ public final class ModeSplitPacketSendRouteCompatTest {
         require(!previewBody.contains("hasSurvivor"),
                 "Zombies requester-only preview must not acquire the survivor-membership gate");
 
-        String map = source("com.cdp.codpattern.compat.fpsmatch.map.ZombiesMap");
+        String map = source("com.cdp.codpattern.compat.fpsmatch.map.zombies.ZombiesMap");
         requireTokens(map,
                 "getMapTeams().getJoinedPlayers().forEach(playerData -> playerData.getPlayer().ifPresent(players::add));",
                 "Set<UUID> survivorPlayerIds()",
@@ -173,6 +175,29 @@ public final class ModeSplitPacketSendRouteCompatTest {
         return packets;
     }
 
+    private static Map<String, String> readAuthorizedRuntimeClassNames() throws IOException {
+        require(Files.isRegularFile(PACKAGE_RELOCATIONS),
+                "authorized Round 2 package relocation map is missing");
+        Map<String, String> oldToRelocated = new HashMap<>();
+        int lineNumber = 0;
+        for (String rawLine : Files.readAllLines(PACKAGE_RELOCATIONS, StandardCharsets.UTF_8)) {
+            lineNumber++;
+            if (rawLine.isBlank() || rawLine.startsWith("#")) {
+                continue;
+            }
+            String[] fields = rawLine.split("\\t", -1);
+            require(fields.length == 3 && !fields[0].isBlank() && !fields[1].isBlank(),
+                    "invalid authorized package relocation row at "
+                            + PACKAGE_RELOCATIONS + ":" + lineNumber);
+            require(oldToRelocated.put(fields[0], fields[1]) == null,
+                    "duplicate authorized package relocation source at "
+                            + PACKAGE_RELOCATIONS + ":" + lineNumber);
+        }
+        require(oldToRelocated.size() == 18,
+                "authorized Round 2 package relocation count drifted: " + oldToRelocated.size());
+        return Map.copyOf(oldToRelocated);
+    }
+
     private static List<String> dataLines(Path path) throws IOException {
         require(Files.isRegularFile(path), "missing Phase 0 baseline: " + path);
         return Files.readAllLines(path, StandardCharsets.UTF_8).stream()
@@ -181,8 +206,7 @@ public final class ModeSplitPacketSendRouteCompatTest {
     }
 
     private static String source(String className) throws IOException {
-        Path path = MAIN_JAVA.resolve(className.replace('.', '/') + ".java");
-        require(Files.isRegularFile(path), "missing source for " + className + ": " + path);
+        Path path = ModeSplitVerificationRoots.productionJavaSource(className);
         return Files.readString(path, StandardCharsets.UTF_8);
     }
 

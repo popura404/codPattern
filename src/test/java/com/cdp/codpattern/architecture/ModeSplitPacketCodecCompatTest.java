@@ -33,7 +33,6 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
  * Phase 0 characterization for the one legacy {@code codpattern:main} channel.
@@ -44,13 +43,14 @@ import java.util.stream.Stream;
  * twice in one JVM.</p>
  */
 public final class ModeSplitPacketCodecCompatTest {
-    private static final Path MAIN_JAVA = Path.of("src/main/java");
     private static final Path REGISTRATION_BASELINE =
             Path.of("docs/mode-split/phase0/packet-registration-baseline.tsv");
     private static final Path HELPER_BASELINE =
             Path.of("docs/mode-split/phase0/packet-codec-helper-baseline.tsv");
     private static final Path LEGACY_BASELINE =
             Path.of("docs/mode-split/phase0/packet-legacy-decode-baseline.tsv");
+    private static final Path PACKAGE_RELOCATION_PATH =
+            Path.of("docs/mode-split/physical/round2/SPLIT_PACKAGE_RELOCATION_PROPOSAL.tsv");
 
     private static final Pattern IMPORT = Pattern.compile("^import\\s+([\\w.]+);$", Pattern.MULTILINE);
     private static final Pattern MESSAGE_BUILDER = Pattern.compile(
@@ -82,12 +82,12 @@ public final class ModeSplitPacketCodecCompatTest {
     private static final Map<String, SlotPacket> MODE_PACKET_SLOTS = Map.of(
             "FPSM_MODE_TOOL_ACTION",
             new SlotPacket(
-                    "com.phasetranscrystal.fpsmatch.common.packet.ZombiesDeployToolActionC2SPacket",
+                    "com.phasetranscrystal.fpsmatch.common.packet.zombies.ZombiesDeployToolActionC2SPacket",
                     "C2S",
                     "PLAY_TO_SERVER"),
             "FPSM_MODE_TOOL_SCREEN",
             new SlotPacket(
-                    "com.phasetranscrystal.fpsmatch.common.packet.OpenZombiesDeployToolScreenS2CPacket",
+                    "com.phasetranscrystal.fpsmatch.common.packet.zombies.OpenZombiesDeployToolScreenS2CPacket",
                     "S2C",
                     "PLAY_TO_CLIENT")
     );
@@ -115,8 +115,8 @@ public final class ModeSplitPacketCodecCompatTest {
     }
 
     private static List<Registration> scanRegistrationOrder() throws IOException {
-        Path channelPath = MAIN_JAVA.resolve(
-                "com/cdp/codpattern/adapter/forge/network/ModNetworkChannel.java");
+        Path channelPath = ModeSplitVerificationRoots.productionJavaSource(
+                "com.cdp.codpattern.adapter.forge.network.ModNetworkChannel");
         String channelSource = Files.readString(channelPath, StandardCharsets.UTF_8);
         String registerBody = methodBody(channelSource, "public static void register()");
         List<RegistrarCall> actualCalls = new ArrayList<>();
@@ -129,11 +129,12 @@ public final class ModeSplitPacketCodecCompatTest {
 
         List<Registration> registrations = new ArrayList<>();
         int discriminator = 0;
-        String zombiesPacketContributor = Files.readString(MAIN_JAVA.resolve(
-                "com/cdp/codpattern/app/zombies/bootstrap/ZombiesNetworkPacketContributor.java"));
+        String zombiesPacketContributor = Files.readString(
+                ModeSplitVerificationRoots.productionJavaSource(
+                        "com.cdp.codpattern.app.zombies.bootstrap.ZombiesNetworkPacketContributor"));
         for (RegistrarCall call : actualCalls) {
-            Path registrarPath = MAIN_JAVA.resolve(
-                    "com/cdp/codpattern/adapter/forge/network/" + call.className() + ".java");
+            Path registrarPath = ModeSplitVerificationRoots.productionJavaSource(
+                    "com.cdp.codpattern.adapter.forge.network." + call.className());
             String source = Files.readString(registrarPath, StandardCharsets.UTF_8);
             Map<String, String> imports = imports(source);
             String body = methodBody(source, "static void " + call.methodName() + "()");
@@ -216,9 +217,11 @@ public final class ModeSplitPacketCodecCompatTest {
         Set<String> registered = new TreeSet<>();
         registrations.forEach(row -> registered.add(row.className()));
         Set<String> packetSources = new TreeSet<>();
-        try (Stream<Path> paths = Files.walk(MAIN_JAVA)) {
-            paths.filter(path -> path.getFileName().toString().endsWith("Packet.java"))
-                    .forEach(path -> packetSources.add(className(path)));
+        for (ModeSplitVerificationRoots.LocatedFile source
+                : ModeSplitVerificationRoots.productionJavaFiles()) {
+            if (source.path().getFileName().toString().endsWith("Packet.java")) {
+                packetSources.add(className(source.relativePath()));
+            }
         }
         requireEquals(registered, packetSources,
                 "production *Packet.java inventory and channel registration differ");
@@ -228,19 +231,15 @@ public final class ModeSplitPacketCodecCompatTest {
         Set<String> registered = new HashSet<>();
         registrations.forEach(row -> registered.add(row.className()));
         Set<String> actualHelpers = new TreeSet<>();
-        try (Stream<Path> paths = Files.walk(MAIN_JAVA)) {
-            paths.filter(path -> path.getFileName().toString().endsWith(".java"))
-                    .filter(path -> {
-                        try {
-                            return Files.readString(path, StandardCharsets.UTF_8).contains("FriendlyByteBuf");
-                        } catch (IOException error) {
-                            throw new RuntimeException(error);
-                        }
-                    })
-                    .map(ModeSplitPacketCodecCompatTest::className)
-                    .filter(name -> !registered.contains(name))
-                    .filter(name -> !name.contains(".architecture.gametest."))
-                    .forEach(actualHelpers::add);
+        for (ModeSplitVerificationRoots.LocatedFile source
+                : ModeSplitVerificationRoots.productionJavaFiles()) {
+            if (!Files.readString(source.path(), StandardCharsets.UTF_8).contains("FriendlyByteBuf")) {
+                continue;
+            }
+            String name = className(source.relativePath());
+            if (!registered.contains(name) && !name.contains(".architecture.gametest.")) {
+                actualHelpers.add(name);
+            }
         }
 
         Set<String> expectedHelpers = new TreeSet<>();
@@ -508,6 +507,7 @@ public final class ModeSplitPacketCodecCompatTest {
 
     private static List<FixtureRow> readFixtureRows() throws IOException {
         List<FixtureRow> rows = new ArrayList<>();
+        Map<String, String> runtimeClassNames = authorizedRuntimeClassNames();
         for (String line : dataLines(REGISTRATION_BASELINE)) {
             String[] fields = line.split("\\t", -1);
             requireEquals(6, fields.length, "invalid packet registration baseline row: " + line);
@@ -515,12 +515,33 @@ public final class ModeSplitPacketCodecCompatTest {
             rows.add(new FixtureRow(
                     Integer.parseInt(fields[0]),
                     fields[1],
-                    fields[2],
+                    runtimeClassNames.getOrDefault(fields[2], fields[2]),
                     fields[3],
                     fields[4],
                     fields[5]));
         }
         return rows;
+    }
+
+    private static Map<String, String> authorizedRuntimeClassNames() throws IOException {
+        Path path = ModeSplitVerificationRoots.resolveRepositoryPath(PACKAGE_RELOCATION_PATH);
+        require(Files.isRegularFile(path), "authorized Round 2 package relocation map is missing");
+        Map<String, String> oldToRelocated = new HashMap<>();
+        int lineNumber = 0;
+        for (String rawLine : Files.readAllLines(path, StandardCharsets.UTF_8)) {
+            lineNumber++;
+            if (rawLine.isBlank() || rawLine.startsWith("#")) {
+                continue;
+            }
+            String[] fields = rawLine.split("\\t", -1);
+            require(fields.length == 3 && !fields[0].isBlank() && !fields[1].isBlank(),
+                    "invalid authorized package relocation row at " + path + ":" + lineNumber);
+            require(oldToRelocated.put(fields[0], fields[1]) == null,
+                    "duplicate authorized package relocation source at " + path + ":" + lineNumber);
+        }
+        requireEquals(18, oldToRelocated.size(),
+                "authorized Round 2 package relocation count drifted");
+        return Map.copyOf(oldToRelocated);
     }
 
     private static List<String> dataLines(Path path) throws IOException {
@@ -560,8 +581,7 @@ public final class ModeSplitPacketCodecCompatTest {
         return imports;
     }
 
-    private static String className(Path source) {
-        String relative = MAIN_JAVA.relativize(source).toString().replace('\\', '/');
+    private static String className(String relative) {
         return relative.substring(0, relative.length() - ".java".length()).replace('/', '.');
     }
 

@@ -1,0 +1,63 @@
+def phase0Artifacts = [
+        'docs/mode-split/phase0/ownership-manifest.tsv',
+        'docs/mode-split/phase0/dependency-ratchet-allowlist.tsv',
+        'docs/mode-split/phase0/zombies-identity-ratchet.tsv',
+        'docs/mode-split/phase0/compatibility-manifest.json',
+        'docs/mode-split/phase0/event-handler-baseline.tsv',
+        'docs/mode-split/phase0/packet-registration-baseline.tsv',
+        'docs/mode-split/phase0/packet-codec-helper-baseline.tsv',
+        'docs/mode-split/phase0/packet-legacy-decode-baseline.tsv',
+        'docs/mode-split/phase0/packet-send-route-baseline.tsv',
+        'docs/mode-split/phase0/translation-call-baseline.tsv',
+        'docs/mode-split/phase0/data-fixture-baseline.md',
+        'docs/mode-split/phase0/registry-conflict-baseline.md',
+        'docs/mode-split/phase0/pvp-behavior-baseline.md',
+        'docs/mode-split/phase0/zombies-behavior-baseline.md',
+        'docs/mode-split/phase0/static-contract-test-migration-ledger.tsv',
+        'docs/mode-split/phase0/test-execution-inventory.md',
+        'docs/mode-split/phase0/known-defects.tsv',
+        'docs/mode-split/phase0/verification-status.md'
+]
+
+tasks.register('verifyModeSplitPhase0Artifacts') {
+    group = 'verification'
+    description = 'Verify that every required Phase 0 review artifact is present and non-empty.'
+    inputs.files(phase0Artifacts.collect { file(it) })
+
+    doLast {
+        List<String> missing = phase0Artifacts.findAll { path ->
+            File artifact = file(path)
+            !artifact.isFile() || artifact.length() == 0L
+        }
+        if (!missing.isEmpty()) {
+            throw new GradleException("Missing or empty Phase 0 artifacts: ${missing}")
+        }
+        println "Mode-split Phase 0 artifacts passed: ${phase0Artifacts.size()} required files present."
+    }
+}
+
+tasks.register('runModeSplitPhase0Baseline') {
+    group = 'verification'
+    description = hasZombiesAddon
+            ? 'Run the complete executable Phase 0 mode-split preparation baseline.'
+            : 'Run the main-only executable Phase 0 preparation baseline.'
+    def baselineTasks = [
+            'verifyModeSplitStaticTestLedger',
+            'verifyModeSplitKnownDefects',
+            'runCommonCompatSuite',
+            'runPvpBaselineCompatSuite',
+            'runPhase0DataFixtureCompat',
+            'verifyModeSplitPhase0Artifacts'
+    ]
+    if (hasZombiesAddon) {
+        baselineTasks.addAll([
+                'runModeSplitDependencyRatchet',
+                'runZombiesMvp123CompatSuite',
+                'runModeSplitCompatibilityManifest',
+                'runModeSplitPacketCodecCompat',
+                'runModeSplitPacketSendRouteCompat',
+                'runModeSplitTranslationCallCompat'
+        ])
+    }
+    dependsOn(baselineTasks)
+}

@@ -23,6 +23,12 @@ apply plugin: 'org.spongepowered.mixin'
 version = mod_version
 group = mod_group_id
 
+// The main mod is a standalone Gradle build.  The Zombies addon owns the
+// reverse dependency when it is run from its own checkout, so this project
+// never discovers or includes addon sources.
+def hasZombiesAddon = false
+ext.hasZombiesAddon = false
+
 base {
     archivesName = mod_id
 }
@@ -60,7 +66,7 @@ minecraft {
 
         gameTestServer {
             property 'forge.enabledGameTestNamespaces', mod_id
-            environment 'MOD_CLASSES', "${mod_id}%%${layout.buildDirectory.dir('gametestMod/main').get().asFile.absolutePath}"
+            environment 'MOD_CLASSES', "${mod_id}%%${layout.buildDirectory.dir('gametestMod/codpattern').get().asFile.absolutePath}"
         }
 
         data {
@@ -94,7 +100,11 @@ repositories {
 
 def requestedTaskNames = gradle.startParameter.taskNames.collect { it.toLowerCase() }
 def dedicatedServerRunRequested = requestedTaskNames.any { taskName ->
-    taskName.contains('runserver') || taskName.contains('gametestserver')
+    taskName.contains('server')
+            || taskName.contains('gametest')
+            || taskName.contains('runsplitround4verificationgate')
+            || taskName.contains('runsplitround5verificationgate')
+            || taskName.contains('runsplitround6verificationgate')
 }
 def withLrTactical = (findProperty('withLrTactical') ?: 'false').toString().toBoolean()
 
@@ -138,20 +148,28 @@ tasks.register('syncGameTestStructures', Copy) {
     include '**/*.snbt'
 }
 
+def legacyMergedGameTestModRoot = layout.buildDirectory.dir('gametestMod/main')
+
 tasks.register('syncGameTestModClasses', Sync) {
     group = 'verification'
-    description = 'Build a single exploded mod root for Forge GameTest. The GameTest launcher can lose classes from multi-root MOD_CLASSES entries.'
-    into layout.buildDirectory.dir('gametestMod/main')
+    description = 'Build the main-only exploded mod root used by Forge GameTest.'
+    into layout.buildDirectory.dir('gametestMod/codpattern')
     from(sourceSets.main.output.resourcesDir) {
         into '.'
     }
     from(sourceSets.main.output.classesDirs) {
         into '.'
     }
-    from(sourceSets.test.output.classesDirs) {
-        into '.'
+    dependsOn tasks.named('classes')
+    doFirst {
+        File legacyRoot = legacyMergedGameTestModRoot.get().asFile
+        File expectedParent = layout.buildDirectory.dir('gametestMod').get().asFile
+        if (legacyRoot.name != 'main'
+                || legacyRoot.canonicalFile.parentFile != expectedParent.canonicalFile) {
+            throw new GradleException("Refusing to remove unexpected legacy GameTest root: ${legacyRoot}")
+        }
+        delete legacyRoot
     }
-    dependsOn tasks.named('testClasses')
 }
 
 tasks.matching { it.name == 'runGameTestServer' }.configureEach {
@@ -192,23 +210,19 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-tasks.register('runZombiesMvp123CompatSuite', JavaExec) {
+tasks.register('runMainCompatibilitySuite') {
     group = 'verification'
-    description = 'Run the pure JVM zombies MVP1-MVP3 compatibility suite.'
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.cdp.codpattern.app.zombies.service.ZombiesMvp123CompatTestSuite'
-    dependsOn tasks.named('testClasses')
+    description = 'Run all main-owned common, Frontline, Team Deathmatch, PVP, and fixture compatibility gates.'
+    dependsOn 'runCommonCompatSuite'
+    dependsOn 'runPvpBaselineCompatSuite'
+    dependsOn 'runMainPhase0DataFixtureCompat'
 }
 
-apply from: 'gradle/mode-split-dependency-ratchet.gradle'
 apply from: 'gradle/mode-split-test-ledger.gradle'
-apply from: 'gradle/mode-split-compatibility-manifest.gradle'
-apply from: 'gradle/mode-split-packet-codec.gradle'
-apply from: 'gradle/mode-split-send-route.gradle'
-apply from: 'gradle/mode-split-translation-calls.gradle'
 apply from: 'gradle/mode-split-phase0.gradle'
 apply from: 'gradle/mode-split-phase6.gradle'
 apply from: 'gradle/mode-split-phase7.gradle'
+apply from: 'gradle/mode-split-main-only-distribution.gradle'
 
 // 提取依赖到 libs-extracted，便于 Agent 和 IDE 访问
 // 运行: gradlew extractDependencyLibs
@@ -313,33 +327,6 @@ def normalizeModsDir(Object rawValue) {
 
 tasks.register('buildAndCopyToMods') {
     group = 'distribution'
-    description = 'Builds and copies the reobfuscated jar into a Minecraft mods directory.'
-    dependsOn 'build'
-
-    doLast {
-        def rawModsDir = project.findProperty('modsDir') ?: System.getenv('MODS_DIR')
-        def modsDirPath = normalizeModsDir(rawModsDir)
-        if (modsDirPath == null) {
-            throw new GradleException("modsDir not set. Example: ./gradlew buildAndCopyToMods -PmodsDir=/mnt/c/Users/<you>/Desktop/.minecraft/versions/1.20.1-Forge_47.4.0/mods")
-        }
-
-        def modsDir = file(modsDirPath)
-        if (!modsDir.exists()) {
-            throw new GradleException("modsDir does not exist: ${modsDir}")
-        }
-
-        def jarFile = tasks.named('jar', Jar).get().archiveFile.get().asFile
-        if (!jarFile.exists()) {
-            throw new GradleException("Built jar not found: ${jarFile}")
-        }
-
-        delete fileTree(modsDir) {
-            include "${mod_id}*.jar"
-        }
-        copy {
-            from jarFile
-            into modsDir
-        }
-        println "Copied ${jarFile.name} -> ${modsDir}"
-    }
+    description = 'Compatibility alias for deployment of the main mod only.'
+    dependsOn tasks.named('deploySplitMainOnly')
 }

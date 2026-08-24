@@ -134,6 +134,8 @@ These are the actual default fields in the current code:
 - Full implementation-oriented guide: [GUIDE.md](GUIDE.md)
 - Common questions: [QANDA.md](QANDA.md)
 - Version history: [CHANGES.md](CHANGES.md)
+- Main-mod / Zombies addon build, run, and installation entry points:
+  [SPLIT_INSTALLATION_AND_UPGRADE.md](mode-split/physical/SPLIT_INSTALLATION_AND_UPGRADE.md)
 
 ## Compatibility and Dependencies
 

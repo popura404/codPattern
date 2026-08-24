@@ -22,15 +22,16 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 public final class ModeSplitCompatibilityManifestCompatTest {
     private static final Path MANIFEST_PATH =
             Path.of("docs/mode-split/phase0/compatibility-manifest.json");
     private static final Path EVENT_BASELINE_PATH =
             Path.of("docs/mode-split/phase0/event-handler-baseline.tsv");
-    private static final Path MAIN_JAVA = Path.of("src/main/java");
-
+    private static final Path PACKAGE_RELOCATION_PATH =
+            Path.of("docs/mode-split/physical/round2/SPLIT_PACKAGE_RELOCATION_PROPOSAL.tsv");
+    private static final Path ADDON_LANGUAGE_ROOT = Path.of(
+            "../zombies-addon/src/main/resources/assets/codpattern_zombies/lang");
     private static final Pattern COMMAND_LITERAL =
             Pattern.compile("Commands\\.literal\\(\\\"([^\\\"]+)\\\"\\)");
     private static final Pattern FORMAT_TOKEN = Pattern.compile(
@@ -88,7 +89,8 @@ public final class ModeSplitCompatibilityManifestCompatTest {
                 "Forge 1.20.1 must stay on Java 17");
         requireContains(build, "id 'net.minecraftforge.gradle'", "ForgeGradle plugin disappeared");
 
-        Path metadata = Path.of(loader.get("metadataFile").getAsString());
+        Path metadata = ModeSplitVerificationRoots.resolveRepositoryPath(
+                Path.of(loader.get("metadataFile").getAsString()));
         require(Files.exists(metadata), "Forge mods.toml metadata file is missing");
         String modsToml = read(metadata);
         requireContains(modsToml, "modLoader=\"javafml\"", "Forge loader metadata drifted");
@@ -248,7 +250,7 @@ public final class ModeSplitCompatibilityManifestCompatTest {
                 "src/main/java/com/cdp/codpattern/compat/fpsmatch/data/CodTacticalTdmMapData.java",
                 "BuiltInGameModes.TEAM_DEATHMATCH", folders.get("teamdeathmatch").getAsString());
         requirePersistenceFolder(
-                "src/main/java/com/cdp/codpattern/compat/fpsmatch/data/ZombiesMapData.java",
+                "src/main/java/com/cdp/codpattern/compat/fpsmatch/data/zombies/ZombiesMapData.java",
                 "BuiltInGameModes.ZOMBIES", folders.get("zombies").getAsString());
 
         String configPath = read(Path.of(
@@ -328,7 +330,7 @@ public final class ModeSplitCompatibilityManifestCompatTest {
                 "src/main/java/com/phasetranscrystal/fpsmatch/common/item/SpawnPointTool.java",
                 actualTransientTags, actualToolTags);
         collectToolTags(
-                "src/main/java/com/phasetranscrystal/fpsmatch/common/item/ZombiesDeployTool.java",
+                "src/main/java/com/phasetranscrystal/fpsmatch/common/item/zombies/ZombiesDeployTool.java",
                 actualTransientTags, actualToolTags);
         String deployPreview = read(Path.of(
                 "src/main/java/com/cdp/codpattern/app/zombies/deploy/ZombiesDeployPreviewService.java"));
@@ -387,10 +389,23 @@ public final class ModeSplitCompatibilityManifestCompatTest {
     private static void verifyTranslations(JsonArray translations) throws Exception {
         for (JsonElement element : translations) {
             JsonObject expected = element.getAsJsonObject();
-            JsonObject translationsJson = readJson(Path.of(expected.get("file").getAsString()));
+            Path mainPath = ModeSplitVerificationRoots.resolveRepositoryPath(
+                    Path.of(expected.get("file").getAsString()));
+            JsonObject translationsJson = readJson(mainPath);
             TreeMap<String, String> values = new TreeMap<>();
             for (Map.Entry<String, JsonElement> entry : translationsJson.entrySet()) {
                 values.put(entry.getKey(), entry.getValue().getAsString());
+            }
+            Path addonPath = ModeSplitVerificationRoots.resolveRepositoryPath(
+                    ADDON_LANGUAGE_ROOT.resolve(mainPath.getFileName()));
+            if (Files.isRegularFile(addonPath)) {
+                JsonObject addonTranslations = readJson(addonPath);
+                for (Map.Entry<String, JsonElement> entry : addonTranslations.entrySet()) {
+                    require(!values.containsKey(entry.getKey()),
+                            "main/addon translation key overlap in " + mainPath.getFileName()
+                                    + ": " + entry.getKey());
+                    values.put(entry.getKey(), entry.getValue().getAsString());
+                }
             }
 
             StringBuilder keys = new StringBuilder();
@@ -434,7 +449,37 @@ public final class ModeSplitCompatibilityManifestCompatTest {
         List<String> expectedRows = Files.readAllLines(EVENT_BASELINE_PATH, StandardCharsets.UTF_8).stream()
                 .filter(line -> !line.isBlank() && !line.startsWith("#"))
                 .toList();
-        requireEquals(expectedRows, actualRows, "Forge event subscriber metadata drifted");
+        Map<String, String> relocatedToBaseline = readAuthorizedPackageRelocations();
+        Set<String> addonSubscribers = Set.of(
+                "com.cdp.codpattern.compat.fpsmatch.data.zombies.ZombiesMapData",
+                "com.cdp.codpattern.compat.tacz.event.zombies.TaczHeadshotMultiplierOverrideHandler",
+                "com.cdp.codpattern.event.zombies.ZombiesBarrierMovementEventHandler",
+                "com.cdp.codpattern.event.zombies.ZombiesServerLifecycleEventHandler",
+                "com.cdp.codpattern.event.client.zombies.ZombiesCombatMarkerWorldRenderer",
+                "com.cdp.codpattern.event.client.zombies.ZombiesObjectLabelWorldRenderer");
+        List<String> addonRows = actualRows.stream().filter(row ->
+                addonSubscribers.contains(row.substring(0, row.indexOf('\t')))).toList();
+        requireEquals(9, addonRows.size(),
+                "physical addon must retain exactly nine automatic event handlers");
+        requireEquals(addonSubscribers, addonRows.stream()
+                        .map(row -> row.substring(0, row.indexOf('\t')))
+                        .collect(java.util.stream.Collectors.toSet()),
+                "physical addon automatic subscriber class ownership drifted");
+        for (String row : addonRows) {
+            String[] fields = row.split("\\t", -1);
+            requireEquals("ZombiesAddonConstants.MOD_ID", fields[1],
+                    "physical addon subscriber must use the addon loader identity: " + fields[0]);
+        }
+        List<String> normalizedActualRows = actualRows.stream().map(row -> {
+            String[] fields = row.split("\\t", -1);
+            if (addonSubscribers.contains(fields[0])) {
+                fields[1] = "codpattern";
+            }
+            fields[0] = relocatedToBaseline.getOrDefault(fields[0], fields[0]);
+            return String.join("\t", fields);
+        }).sorted().toList();
+        requireEquals(expectedRows, normalizedActualRows,
+                "Forge event subscriber metadata drifted beyond the approved addon mod-id move");
 
         Set<String> classes = new HashSet<>();
         actualRows.forEach(row -> classes.add(row.substring(0, row.indexOf('\t'))));
@@ -442,39 +487,60 @@ public final class ModeSplitCompatibilityManifestCompatTest {
                 "Forge event subscriber class count drifted");
         requireEquals(eventHandlers.get("handlerCount").getAsInt(), actualRows.size(),
                 "Forge event handler count drifted");
-        String canonical = String.join("\n", actualRows) + "\n";
+        String canonical = String.join("\n", normalizedActualRows) + "\n";
         requireEquals(eventHandlers.get("sha256").getAsString(), sha256(canonical),
                 "Forge event handler digest drifted");
     }
 
+    private static Map<String, String> readAuthorizedPackageRelocations() throws IOException {
+        Path path = ModeSplitVerificationRoots.resolveRepositoryPath(PACKAGE_RELOCATION_PATH);
+        require(Files.isRegularFile(path), "authorized Round 2 package relocation map is missing");
+        Map<String, String> relocatedToBaseline = new TreeMap<>();
+        int lineNumber = 0;
+        for (String rawLine : Files.readAllLines(path, StandardCharsets.UTF_8)) {
+            lineNumber++;
+            if (rawLine.isBlank() || rawLine.startsWith("#")) {
+                continue;
+            }
+            String[] fields = rawLine.split("\\t", -1);
+            require(fields.length == 3 && !fields[0].isBlank() && !fields[1].isBlank(),
+                    "invalid authorized package relocation row at " + path + ":" + lineNumber);
+            require(relocatedToBaseline.put(fields[1], fields[0]) == null,
+                    "duplicate authorized package relocation target at " + path + ":" + lineNumber);
+        }
+        requireEquals(18, relocatedToBaseline.size(),
+                "authorized Round 2 package relocation count drifted");
+        return Map.copyOf(relocatedToBaseline);
+    }
+
     private static List<String> extractEventHandlerRows() throws Exception {
         List<String> rows = new ArrayList<>();
-        try (Stream<Path> paths = Files.walk(MAIN_JAVA)) {
-            for (Path path : paths.filter(file -> file.toString().endsWith(".java")).sorted().toList()) {
-                String source = read(path);
-                Matcher subscriber = EVENT_SUBSCRIBER.matcher(source);
-                if (!subscriber.find()) {
-                    continue;
-                }
-                String subscriberArgs = normalizeWhitespace(subscriber.group(1));
-                String modId = eventSubscriberModId(subscriberArgs);
-                String bus = subscriberArgs.contains("Bus.MOD") ? "MOD" : "FORGE";
-                String dist = subscriberArgs.contains("Dist.CLIENT") ? "CLIENT" : "BOTH";
-                String className = requiredGroup(PACKAGE, source, 1, "package in " + path)
-                        + "." + requiredGroup(TYPE, source, 1, "type in " + path);
+        for (ModeSplitVerificationRoots.LocatedFile located
+                : ModeSplitVerificationRoots.productionJavaFiles()) {
+            Path path = located.path();
+            String source = read(path);
+            Matcher subscriber = EVENT_SUBSCRIBER.matcher(source);
+            if (!subscriber.find()) {
+                continue;
+            }
+            String subscriberArgs = normalizeWhitespace(subscriber.group(1));
+            String modId = eventSubscriberModId(subscriberArgs);
+            String bus = subscriberArgs.contains("Bus.MOD") ? "MOD" : "FORGE";
+            String dist = subscriberArgs.contains("Dist.CLIENT") ? "CLIENT" : "BOTH";
+            String className = requiredGroup(PACKAGE, source, 1, "package in " + path)
+                    + "." + requiredGroup(TYPE, source, 1, "type in " + path);
 
-                Matcher handler = EVENT_HANDLER.matcher(source);
-                while (handler.find()) {
-                    String eventArgs = normalizeWhitespace(handler.group(1));
-                    String eventParameter = normalizeWhitespace(handler.group(3));
-                    String eventType = eventParameter.replaceFirst("\\s+\\w+$", "");
-                    String priority = captureOrDefault(eventArgs,
-                            Pattern.compile("priority\\s*=\\s*EventPriority\\.(\\w+)"), "NORMAL");
-                    String receiveCanceled = captureOrDefault(eventArgs,
-                            Pattern.compile("receiveCanceled\\s*=\\s*(true|false)"), "false");
-                    rows.add(String.join("\t", className, modId, bus, dist, handler.group(2), eventType,
-                            priority, receiveCanceled));
-                }
+            Matcher handler = EVENT_HANDLER.matcher(source);
+            while (handler.find()) {
+                String eventArgs = normalizeWhitespace(handler.group(1));
+                String eventParameter = normalizeWhitespace(handler.group(3));
+                String eventType = eventParameter.replaceFirst("\\s+\\w+$", "");
+                String priority = captureOrDefault(eventArgs,
+                        Pattern.compile("priority\\s*=\\s*EventPriority\\.(\\w+)"), "NORMAL");
+                String receiveCanceled = captureOrDefault(eventArgs,
+                        Pattern.compile("receiveCanceled\\s*=\\s*(true|false)"), "false");
+                rows.add(String.join("\t", className, modId, bus, dist, handler.group(2), eventType,
+                        priority, receiveCanceled));
             }
         }
         rows.sort(String::compareTo);
@@ -497,14 +563,23 @@ public final class ModeSplitCompatibilityManifestCompatTest {
     }
 
     private static void verifyCombinedBootstrapSequence(JsonArray sequence) throws Exception {
-        String source = read(Path.of("src/main/java/com/cdp/codpattern/CodPattern.java"));
-        int previous = -1;
-        for (String call : strings(sequence)) {
-            int current = source.indexOf(call);
-            require(current >= 0, "combined bootstrap call is missing: " + call);
-            require(current > previous, "combined bootstrap order drifted at: " + call);
-            previous = current;
-        }
+        List<String> calls = strings(sequence);
+        requireEquals(List.of(
+                "CoreBootstrap.install(modEventBus);",
+                "ZombiesBootstrap.install(modEventBus);"), calls,
+                "frozen combined bootstrap sequence drifted");
+        String mainEntry = read(Path.of("src/main/java/com/cdp/codpattern/CodPattern.java"));
+        String addonEntry = read(Path.of(
+                "../zombies-addon/src/main/java/com/cdp/codpattern/zombiesaddon/ZombiesAddon.java"));
+        requireContains(mainEntry, calls.get(0), "main bootstrap call is missing");
+        require(!mainEntry.contains("ZombiesBootstrap"),
+                "physical main entrypoint must not install the Zombies bootstrap");
+        int compatibility = addonEntry.indexOf("ZombiesAddonCompatibility.install(localVersion);");
+        int zombiesInstall = addonEntry.indexOf(calls.get(1));
+        require(compatibility >= 0 && zombiesInstall > compatibility,
+                "addon compatibility enforcement must precede Zombies bootstrap installation");
+        require(!addonEntry.contains("CoreBootstrap"),
+                "physical addon entrypoint must not install the core bootstrap");
         String core = read(Path.of("src/main/java/com/cdp/codpattern/bootstrap/CoreBootstrap.java"));
         String zombies = read(Path.of(
                 "src/main/java/com/cdp/codpattern/app/zombies/bootstrap/ZombiesBootstrap.java"));
@@ -535,7 +610,8 @@ public final class ModeSplitCompatibilityManifestCompatTest {
     }
 
     private static String read(Path path) throws IOException {
-        return Files.readString(path, StandardCharsets.UTF_8);
+        return Files.readString(
+                ModeSplitVerificationRoots.resolveRepositoryPath(path), StandardCharsets.UTF_8);
     }
 
     private static List<String> strings(JsonArray array) {

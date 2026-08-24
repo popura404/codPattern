@@ -1,0 +1,220 @@
+import java.util.regex.Pattern
+
+def modeSplitStaticTestLedger = layout.projectDirectory.file(
+        'docs/mode-split/phase0/static-contract-test-migration-ledger.tsv')
+def modeSplitTestJavaRoots = providers.provider {
+    String configured = (findProperty('modeSplitTestJavaRoots') ?: '').toString().trim()
+    if (configured.isEmpty()) {
+        List<File> defaults = [file('src/test/java')]
+        Project addonProject = rootProject.findProject(':zombies-addon')
+        if (addonProject != null) {
+            defaults.add(addonProject.file('src/test/java'))
+        }
+        configured = defaults*.absolutePath.join(File.pathSeparator)
+    }
+    configured.split(Pattern.quote(File.pathSeparator), -1)
+            .findAll { !it.isBlank() }
+            .collect { file(it) }
+}
+
+tasks.register('runCommonCompatSuite', JavaExec) {
+    group = 'verification'
+    description = 'Run the Phase 0 common compatibility suite.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.cdp.codpattern.verification.CommonCompatTestSuite'
+    dependsOn tasks.named('testClasses')
+}
+
+tasks.register('runPvpBaselineCompatSuite', JavaExec) {
+    group = 'verification'
+    description = 'Run the Phase 0 Frontline and Team Deathmatch compatibility baseline.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.cdp.codpattern.app.tdm.service.PvpBaselineCompatTestSuite'
+    dependsOn tasks.named('testClasses')
+}
+
+tasks.register('runMainPhase0DataFixtureCompat', JavaExec) {
+    group = 'verification'
+    description = 'Run the main-owned Phase 0 Frontline, Team Deathmatch, shared config, and backpack fixtures.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.cdp.codpattern.compat.modesplit.Phase0MainDataFixtureCompatTest'
+    dependsOn tasks.named('testClasses')
+}
+
+tasks.register('runPhase0DataFixtureCompat') {
+    group = 'verification'
+    description = hasZombiesAddon
+            ? 'Run the split main/addon fixture runners and their combined semantic-union probe.'
+            : 'Run the main-owned Phase 0 fixture runner.'
+    dependsOn tasks.named('runMainPhase0DataFixtureCompat')
+    if (hasZombiesAddon) {
+        dependsOn ':zombies-addon:runZombiesPhase0DataFixtureCompat'
+        dependsOn ':zombies-addon:runCombinedPhase0DataFixtureCompat'
+    }
+}
+
+tasks.register('verifyModeSplitStaticTestLedger') {
+    group = 'verification'
+    description = 'Verify that every static compatibility test has an aggregate or explicit pending disposition.'
+
+    inputs.file(modeSplitStaticTestLedger)
+    inputs.files(providers.provider {
+        modeSplitTestJavaRoots.get().collect { root -> fileTree(root) {
+            include '**/*StaticContractCompatTest.java'
+            include '**/*CompatTestSuite.java'
+        } }
+    })
+
+    doLast {
+        File ledgerFile = modeSplitStaticTestLedger.asFile
+        if (!ledgerFile.isFile()) {
+            throw new GradleException("Missing static-contract migration ledger: ${ledgerFile}")
+        }
+
+        Map<String, Map<String, String>> entries = new TreeMap<>()
+        ledgerFile.readLines('UTF-8').eachWithIndex { rawLine, index ->
+            String trimmed = rawLine.trim()
+            if (trimmed.isEmpty() || trimmed.startsWith('#')) {
+                return
+            }
+
+            String[] fields = rawLine.split('\\t', -1)
+            if (fields.length != 6) {
+                throw new GradleException(
+                        "Invalid static-contract ledger row ${ledgerFile}:${index + 1}; expected 6 tab-separated fields")
+            }
+
+            String className = fields[0].trim()
+            String status = fields[1].trim()
+            String executionTask = fields[2].trim()
+            String invoker = fields[3].trim()
+            String owner = fields[4].trim()
+            String disposition = fields[5].trim()
+
+            if (className.isEmpty() || owner.isEmpty() || disposition.isEmpty()) {
+                throw new GradleException(
+                        "Blank required field in static-contract ledger row ${ledgerFile}:${index + 1}")
+            }
+            if (!(status in ['AGGREGATED', 'PENDING'])) {
+                throw new GradleException(
+                        "Unknown static-contract status '${status}' at ${ledgerFile}:${index + 1}")
+            }
+            if (entries.put(className, [
+                    status: status,
+                    task: executionTask,
+                    invoker: invoker,
+                    owner: owner,
+                    disposition: disposition
+            ]) != null) {
+                throw new GradleException("Duplicate static-contract ledger class: ${className}")
+            }
+        }
+
+        // The ledger intentionally keeps the historical addon rows, but a
+        // root-only checkout has no physical sources or addon aggregate task
+        // against which those rows could be evaluated.
+        if (!hasZombiesAddon) {
+            entries = entries.findAll { className, entry -> entry.owner != 'Zombies' }
+        }
+
+        Set<String> actual = new TreeSet<>()
+        modeSplitTestJavaRoots.get().each { File root ->
+            fileTree(root) {
+                include '**/*StaticContractCompatTest.java'
+            }.files.each { File source ->
+                String relative = root.toPath().relativize(source.toPath()).toString().replace('\\', '/')
+                String className = relative.substring(0, relative.length() - '.java'.length())
+                        .replace('/', '.')
+                actual.add(className)
+            }
+        }
+
+        Set<String> missing = new TreeSet<>(actual)
+        missing.removeAll(entries.keySet())
+        Set<String> stale = new TreeSet<>(entries.keySet())
+        stale.removeAll(actual)
+        if (!missing.isEmpty() || !stale.isEmpty()) {
+            throw new GradleException(
+                    "Static-contract migration ledger mismatch. Missing rows=${missing}; stale rows=${stale}")
+        }
+
+        entries.each { String className, Map<String, String> entry ->
+            if (entry.status == 'PENDING') {
+                return
+            }
+            if (entry.task.isEmpty() || entry.task == '-') {
+                throw new GradleException("Aggregated static contract has no task: ${className}")
+            }
+            if (tasks.findByName(entry.task) == null) {
+                throw new GradleException(
+                        "Aggregated static contract names missing Gradle task '${entry.task}': ${className}")
+            }
+            if (entry.invoker.isEmpty() || entry.invoker == '-') {
+                throw new GradleException("Aggregated static contract has no invoker: ${className}")
+            }
+
+            List<File> invokerSources = modeSplitTestJavaRoots.get().collect { root ->
+                new File(root, entry.invoker.replace('.', '/') + '.java')
+            }.findAll { it.isFile() }
+            if (invokerSources.size() != 1) {
+                throw new GradleException(
+                        "Static-contract invoker source must exist in exactly one test root for ${className}: " +
+                                "${invokerSources}")
+            }
+            File invokerSource = invokerSources[0]
+            String sourceText = invokerSource.getText('UTF-8')
+            String simpleName = className.substring(className.lastIndexOf('.') + 1)
+            if (!sourceText.contains(className) && !sourceText.contains(simpleName + '.main(')) {
+                throw new GradleException(
+                        "Invoker ${entry.invoker} does not reference aggregated static contract ${className}")
+            }
+        }
+
+        long aggregated = entries.values().count { it.status == 'AGGREGATED' }
+        long pending = entries.values().count { it.status == 'PENDING' }
+        println "Mode-split static-contract ledger passed: ${entries.size()} classified, " +
+                "${aggregated} aggregated, ${pending} explicitly pending."
+    }
+}
+
+tasks.register('verifyModeSplitKnownDefects') {
+    group = 'verification'
+    description = 'Verify that the Phase 0 known-defect ledger is well-formed, unique, and classified.'
+
+    def ledger = layout.projectDirectory.file('docs/mode-split/phase0/known-defects.tsv')
+    inputs.file(ledger)
+
+    doLast {
+        File ledgerFile = ledger.asFile
+        if (!ledgerFile.isFile()) {
+            throw new GradleException("Missing known-defect ledger: ${ledgerFile}")
+        }
+        Set<String> ids = new LinkedHashSet<>()
+        int rows = 0
+        ledgerFile.readLines('UTF-8').eachWithIndex { rawLine, index ->
+            if (rawLine.isBlank() || rawLine.startsWith('#')) {
+                return
+            }
+            String[] fields = rawLine.split('\\t', -1)
+            if (fields.length != 9) {
+                throw new GradleException(
+                        "Invalid known-defect row ${ledgerFile}:${index + 1}; expected 9 tab-separated fields")
+            }
+            if (!ids.add(fields[0])) {
+                throw new GradleException("Duplicate known-defect id: ${fields[0]}")
+            }
+            if (fields.any { it.trim().isEmpty() }) {
+                throw new GradleException("Blank known-defect field at ${ledgerFile}:${index + 1}")
+            }
+            if (!(fields[6].contains('DEFERRED') || fields[6].contains('KNOWN_'))) {
+                throw new GradleException(
+                        "Known defect lacks an explicit classified disposition at ${ledgerFile}:${index + 1}")
+            }
+            rows++
+        }
+        if (rows < 6) {
+            throw new GradleException("Known-defect ledger is incomplete: only ${rows} classified rows")
+        }
+        println "Mode-split known-defect ledger passed: ${rows} unique classified defects."
+    }
+}

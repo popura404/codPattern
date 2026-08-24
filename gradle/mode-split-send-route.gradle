@@ -1,0 +1,7 @@
+tasks.register('runModeSplitPacketSendRouteCompat', JavaExec) {
+    group = 'verification'
+    description = 'Verify the Phase 0 packet authorization, handler-thread, send-route, recipient, and roster-projection baseline.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.cdp.codpattern.architecture.ModeSplitPacketSendRouteCompatTest'
+    dependsOn tasks.named('testClasses')
+}

@@ -134,6 +134,8 @@ COD Pattern 是一个面向 **TaCZ + 内置 FPSM 兼容核心** 的模组，提�
 - 想看完整实现说明：前往 [GUIDE.md](GUIDE.md)
 - 想查常见问题：前往 [QANDA.md](QANDA.md)
 - 想看版本历史：前往 [CHANGES.md](CHANGES.md)
+- 主模组 / Zombies addon 的构建、运行与安装入口：前往
+  [SPLIT_INSTALLATION_AND_UPGRADE.md](mode-split/physical/SPLIT_INSTALLATION_AND_UPGRADE.md)
 
 ## 兼容性与依赖
 

@@ -25,6 +25,9 @@ libs-src
 eclipse
 run
 run-data
+run-main-only/
+run-combined/
+run-combined-gametest/
 logs
 crash-reports
 src/generated/resources

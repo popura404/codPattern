@@ -1,0 +1,20 @@
+tasks.register('runFrontlineRegressionSuite', JavaExec) {
+    group = 'verification'
+    description = 'Run the independent Frontline team-match regression suite.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.cdp.codpattern.app.tdm.service.FrontlineRegressionSuite'
+    dependsOn tasks.named('testClasses')
+}
+
+tasks.register('runTeamDeathmatchRegressionSuite', JavaExec) {
+    group = 'verification'
+    description = 'Run the independent Team Deathmatch team-match regression suite.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.cdp.codpattern.app.tdm.service.TeamDeathmatchRegressionSuite'
+    dependsOn tasks.named('testClasses')
+}
+
+tasks.named('runPvpBaselineCompatSuite').configure {
+    dependsOn tasks.named('runFrontlineRegressionSuite')
+    dependsOn tasks.named('runTeamDeathmatchRegressionSuite')
+}
