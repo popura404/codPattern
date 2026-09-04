@@ -16,12 +16,14 @@ out
 # gradle
 build
 .gradle
+.gradle-codex
 
 # external dependency sources (decompiled, local only)
 libs-extracted
 libs-src
 
 # other
+gradle
 eclipse
 run
 run-data
