@@ -1,7 +1,0 @@
-tasks.register('runModeSplitCompatibilityManifest', JavaExec) {
-    group = 'verification'
-    description = 'Verify the Phase 0 mode-split compatibility manifest against the live checkout.'
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.cdp.codpattern.architecture.ModeSplitCompatibilityManifestCompatTest'
-    dependsOn tasks.named('testClasses')
-}

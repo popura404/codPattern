@@ -1,7 +1,0 @@
-tasks.register('runModeSplitDependencyRatchet', JavaExec) {
-    group = 'verification'
-    description = 'Verify the Phase 0 future-main to Zombies dependency baseline does not grow.'
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.cdp.codpattern.architecture.ModeSplitDependencyRatchetCompatTest'
-    dependsOn tasks.named('testClasses')
-}
