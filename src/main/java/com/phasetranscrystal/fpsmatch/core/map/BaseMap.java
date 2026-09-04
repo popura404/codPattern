@@ -37,10 +37,20 @@ public abstract class BaseMap {
     private final MapTeams mapTeams;
 
     public BaseMap(ServerLevel serverLevel, String mapName, AreaData areaData) {
+        this(serverLevel, mapName, areaData, null);
+    }
+
+    /**
+     * Constructor variant for maps whose game type is known before the map
+     * runtime has been assembled.  MapTeams creates the spectator team while
+     * this constructor is still running, so it must not call an overridden
+     * getGameType() that depends on subclass fields initialized afterwards.
+     */
+    protected BaseMap(ServerLevel serverLevel, String mapName, AreaData areaData, String gameType) {
         this.serverLevel = serverLevel;
         this.mapName = mapName;
         this.mapArea = areaData;
-        this.mapTeams = new MapTeams(serverLevel, this);
+        this.mapTeams = new MapTeams(serverLevel, this, gameType);
     }
 
     public BaseTeam addTeam(String teamName, int playerLimit) {

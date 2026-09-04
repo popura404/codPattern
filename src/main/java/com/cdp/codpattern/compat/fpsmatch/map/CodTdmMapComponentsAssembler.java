@@ -1,5 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.map;
 
+import com.cdp.codpattern.app.teammatch.TeamMatchPolicy;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.MinecraftServer;
 
@@ -12,6 +13,7 @@ final class CodTdmMapComponentsAssembler {
     }
 
     static CodTdmMapComposition.Components compose(
+            TeamMatchPolicy policy,
             CodTdmMap map,
             CodTdmPlayerRuntimeState playerState,
             CodTdmMatchRuntimeState matchState,
@@ -61,11 +63,11 @@ final class CodTdmMapComponentsAssembler {
                 map::startGame,
                 map::victory,
                 map::resetGame,
-                resolveMatchRecordDir(map)
+                resolveMatchRecordDir(policy)
         );
     }
 
-    private static java.util.function.Function<MinecraftServer, Path> resolveMatchRecordDir(CodTdmMap map) {
-        return map.teamMatchPolicy()::resolveMatchRecordDirectory;
+    private static java.util.function.Function<MinecraftServer, Path> resolveMatchRecordDir(TeamMatchPolicy policy) {
+        return policy::resolveMatchRecordDirectory;
     }
 }

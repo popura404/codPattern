@@ -54,7 +54,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
             AreaData areaData,
             TeamMatchPolicy policy
     ) {
-        super(serverLevel, mapName, areaData);
+        super(serverLevel, mapName, areaData, policy.gameType());
         CodTdmMapRuntimeAssembly.BootstrapResult bootstrapResult = CodTdmMapRuntimeAssembly.bootstrap(
                 policy,
                 this,

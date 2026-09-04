@@ -83,6 +83,7 @@ final class CodTdmMapRuntimeAssembly {
             Runnable markStoppedAction
     ) {
         CodTdmMapComposition.Components components = CodTdmMapComponentsAssembler.compose(
+                policy,
                 map,
                 playerState,
                 matchState,

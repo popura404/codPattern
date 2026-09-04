@@ -19,25 +19,32 @@ import java.util.UUID;
 public class MapTeams {
     protected final ServerLevel level;
     protected final BaseMap map;
+    private final String constructionGameType;
 
     private final Map<String, BaseTeam> teams = new LinkedHashMap<>();
     private final BaseTeam spectatorTeam;
 
     public MapTeams(ServerLevel level, BaseMap map) {
+        this(level, map, null);
+    }
+
+    public MapTeams(ServerLevel level, BaseMap map, String gameType) {
         this.level = level;
         this.map = map;
+        this.constructionGameType = gameType;
         this.spectatorTeam = addTeam("spectator", -1, false);
         BlockPos center = BlockPos.containing(map.mapArea.getAABB().getCenter());
         this.spectatorTeam.addSpawnPointData(new SpawnPointData(map.getServerLevel().dimension(), center, 0.0F, 0.0F));
     }
 
     public BaseTeam addTeam(String teamName, int limit, boolean addToSystem) {
-        String fixedName = map.getGameType() + "_" + map.getMapName() + "_" + teamName;
+        String gameType = constructionGameType != null ? constructionGameType : map.getGameType();
+        String fixedName = gameType + "_" + map.getMapName() + "_" + teamName;
         PlayerTeam playerTeam = Objects.requireNonNullElseGet(
                 level.getScoreboard().getPlayerTeam(fixedName),
                 () -> level.getScoreboard().addPlayerTeam(fixedName)
         );
-        BaseTeam team = new BaseTeam(map.getGameType(), map.getMapName(), teamName, limit, playerTeam);
+        BaseTeam team = new BaseTeam(gameType, map.getMapName(), teamName, limit, playerTeam);
         if (addToSystem) {
             teams.put(teamName, team);
         }
