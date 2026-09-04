@@ -26,10 +26,6 @@ public final class TdmMapEditorSchemas {
     private TdmMapEditorSchemas() {
     }
 
-    public static void registerDefaults() {
-        ModeMapEditorSchemas.registerDefaults();
-    }
-
     public static ModeMapEditorSchema frontlineSchema() {
         return FRONTLINE_SCHEMA;
     }

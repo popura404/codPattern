@@ -1,27 +1,14 @@
 package com.cdp.codpattern.app.match.persistence;
 
 import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.ModeModules;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
+/** Read-only persistence-provider facade over the frozen mode catalog. */
 public final class ModeMapPersistenceRegistry {
-    private static final Map<String, ModeMapPersistenceProvider> PROVIDERS = new LinkedHashMap<>();
-
     private ModeMapPersistenceRegistry() {
-    }
-
-    public static void register(ModeMapPersistenceProvider provider) {
-        if (provider == null) {
-            return;
-        }
-        String gameType = GameModeRegistry.canonicalize(provider.gameType());
-        if (gameType.isBlank()) {
-            return;
-        }
-        PROVIDERS.put(gameType, provider);
     }
 
     public static Optional<ModeMapPersistenceProvider> find(String gameType) {
@@ -29,10 +16,12 @@ public final class ModeMapPersistenceRegistry {
         if (canonicalGameType.isBlank()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(PROVIDERS.get(canonicalGameType));
+        return ModeModules.catalog().persistenceProviders().stream()
+                .filter(provider -> GameModeRegistry.canonicalize(provider.gameType()).equals(canonicalGameType))
+                .findFirst();
     }
 
     public static List<ModeMapPersistenceProvider> providers() {
-        return List.copyOf(PROVIDERS.values());
+        return ModeModules.catalog().persistenceProviders();
     }
 }

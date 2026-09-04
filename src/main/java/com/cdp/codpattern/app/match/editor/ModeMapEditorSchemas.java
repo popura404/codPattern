@@ -1,6 +1,5 @@
 package com.cdp.codpattern.app.match.editor;
 
-import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.model.ModeCapability;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
@@ -14,12 +13,7 @@ public final class ModeMapEditorSchemas {
     private ModeMapEditorSchemas() {
     }
 
-    public static void registerDefaults() {
-        GameModeBootstrap.registerEditorSchemas();
-    }
-
     public static List<String> spawnPointLayerKeys(String gameType) {
-        registerDefaults();
         List<String> keys = ModeMapEditorSchemaRegistry.pointLayerKeys(gameType);
         return keys.isEmpty() ? List.of(SpawnPointKind.INITIAL.serializedName()) : keys;
     }
@@ -30,7 +24,6 @@ public final class ModeMapEditorSchemas {
     }
 
     public static Optional<String> resolvePointLayerKey(String gameType, String rawLayerKey) {
-        registerDefaults();
         String requestedKey = rawLayerKey == null || rawLayerKey.isBlank()
                 ? SpawnPointKind.INITIAL.serializedName()
                 : rawLayerKey.trim();
@@ -44,12 +37,10 @@ public final class ModeMapEditorSchemas {
     }
 
     public static List<String> areaLayerKeys(String gameType) {
-        registerDefaults();
         return ModeMapEditorSchemaRegistry.areaLayerKeys(gameType);
     }
 
     public static Optional<String> resolveAreaLayerKey(String gameType, String rawLayerKey) {
-        registerDefaults();
         String requestedKey = rawLayerKey == null ? "" : rawLayerKey.trim();
         if (requestedKey.isBlank()) {
             return Optional.empty();
@@ -86,7 +77,6 @@ public final class ModeMapEditorSchemas {
     }
 
     public static boolean supportsObjectFeature(String gameType, String featureKey) {
-        registerDefaults();
         return ModeMapEditorSchemaRegistry.supportsObjectFeature(gameType, featureKey);
     }
 }

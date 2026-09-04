@@ -1,27 +1,14 @@
 package com.cdp.codpattern.app.match.editor;
 
 import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.ModeModules;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
+/** Read-only editor-schema facade over the frozen mode catalog. */
 public final class ModeMapEditorSchemaRegistry {
-    private static final Map<String, ModeMapEditorSchema> SCHEMAS = new LinkedHashMap<>();
-
     private ModeMapEditorSchemaRegistry() {
-    }
-
-    public static void register(String gameType, ModeMapEditorSchema schema) {
-        if (schema == null) {
-            return;
-        }
-        String canonicalGameType = GameModeRegistry.canonicalize(gameType);
-        if (canonicalGameType.isBlank()) {
-            return;
-        }
-        SCHEMAS.put(canonicalGameType, schema);
     }
 
     public static Optional<ModeMapEditorSchema> find(String gameType) {
@@ -29,7 +16,7 @@ public final class ModeMapEditorSchemaRegistry {
         if (canonicalGameType.isBlank()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(SCHEMAS.get(canonicalGameType));
+        return ModeModules.catalog().editorSchema(canonicalGameType);
     }
 
     public static List<String> pointLayerKeys(String gameType) {

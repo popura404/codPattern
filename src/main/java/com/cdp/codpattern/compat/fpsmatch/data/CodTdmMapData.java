@@ -1,7 +1,6 @@
 package com.cdp.codpattern.compat.fpsmatch.data;
 
 import com.cdp.codpattern.app.match.BuiltInGameModes;
-import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.persistence.CommonModeMapData;
 import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceProvider;
 import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMap;
@@ -105,7 +104,6 @@ public class CodTdmMapData {
      */
     @SubscribeEvent
     public static void onRegisterSaveData(RegisterFPSMSaveDataEvent event) {
-        GameModeBootstrap.registerPersistenceProviders();
         SaveHolder<MapData> saveHolder = new SaveHolder.Builder<>(MapData.CODEC)
                 .withReadHandler(CodTdmMapData::loadMap)
                 .withWriteHandler(CodTdmMapData::saveAllMaps)

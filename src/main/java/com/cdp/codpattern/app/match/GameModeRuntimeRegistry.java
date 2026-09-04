@@ -1,25 +1,11 @@
 package com.cdp.codpattern.app.match;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
+/** Read-only runtime-provider facade over the frozen mode catalog. */
 public final class GameModeRuntimeRegistry {
-    private static final Map<String, GameModeRuntimeProvider> PROVIDERS = new LinkedHashMap<>();
-
     private GameModeRuntimeRegistry() {
-    }
-
-    public static void register(GameModeRuntimeProvider provider) {
-        if (provider == null) {
-            return;
-        }
-        String canonicalGameType = GameModeRegistry.canonicalize(provider.gameType());
-        if (canonicalGameType.isBlank()) {
-            return;
-        }
-        PROVIDERS.put(canonicalGameType, provider);
     }
 
     public static Optional<GameModeRuntimeProvider> find(String gameType) {
@@ -27,10 +13,12 @@ public final class GameModeRuntimeRegistry {
         if (canonicalGameType.isBlank()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(PROVIDERS.get(canonicalGameType));
+        return ModeModules.catalog().runtimeProviders().stream()
+                .filter(provider -> GameModeRegistry.canonicalize(provider.gameType()).equals(canonicalGameType))
+                .findFirst();
     }
 
     public static List<GameModeRuntimeProvider> providers() {
-        return List.copyOf(PROVIDERS.values());
+        return ModeModules.catalog().runtimeProviders();
     }
 }

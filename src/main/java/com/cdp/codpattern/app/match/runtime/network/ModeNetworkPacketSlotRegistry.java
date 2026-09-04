@@ -11,7 +11,7 @@ import java.util.function.IntSupplier;
 public final class ModeNetworkPacketSlotRegistry {
     private final Map<String, ModeNetworkPacketRegistration> registrations = new LinkedHashMap<>();
 
-    public void install(String slotId, ModeNetworkPacketRegistration registration) {
+    public synchronized void install(String slotId, ModeNetworkPacketRegistration registration) {
         String normalizedSlotId = normalize(slotId);
         Objects.requireNonNull(registration, "registration");
         if (registrations.putIfAbsent(normalizedSlotId, registration) != null) {
@@ -19,7 +19,7 @@ public final class ModeNetworkPacketSlotRegistry {
         }
     }
 
-    public boolean registerOrReserve(String slotId, IntSupplier reserveDiscriminator) {
+    public synchronized boolean registerOrReserve(String slotId, IntSupplier reserveDiscriminator) {
         ModeNetworkPacketRegistration registration = registrations.get(normalize(slotId));
         if (registration != null) {
             registration.register();
@@ -29,7 +29,7 @@ public final class ModeNetworkPacketSlotRegistry {
         return false;
     }
 
-    public int size() {
+    public synchronized int size() {
         return registrations.size();
     }
 

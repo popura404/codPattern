@@ -1,6 +1,5 @@
 package com.cdp.codpattern.client.gui.screen.match;
 
-import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.model.ClientModePresentation;
 import com.cdp.codpattern.app.match.model.ClientModePresentationRegistry;
@@ -231,7 +230,6 @@ public final class ModePreviewPanel {
     }
 
     private static ClientModePresentation resolvePresentation(String gameType) {
-        GameModeBootstrap.registerClientPresentations();
         return ClientModePresentationRegistry.find(gameType).orElseGet(() -> fallbackPresentation(gameType));
     }
 

@@ -1,20 +1,21 @@
 package com.cdp.codpattern.app.match.runtime.player;
 
 import com.cdp.codpattern.app.match.extension.ModePlayerLoginContributor;
+import com.cdp.codpattern.app.match.ModeModules;
 import net.minecraft.server.level.ServerPlayer;
 
-/** Combined-distribution holder for login contributors installed by the composition shim. */
+/** Read-only login route over the frozen mode catalog. */
 public final class ModePlayerLoginContributors {
-    private static final ModePlayerLoginRouter ROUTER = new ModePlayerLoginRouter();
-
     private ModePlayerLoginContributors() {
     }
 
-    public static void register(ModePlayerLoginContributor contributor) {
-        ROUTER.register(contributor);
-    }
-
     public static ModePlayerLoginContributor.LoginDisposition route(ServerPlayer player) {
-        return ROUTER.route(player);
+        for (ModePlayerLoginContributor contributor : ModeModules.catalog().playerLoginContributors()) {
+            ModePlayerLoginContributor.LoginDisposition disposition = contributor.onPlayerLogin(player);
+            if (disposition == ModePlayerLoginContributor.LoginDisposition.STOP_SHARED_LOGIN) {
+                return disposition;
+            }
+        }
+        return ModePlayerLoginContributor.LoginDisposition.CONTINUE;
     }
 }

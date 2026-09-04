@@ -1,6 +1,5 @@
 package com.cdp.codpattern.compat.fpsmatch.event;
 
-import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.model.DamageContext;
 import com.cdp.codpattern.app.match.model.DamageDecision;
 import com.cdp.codpattern.app.match.model.DeathContext;
@@ -15,7 +14,6 @@ import com.cdp.codpattern.app.match.runtime.protection.ModeAreaProtectionContrib
 import com.cdp.codpattern.app.match.port.ModeCombatEventPort;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGateway;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
-import com.phasetranscrystal.fpsmatch.core.event.RegisterFPSMapEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -41,14 +39,6 @@ import java.util.Optional;
  */
 @Mod.EventBusSubscriber(modid = "codpattern", bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class CodTdmEventHandler {
-
-    /**
-     * 注册 TDM 游戏类型
-     */
-    @SubscribeEvent
-    public static void onRegisterFPSMap(RegisterFPSMapEvent event) {
-        GameModeBootstrap.registerCommonProviders(event);
-    }
 
     /**
      * 处理伤害事件
