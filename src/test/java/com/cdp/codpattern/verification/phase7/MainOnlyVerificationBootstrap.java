@@ -1,8 +1,8 @@
 package com.cdp.codpattern.verification.phase7;
 
-import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.GameModeRegistry;
-import com.cdp.codpattern.app.tdm.model.TdmGameModeDefinitions;
+import com.cdp.codpattern.app.match.ModeModules;
+import com.cdp.codpattern.app.tdm.TdmModeModule;
 
 import java.util.List;
 
@@ -12,8 +12,8 @@ public final class MainOnlyVerificationBootstrap {
     }
 
     public static List<String> install() {
-        TdmGameModeDefinitions.registerDefaults();
-        GameModeBootstrap.registerCommonProviders();
+        ModeModules.contribute(TdmModeModule.INSTANCE);
+        ModeModules.freeze();
         return GameModeRegistry.orderedDefinitions().stream()
                 .map(definition -> definition.gameType())
                 .toList();

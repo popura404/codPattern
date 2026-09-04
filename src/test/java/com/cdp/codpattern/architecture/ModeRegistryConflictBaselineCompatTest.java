@@ -1,145 +1,180 @@
 package com.cdp.codpattern.architecture;
 
-import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.GameModeRuntimeProvider;
-import com.cdp.codpattern.app.match.GameModeRuntimeRegistry;
-import com.cdp.codpattern.app.match.editor.ModeMapEditorSchema;
-import com.cdp.codpattern.app.match.editor.ModeMapEditorSchemaRegistry;
-import com.cdp.codpattern.app.match.model.ClientModePresentation;
-import com.cdp.codpattern.app.match.model.ClientModePresentationRegistry;
+import com.cdp.codpattern.app.match.ModeCatalog;
+import com.cdp.codpattern.app.match.ModeModuleCollector;
+import com.cdp.codpattern.app.match.ModeRoomHandle;
+import com.cdp.codpattern.app.match.extension.ModeModule;
+import com.cdp.codpattern.app.match.extension.ModePlayerLoginContributor;
 import com.cdp.codpattern.app.match.model.GameModeDefinition;
 import com.cdp.codpattern.app.match.model.JoinPolicy;
 import com.cdp.codpattern.app.match.model.LifecycleKind;
 import com.cdp.codpattern.app.match.model.ModeFamily;
 import com.cdp.codpattern.app.match.model.ScoreboardKind;
 import com.cdp.codpattern.app.match.model.TeamPolicy;
-import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceProvider;
-import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceRegistry;
-import net.minecraft.SharedConstants;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.server.Bootstrap;
+import com.phasetranscrystal.fpsmatch.core.data.AreaData;
+import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.Proxy;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-/** Characterizes the current process-global mode-registry conflict semantics. */
+/** Verifies concurrent collection, deterministic freeze, and all catalog conflict fences. */
 public final class ModeRegistryConflictBaselineCompatTest {
-    private static final List<Class<?>> REGISTRIES = List.of(
-            GameModeRegistry.class,
-            GameModeRuntimeRegistry.class,
-            ModeMapPersistenceRegistry.class,
-            ModeMapEditorSchemaRegistry.class,
-            ClientModePresentationRegistry.class);
-
     private ModeRegistryConflictBaselineCompatTest() {
     }
 
     public static void main(String[] args) throws Exception {
-        bootstrapRegistriesForProviderInterfaces();
-        clearRegistriesForIsolatedCharacterization();
-        try {
-            characterizeDefinitionAndAliasConflicts();
-            characterizeProviderReplacementAndCanonicalization();
-            characterizeMissingPublicIsolationApi();
-            System.out.println("PASS mode registry conflict baseline compat");
-        } finally {
-            clearRegistriesForIsolatedCharacterization();
+        lifecycleAndIdentityRules();
+        parallelContributionsFreezeDeterministically();
+        definitionAndAliasConflictsFail();
+        providerAndExtensionConflictsFail();
+        System.out.println("PASS immutable mode catalog concurrency and conflict compat");
+    }
+
+    private static void lifecycleAndIdentityRules() {
+        ModeModuleCollector collector = new ModeModuleCollector();
+        ModeModule module = module("fixture", 0, definition("fixture", List.of("fixture_alias")));
+        expectFailure(collector::catalog, "not frozen");
+        collector.contribute(module);
+        collector.contribute(module);
+        require(collector.contributionCount() == 1, "same module instance contribution must be idempotent");
+        expectFailure(() -> collector.contribute(module("fixture", 0, definition("other", List.of()))),
+                "Different mode module instance");
+
+        ModeCatalog first = collector.freeze();
+        require(first == collector.freeze(), "repeated freeze must return the same immutable snapshot");
+        require(first.findDefinition("FIXTURE_ALIAS").orElseThrow().gameType().equals("fixture"),
+                "frozen aliases must be normalized and immutable");
+        expectFailure(() -> collector.contribute(module("late", 0, definition("late", List.of()))),
+                "already frozen");
+    }
+
+    private static void parallelContributionsFreezeDeterministically() throws Exception {
+        int moduleCount = 240;
+        ModeModuleCollector collector = new ModeModuleCollector();
+        ExecutorService executor = Executors.newFixedThreadPool(12);
+        CountDownLatch start = new CountDownLatch(1);
+        List<ModeModule> modules = new ArrayList<>();
+        for (int index = 0; index < moduleCount; index++) {
+            String id = "parallel_" + index;
+            ModeModule module = module(id, index % 7, definition(id, List.of("alias_" + index)));
+            modules.add(module);
+            executor.submit(() -> {
+                await(start);
+                collector.contribute(module);
+                collector.contribute(module);
+            });
         }
+        start.countDown();
+        executor.shutdown();
+        require(executor.awaitTermination(30, TimeUnit.SECONDS), "parallel contributions timed out");
+        require(collector.contributionCount() == moduleCount, "parallel collection lost module contributions");
+
+        List<String> expected = modules.stream()
+                .sorted(java.util.Comparator.comparingInt(ModeModule::order)
+                        .thenComparing(module -> module.id().toString()))
+                .flatMap(module -> module.definitions().stream())
+                .map(GameModeDefinition::gameType)
+                .toList();
+        List<String> actual = collector.freeze().definitions().stream()
+                .map(GameModeDefinition::gameType)
+                .toList();
+        require(actual.equals(expected), "parallel freeze order must be stable by order, id, and declaration");
     }
 
-    private static void bootstrapRegistriesForProviderInterfaces() throws ReflectiveOperationException {
-        SharedConstants.tryDetectVersion();
-        Field bootstrapFlag = Bootstrap.class.getDeclaredField("isBootstrapped");
-        bootstrapFlag.setAccessible(true);
-        bootstrapFlag.setBoolean(null, true);
-        require(!BuiltInRegistries.REGISTRY.keySet().isEmpty(),
-                "built-in registries must load before proxying provider interfaces");
+    private static void definitionAndAliasConflictsFail() {
+        expectFreezeFailure(List.of(
+                module("one", 0, definition("shared", List.of())),
+                module("two", 0, definition("SHARED", List.of()))), "Duplicate game mode");
+        expectFreezeFailure(List.of(
+                module("one", 0, definition("one", List.of("shared_alias"))),
+                module("two", 0, definition("two", List.of("SHARED_ALIAS")))), "Duplicate game mode alias");
+        expectFreezeFailure(List.of(
+                module("one", 0, definition("one", List.of("two"))),
+                module("two", 0, definition("two", List.of()))), "occupies a mode name");
     }
 
-    private static void characterizeDefinitionAndAliasConflicts() {
-        GameModeRegistry.registerDefinition(definition(" Alpha ", List.of("OldAlias", "SharedAlias"), "first"));
-        GameModeRegistry.registerDefinition(definition("Beta", List.of("SharedAlias"), "beta"));
+    private static void providerAndExtensionConflictsFail() {
+        GameModeRuntimeProvider mismatched = runtimeProvider("wrong");
+        GameModeDefinition invalidProvider = withRuntime(definition("right", List.of()), mismatched);
+        expectFreezeFailure(List.of(module("provider", 0, invalidProvider)), "runtime provider");
 
-        require("alpha".equals(GameModeRegistry.canonicalize(" oldalias ")),
-                "aliases must trim/lowercase and resolve to the original canonical mode");
-        require("beta".equals(GameModeRegistry.canonicalize("SHAREDALIAS")),
-                "later alias collision must silently redirect the alias to the later mode");
-        require(GameModeRegistry.orderedDefinitions().stream().map(GameModeDefinition::gameType).toList()
-                        .equals(List.of("alpha", "beta")),
-                "first canonical insertion order must be retained");
-
-        GameModeRegistry.registerDefinition(definition("ALPHA", List.of("NewAlias"), "replacement"));
-
-        require("replacement".equals(GameModeRegistry.findDefinition("alpha").orElseThrow().displayNameKey()),
-                "duplicate canonical registration must silently replace the definition");
-        require(GameModeRegistry.orderedDefinitions().stream().map(GameModeDefinition::gameType).toList()
-                        .equals(List.of("alpha", "beta")),
-                "duplicate canonical replacement must preserve the original insertion position");
-        require("alpha".equals(GameModeRegistry.canonicalize("OldAlias")),
-                "aliases from the replaced definition currently remain registered");
-        require("alpha".equals(GameModeRegistry.canonicalize("NewAlias")),
-                "aliases from the replacement definition must be added");
-        require("beta".equals(GameModeRegistry.canonicalize("SharedAlias")),
-                "replacing alpha without the colliding alias must not reclaim the alias from beta");
+        ModePlayerLoginContributor first = loginContributor("duplicate.extension");
+        ModePlayerLoginContributor second = loginContributor("duplicate.extension");
+        ModeModule left = moduleWithLogin("left", definition("left", List.of()), first);
+        ModeModule right = moduleWithLogin("right", definition("right", List.of()), second);
+        expectFreezeFailure(List.of(left, right), "Duplicate player-login contributor id");
     }
 
-    private static void characterizeProviderReplacementAndCanonicalization() {
-        GameModeRuntimeProvider runtimeOne = proxy(GameModeRuntimeProvider.class, "SharedAlias");
-        GameModeRuntimeProvider runtimeTwo = proxy(GameModeRuntimeProvider.class, "beta");
-        GameModeRuntimeRegistry.register(runtimeOne);
-        GameModeRuntimeRegistry.register(runtimeTwo);
-        require(GameModeRuntimeRegistry.find("sharedalias").orElseThrow() == runtimeTwo,
-                "runtime providers must canonicalize aliases and silently replace duplicates");
-        require(GameModeRuntimeRegistry.providers().equals(List.of(runtimeTwo)),
-                "runtime provider replacement must preserve one canonical insertion slot");
-
-        ModeMapPersistenceProvider persistenceOne = proxy(ModeMapPersistenceProvider.class, "SharedAlias");
-        ModeMapPersistenceProvider persistenceTwo = proxy(ModeMapPersistenceProvider.class, "BETA");
-        ModeMapPersistenceRegistry.register(persistenceOne);
-        ModeMapPersistenceRegistry.register(persistenceTwo);
-        require(ModeMapPersistenceRegistry.find("sharedalias").orElseThrow() == persistenceTwo,
-                "persistence providers must canonicalize aliases and silently replace duplicates");
-        require(ModeMapPersistenceRegistry.providers().equals(List.of(persistenceTwo)),
-                "persistence replacement must preserve one canonical insertion slot");
-
-        ModeMapEditorSchema schemaOne = emptySchema();
-        ModeMapEditorSchema schemaTwo = emptySchema();
-        ModeMapEditorSchemaRegistry.register("SharedAlias", schemaOne);
-        ModeMapEditorSchemaRegistry.register("beta", schemaTwo);
-        require(ModeMapEditorSchemaRegistry.find("sharedalias").orElseThrow() == schemaTwo,
-                "editor schemas must canonicalize aliases and silently replace duplicates");
-
-        ClientModePresentation presentationOne = new ClientModePresentation("first", 1, 1, 1, "first", "first");
-        ClientModePresentation presentationTwo = new ClientModePresentation("second", 2, 2, 2, "second", "second");
-        ClientModePresentationRegistry.register("SharedAlias", presentationOne);
-        ClientModePresentationRegistry.register("beta", presentationTwo);
-        require(ClientModePresentationRegistry.find("sharedalias").orElseThrow() == presentationTwo,
-                "client presentations must canonicalize aliases and silently replace duplicates");
+    private static void expectFreezeFailure(List<ModeModule> modules, String messagePart) {
+        ModeModuleCollector collector = new ModeModuleCollector();
+        modules.forEach(collector::contribute);
+        expectFailure(collector::freeze, messagePart);
+        expectFailure(collector::catalog, "freeze failed");
+        expectFailure(() -> collector.contribute(module("after_failure", 0,
+                definition("after_failure", List.of()))), "already frozen");
     }
 
-    private static void characterizeMissingPublicIsolationApi() {
-        for (Class<?> registry : REGISTRIES) {
-            boolean hasPublicReset = Arrays.stream(registry.getDeclaredMethods())
-                    .filter(method -> Modifier.isPublic(method.getModifiers()))
-                    .map(Method::getName)
-                    .anyMatch(name -> name.equals("clear") || name.equals("reset") || name.equals("clearAll"));
-            require(!hasPublicReset, registry.getSimpleName() + " must remain characterized as lacking a public reset API");
-        }
+    private static ModeModule module(String id, int order, GameModeDefinition... definitions) {
+        return new ModeModule() {
+            private final ResourceLocation moduleId = new ResourceLocation("test", id);
+
+            @Override
+            public ResourceLocation id() {
+                return moduleId;
+            }
+
+            @Override
+            public int order() {
+                return order;
+            }
+
+            @Override
+            public List<GameModeDefinition> definitions() {
+                return List.of(definitions);
+            }
+        };
     }
 
-    private static GameModeDefinition definition(String gameType, List<String> aliases, String displayKey) {
+    private static ModeModule moduleWithLogin(
+            String id,
+            GameModeDefinition definition,
+            ModePlayerLoginContributor contributor
+    ) {
+        ModeModule base = module(id, 0, definition);
+        return new ModeModule() {
+            @Override
+            public ResourceLocation id() {
+                return base.id();
+            }
+
+            @Override
+            public List<GameModeDefinition> definitions() {
+                return base.definitions();
+            }
+
+            @Override
+            public List<ModePlayerLoginContributor> playerLoginContributors() {
+                return List.of(contributor);
+            }
+        };
+    }
+
+    private static GameModeDefinition definition(String gameType, List<String> aliases) {
         return new GameModeDefinition(
                 gameType,
                 aliases,
-                displayKey,
-                "room." + displayKey,
-                "command." + displayKey,
+                "mode." + gameType,
+                "room." + gameType,
+                "command." + gameType,
                 List.of(),
                 ModeFamily.CUSTOM,
                 TeamPolicy.NONE,
@@ -149,57 +184,72 @@ public final class ModeRegistryConflictBaselineCompatTest {
                 Set.of());
     }
 
-    @SuppressWarnings("unchecked")
-    private static <T> T proxy(Class<T> type, String gameType) {
-        return (T) Proxy.newProxyInstance(
-                type.getClassLoader(),
-                new Class<?>[]{type},
-                (instance, method, args) -> {
-                    if (method.getName().equals("gameType")) {
-                        return gameType;
-                    }
-                    if (method.getName().equals("toString")) {
-                        return type.getSimpleName() + "[" + gameType + "]";
-                    }
-                    if (method.getReturnType().equals(boolean.class)) {
-                        return false;
-                    }
-                    if (method.getReturnType().equals(int.class)) {
-                        return 0;
-                    }
-                    return null;
-                });
+    private static GameModeDefinition withRuntime(
+            GameModeDefinition definition,
+            GameModeRuntimeProvider provider
+    ) {
+        return new GameModeDefinition(
+                definition.gameType(), definition.aliases(), definition.displayNameKey(),
+                definition.roomHeaderKey(), definition.createCommand(), definition.teams(), definition.family(),
+                definition.teamPolicy(), definition.joinPolicy(), definition.lifecycleKind(),
+                definition.scoreboardKind(), definition.capabilities(), Optional.of(provider), Optional.empty(),
+                Optional.empty(), Optional.empty());
     }
 
-    private static ModeMapEditorSchema emptySchema() {
-        return new ModeMapEditorSchema() {
+    private static GameModeRuntimeProvider runtimeProvider(String gameType) {
+        return new GameModeRuntimeProvider() {
             @Override
-            public List<com.cdp.codpattern.app.match.editor.PointLayerDefinition> pointLayers() {
-                return List.of();
+            public String gameType() {
+                return gameType;
             }
 
             @Override
-            public List<com.cdp.codpattern.app.match.editor.AreaLayerDefinition> areaLayers() {
-                return List.of();
+            public BaseMap createMap(ServerLevel level, String mapName, AreaData areaData) {
+                return null;
             }
 
             @Override
-            public List<com.cdp.codpattern.app.match.editor.ObjectFeatureDefinition> objectFeatures() {
-                return List.of();
+            public Optional<ModeRoomHandle> roomHandle(BaseMap map) {
+                return Optional.empty();
+            }
+
+            @Override
+            public java.util.stream.Stream<ModeRoomHandle> listRoomHandles() {
+                return java.util.stream.Stream.empty();
             }
         };
     }
 
-    @SuppressWarnings("unchecked")
-    private static void clearRegistriesForIsolatedCharacterization() throws ReflectiveOperationException {
-        for (Class<?> registry : REGISTRIES) {
-            for (Field field : registry.getDeclaredFields()) {
-                if (!Modifier.isStatic(field.getModifiers()) || !Map.class.isAssignableFrom(field.getType())) {
-                    continue;
-                }
-                field.setAccessible(true);
-                ((Map<Object, Object>) field.get(null)).clear();
+    private static ModePlayerLoginContributor loginContributor(String id) {
+        return new ModePlayerLoginContributor() {
+            @Override
+            public String id() {
+                return id;
             }
+
+            @Override
+            public LoginDisposition onPlayerLogin(net.minecraft.server.level.ServerPlayer player) {
+                return LoginDisposition.CONTINUE;
+            }
+        };
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    private static void expectFailure(Runnable operation, String messagePart) {
+        try {
+            operation.run();
+            throw new AssertionError("Expected failure containing: " + messagePart);
+        } catch (IllegalStateException expected) {
+            require(expected.getMessage().contains(messagePart),
+                    "unexpected failure message: " + expected.getMessage());
         }
     }
 

@@ -172,16 +172,35 @@ public final class ModeSplitVerificationRoots {
     }
 
     private static Path findRepositoryRoot() {
-        Path current = Paths.get("").toAbsolutePath().normalize();
-        while (current != null) {
-            if (Files.isRegularFile(current.resolve("settings.gradle"))
-                    && Files.isRegularFile(current.resolve(
-                    "docs/mode-split/phase0/ownership-manifest.tsv"))) {
-                return current;
-            }
-            current = current.getParent();
+        List<Path> starts = new ArrayList<>();
+        starts.add(Paths.get("").toAbsolutePath().normalize());
+        try {
+            starts.add(Paths.get(ModeSplitVerificationRoots.class.getProtectionDomain()
+                    .getCodeSource().getLocation().toURI()).toAbsolutePath().normalize());
+        } catch (Exception ignored) {
+            // The working-directory search below still provides the normal path.
         }
-        throw new AssertionError("Could not locate the codPattern repository root");
+        for (Path start : starts) {
+            Path current = start;
+            while (current != null) {
+                if (isMainRepository(current)) {
+                    return current;
+                }
+                Path siblingMain = current.resolveSibling("codPattern");
+                if (isMainRepository(siblingMain)) {
+                    return siblingMain.normalize();
+                }
+                current = current.getParent();
+            }
+        }
+        throw new AssertionError("Could not locate the codPattern repository root from " + starts);
+    }
+
+    private static boolean isMainRepository(Path path) {
+        return path != null
+                && Files.isRegularFile(path.resolve("settings.gradle"))
+                && Files.isRegularFile(path.resolve(
+                "src/main/java/com/cdp/codpattern/CodPatternConstants.java"));
     }
 
     public record LocatedFile(Path path, String relativePath) {

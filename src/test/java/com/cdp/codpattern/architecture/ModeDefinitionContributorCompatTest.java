@@ -1,6 +1,6 @@
 package com.cdp.codpattern.architecture;
 
-import com.cdp.codpattern.app.match.extension.ModeDefinitionContributor;
+import com.cdp.codpattern.app.match.extension.ModeModule;
 import com.cdp.codpattern.app.match.model.GameModeDefinition;
 import com.cdp.codpattern.app.match.model.JoinPolicy;
 import com.cdp.codpattern.app.match.model.LifecycleKind;
@@ -9,7 +9,6 @@ import com.cdp.codpattern.app.match.model.ModeFamily;
 import com.cdp.codpattern.app.match.model.ScoreboardKind;
 import com.cdp.codpattern.app.match.model.TeamPolicy;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -31,14 +30,21 @@ public final class ModeDefinitionContributorCompatTest {
                 LifecycleKind.MODE_DEFINED,
                 ScoreboardKind.MODE_DEFINED,
                 Set.of(ModeCapability.READY_STATE));
-        ModeDefinitionContributor contributor = registrar -> registrar.register(definition);
-        List<GameModeDefinition> collected = new ArrayList<>();
+        ModeModule module = new ModeModule() {
+            @Override
+            public net.minecraft.resources.ResourceLocation id() {
+                return new net.minecraft.resources.ResourceLocation("external_fixture", "mode");
+            }
 
-        contributor.contribute(collected::add);
+            @Override
+            public List<GameModeDefinition> definitions() {
+                return List.of(definition);
+            }
+        };
 
-        require(collected.equals(List.of(definition)),
-                "the extension skeleton should expose definitions without a concrete registry dependency");
-        System.out.println("PASS mode definition contributor compat");
+        require(module.definitions().equals(List.of(definition)),
+                "the public module API should expose definitions without a concrete registry dependency");
+        System.out.println("PASS mode module public API compat");
     }
 
     private static void require(boolean condition, String message) {

@@ -1,17 +1,16 @@
 package com.cdp.codpattern.architecture.phase7;
 
-import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.GameModeRuntimeProvider;
 import com.cdp.codpattern.app.match.GameModeRuntimeRegistry;
 import com.cdp.codpattern.app.match.ModeRoomHandle;
+import com.cdp.codpattern.app.match.ModeModules;
 import com.cdp.codpattern.app.match.editor.AreaLayerDefinition;
 import com.cdp.codpattern.app.match.editor.ModeMapEditorSchema;
 import com.cdp.codpattern.app.match.editor.ModeMapEditorSchemaRegistry;
 import com.cdp.codpattern.app.match.editor.ObjectFeatureDefinition;
 import com.cdp.codpattern.app.match.editor.PointLayerDefinition;
-import com.cdp.codpattern.app.match.extension.ModeDefinitionContributions;
-import com.cdp.codpattern.app.match.extension.ModeDefinitionContributor;
+import com.cdp.codpattern.app.match.extension.ModeModule;
 import com.cdp.codpattern.app.match.extension.ModePlayerLoginContributor;
 import com.cdp.codpattern.app.match.model.ClientModePresentation;
 import com.cdp.codpattern.app.match.model.ClientModePresentationRegistry;
@@ -26,7 +25,7 @@ import com.cdp.codpattern.app.match.persistence.CommonModeMapData;
 import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceProvider;
 import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceRegistry;
 import com.cdp.codpattern.app.match.runtime.network.ModeNetworkPacketSlotRegistry;
-import com.cdp.codpattern.app.match.runtime.player.ModePlayerLoginRouter;
+import com.cdp.codpattern.app.match.runtime.player.ModePlayerLoginContributors;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.save.FPSMDataManager;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
@@ -79,9 +78,34 @@ public final class SyntheticExternalModeContributorCompatTest {
                 Optional.of(editorSchema),
                 Optional.of(presentation));
 
-        ModeDefinitionContributor contributor = registrar -> registrar.register(definition);
-        ModeDefinitionContributions.register(contributor);
-        GameModeBootstrap.registerCommonProviders();
+        ModePlayerLoginContributor loginContributor = new ModePlayerLoginContributor() {
+            @Override
+            public String id() {
+                return "external_fixture.login";
+            }
+
+            @Override
+            public LoginDisposition onPlayerLogin(net.minecraft.server.level.ServerPlayer player) {
+                return LoginDisposition.STOP_SHARED_LOGIN;
+            }
+        };
+        ModeModules.contribute(new ModeModule() {
+            @Override
+            public ResourceLocation id() {
+                return new ResourceLocation("external_fixture", "mode");
+            }
+
+            @Override
+            public List<GameModeDefinition> definitions() {
+                return List.of(definition);
+            }
+
+            @Override
+            public List<ModePlayerLoginContributor> playerLoginContributors() {
+                return List.of(loginContributor);
+            }
+        });
+        ModeModules.freeze();
 
         require(GameModeRegistry.findDefinition(ALIAS).orElseThrow().gameType().equals(GAME_TYPE),
                 "external definition and alias must reach the public mode registry");
@@ -97,19 +121,8 @@ public final class SyntheticExternalModeContributorCompatTest {
                         && "external_fixture".equals(installedPresentation.previewTexture().getNamespace()),
                 "external namespaced client presentation must reach generic client routing");
 
-        ModePlayerLoginContributor loginContributor = new ModePlayerLoginContributor() {
-            @Override
-            public String id() {
-                return "external_fixture.login";
-            }
-
-            @Override
-            public LoginDisposition onPlayerLogin(net.minecraft.server.level.ServerPlayer player) {
-                return LoginDisposition.STOP_SHARED_LOGIN;
-            }
-        };
-        ModePlayerLoginRouter loginRouter = new ModePlayerLoginRouter(List.of(loginContributor));
-        require(loginRouter.route(null) == ModePlayerLoginContributor.LoginDisposition.STOP_SHARED_LOGIN,
+        require(ModePlayerLoginContributors.route(null)
+                        == ModePlayerLoginContributor.LoginDisposition.STOP_SHARED_LOGIN,
                 "external event contributor must reach the generic login route");
 
         ModeNetworkPacketSlotRegistry isolatedPackets = new ModeNetworkPacketSlotRegistry();

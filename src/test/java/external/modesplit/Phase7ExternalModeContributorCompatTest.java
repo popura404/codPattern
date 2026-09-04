@@ -1,13 +1,13 @@
 package external.modesplit;
 
-import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.GameModeRuntimeProvider;
 import com.cdp.codpattern.app.match.GameModeRuntimeRegistry;
 import com.cdp.codpattern.app.match.ModeRoomHandle;
+import com.cdp.codpattern.app.match.ModeModules;
 import com.cdp.codpattern.app.match.editor.ModeMapEditorSchema;
 import com.cdp.codpattern.app.match.editor.ModeMapEditorSchemaRegistry;
-import com.cdp.codpattern.app.match.extension.ModeDefinitionContributor;
+import com.cdp.codpattern.app.match.extension.ModeModule;
 import com.cdp.codpattern.app.match.extension.ModePlayerLoginContributor;
 import com.cdp.codpattern.app.match.model.ClientModePresentation;
 import com.cdp.codpattern.app.match.model.ClientModePresentationRegistry;
@@ -158,6 +158,18 @@ public final class Phase7ExternalModeContributorCompatTest {
         private final GameModeRuntimeProvider runtimeProvider = new ExternalRuntimeProvider();
         private final ModeMapPersistenceProvider persistenceProvider = new ExternalPersistenceProvider();
         private final ModeMapEditorSchema editorSchema = new EmptyEditorSchema();
+        private final ModePlayerLoginContributor loginContributor = new ModePlayerLoginContributor() {
+            @Override
+            public String id() {
+                return "externalarena.login";
+            }
+
+            @Override
+            public LoginDisposition onPlayerLogin(net.minecraft.server.level.ServerPlayer player) {
+                loginCalls.incrementAndGet();
+                return LoginDisposition.CONTINUE;
+            }
+        };
         private final GameModeDefinition definition = new GameModeDefinition(
                 GAME_TYPE,
                 List.of(ALIAS),
@@ -183,23 +195,23 @@ public final class Phase7ExternalModeContributorCompatTest {
                         "externalarena")));
 
         private void install() {
-            ModeDefinitionContributor definitionContributor =
-                    registrar -> registrar.register(definition);
-            definitionContributor.contribute(GameModeRegistry::registerDefinition);
-            GameModeBootstrap.registerCommonProviders();
-
-            ModePlayerLoginContributors.register(new ModePlayerLoginContributor() {
+            ModeModules.contribute(new ModeModule() {
                 @Override
-                public String id() {
-                    return "externalarena.login";
+                public ResourceLocation id() {
+                    return new ResourceLocation("externalarena", "mode");
                 }
 
                 @Override
-                public LoginDisposition onPlayerLogin(net.minecraft.server.level.ServerPlayer player) {
-                    loginCalls.incrementAndGet();
-                    return LoginDisposition.CONTINUE;
+                public List<GameModeDefinition> definitions() {
+                    return List.of(definition);
+                }
+
+                @Override
+                public List<ModePlayerLoginContributor> playerLoginContributors() {
+                    return List.of(loginContributor);
                 }
             });
+            ModeModules.freeze();
 
             networkRegistry.install(NETWORK_SLOT_ID, networkRegistrations::incrementAndGet);
             ModeClientActionHandlers.register(CLIENT_ACTION_ID, payload -> {

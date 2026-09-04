@@ -1,11 +1,12 @@
 package com.cdp.codpattern.verification.phase7;
 
-import com.cdp.codpattern.app.match.GameModeBootstrap;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.GameModeRuntimeProvider;
 import com.cdp.codpattern.app.match.GameModeRuntimeRegistry;
 import com.cdp.codpattern.app.match.ModeRoomHandle;
-import com.cdp.codpattern.app.match.extension.ModeDefinitionContributor;
+import com.cdp.codpattern.app.match.ModeCatalog;
+import com.cdp.codpattern.app.match.ModeModuleCollector;
+import com.cdp.codpattern.app.match.extension.ModeModule;
 import com.cdp.codpattern.app.match.extension.ModePlayerLoginContributor;
 import com.cdp.codpattern.app.match.model.ClientModePresentation;
 import com.cdp.codpattern.app.match.model.ClientModePresentationRegistry;
@@ -101,20 +102,8 @@ public final class Phase7MainOnlyFreshJvmProbe {
                 Optional.empty(),
                 Optional.of(presentation));
 
-        ModeDefinitionContributor contributor = registrar -> registrar.register(definition);
-        contributor.contribute(GameModeRegistry::registerDefinition);
-        GameModeBootstrap.registerCommonProviders();
-
-        require(GameModeRegistry.findDefinition("external_fixture_alias").orElseThrow().gameType()
-                        .equals(EXTERNAL_MODE),
-                "external definition and alias should reach the public registry");
-        require(GameModeRuntimeRegistry.find(EXTERNAL_MODE).orElseThrow() == runtimeProvider,
-                "external runtime should reach the public runtime registry");
-        require(ClientModePresentationRegistry.find(EXTERNAL_MODE).orElseThrow().equals(presentation),
-                "external presentation should reach the public client registry");
-
         AtomicInteger eventCalls = new AtomicInteger();
-        ModePlayerLoginRouter eventRouter = new ModePlayerLoginRouter(List.of(new ModePlayerLoginContributor() {
+        ModePlayerLoginContributor loginContributor = new ModePlayerLoginContributor() {
             @Override
             public String id() {
                 return "external_fixture.login";
@@ -125,7 +114,35 @@ public final class Phase7MainOnlyFreshJvmProbe {
                 eventCalls.incrementAndGet();
                 return LoginDisposition.CONTINUE;
             }
-        }));
+        };
+        ModeModuleCollector collector = new ModeModuleCollector();
+        collector.contribute(new ModeModule() {
+            @Override
+            public ResourceLocation id() {
+                return new ResourceLocation("external_fixture", "mode");
+            }
+
+            @Override
+            public List<GameModeDefinition> definitions() {
+                return List.of(definition);
+            }
+
+            @Override
+            public List<ModePlayerLoginContributor> playerLoginContributors() {
+                return List.of(loginContributor);
+            }
+        });
+        ModeCatalog externalCatalog = collector.freeze();
+
+        require(externalCatalog.findDefinition("external_fixture_alias").orElseThrow().gameType()
+                        .equals(EXTERNAL_MODE),
+                "external definition and alias should reach the public registry");
+        require(externalCatalog.runtimeProviders().equals(List.of(runtimeProvider)),
+                "external runtime should reach the public runtime registry");
+        require(externalCatalog.clientPresentation(EXTERNAL_MODE).orElseThrow().equals(presentation),
+                "external presentation should reach the public client registry");
+
+        ModePlayerLoginRouter eventRouter = new ModePlayerLoginRouter(externalCatalog.playerLoginContributors());
         require(eventRouter.route(null) == ModePlayerLoginContributor.LoginDisposition.CONTINUE,
                 "external event contributor should reach the public event router");
         require(eventCalls.get() == 1, "external event contributor should run exactly once");
