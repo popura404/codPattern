@@ -6,6 +6,7 @@ import com.cdp.codpattern.app.tdm.TdmModeModule;
 import com.cdp.codpattern.client.bootstrap.CoreClientBootstrap;
 import com.cdp.codpattern.command.CommandRegistration;
 import com.cdp.codpattern.config.tdm.CodTdmConfig;
+import com.phasetranscrystal.fpsmatch.common.item.FPSMCreativeModeTabRegister;
 import com.phasetranscrystal.fpsmatch.common.item.FPSMItemRegister;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
@@ -33,6 +34,7 @@ public final class CoreBootstrap {
 
         modEventBus.addListener(CoreBootstrap::onCommonSetup);
         modEventBus.addListener(FPSMItemRegister::onBuildCreativeModeTabContents);
+        FPSMCreativeModeTabRegister.CREATIVE_MODE_TABS.register(modEventBus);
         FPSMItemRegister.ITEMS.register(modEventBus);
 
         MinecraftForge.EVENT_BUS.addListener(CoreBootstrap::onServerStarting);

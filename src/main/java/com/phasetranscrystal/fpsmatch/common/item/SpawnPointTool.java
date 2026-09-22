@@ -56,6 +56,11 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
     }
 
     @Override
+    public Component getName(ItemStack stack) {
+        return TdmToolText.itemName("item.codpattern.spawn_point_tool");
+    }
+
+    @Override
     public void handleWorldInteraction(ServerPlayer player, ItemStack stack, ToolInteractionAction action, ToolInteractionHit hit) {
         if (!ToolAccessHelper.ensureAdminAccess(player)) {
             return;
@@ -547,6 +552,7 @@ public class SpawnPointTool extends CreatorToolItem implements WorldToolItem {
     @Override
     public void appendHoverText(ItemStack stack, Level level, List<Component> tooltip, TooltipFlag isAdvanced) {
         super.appendHoverText(stack, level, tooltip, isAdvanced);
+        tooltip.add(TdmToolText.applicableModesTooltip());
         tooltip.add(Component.translatable("tooltip.fpsm.separator").withStyle(ChatFormatting.GOLD));
         tooltip.add(Component.literal("Edit mode")
                 .append(": ")

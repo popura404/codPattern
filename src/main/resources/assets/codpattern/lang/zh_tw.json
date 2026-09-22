@@ -1,4 +1,10 @@
 {
+    "itemGroup.codpattern.tools_and_items": "codpattern工具與物品",
+    "mode.codpattern.teamdeathmatch.tool_name": "戰術死鬥",
+    "mode.codpattern.frontline.tool_name": "衝鋒死鬥",
+    "item.codpattern.map_creator_tool": "%1$s、%2$s地圖建立工具",
+    "item.codpattern.spawn_point_tool": "%1$s、%2$s重生點工具",
+    "tooltip.codpattern.applicable_modes": "適用於：%1$s、%2$s模式",
     "screen.codpattern.common.confirm": "確定",
     "screen.codpattern.common.cancel": "取消",
     "screen.codpattern.common.refresh": "重新整理",

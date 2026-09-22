@@ -1,4 +1,10 @@
 {
+    "itemGroup.codpattern.tools_and_items": "codpattern ツールとアイテム",
+    "mode.codpattern.teamdeathmatch.tool_name": "タクティカルデスマッチ",
+    "mode.codpattern.frontline.tool_name": "フロントラインデスマッチ",
+    "item.codpattern.map_creator_tool": "%1$s・%2$s マップ作成ツール",
+    "item.codpattern.spawn_point_tool": "%1$s・%2$s スポーン地点ツール",
+    "tooltip.codpattern.applicable_modes": "対応モード：%1$s・%2$s",
     "screen.codpattern.common.confirm": "確認",
     "screen.codpattern.common.cancel": "キャンセル",
     "screen.codpattern.common.refresh": "更新",
