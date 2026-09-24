@@ -97,6 +97,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
 
     @Override
     public void startGame() {
+        if (!com.cdp.codpattern.config.storage.ServerMapStorage.canUse(getGameType())) return;
         lifecycleRuntime.startGame();
     }
 

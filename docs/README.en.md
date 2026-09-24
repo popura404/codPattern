@@ -1,5 +1,8 @@
 # COD Pattern
 
+> Storage paths below were updated for `0.8.3b`. See [map storage and explicit OP migration](map-storage-operations.md) before upgrading an existing save.
+
+
 [Repository README](../README.md) | [中文文档](README.md) | [Detailed Guide](GUIDE.md) | [Q&A (Chinese)](QANDA.md) | [Changelog](CHANGES.md)
 
 > Release status: Beta. This documentation currently covers `0.6.10b`. Validate in a staging environment before production rollout, and back up the world save, `serverconfig/codpattern/`, and `fpsmatch/` first.
@@ -47,8 +50,8 @@ The project uses a server-authoritative design. Loadouts, filters, room state, a
 
 - Loadouts are stored in `serverconfig/codpattern/backpack_rules/backpack_config.json`
 - Weapon filters are stored in `serverconfig/codpattern/backpack_rules/weapon_filter.json`
-- TDM config is stored in `serverconfig/codpattern/tdm_rules/config.json`
-- Map data is stored under `<game dir>/fpsmatch/<world name>/...`
+- TDM config is stored in `serverconfig/codpattern/maps/builtin/rules/config.json`
+- Map data is stored under `<world save>/serverconfig/codpattern/maps/`
 - Optional integrations: LR Tactical 0.3.0+, Physics Mod, and `tacz-addon 1.1.6`
 - Without LR Tactical, COD Pattern disables LR melee, throwable selection, dedicated throwable slots, and default throwable distribution. With it installed, those features are available.
 - Bundles `zh_cn / zh_tw / en_us / ja_jp` language resources
@@ -99,7 +102,7 @@ The project uses a server-authoritative design. Loadouts, filters, room state, a
   - `throwablesEnabled`
   - `ammunitionPerMagazineMultiple`
 
-### `tdm_rules/config.json`
+### `maps/builtin/rules/config.json`
 
 These are the actual default fields in the current code:
 
@@ -126,8 +129,8 @@ These are the actual default fields in the current code:
 
 ### Match Result Export Directories
 
-- `frontline` -> `serverconfig/codpattern/tdm_match_records/`
-- `teamdeathmatch` -> `serverconfig/codpattern/tactical_tdm_match_records/`
+- `frontline` -> `serverconfig/codpattern/maps/builtin/frontline/records/`
+- `teamdeathmatch` -> `serverconfig/codpattern/maps/builtin/teamdeathmatch/records/`
 
 ## Documentation
 

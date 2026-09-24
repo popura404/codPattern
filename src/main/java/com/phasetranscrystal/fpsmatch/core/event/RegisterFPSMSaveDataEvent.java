@@ -11,6 +11,11 @@ public class RegisterFPSMSaveDataEvent extends Event {
         this.dataManager = dataManager;
     }
 
+    public <T> void registerMapData(Class<T> clazz,
+            com.cdp.codpattern.config.storage.MapStorageRegistration registration, SaveHolder<T> holder) {
+        dataManager.registerMapData(clazz, registration, holder);
+    }
+
     public <T> void registerData(Class<T> clazz, String folderName, SaveHolder<T> saveHolder) {
         dataManager.registerData(clazz, folderName, saveHolder);
     }

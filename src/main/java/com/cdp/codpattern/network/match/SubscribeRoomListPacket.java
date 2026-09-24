@@ -25,6 +25,7 @@ public class SubscribeRoomListPacket {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
+                com.cdp.codpattern.config.storage.ServerMapStorage.get(player.server).onLobbyRequest();
                 CodTdmRoomManager.getInstance().subscribeLobbySummary(player);
             }
         });

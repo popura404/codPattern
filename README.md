@@ -13,6 +13,7 @@ LR Tactical 0.3.0+ 是可选联动；未安装时，LR 近战、投掷物选择�
 > - `0.6.9b`：敌方血条改为世界空间渲染
 > - `0.6.10b`：放宽传送安全校验，补充 `endtp` 失败告警、朝向预览，并将 `endtp set` 改为当前位置批量写入全部地图
 
+- [0.8.3b 地图存储与 OP 手动迁移](docs/map-storage-operations.md)
 - [项目概览](docs/README.md)
 - [详细操作与实现说明](docs/GUIDE.md)
 - [常见问题 Q&A](docs/QANDA.md)

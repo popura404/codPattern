@@ -449,5 +449,12 @@
     "screen.codpattern.room.notice.left_room": "Left room",
     "screen.codpattern.room.ready": "Ready",
     "screen.codpattern.room.ready_cancel": "Unready",
-    "screen.codpattern.room.button": "Game Lobby"
+    "screen.codpattern.room.button": "Game Lobby",
+  "message.codpattern.storage.legacy": "[COD Pattern] Legacy map/rule files were detected for this save. This version no longer loads maps from those locations. Back up the complete save AND the game fpsmatch directory, then have an administrator run /cdp map migrate check and /cdp map migrate confirm. WARNING: migration is destructive; successfully moved source files are removed. Relocation does not upgrade data schemas or guarantee compatibility with the main mod or addons. Restart and verify maps and rules afterwards.",
+  "message.codpattern.storage.uncertain": "[COD Pattern] Legacy migration status could not be confirmed (missing addon, unreadable directory or invalid marker). Back up the save and fpsmatch, then run /cdp map migrate check. No automatic migration will run.",
+  "message.codpattern.storage.complete": "[COD Pattern] Map files moved; this save was marked under fpsmatch/.codpattern-migrations/. Restart and verify maps, spawn points, rules and addon features. File migration does not guarantee gameplay compatibility. Keep your pre-migration backup; do not repeat migration or delete the entire fpsmatch directory.",
+  "message.codpattern.storage.partial": "[COD Pattern] Migration did not fully complete: %s completed, %s unresolved/failed. See the console report, including marker errors. Unfinished items are not marked successful. Restart to check affected modes; retain old files and backups, fix issues, then have an OP check and retry.",
+  "message.codpattern.storage.busy": "A storage operation is running, or affected modes still have matches/players. Finish those activities and retry.",
+  "message.codpattern.storage.checking": "Inspecting legacy maps and rules. The confirm command will perform destructive relocation after rechecking. A full save and fpsmatch backup is required beforehand.",
+  "message.codpattern.storage.locked": "This mode is migrating, awaiting restart or has unresolved legacy rules. Creating, joining, editing and saving are unavailable. Ask an administrator to run /cdp map migrate check."
 }

@@ -1,5 +1,8 @@
 # COD Pattern Guide
 
+> 本文地图目录已同步至 `0.8.3b`；旧存档升级请先阅读[地图存储与手动迁移](map-storage-operations.md)。其他章节仍保留原版本说明。
+
+
 [项目概览](README.md) | [Q&A](QANDA.md) | [更新日志](CHANGES.md)
 
 > 本文只描述当前仓库代码已经实现的行为。命令、目录、限制、校验与数据流均以当前版本源码为准。本文基于ai撰写，内容仅供参考
@@ -45,16 +48,16 @@ LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投�
 |---|---|
 | `<世界>/serverconfig/codpattern/backpack_rules/backpack_config.json` | 玩家背包、槽位物品、配件预设 |
 | `<世界>/serverconfig/codpattern/backpack_rules/weapon_filter.json` | 武器分类、黑名单、投掷物开关、弹药倍率 |
-| `<世界>/serverconfig/codpattern/tdm_rules/config.json` | 房间与 TDM 节奏配置 |
-| `<世界>/serverconfig/codpattern/tdm_match_records/` | `frontline` 战绩导出 |
-| `<世界>/serverconfig/codpattern/tactical_tdm_match_records/` | `teamdeathmatch` 战绩导出 |
-| `<游戏目录>/fpsmatch/<世界名>/frontline/` | `frontline` 地图数据 |
-| `<游戏目录>/fpsmatch/<世界名>/teamdeathmatch/` | `teamdeathmatch` 地图数据 |
+| `<世界>/serverconfig/codpattern/maps/builtin/rules/config.json` | 房间与 TDM 节奏配置 |
+| `<世界>/serverconfig/codpattern/maps/builtin/frontline/records/` | `frontline` 战绩导出 |
+| `<世界>/serverconfig/codpattern/maps/builtin/teamdeathmatch/records/` | `teamdeathmatch` 战绩导出 |
+| `<世界>/serverconfig/codpattern/maps/builtin/frontline/` | `frontline` 地图数据 |
+| `<世界>/serverconfig/codpattern/maps/builtin/teamdeathmatch/` | `teamdeathmatch` 地图数据 |
 
 要点：
 
 - 背包和 TDM 配置在世界存档的 `serverconfig` 下面。
-- 地图不在世界存档里，而在游戏根目录的 `fpsmatch/<世界名>/...` 下面。
+- 地图定义与规则统一放在当前世界存档的 `serverconfig/codpattern/maps/` 下面；背包配置保持原位。
 - 迁移服务器时，世界存档和 `fpsmatch/` 目录要一起复制。
 
 ## 3. 服务端启动和玩家进服时会发生什么
@@ -64,7 +67,7 @@ LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投�
 服务端启动后会执行两件事：
 
 1. 注册网络包。
-2. 加载 `tdm_rules/config.json`。
+2. 加载 `maps/builtin/rules/config.json`。
 
 对应实现：
 
@@ -219,7 +222,7 @@ LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投�
 
 它不会做的事：
 
-- 不会重载 `tdm_rules/config.json`
+- 不会重载 `maps/builtin/rules/config.json`
 - 不会重建地图
 - 不会替代重启服务器
 
@@ -227,7 +230,7 @@ LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投�
 
 - 手改 `weapon_filter.json` 后，可以用 `/cdp update`
 - 手改 `backpack_config.json` 后，最稳妥的方式仍然是停服修改
-- 手改 `tdm_rules/config.json` 后，需要重启服务器
+- 手改 `maps/builtin/rules/config.json` 后，需要重启服务器
 
 ## 5. TaCZ 改枪与配件预设
 
@@ -708,11 +711,11 @@ LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投�
 
 这些占位值不会自动替换成真实枪包名，需要你手动改成自己的内容。
 
-### 8.3 `tdm_rules/config.json`
+### 8.3 `maps/builtin/rules/config.json`
 
 路径：
 
-- `<世界>/serverconfig/codpattern/tdm_rules/config.json`
+- `<世界>/serverconfig/codpattern/maps/builtin/rules/config.json`
 
 当前默认字段如下：
 
@@ -743,8 +746,8 @@ LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投�
 
 路径：
 
-- `<游戏目录>/fpsmatch/<世界名>/frontline/<地图名>.json`
-- `<游戏目录>/fpsmatch/<世界名>/teamdeathmatch/<地图名>.json`
+- `<世界>/serverconfig/codpattern/maps/builtin/frontline/<地图目录>/map.json`
+- `<世界>/serverconfig/codpattern/maps/builtin/teamdeathmatch/<地图目录>/map.json`
 
 文件里保存的是：
 
@@ -757,9 +760,9 @@ LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投�
 ## 9. 首次部署到可开局的最短流程
 
 1. 把 `codpattern` 与依赖模组放进 `mods/`。
-2. 启动一次服务器，让 `serverconfig/codpattern/` 和 `fpsmatch/<世界名>/` 自动生成。
+2. 首次新建存档时启动服务器生成配置；旧存档升级时先按[迁移说明](map-storage-operations.md)检查，程序不会自动搬迁旧地图。
 3. 调整 `weapon_filter.json`，确认枪械分类和黑名单。
-4. 调整 `tdm_rules/config.json`，然后重启服务器。
+4. 调整 `maps/builtin/rules/config.json`，然后重启服务器。
 5. 用 `/cdp map create` 建图。
 6. 给 `kortac` 和 `specgru` 至少各配置 `1` 个 `INITIAL` 点。
 7. 给双方继续配置足够数量的 `DYNAMIC_CANDIDATE` 点。
@@ -769,10 +772,10 @@ LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投�
 ## 10. 开服前检查清单
 
 - TaCZ 版本不低于 `1.1.6`
-- 地图已经真正保存到 `fpsmatch/<世界名>/...`
+- 地图已经真正保存到当前存档的 `serverconfig/codpattern/maps/`
 - 双方都有 `INITIAL` 点
 - 双方都有足够的 `DYNAMIC_CANDIDATE` 点
 - `endtp` 已配置
 - `weapon_filter.json` 已改成你的枪包策略
-- `tdm_rules/config.json` 已按你的节奏重启生效
+- `maps/builtin/rules/config.json` 已按你的节奏重启生效
 - 世界存档与 `fpsmatch/` 已备份

@@ -449,5 +449,12 @@
     "screen.codpattern.room.notice.left_room": "已离开房间",
     "screen.codpattern.room.ready": "准备",
     "screen.codpattern.room.ready_cancel": "取消准备",
-    "screen.codpattern.room.button": "游戏大厅"
+    "screen.codpattern.room.button": "游戏大厅",
+  "message.codpattern.storage.legacy": "[COD Pattern] 检测到当前存档的旧版地图或规则文件，旧目录已不再用于本版本的地图加载。请管理员先备份完整存档及游戏目录下的 fpsmatch 文件夹，再执行 /cdp map migrate check 查看清单，确认后使用 /cdp map migrate confirm 迁移。注意：这是破坏性迁移，成功搬迁的旧文件会被移除；迁移仅调整位置，不保证旧数据与当前主模组及附属兼容。迁移后地图或规则仍可能无法生效，请重启并逐项检查。",
+  "message.codpattern.storage.uncertain": "[COD Pattern] 无法确认旧地图迁移状态，可能存在未加载附属、目录读取失败或迁移标记异常。请管理员备份存档及 fpsmatch 后执行 /cdp map migrate check 检查；系统不会自动迁移。",
+  "message.codpattern.storage.complete": "[COD Pattern] 本次地图文件迁移已完成，已在 fpsmatch/.codpattern-migrations/ 写入当前存档标记。请重启服务器并检查地图、出生点、房间规则及附属功能。文件搬迁成功不代表旧数据兼容或已生效；确认正常前请保留备份，勿重复迁移或删除整个 fpsmatch 文件夹。",
+  "message.codpattern.storage.partial": "[COD Pattern] 本次迁移未全部完成：成功 %s 项，未处理或失败 %s 项。请管理员查看控制台报告；未完成项未标记成功，标记写入失败也会单独报告。受影响模式须重启后检查，请勿删除旧文件或备份；修复后重新检查并由 OP 执行迁移。",
+  "message.codpattern.storage.busy": "迁移检查正在运行，或受影响模式仍有比赛/玩家。请结束相关活动后重试。",
+  "message.codpattern.storage.checking": "正在只读检查当前存档的旧地图与规则。confirm 命令将在重新校验后执行破坏性搬迁；必须事先备份完整存档与 fpsmatch。",
+  "message.codpattern.storage.locked": "该模式正在迁移、等待重启或有待迁移规则，暂时无法创建、加入、编辑或保存。请管理员执行 /cdp map migrate check。"
 }

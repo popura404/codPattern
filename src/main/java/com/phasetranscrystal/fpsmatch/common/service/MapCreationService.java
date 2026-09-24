@@ -42,6 +42,11 @@ public final class MapCreationService {
             return Result.failure("invalid_name", "message.fpsm.map_creator_tool.invalid_name");
         }
 
+        try {
+            com.cdp.codpattern.config.storage.ServerMapStorage.get(player.server).requireCreate(type, mapName);
+        } catch (RuntimeException e) {
+            return Result.failure("storage_locked", "message.codpattern.storage.locked");
+        }
         Optional<AreaData> area = createArea(pos1, pos2);
         if (area.isEmpty()) {
             return Result.failure("invalid_area", "message.fpsm.map_creator_tool.invalid_area");
@@ -56,11 +61,14 @@ public final class MapCreationService {
             return Result.failure("invalid_type", "message.fpsm.map_creator_tool.invalid_type");
         }
 
-        BaseMap newMap = factory.apply(player.serverLevel(), mapName, area.get());
-        core.registerMap(type, newMap);
+        BaseMap newMap;
         try {
+            newMap = factory.apply(player.serverLevel(), mapName, area.get());
+            core.registerMap(type, newMap);
             CodMapPersistence.saveMapOrRollback(newMap, () -> core.unregisterMap(newMap));
         } catch (RuntimeException e) {
+            com.mojang.logging.LogUtils.getLogger().error("Failed to create map {}/{}", type, mapName, e);
+            com.cdp.codpattern.config.storage.ServerMapStorage.get(player.server).abandonCreation(type, mapName);
             return Result.failure("save_failed_rolled_back", "message.codpattern.map.create_save_failed_rollback", type, mapName);
         }
 

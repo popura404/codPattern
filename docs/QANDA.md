@@ -1,5 +1,8 @@
 # COD Pattern Q&A
 
+> 本文地图目录已同步至 `0.8.3b`；旧存档升级请先阅读[地图存储与手动迁移](map-storage-operations.md)。其他章节仍保留原版本说明。
+
+
 [项目概览](README.md) | [详细 Guide](GUIDE.md) | [更新日志](CHANGES.md)
 
 > 这一页只收录当前实现下最常见的问题和排查方向，不重复展开 Guide 里的完整流程说明。
@@ -35,7 +38,7 @@
 
 `/cdp update` 会重新读取筛选配置，并把筛选配置和每个玩家的背包数据同步到客户端。
 
-## 3. 为什么我改了 `tdm_rules/config.json`，游戏里没有生效
+## 3. 为什么我改了 `maps/builtin/rules/config.json`，游戏里没有生效
 
 因为这份配置只在服务端启动时加载。
 
@@ -48,12 +51,13 @@
 
 ## 4. 房间列表里为什么没有我的地图
 
-常见原因有四类：
+常见原因有以下几类：
 
 1. 地图根本没有创建成功。
-2. 地图持久化失败，文件没有落到 `fpsmatch/<世界名>/<模式>/`。
+2. 地图持久化失败，文件没有落到当前存档的 `serverconfig/codpattern/maps/builtin/<模式>/<地图目录>/map.json`。
 3. 你查的是错误模式。
-4. 迁移服务器时漏拷了 `fpsmatch/` 目录。
+4. 旧版地图尚未通过 OP 命令迁移，或迁移后尚未重启。
+5. 搬迁服务器时漏拷地图配置或 `.storage/` 迁移记录。
 
 先执行：
 
@@ -63,10 +67,10 @@
 /cdp map list teamdeathmatch
 ```
 
-再到游戏根目录检查：
+再到当前世界存档中检查：
 
-- `fpsmatch/<世界名>/frontline/`
-- `fpsmatch/<世界名>/teamdeathmatch/`
+- `serverconfig/codpattern/maps/builtin/frontline/`
+- `serverconfig/codpattern/maps/builtin/teamdeathmatch/`
 
 ## 5. 为什么比赛进行中不能加入房间
 
@@ -183,17 +187,17 @@
 
 如果需要切换，要手动点选那套背包。
 
-## 13. 为什么我只复制了世界存档，地图还是全没了
+## 13. 搬迁服务器或升级版本时应复制哪些数据
 
-因为地图不保存在世界存档里。
+`0.8.3b` 起地图定义和规则位于当前世界存档内。旧版地图仍在游戏目录的 `fpsmatch/`，需先备份，再按[迁移说明](map-storage-operations.md)执行 OP 命令；仅更新模组不会自动搬迁。
 
 当前地图文件保存在：
 
-- `fpsmatch/<世界名>/frontline/`
-- `fpsmatch/<世界名>/teamdeathmatch/`
+- `serverconfig/codpattern/maps/builtin/frontline/`
+- `serverconfig/codpattern/maps/builtin/teamdeathmatch/`
 
-迁移时至少要同时复制：
+备份或搬迁服务器时应保留：
 
-1. 世界存档
-2. `serverconfig/codpattern/`
-3. `fpsmatch/`
+1. 完整世界存档，包括 `serverconfig/codpattern/maps/.storage/`
+2. 游戏目录的 `fpsmatch/`，其中可能仍有旧地图、全局数据或其他附属数据
+3. 配套版本的主模组和附属，以及迁移前备份

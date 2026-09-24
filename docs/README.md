@@ -1,5 +1,8 @@
 # COD Pattern
 
+> 本文地图目录已同步至 `0.8.3b`；旧存档升级请先阅读[地图存储与手动迁移](map-storage-operations.md)。其他章节仍保留原版本说明。
+
+
 [仓库入口](../README.md) | [English README](README.en.md) | [详细 Guide](GUIDE.md) | [Q&A](QANDA.md) | [更新日志](CHANGES.md)
 
 > 发布状态：Beta，当前文档覆盖至 `0.6.10b`。建议先在测试环境验证后再部署到正式服务器，并提前备份世界存档、`serverconfig/codpattern/` 和 `fpsmatch/`。
@@ -47,8 +50,8 @@ COD Pattern 是一个面向 **TaCZ + 内置 FPSM 兼容核心** 的模组，提�
 
 - 背包数据保存在 `serverconfig/codpattern/backpack_rules/backpack_config.json`
 - 武器筛选保存在 `serverconfig/codpattern/backpack_rules/weapon_filter.json`
-- TDM 配置保存在 `serverconfig/codpattern/tdm_rules/config.json`
-- 地图数据保存在 `<游戏目录>/fpsmatch/<世界名>/...`
+- TDM 配置保存在 `serverconfig/codpattern/maps/builtin/rules/config.json`
+- 地图数据保存在 `<世界>/serverconfig/codpattern/maps/`
 - 可选联动：LR Tactical 0.3.0+、Physics Mod、`tacz-addon 1.1.6`
 - 未安装 LR Tactical 时，COD Pattern 会禁用 LR 近战、投掷物选择、投掷物槽位和默认投掷物发放；安装后这些功能恢复可用。
 - 已提供 `zh_cn / zh_tw / en_us / ja_jp` 语言资源
@@ -99,7 +102,7 @@ COD Pattern 是一个面向 **TaCZ + 内置 FPSM 兼容核心** 的模组，提�
   - `throwablesEnabled`
   - `ammunitionPerMagazineMultiple`
 
-### `tdm_rules/config.json`
+### `maps/builtin/rules/config.json`
 
 当前版本真实生效的默认字段如下：
 
@@ -126,8 +129,8 @@ COD Pattern 是一个面向 **TaCZ + 内置 FPSM 兼容核心** 的模组，提�
 
 ### 战绩导出目录
 
-- `frontline` -> `serverconfig/codpattern/tdm_match_records/`
-- `teamdeathmatch` -> `serverconfig/codpattern/tactical_tdm_match_records/`
+- `frontline` -> `serverconfig/codpattern/maps/builtin/frontline/records/`
+- `teamdeathmatch` -> `serverconfig/codpattern/maps/builtin/teamdeathmatch/records/`
 
 ## 文档导航
 

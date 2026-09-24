@@ -13,7 +13,7 @@ import java.nio.file.Path;
 
 /**
  * COD Team Deathmatch 配置文件
- * 存储于 serverconfig/codpattern/tdm_rules/config.json
+ * 存储于 serverconfig/codpattern/maps/builtin/rules/config.json
  */
 public class CodTdmConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(CodTdmConfig.class);
@@ -194,6 +194,11 @@ public class CodTdmConfig {
      * 加载配置文件
      */
     public static void load(MinecraftServer server) {
+        INSTANCE = new CodTdmConfig();
+        if (com.cdp.codpattern.config.storage.ServerMapStorage.get(server).migration().commonRulesPending()) {
+            LOGGER.warn("Legacy common rules detected; use /cdp map migrate check before starting matches");
+            return;
+        }
         try {
             Path configDir = ConfigPath.SERVER_TDM_CONFIG.getPath(server);
             Path configFile = configDir.resolve("config.json");
@@ -223,6 +228,7 @@ public class CodTdmConfig {
      * 保存配置文件
      */
     public static void save(MinecraftServer server) {
+        com.cdp.codpattern.config.storage.ServerMapStorage.get(server).requireAvailable("frontline");
         try {
             Path configDir = ConfigPath.SERVER_TDM_CONFIG.getPath(server);
             Path configFile = configDir.resolve("config.json");

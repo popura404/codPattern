@@ -272,6 +272,7 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
     }
 
     private static Optional<ModeRoomHandle> roomHandle(BaseMap map) {
+        if (map != null && !com.cdp.codpattern.config.storage.ServerMapStorage.canUse(map.getGameType())) return Optional.empty();
         if (map != null) {
             Optional<ModeRoomHandle> providerHandle = GameModeRuntimeRegistry.find(map.getGameType())
                     .flatMap(provider -> provider.roomHandle(map));

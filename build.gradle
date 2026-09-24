@@ -330,3 +330,11 @@ tasks.register('buildAndCopyToMods') {
     description = 'Compatibility alias for deployment of the main mod only.'
     dependsOn tasks.named('deploySplitMainOnly')
 }
+
+tasks.register('runMapStorageCompat', JavaExec) {
+    group = 'verification'
+    description = 'Exercise map relocation against temporary files without touching runtime saves.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.cdp.codpattern.config.storage.MapStorageMigrationCompatTest'
+    dependsOn tasks.named('testClasses')
+}

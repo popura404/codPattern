@@ -56,7 +56,14 @@ public class CodTacticalTdmMapData {
                 .isGlobal(false)
                 .build();
 
-        event.registerData(MapData.class, BuiltInGameModes.TEAM_DEATHMATCH, saveHolder);
+        event.registerMapData(MapData.class, new com.cdp.codpattern.config.storage.MapStorageRegistration(
+                BuiltInGameModes.TEAM_DEATHMATCH, "codpattern", "builtin/teamdeathmatch",
+                java.util.List.of("teamdeathmatch", "cdptacticaltdm"), json -> {
+                    saveHolder.decodeFromJson(json);
+                    if (json.has("gameType") && !java.util.List.of("teamdeathmatch", "cdptacticaltdm").contains(json.get("gameType").getAsString())) {
+                        throw new IllegalArgumentException("Wrong map mode");
+                    }
+                }, null), saveHolder);
     }
 
     private static void loadMap(MapData data) {

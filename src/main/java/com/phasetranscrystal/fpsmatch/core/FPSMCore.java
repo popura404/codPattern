@@ -31,14 +31,12 @@ import java.util.UUID;
 public class FPSMCore {
     private static FPSMCore INSTANCE;
 
-    private final String archiveName;
     private final Map<String, List<BaseMap>> games = new LinkedHashMap<>();
     private final Map<String, Function3<ServerLevel, String, AreaData, BaseMap>> registry = new LinkedHashMap<>();
     private final FPSMDataManager fpsmDataManager;
 
-    private FPSMCore(String archiveName) {
-        this.archiveName = archiveName;
-        this.fpsmDataManager = new FPSMDataManager(archiveName);
+    private FPSMCore(MinecraftServer server) {
+        this.fpsmDataManager = new FPSMDataManager(server);
     }
 
     public static FPSMCore getInstance() {
@@ -233,7 +231,7 @@ public class FPSMCore {
 
     @SubscribeEvent
     public static void onServerStartedEvent(ServerStartedEvent event) {
-        INSTANCE = new FPSMCore(event.getServer().getWorldData().getLevelName());
+        INSTANCE = new FPSMCore(event.getServer());
         MinecraftForge.EVENT_BUS.post((Event) new RegisterFPSMapEvent(INSTANCE));
         MinecraftForge.EVENT_BUS.post((Event) new RegisterFPSMSaveDataEvent(INSTANCE.fpsmDataManager));
         INSTANCE.fpsmDataManager.readData();
@@ -255,5 +253,6 @@ public class FPSMCore {
         INSTANCE.games.clear();
         INSTANCE.registry.clear();
         INSTANCE = null;
+        com.cdp.codpattern.config.storage.ServerMapStorage.close(event.getServer());
     }
 }

@@ -26,7 +26,7 @@ import java.util.Optional;
 
 /**
  * TDM 地图数据序列化和保存
- * 数据将保存到 fpsmatch/<world>/frontline/ 文件夹
+ * 数据保存到 <world>/serverconfig/codpattern/maps/builtin/frontline/<地图目录>/map.json
  */
 @Mod.EventBusSubscriber(modid = "codpattern", bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class CodTdmMapData {
@@ -110,7 +110,14 @@ public class CodTdmMapData {
                 .isGlobal(false) // 保存到世界文件夹
                 .build();
 
-        event.registerData(MapData.class, BuiltInGameModes.FRONTLINE, saveHolder);
+        event.registerMapData(MapData.class, new com.cdp.codpattern.config.storage.MapStorageRegistration(
+                BuiltInGameModes.FRONTLINE, "codpattern", "builtin/frontline",
+                java.util.List.of("frontline", "cdptdm"), json -> {
+                    saveHolder.decodeFromJson(json);
+                    if (json.has("gameType") && !java.util.List.of("frontline", "cdptdm").contains(json.get("gameType").getAsString())) {
+                        throw new IllegalArgumentException("Wrong map mode");
+                    }
+                }, null), saveHolder);
     }
 
     /**

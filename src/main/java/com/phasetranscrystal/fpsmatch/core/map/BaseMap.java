@@ -47,6 +47,9 @@ public abstract class BaseMap {
      * getGameType() that depends on subclass fields initialized afterwards.
      */
     protected BaseMap(ServerLevel serverLevel, String mapName, AreaData areaData, String gameType) {
+        if (serverLevel != null && gameType != null) {
+            com.cdp.codpattern.config.storage.ServerMapStorage.get(serverLevel.getServer()).requireAvailable(gameType);
+        }
         this.serverLevel = serverLevel;
         this.mapName = mapName;
         this.mapArea = areaData;
@@ -86,6 +89,10 @@ public abstract class BaseMap {
     }
 
     public void join(ServerPlayer player) {
+        if (!com.cdp.codpattern.config.storage.ServerMapStorage.canUse(getGameType())) {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.codpattern.storage.locked"));
+            return;
+        }
         List<BaseTeam> teams = mapTeams.getTeams();
         teams.stream()
                 .min(Comparator.comparingInt(BaseTeam::getPlayerCount))
@@ -93,12 +100,20 @@ public abstract class BaseMap {
     }
 
     public void join(String teamName, ServerPlayer player) {
+        if (!com.cdp.codpattern.config.storage.ServerMapStorage.canUse(getGameType())) {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.codpattern.storage.locked"));
+            return;
+        }
         FPSMCore.checkAndLeaveTeam(player);
         player.setGameMode(GameType.ADVENTURE);
         mapTeams.joinTeam(teamName, player);
     }
 
     public void joinSpec(ServerPlayer player) {
+        if (!com.cdp.codpattern.config.storage.ServerMapStorage.canUse(getGameType())) {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.codpattern.storage.locked"));
+            return;
+        }
         FPSMCore.checkAndLeaveTeam(player);
         player.setGameMode(GameType.SPECTATOR);
         mapTeams.leaveTeam(player);

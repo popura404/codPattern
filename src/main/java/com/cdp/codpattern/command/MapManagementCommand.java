@@ -81,6 +81,8 @@ public final class MapManagementCommand {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("map")
                 .requires(source -> source.hasPermission(MAP_PERMISSION_LEVEL));
 
+        root.then(MapMigrationCommand.buildCommand());
+
         root.then(Commands.literal("list")
                 .executes(context -> listTypes(context.getSource()))
                 .then(Commands.argument("type", StringArgumentType.word())
@@ -304,11 +306,19 @@ public final class MapManagementCommand {
             source.sendFailure(Component.translatable("message.fpsm.map_creator_tool.invalid_type"));
             return 0;
         }
-        BaseMap newMap = factory.apply(source.getLevel(), mapName, new AreaData(from, to));
-        core.registerMap(type, newMap);
         try {
+            com.cdp.codpattern.config.storage.ServerMapStorage.get(source.getServer()).requireCreate(type, mapName);
+        } catch (RuntimeException e) {
+            source.sendFailure(Component.literal(e.getMessage())); return 0;
+        }
+        BaseMap newMap;
+        try {
+            newMap = factory.apply(source.getLevel(), mapName, new AreaData(from, to));
+            core.registerMap(type, newMap);
             CodMapPersistence.saveMapOrRollback(newMap, () -> core.unregisterMap(newMap));
         } catch (RuntimeException e) {
+            com.mojang.logging.LogUtils.getLogger().error("Failed to create map {}/{}", type, mapName, e);
+            com.cdp.codpattern.config.storage.ServerMapStorage.get(source.getServer()).abandonCreation(type, mapName);
             source.sendFailure(Component.translatable("message.codpattern.map.create_save_failed_rollback", type, mapName));
             return 0;
         }
@@ -801,6 +811,9 @@ public final class MapManagementCommand {
     }
 
     private static BaseMap requireMap(CommandSourceStack source, String rawType, String mapName) {
+        if (!com.cdp.codpattern.config.storage.ServerMapStorage.canUse(GameModeRegistry.canonicalize(rawType))) {
+            source.sendFailure(Component.translatable("message.codpattern.storage.locked")); return null;
+        }
         String type = resolveGameType(source, rawType);
         if (type == null) {
             return null;

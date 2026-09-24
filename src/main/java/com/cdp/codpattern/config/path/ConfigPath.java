@@ -9,9 +9,9 @@ public enum ConfigPath {
 
     SERVERBACKPACK("serverconfig/codpattern/backpack_rules/backpack_config.json"),
     SERVER_FILTER("serverconfig/codpattern/backpack_rules/weapon_filter.json"),
-    SERVER_TDM_CONFIG("serverconfig/codpattern/tdm_rules"),
-    SERVER_TDM_MATCH_RECORDS("serverconfig/codpattern/tdm_match_records"),
-    SERVER_TACTICAL_TDM_MATCH_RECORDS("serverconfig/codpattern/tactical_tdm_match_records");
+    SERVER_TDM_CONFIG("serverconfig/codpattern/maps/builtin/rules"),
+    SERVER_TDM_MATCH_RECORDS("serverconfig/codpattern/maps/builtin/frontline/records"),
+    SERVER_TACTICAL_TDM_MATCH_RECORDS("serverconfig/codpattern/maps/builtin/teamdeathmatch/records");
 
     private final String path;
 

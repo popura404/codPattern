@@ -174,6 +174,10 @@ public class SpawnPointToolActionC2SPacket {
                 return;
             }
 
+            if (!com.cdp.codpattern.config.storage.ServerMapStorage.canUse(
+                    com.cdp.codpattern.app.match.GameModeRegistry.canonicalize(selectedType))) {
+                player.sendSystemMessage(Component.translatable("message.codpattern.storage.locked")); return;
+            }
             switch (action) {
                 case REFRESH -> sendScreen(
                         player,
@@ -694,7 +698,8 @@ public class SpawnPointToolActionC2SPacket {
         String selectedMap = availableMaps.contains(requestedMap) ? requestedMap : firstOrBlank(availableMaps);
         Optional<BaseMap> map = selectedType.isBlank() || selectedMap.isBlank()
                 ? Optional.empty()
-                : core.getMapByTypeWithName(selectedType, selectedMap);
+                : core.getMapByTypeWithName(selectedType, selectedMap)
+                        .filter(value -> com.cdp.codpattern.config.storage.ServerMapStorage.canUse(value.getGameType()));
         List<String> availableTeams = map.map(baseMap -> baseMap.getMapTeams().getTeams().stream()
                 .map(team -> team.name)
                 .toList()).orElse(List.of());
