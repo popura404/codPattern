@@ -456,5 +456,17 @@
   "message.codpattern.storage.partial": "[COD Pattern] Migration did not fully complete: %s completed, %s unresolved/failed. See the console report, including marker errors. Unfinished items are not marked successful. Restart to check affected modes; retain old files and backups, fix issues, then have an OP check and retry.",
   "message.codpattern.storage.busy": "A storage operation is running, or affected modes still have matches/players. Finish those activities and retry.",
   "message.codpattern.storage.checking": "Inspecting legacy maps and rules. The confirm command will perform destructive relocation after rechecking. A full save and fpsmatch backup is required beforehand.",
-  "message.codpattern.storage.locked": "This mode is migrating, awaiting restart or has unresolved legacy rules. Creating, joining, editing and saving are unavailable. Ask an administrator to run /cdp map migrate check."
+  "message.codpattern.storage.locked": "This mode is migrating, awaiting restart or has unresolved legacy rules. Creating, joining, editing and saving are unavailable. Ask an administrator to run /cdp map migrate check.",
+  "message.codpattern.force_end.started": "Administrator %s is forcibly ending this match.",
+  "message.codpattern.force_end.completed": "Room %s ended; online players have recovered.",
+  "message.codpattern.force_end.settlement_failed": "Room %s ended and cleanup completed, but settlement failed. Check the server log.",
+  "message.codpattern.force_end.pending": "Room %s is stopped. Recovery or cleanup is pending; new matches are blocked and retries will continue.",
+  "message.codpattern.force_end.idle": "Room %s has no match to end.",
+  "message.codpattern.force_end.stale": "The match in room %s has changed. Refresh and try again.",
+  "message.codpattern.force_end.in_progress": "Room %s is already being terminated.",
+  "message.codpattern.force_end.offline": "Recovery for %s offline players is saved and will run on login.",
+  "message.codpattern.force_end.unknown": "No room registered by an active mode: %s",
+  "message.codpattern.force_end.persistence": "Room %s stopped, but recovery records could not be saved. Online recovery continues; new matches are blocked.",
+  "message.codpattern.force_end.players_pending": "Room %s stopped; recovery for some online players remains pending and will retry.",
+  "message.codpattern.force_end.resources_pending": "Online players in room %s recovered, but room resource cleanup is pending and will retry."
 }

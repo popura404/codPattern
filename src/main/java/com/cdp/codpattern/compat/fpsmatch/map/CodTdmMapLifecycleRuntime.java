@@ -18,6 +18,26 @@ final record CodTdmMapLifecycleRuntime(
         Runnable markStoppedAction
 ) {
 
+    com.cdp.codpattern.app.match.runtime.termination.ModeForceEndHandler forceEndHandler() {
+        return new com.cdp.codpattern.app.match.runtime.termination.ModeForceEndHandler() {
+            public com.cdp.codpattern.app.match.model.result.ModeOperationResult<Void> stop(
+                    com.cdp.codpattern.app.match.runtime.termination.ForceEndContext context) {
+                phaseRuntime.stopForForceEnd();
+                return com.cdp.codpattern.app.match.model.result.ModeOperationResult.success(null);
+            }
+            public com.cdp.codpattern.app.match.model.result.ModeOperationResult<Void> settle(
+                    com.cdp.codpattern.app.match.runtime.termination.ForceEndContext context) {
+                phaseRuntime.settleForForceEnd();
+                return com.cdp.codpattern.app.match.model.result.ModeOperationResult.success(null);
+            }
+            public com.cdp.codpattern.app.match.model.result.ModeOperationResult<Void> cleanup(
+                    com.cdp.codpattern.app.match.runtime.termination.ForceEndContext context) {
+                resetGame();
+                return com.cdp.codpattern.app.match.model.result.ModeOperationResult.success(null);
+            }
+        };
+    }
+
     void tick() {
         tickRuntime.tick();
         clientSyncCoordinator.tick();

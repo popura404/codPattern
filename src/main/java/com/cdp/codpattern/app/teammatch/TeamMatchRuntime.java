@@ -110,6 +110,8 @@ public final class TeamMatchRuntime {
                 if (player == null) {
                     return JoinRoomResult.failure(roomId(), "PLAYER_MISSING", "");
                 }
+                if (!com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(player.server).canJoin(roomId(), player.getUUID()))
+                    return JoinRoomResult.failure(roomId(), "RECOVERY_PENDING", "message.codpattern.force_end.pending");
                 if (readPort.containsJoinedPlayer(player.getUUID()) || readPort.containsSpectator(player)) {
                     return JoinRoomResult.success(roomId(), "ALREADY_JOINED");
                 }
@@ -170,6 +172,11 @@ public final class TeamMatchRuntime {
             @Override
             public void syncToClient() {
                 actionPort.syncToClient();
+            }
+
+            @Override
+            public com.cdp.codpattern.app.match.runtime.termination.ModeForceEndHandler forceEndHandler() {
+                return actionPort.forceEndHandler();
             }
         };
     }

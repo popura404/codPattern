@@ -68,7 +68,15 @@ public abstract class BaseMap {
         return mapTeams;
     }
 
+    public abstract com.cdp.codpattern.app.match.runtime.termination.ModeForceEndHandler forceEndHandler();
+
+    public final boolean recoveryBlocked() {
+        return com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.current()
+                .map(service -> service.blocked(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(this))).orElse(false);
+    }
+
     public final void mapTick() {
+        if (recoveryBlocked()) { syncToClient(); return; }
         if (victoryGoal()) {
             victory();
         }
@@ -100,21 +108,31 @@ public abstract class BaseMap {
     }
 
     public void join(String teamName, ServerPlayer player) {
+        if (!com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(serverLevel.getServer())
+                .canJoin(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(this), player.getUUID())) return;
         if (!com.cdp.codpattern.config.storage.ServerMapStorage.canUse(getGameType())) {
             player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.codpattern.storage.locked"));
             return;
         }
         FPSMCore.checkAndLeaveTeam(player);
+        com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(serverLevel.getServer())
+                .capture(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(this), player);
+        com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(serverLevel.getServer()).useAdventureRecovery(player);
         player.setGameMode(GameType.ADVENTURE);
         mapTeams.joinTeam(teamName, player);
     }
 
     public void joinSpec(ServerPlayer player) {
+        if (!com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(serverLevel.getServer())
+                .canJoin(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(this), player.getUUID())) return;
         if (!com.cdp.codpattern.config.storage.ServerMapStorage.canUse(getGameType())) {
             player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.codpattern.storage.locked"));
             return;
         }
         FPSMCore.checkAndLeaveTeam(player);
+        com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(serverLevel.getServer())
+                .capture(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(this), player);
+        com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(serverLevel.getServer()).useAdventureRecovery(player);
         player.setGameMode(GameType.SPECTATOR);
         mapTeams.leaveTeam(player);
         mapTeams.getSpectatorTeam().join(player);
@@ -123,6 +141,7 @@ public abstract class BaseMap {
     }
 
     public void leave(ServerPlayer player) {
+        com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(serverLevel.getServer()).leave(player);
         mapTeams.leaveTeam(player);
         player.setGameMode(GameType.ADVENTURE);
         WarmupMovementLockService.unlock(player);

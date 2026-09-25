@@ -51,3 +51,11 @@ versionRange="[0.3.0,)"
 ordering="AFTER"
 side="BOTH"
 
+
+# Optional addon compatibility gate: the core still runs by itself.
+[[dependencies.codpattern]]
+modId="codpattern_zombies"
+mandatory=false
+versionRange="[0.1.5b,)"
+ordering="NONE"
+side="BOTH"

@@ -38,6 +38,7 @@ final class CodTdmMapAssemblyOutputBuilder {
         );
         CodTdmActionPort actionPort = CodTdmMapActions.fromRuntimes(
                 policy,
+                map,
                 runtimeBundle.combatRuntime(),
                 runtimeBundle.teamMembershipCoordinator(),
                 runtimeBundle.mapMutationRuntime(),

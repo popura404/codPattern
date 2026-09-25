@@ -95,7 +95,8 @@ class CodTdmMapReadPortAdapter implements CodTdmReadPort {
 
     @Override
     public boolean isWaitingPhase() {
-        return readRuntime.isWaitingPhase();
+        return readRuntime.isWaitingPhase() && com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.current()
+                .map(service -> !service.blocked(roomId())).orElse(true);
     }
 
     @Override

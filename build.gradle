@@ -65,6 +65,7 @@ minecraft {
         }
 
         gameTestServer {
+            workingDirectory project.file(findProperty('gameTestRunDir') ?: 'run')
             property 'forge.enabledGameTestNamespaces', mod_id
             environment 'MOD_CLASSES', "${mod_id}%%${layout.buildDirectory.dir('gametestMod/codpattern').get().asFile.absolutePath}"
         }
@@ -144,7 +145,7 @@ tasks.register('syncGameTestStructures', Copy) {
     group = 'verification'
     description = 'Copy GameTest SNBT templates into the run directory used by Forge GameTest.'
     from layout.projectDirectory.dir('src/main/resources/gameteststructures')
-    into layout.projectDirectory.dir('run/gameteststructures')
+    into project.file((findProperty('gameTestRunDir') ?: 'run').toString() + '/gameteststructures')
     include '**/*.snbt'
 }
 
@@ -338,3 +339,13 @@ tasks.register('runMapStorageCompat', JavaExec) {
     mainClass = 'com.cdp.codpattern.config.storage.MapStorageMigrationCompatTest'
     dependsOn tasks.named('testClasses')
 }
+
+
+tasks.register('runForceEndCompat', JavaExec) {
+    group = 'verification'
+    description = 'Inject termination, recovery, persistence, retry, and lease failures.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.cdp.codpattern.app.match.runtime.termination.ForceEndCoordinatorCompatTest'
+    dependsOn tasks.named('testClasses')
+}
+tasks.named('runMainCompatibilitySuite') { dependsOn tasks.named('runForceEndCompat') }

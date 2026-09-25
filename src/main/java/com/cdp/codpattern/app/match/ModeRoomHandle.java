@@ -47,6 +47,7 @@ public record ModeRoomHandle(
         Objects.requireNonNull(roomId, "roomId");
         Objects.requireNonNull(summaryPort, "summaryPort");
         Objects.requireNonNull(lifecyclePort, "lifecyclePort");
+        Objects.requireNonNull(lifecyclePort.forceEndHandler(), "forceEndHandler");
         actionPort = actionPort == null ? Optional.empty() : actionPort;
         teamPort = teamPort == null ? Optional.empty() : teamPort;
         readyPort = readyPort == null ? Optional.empty() : readyPort;

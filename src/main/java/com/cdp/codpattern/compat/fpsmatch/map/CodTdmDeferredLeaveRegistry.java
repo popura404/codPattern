@@ -25,6 +25,7 @@ public final class CodTdmDeferredLeaveRegistry {
         if (player == null || PENDING.consume(player.getUUID()).isEmpty()) {
             return false;
         }
+        if (com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(player.server).ownsRecovery(player.getUUID())) return true;
         player.setGameMode(GameType.ADVENTURE);
         WarmupMovementLockService.unlock(player);
         RoomRespawnStateRegistry.restore(player);

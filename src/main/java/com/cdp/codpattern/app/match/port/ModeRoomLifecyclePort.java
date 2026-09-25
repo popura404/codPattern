@@ -11,4 +11,7 @@ public interface ModeRoomLifecyclePort extends ModeRoomIdentityPort {
     LeaveRoomResult leave(ServerPlayer player);
 
     void syncToClient();
+
+    /** Required for every mode; no fallback to mode-dependent victory/reset semantics. */
+    com.cdp.codpattern.app.match.runtime.termination.ModeForceEndHandler forceEndHandler();
 }

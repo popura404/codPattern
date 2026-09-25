@@ -456,5 +456,17 @@
   "message.codpattern.storage.partial": "[COD Pattern] 本次迁移未全部完成：成功 %s 项，未处理或失败 %s 项。请管理员查看控制台报告；未完成项未标记成功，标记写入失败也会单独报告。受影响模式须重启后检查，请勿删除旧文件或备份；修复后重新检查并由 OP 执行迁移。",
   "message.codpattern.storage.busy": "迁移检查正在运行，或受影响模式仍有比赛/玩家。请结束相关活动后重试。",
   "message.codpattern.storage.checking": "正在只读检查当前存档的旧地图与规则。confirm 命令将在重新校验后执行破坏性搬迁；必须事先备份完整存档与 fpsmatch。",
-  "message.codpattern.storage.locked": "该模式正在迁移、等待重启或有待迁移规则，暂时无法创建、加入、编辑或保存。请管理员执行 /cdp map migrate check。"
+  "message.codpattern.storage.locked": "该模式正在迁移、等待重启或有待迁移规则，暂时无法创建、加入、编辑或保存。请管理员执行 /cdp map migrate check。",
+  "message.codpattern.force_end.started": "管理员 %s 正在强制结束本局。",
+  "message.codpattern.force_end.completed": "房间 %s 已结束，在线玩家已恢复。",
+  "message.codpattern.force_end.settlement_failed": "房间 %s 已结束并完成清理，但结算失败，请查看服务器日志。",
+  "message.codpattern.force_end.pending": "房间 %s 已停止；恢复或清理尚未完成，暂不可开局，将继续重试。",
+  "message.codpattern.force_end.idle": "房间 %s 当前无需结束。",
+  "message.codpattern.force_end.stale": "房间 %s 的本局已变化，请刷新后重试。",
+  "message.codpattern.force_end.in_progress": "房间 %s 正在执行结束流程。",
+  "message.codpattern.force_end.offline": "已保存 %s 名离线玩家的恢复记录，将在上线后优先恢复。",
+  "message.codpattern.force_end.unknown": "未找到有效模式注册的房间：%s",
+  "message.codpattern.force_end.persistence": "房间 %s 已停止，但恢复记录保存失败；在线恢复仍会执行，暂不可开局。",
+  "message.codpattern.force_end.players_pending": "房间 %s 已停止，部分在线玩家尚未恢复，将继续重试。",
+  "message.codpattern.force_end.resources_pending": "房间 %s 的在线玩家已恢复，但房间资源清理尚未完成，将继续重试。"
 }

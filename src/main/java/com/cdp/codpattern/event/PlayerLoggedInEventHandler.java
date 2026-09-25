@@ -42,6 +42,8 @@ public class PlayerLoggedInEventHandler {
         ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), (ServerPlayer) player);
 
         ServerPlayer serverPlayer = (ServerPlayer) player;
+        if (com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(server)
+                .ownsRecovery(serverPlayer.getUUID())) return;
         if (ModePlayerLoginContributors.route(serverPlayer)
                 == ModePlayerLoginContributor.LoginDisposition.STOP_SHARED_LOGIN) {
             return;

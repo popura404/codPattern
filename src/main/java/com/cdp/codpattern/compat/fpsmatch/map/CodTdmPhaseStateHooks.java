@@ -80,6 +80,9 @@ final class CodTdmPhaseStateHooks implements PhaseStateMachine.Hooks {
     @Override
     public void clearAllPlayersInventory() {
         port.clearAllPlayersInventory();
+        for (ServerPlayer player : port.getJoinedPlayers()) {
+            com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(player.server).acknowledgeInventoryCleared(player);
+        }
     }
 
     @Override

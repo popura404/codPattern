@@ -74,7 +74,19 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
     // 基础方法覆盖
 
     @Override
+    public com.cdp.codpattern.app.match.runtime.termination.ModeForceEndHandler forceEndHandler() {
+        return lifecycleRuntime.forceEndHandler();
+    }
+
+    public void beginAttempt() {
+        var service = com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(getServerLevel().getServer());
+        service.begin(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(this),
+                getMapTeams().getJoinedPlayersWithSpec(), readPort.matchEndTeleportPoint().orElse(null));
+    }
+
+    @Override
     public void tick() {
+        if (recoveryBlocked()) return;
         lifecycleRuntime.tick();
     }
 
@@ -98,6 +110,8 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
     @Override
     public void startGame() {
         if (!com.cdp.codpattern.config.storage.ServerMapStorage.canUse(getGameType())) return;
+        if (recoveryBlocked()) return;
+        beginAttempt();
         lifecycleRuntime.startGame();
     }
 
@@ -113,7 +127,8 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
 
     @Override
     public void resetGame() {
-        lifecycleRuntime.resetGame();
+        var service = com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(getServerLevel().getServer());
+        service.finishNormally(this);
     }
 
     /**
@@ -132,6 +147,9 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
 
     @Override
     public void onPlayerLoggedIn(ServerPlayer player) {
+        var termination = com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(player.server);
+        if (termination.terminated(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(this))
+                || termination.playerPending(player.getUUID())) return;
         lifecycleRuntime.handleReconnect(player);
     }
 
@@ -140,10 +158,12 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
      */
     @Override
     public void givePlayerKits(ServerPlayer player) {
+        com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(getServerLevel().getServer()).registerRoundInventory(player);
         kitsRuntime.givePlayerKits(player);
     }
 
     public void givePlayerKitsSilently(ServerPlayer player) {
+        com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(getServerLevel().getServer()).registerRoundInventory(player);
         kitsRuntime.givePlayerKitsSilently(player);
     }
 

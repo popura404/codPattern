@@ -52,6 +52,12 @@ final class CodTdmMatchResultExporter {
     }
 
     void exportOnMatchEnded() {
+        if (matchState.playingStartEpochMillis() <= 0 || mapPort.serverLevel() == null) return;
+        var service = com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(mapPort.serverLevel().getServer());
+        service.settleNormally(com.cdp.codpattern.app.match.model.RoomId.of(mapPort.gameType(), mapNameSupplier.get()), this::writeResult);
+    }
+
+    private void writeResult() {
         if (matchState.isResultExported()) {
             return;
         }
@@ -104,8 +110,12 @@ final class CodTdmMatchResultExporter {
                 .thenComparing(PlayerMatchStats::deaths)
                 .thenComparing(PlayerMatchStats::playerName, String.CASE_INSENSITIVE_ORDER));
 
+        var termination = com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(serverLevel.getServer());
+        var room = com.cdp.codpattern.app.match.model.RoomId.of(mapPort.gameType(), mapName);
         MatchResultFile record = new MatchResultFile(
                 mapName,
+                termination.generation(room).toString(),
+                termination.terminationReason(room),
                 startedAt,
                 Instant.ofEpochMilli(startedAt).toString(),
                 endedAt,
@@ -141,6 +151,7 @@ final class CodTdmMatchResultExporter {
                     players.size());
         } catch (Exception e) {
             LOGGER.warn("Failed to export TDM match result for map={}", mapName, e);
+            throw new IllegalStateException("Match result export failed", e);
         }
     }
 
@@ -188,6 +199,8 @@ final class CodTdmMatchResultExporter {
 
     private record MatchResultFile(
             String mapName,
+            String matchGeneration,
+            String terminationReason,
             long startedAtEpochMillis,
             String startedAtIso,
             long endedAtEpochMillis,

@@ -193,17 +193,6 @@ public final class PhaseStateMachine {
     private static TickResult tickEnded(int phaseTimer, int gameTimeTicks, Hooks hooks) {
         int nextPhaseTimer = phaseTimer + 1;
         if (nextPhaseTimer >= END_PHASE_TOTAL_TICKS) {
-            if (hooks.hasMatchEndTeleportPoint()) {
-                for (ServerPlayer player : hooks.getJoinedPlayers()) {
-                    if (!hooks.teleportPlayerToMatchEndPoint(player)) {
-                        hooks.notifyUnusableEndTeleportPoint(player);
-                    }
-                }
-            } else {
-                for (ServerPlayer player : hooks.getJoinedPlayers()) {
-                    hooks.notifyMissingEndTeleportPoint(player);
-                }
-            }
             hooks.resetGame();
             return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.empty(), true);
         }

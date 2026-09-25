@@ -188,6 +188,16 @@ public final class ModeRoomHandleBuilderCompatTest {
     }
 
     private static Object defaultValue(Class<?> type) {
+        if (type == com.cdp.codpattern.app.match.runtime.termination.ModeForceEndHandler.class) {
+            return new com.cdp.codpattern.app.match.runtime.termination.ModeForceEndHandler() {
+                public com.cdp.codpattern.app.match.model.result.ModeOperationResult<Void> stop(com.cdp.codpattern.app.match.runtime.termination.ForceEndContext c) {
+                    return com.cdp.codpattern.app.match.model.result.ModeOperationResult.success(null);
+                }
+                public com.cdp.codpattern.app.match.model.result.ModeOperationResult<Void> cleanup(com.cdp.codpattern.app.match.runtime.termination.ForceEndContext c) {
+                    return com.cdp.codpattern.app.match.model.result.ModeOperationResult.success(null);
+                }
+            };
+        }
         if (!type.isPrimitive()) {
             return null;
         }

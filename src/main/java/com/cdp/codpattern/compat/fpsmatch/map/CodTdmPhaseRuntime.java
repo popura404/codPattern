@@ -25,6 +25,15 @@ final class CodTdmPhaseRuntime {
         this.syncToClientAction = syncToClientAction;
     }
 
+    void stopForForceEnd() { voteRuntime.clearActiveVoteSession(); }
+
+    void settleForForceEnd() {
+        if (matchState.playingStartEpochMillis() > 0 && !matchState.isResultExported()) {
+            phaseStateHooks.notifyMatchEnded();
+            phaseStateHooks.onMatchEnded();
+        }
+    }
+
     void transitionToPhase(TdmGamePhase newPhase) {
         if (newPhase != matchState.phase()) {
             voteRuntime.clearActiveVoteSession();

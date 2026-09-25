@@ -32,6 +32,8 @@ public final class ModeEntityOwnershipRegistry {
         if (roomId == null || entity == null) {
             return;
         }
+        com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.current()
+                .ifPresent(service -> service.registerEntity(roomId, entity));
         Entry entry = new Entry(roomId, entity.level().dimension(), entity.getUUID());
         suppressedPersistentRestores.remove(entity.getUUID());
         entriesByEntityId.put(entity.getUUID(), entry);

@@ -79,17 +79,18 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
 
     @Override
     public Optional<VoteControlPort> findPlayerVoteControlPort(ServerPlayer player) {
-        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::votePort);
+        return findPlayerRoomHandle(player).filter(h -> com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.current()
+                .map(service -> !service.blocked(h.roomId())).orElse(true)).flatMap(ModeRoomHandle::votePort);
     }
 
     @Override
     public Optional<ModeCombatEventPort> findPlayerCombatEventPort(ServerPlayer player) {
-        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::combatEventPort);
+        return findPlayerRoomHandle(player).filter(FpsMatchCoreGateway::canMutateMatch).flatMap(ModeRoomHandle::combatEventPort);
     }
 
     @Override
     public Optional<ModeEntityCombatEventPort> findRoomEntityCombatEventPort(RoomId roomId) {
-        return findRoomHandle(roomId).flatMap(ModeRoomHandle::entityCombatEventPort);
+        return findRoomHandle(roomId).filter(FpsMatchCoreGateway::canMutateMatch).flatMap(ModeRoomHandle::entityCombatEventPort);
     }
 
     @Override
@@ -121,7 +122,7 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
 
     @Override
     public Optional<ModeKitDistributionPort> findPlayerKitDistributionPort(ServerPlayer player) {
-        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::kitDistributionPort);
+        return findPlayerRoomHandle(player).filter(FpsMatchCoreGateway::canMutateMatch).flatMap(ModeRoomHandle::kitDistributionPort);
     }
 
     @Override
@@ -136,7 +137,7 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
 
     @Override
     public Optional<ModeInteractableObjectPort> findPlayerInteractableObjectPort(ServerPlayer player) {
-        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::interactableObjectPort);
+        return findPlayerRoomHandle(player).filter(FpsMatchCoreGateway::canMutateMatch).flatMap(ModeRoomHandle::interactableObjectPort);
     }
 
     @Override
@@ -151,7 +152,7 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
 
     @Override
     public Optional<ModeRespawnPolicyPort> findPlayerRespawnPolicyPort(ServerPlayer player) {
-        return findPlayerRoomHandle(player).flatMap(ModeRoomHandle::respawnPolicyPort);
+        return findPlayerRoomHandle(player).filter(FpsMatchCoreGateway::canMutateMatch).flatMap(ModeRoomHandle::respawnPolicyPort);
     }
 
     @Override
@@ -209,6 +210,11 @@ public final class FpsMatchCoreGateway implements FpsMatchGateway {
         Optional<ModeRoomHandle> handleOptional = findPlayerRoomHandle(player);
         handleOptional.ifPresent(handle -> handle.lifecyclePort().leave(player));
         return handleOptional.map(handle -> handle.roomId().mapName());
+    }
+
+    private static boolean canMutateMatch(ModeRoomHandle handle) {
+        return com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.current()
+                .map(service -> !service.terminated(handle.roomId())).orElse(true);
     }
 
     private static Optional<ModeRoomHandle> findRoomHandle(RoomId roomId) {

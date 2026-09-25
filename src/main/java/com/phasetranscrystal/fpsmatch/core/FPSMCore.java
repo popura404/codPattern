@@ -104,6 +104,10 @@ public class FPSMCore {
         if (!registry.containsKey(type) || map == null || isRegistered(type, map.getMapName())) {
             return;
         }
+        try { java.util.Objects.requireNonNull(map.forceEndHandler(), "forceEndHandler"); }
+        catch (LinkageError | RuntimeException failure) {
+            throw new IllegalStateException("Mode " + type + " must implement the room termination API before registration", failure);
+        }
         games.computeIfAbsent(type, key -> new ArrayList<>()).add(map);
     }
 

@@ -18,6 +18,7 @@ final class CodTdmMapActions {
 
     static CodTdmActionPort fromRuntimes(
             TeamMatchPolicy policy,
+            CodTdmMap map,
             CodTdmCombatRuntime combatRuntime,
             CodTdmTeamMembershipCoordinator teamMembershipCoordinator,
             CodTdmMapMutationRuntime mapMutationRuntime,
@@ -31,6 +32,7 @@ final class CodTdmMapActions {
         if (policy.tacticalCompatibilityPorts()) {
             return new TacticalMapActionPort(
                     policy,
+                    map,
                     combatRuntime,
                     teamMembershipCoordinator,
                     mapMutationRuntime,
@@ -44,6 +46,7 @@ final class CodTdmMapActions {
         }
         return new MapActionPort(
                 policy,
+                map,
                 combatRuntime,
                 teamMembershipCoordinator,
                 mapMutationRuntime,
@@ -58,6 +61,7 @@ final class CodTdmMapActions {
 
     private static class MapActionPort implements CodTdmActionPort {
         private final TeamMatchPolicy policy;
+        private final CodTdmMap map;
         private final CodTdmCombatRuntime combatRuntime;
         private final CodTdmTeamMembershipCoordinator teamMembershipCoordinator;
         private final CodTdmMapMutationRuntime mapMutationRuntime;
@@ -70,6 +74,7 @@ final class CodTdmMapActions {
 
         private MapActionPort(
                 TeamMatchPolicy policy,
+                CodTdmMap map,
                 CodTdmCombatRuntime combatRuntime,
                 CodTdmTeamMembershipCoordinator teamMembershipCoordinator,
                 CodTdmMapMutationRuntime mapMutationRuntime,
@@ -81,6 +86,7 @@ final class CodTdmMapActions {
                 Supplier<String> mapNameSupplier
         ) {
             this.policy = policy;
+            this.map = map;
             this.combatRuntime = combatRuntime;
             this.teamMembershipCoordinator = teamMembershipCoordinator;
             this.mapMutationRuntime = mapMutationRuntime;
@@ -90,6 +96,16 @@ final class CodTdmMapActions {
             this.requestRosterResyncAction = requestRosterResyncAction;
             this.requestRosterPreviewAction = requestRosterPreviewAction;
             this.mapNameSupplier = mapNameSupplier;
+        }
+
+        @Override
+        public com.cdp.codpattern.app.match.runtime.termination.ModeForceEndHandler forceEndHandler() {
+            return map.forceEndHandler();
+        }
+
+        private boolean terminated() {
+            return com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(map.getServerLevel().getServer())
+                    .terminated(com.cdp.codpattern.app.match.model.RoomId.of(gameType(), mapName()));
         }
 
         @Override
@@ -104,16 +120,19 @@ final class CodTdmMapActions {
 
         @Override
         public void onPlayerDamaged(ServerPlayer player) {
+            if (terminated()) return;
             combatRuntime.onPlayerDamaged(player);
         }
 
         @Override
         public void onPlayerKill(ServerPlayer killer, ServerPlayer victim) {
+            if (terminated()) return;
             combatRuntime.onPlayerKill(killer, victim);
         }
 
         @Override
         public void onPlayerDead(ServerPlayer player, ServerPlayer killer) {
+            if (terminated()) return;
             combatRuntime.onPlayerDead(player, killer);
         }
 
@@ -124,6 +143,7 @@ final class CodTdmMapActions {
 
         @Override
         public void switchTeam(ServerPlayer player, String teamName) {
+            if (map.recoveryBlocked()) return;
             teamMembershipCoordinator.switchTeam(player, teamName);
         }
 
@@ -139,6 +159,7 @@ final class CodTdmMapActions {
 
         @Override
         public void respawnPlayerNow(ServerPlayer player) {
+            if (terminated()) return;
             respawnRuntime.respawnPlayerNow(player);
         }
 
@@ -159,16 +180,20 @@ final class CodTdmMapActions {
 
         @Override
         public boolean initiateStartVote(UUID initiator) {
+            if (map.recoveryBlocked()) return false;
+            map.beginAttempt();
             return voteRuntime.initiateStartVote(initiator);
         }
 
         @Override
         public boolean initiateEndVote(UUID initiator) {
+            if (terminated()) return false;
             return voteRuntime.initiateEndVote(initiator);
         }
 
         @Override
         public boolean submitVoteResponse(UUID playerId, long voteId, boolean accepted) {
+            if (terminated()) return false;
             return voteRuntime.submitVoteResponse(playerId, voteId, accepted);
         }
 
@@ -206,6 +231,7 @@ final class CodTdmMapActions {
     private static final class TacticalMapActionPort extends MapActionPort implements CodTacticalTdmActionPort {
         private TacticalMapActionPort(
                 TeamMatchPolicy policy,
+                CodTdmMap map,
                 CodTdmCombatRuntime combatRuntime,
                 CodTdmTeamMembershipCoordinator teamMembershipCoordinator,
                 CodTdmMapMutationRuntime mapMutationRuntime,
@@ -218,6 +244,7 @@ final class CodTdmMapActions {
         ) {
             super(
                     policy,
+                    map,
                     combatRuntime,
                     teamMembershipCoordinator,
                     mapMutationRuntime,

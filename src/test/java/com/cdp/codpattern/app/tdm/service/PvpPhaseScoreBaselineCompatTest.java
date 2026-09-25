@@ -122,8 +122,8 @@ public final class PvpPhaseScoreBaselineCompatTest {
                 Map.of(),
                 hooks);
         requireTrue(missingEndPoint.resetTriggered(), "ended summary triggers reset at the frozen duration");
-        requireEquals(1, hooks.missingEndTeleportCalls,
-                "missing end teleport is reported once per joined player before reset");
+        requireEquals(0, hooks.missingEndTeleportCalls,
+                "shared recovery owns teleport validation and fallback reporting");
         requireEquals(1, hooks.resetCalls, "ended summary resets the room");
 
         RecordingHooks unusableHooks = new RecordingHooks();
@@ -137,9 +137,9 @@ public final class PvpPhaseScoreBaselineCompatTest {
                 config,
                 Map.of(),
                 unusableHooks);
-        requireEquals(1, unusableHooks.teleportCalls, "configured end teleport is attempted");
-        requireEquals(1, unusableHooks.unusableEndTeleportCalls,
-                "failed end teleport is reported before reset");
+        requireEquals(0, unusableHooks.teleportCalls, "presentation timer delegates teleport to shared recovery");
+        requireEquals(0, unusableHooks.unusableEndTeleportCalls,
+                "shared recovery reports actual fallback outcomes");
         requireEquals(1, unusableHooks.resetCalls, "failed teleport does not suppress cleanup reset");
     }
 
