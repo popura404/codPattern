@@ -93,6 +93,7 @@ public final class RoomTerminationService {
     }
     public boolean acquireLease(RoomId room, UUID generation) {
         thread();
+        if (com.cdp.codpattern.config.storage.ServerMapStorage.get(server).managementUnavailable(room.gameType())) return false;
         if (!state(room).generation.equals(generation)) return false;
         return leases.acquire(leaseKey(room), generation.toString()).acquired();
     }
@@ -130,6 +131,14 @@ public final class RoomTerminationService {
         var state = data.rooms.get(room.encode());
         return loadFailure == null && state != null && state.active && !state.terminated && state.generation.equals(generation);
     }
+    /** Destination identity protection, including historical records retained under old names. */
+    public boolean hasRecordedIdentity(RoomId room) {
+        thread();
+        String encoded = room.encode();
+        return loadFailure != null || data.rooms.keySet().stream().anyMatch(encoded::equalsIgnoreCase)
+                || data.players.values().stream().anyMatch(record -> encoded.equalsIgnoreCase(record.room))
+                || data.entities.values().stream().anyMatch(record -> encoded.equalsIgnoreCase(record.room()));
+    }
     public boolean ownsRecovery(UUID player) {
         var record = data.players.get(player);
         return record != null && record.armed && record.recoveryPending;
@@ -138,7 +147,10 @@ public final class RoomTerminationService {
         var record = data.players.get(player);
         return record != null && record.recoveryPending && !record.recovered;
     }
-    public boolean canJoin(RoomId room, UUID player) { return !blocked(room) && !playerPending(player); }
+    public boolean canJoin(RoomId room, UUID player) {
+        return !com.cdp.codpattern.config.storage.ServerMapStorage.get(server).managementUnavailable(room.gameType())
+                && !blocked(room) && !playerPending(player);
+    }
     public boolean executing(RoomId room) { return state(room).executing; }
 
     /** Capture before changing modes, inventories, positions or respawn locations. */
@@ -174,6 +186,8 @@ public final class RoomTerminationService {
     /** Voting and countdown share the generation with the match they start. */
     public UUID begin(RoomId room, Collection<UUID> players, SpawnPointData endPoint) {
         thread();
+        if (com.cdp.codpattern.config.storage.ServerMapStorage.get(server).managementUnavailable(room.gameType()))
+            throw new IllegalStateException("Map management is pending");
         if (blocked(room)) throw new IllegalStateException("Room cleanup pending");
         for (UUID player : players) if (playerPending(player)) throw new IllegalStateException("Player recovery pending");
         var state = state(room);
@@ -322,6 +336,8 @@ public final class RoomTerminationService {
     public ForceEndCoordinator.Report forceEnd(CommandSourceStack source, RoomId room, UUID expectedGeneration) {
         thread();
         if (source.getServer() != server || !source.hasPermission(2)) throw new SecurityException("Administrator permission required");
+        if (com.cdp.codpattern.config.storage.ServerMapStorage.get(server).managementUnavailable(room.gameType()))
+            throw new IllegalStateException("Map management is in progress");
         BaseMap map = resolve(room);
         if (map == null) throw new IllegalArgumentException("Unknown registered room " + room);
         var state = state(room);

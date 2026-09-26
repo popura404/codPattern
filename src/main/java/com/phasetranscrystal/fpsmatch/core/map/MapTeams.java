@@ -22,6 +22,7 @@ public class MapTeams {
     private final String constructionGameType;
 
     private final Map<String, BaseTeam> teams = new LinkedHashMap<>();
+    private final java.util.Set<String> createdScoreboardTeams = new java.util.LinkedHashSet<>();
     private final BaseTeam spectatorTeam;
 
     public MapTeams(ServerLevel level, BaseMap map) {
@@ -40,10 +41,14 @@ public class MapTeams {
     public BaseTeam addTeam(String teamName, int limit, boolean addToSystem) {
         String gameType = constructionGameType != null ? constructionGameType : map.getGameType();
         String fixedName = gameType + "_" + map.getMapName() + "_" + teamName;
-        PlayerTeam playerTeam = Objects.requireNonNullElseGet(
-                level.getScoreboard().getPlayerTeam(fixedName),
-                () -> level.getScoreboard().addPlayerTeam(fixedName)
-        );
+        PlayerTeam playerTeam = level.getScoreboard().getPlayerTeam(fixedName);
+        if (playerTeam == null) {
+            com.cdp.codpattern.app.match.management.MapMutationResources.beforeCreateScoreboardTeam(fixedName);
+            playerTeam = level.getScoreboard().addPlayerTeam(fixedName);
+            createdScoreboardTeams.add(fixedName);
+        } else {
+            com.cdp.codpattern.app.match.management.MapMutationResources.reusedScoreboardTeam(fixedName);
+        }
         BaseTeam team = new BaseTeam(gameType, map.getMapName(), teamName, limit, playerTeam);
         if (addToSystem) {
             teams.put(teamName, team);
@@ -53,6 +58,31 @@ public class MapTeams {
 
     public BaseTeam addTeam(String teamName, int limit) {
         return addTeam(teamName, limit, true);
+    }
+
+    /** Removes only teams acquired by this instance, after all players have left. */
+    public void retireCreatedScoreboardTeams() {
+        if (!getJoinedPlayersWithSpec().isEmpty()) throw new IllegalStateException("Map still has players");
+        for (String name : createdScoreboardTeamNames()) {
+            PlayerTeam team = level.getScoreboard().getPlayerTeam(name);
+            if (team == null) continue;
+            if (!team.getPlayers().isEmpty()) throw new IllegalStateException("Scoreboard team still has players: " + name);
+            level.getScoreboard().removePlayerTeam(team);
+        }
+        createdScoreboardTeams.clear();
+    }
+
+    public java.util.Set<String> createdScoreboardTeamNames() {
+        java.util.Set<String> exclusive = new java.util.HashSet<>(createdScoreboardTeams);
+        if (com.phasetranscrystal.fpsmatch.core.FPSMCore.initialized()) {
+            com.phasetranscrystal.fpsmatch.core.FPSMCore.getInstance().getAllMaps().values().stream()
+                    .flatMap(java.util.Collection::stream).filter(other -> other != map).forEach(other -> {
+                        var roster = other.getMapTeams();
+                        roster.getTeams().forEach(team -> exclusive.remove(team.getPlayerTeam().getName()));
+                        exclusive.remove(roster.getSpectatorTeam().getPlayerTeam().getName());
+                    });
+        }
+        return java.util.Set.copyOf(exclusive);
     }
 
     public Optional<BaseTeam> getTeamByPlayer(Player player) {

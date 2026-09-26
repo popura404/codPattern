@@ -412,7 +412,7 @@ public final class MapStorageMigration {
         }
     }
 
-    public Result execute(Plan plan, Map<String, String> versions, BooleanSupplier cancelled) {
+    public synchronized Result execute(Plan plan, Map<String, String> versions, BooleanSupplier cancelled) {
         int completed = 0;
         int failed = plan.problems().size();
         List<String> errors = new ArrayList<>(plan.problems());
@@ -509,26 +509,113 @@ public final class MapStorageMigration {
         StorageFiles.write(journalPath(), JSON.toJson(journal));
     }
 
+    /** A receipt is captured before archival and can be persisted by its caller. */
+    public record ArchiveReceipt(String mode, String name, String source, String target,
+                                 Unit previous, boolean markerPresent, JsonElement previousMarkerUnit) { }
+
+    public synchronized ArchiveReceipt prepareArchive(String mode, String name) throws IOException {
+        MapStorageRegistration registration = registration(mode);
+        Path source = paths.map(registration.directory(), name);
+        StorageFiles.checkPath(source);
+        if (!Files.isRegularFile(source.resolve("map.json"))) throw new NoSuchFileException(source.toString());
+        Path target = paths.metadata().resolve("trash").resolve(UUID.randomUUID().toString())
+                .resolve(MapStoragePaths.mapDirectory(name));
+        StorageFiles.checkPath(target);
+        if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) throw new FileAlreadyExistsException(target.toString());
+        if (journalError != null) throw new IOException(journalError);
+        boolean markerPresent = Files.exists(markerPath(), LinkOption.NOFOLLOW_LINKS);
+        JsonElement previousMarkerUnit = null;
+        if (markerPresent) {
+            JsonObject marker = readMarker();
+            previousMarkerUnit = marker.getAsJsonObject("units").get(mapId(mode, name));
+            if (previousMarkerUnit != null) previousMarkerUnit = previousMarkerUnit.deepCopy();
+        }
+        return new ArchiveReceipt(mode, name, source.toString(), target.toString(),
+                journal.units.get(mapId(mode, name)), markerPresent, previousMarkerUnit);
+    }
+
+    /** Idempotent archival that uses the caller's durable receipt. */
+    public synchronized void archive(ArchiveReceipt receipt) throws IOException {
+        validateReceipt(receipt);
+        Path source = Path.of(receipt.source());
+        Path target = Path.of(receipt.target());
+        if (!Files.isRegularFile(source.resolve("map.json"))) throw new NoSuchFileException(source.toString());
+        if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) throw new FileAlreadyExistsException(target.toString());
+        Files.createDirectories(target.getParent());
+        Files.move(source, target);
+        try {
+            Unit deleted = new Unit(mapId(receipt.mode(), receipt.name()), receipt.mode(),
+                    receipt.previous() == null ? List.of() : receipt.previous().files(), "DELETED", target.toString());
+            record(deleted, "DELETED", target.toString());
+            if (receipt.markerPresent()) updateMarkerUnit(mapId(receipt.mode(), receipt.name()), JSON.toJsonTree(deleted));
+        } catch (IOException failure) {
+            try { restoreArchive(receipt); }
+            catch (IOException restoreFailure) { failure.addSuppressed(restoreFailure); }
+            throw failure;
+        }
+    }
+
+    /** Restores only this map's entry; unrelated journal entries are retained. */
+    public synchronized void restoreArchive(ArchiveReceipt receipt) throws IOException {
+        validateReceipt(receipt);
+        Path source = Path.of(receipt.source());
+        Path target = Path.of(receipt.target());
+        boolean sourceExists = Files.exists(source, LinkOption.NOFOLLOW_LINKS);
+        boolean targetExists = Files.exists(target, LinkOption.NOFOLLOW_LINKS);
+        if (sourceExists && targetExists) throw new IOException("Both active and archived map exist");
+        if (!sourceExists && !targetExists) throw new IOException("Active and archived map are both missing");
+        if (targetExists) {
+            Files.createDirectories(source.getParent());
+            Files.move(target, source);
+        }
+        String id = mapId(receipt.mode(), receipt.name());
+        Unit current = journal.units.get(id);
+        if (current != null && !(current.state().equals("DELETED") && receipt.target().equals(current.detail()))
+                && !current.equals(receipt.previous())) {
+            throw new IOException("Archive journal entry changed: " + id);
+        }
+        if (receipt.previous() == null) journal.units.remove(id);
+        else journal.units.put(id, receipt.previous());
+        saveJournal();
+        if (receipt.markerPresent()) updateMarkerUnit(id, receipt.previousMarkerUnit());
+    }
+
+    private JsonObject readMarker() throws IOException {
+        StorageFiles.checkPath(markerPath());
+        try {
+            JsonObject marker = JsonParser.parseString(Files.readString(markerPath())).getAsJsonObject();
+            if (!marker.has("units") || !marker.get("units").isJsonObject()) throw new IOException("Invalid archive marker");
+            return marker;
+        } catch (RuntimeException invalid) { throw new IOException("Invalid archive marker", invalid); }
+    }
+
+    private void updateMarkerUnit(String id, JsonElement value) throws IOException {
+        JsonObject marker = readMarker();
+        JsonObject units = marker.getAsJsonObject("units");
+        if (value == null || value.isJsonNull()) units.remove(id);
+        else units.add(id, value.deepCopy());
+        StorageFiles.write(markerPath(), JSON.toJson(marker));
+    }
+
+    private void validateReceipt(ArchiveReceipt receipt) throws IOException {
+        if (receipt == null) throw new IOException("Missing archive receipt");
+        MapStorageRegistration registration = registration(receipt.mode());
+        Path expected = paths.map(registration.directory(), receipt.name());
+        Path source = Path.of(receipt.source()).toAbsolutePath().normalize();
+        Path target = Path.of(receipt.target()).toAbsolutePath().normalize();
+        if (!expected.equals(source) || !target.startsWith(paths.metadata().resolve("trash"))
+                || !target.getFileName().toString().equals(MapStoragePaths.mapDirectory(receipt.name()))) {
+            throw new IOException("Archive receipt has an invalid path");
+        }
+        StorageFiles.checkPath(source);
+        StorageFiles.checkPath(target);
+    }
+
     public synchronized void archive(String mode, String name) throws IOException {
         MapStorageRegistration registration = registration(mode);
         Path source = paths.map(registration.directory(), name);
-        if (!Files.exists(source.resolve("map.json"))) return;
-        StorageFiles.checkPath(source);
-        Path target = paths.metadata().resolve("trash").resolve(UUID.randomUUID().toString()).resolve(MapStoragePaths.mapDirectory(name));
-        StorageFiles.checkPath(target);
-        Files.createDirectories(target.getParent());
-        Files.move(source, target);
-        Unit previous = journal.units.get(mapId(mode, name));
-        try {
-            Unit deleted = new Unit(mapId(mode, name), mode, previous == null ? List.of() : previous.files(), "DELETED", target.toString());
-            record(deleted, "DELETED", target.toString());
-            if (Files.exists(markerPath())) StorageFiles.write(markerPath(), JSON.toJson(journal));
-        } catch (IOException e) {
-            Files.move(target, source);
-            if (previous == null) journal.units.remove(mapId(mode, name));
-            else journal.units.put(previous.id(), previous);
-            try { saveJournal(); } catch (IOException restoreError) { e.addSuppressed(restoreError); }
-            throw e;
-        }
+        if (!Files.isRegularFile(source.resolve("map.json"))) return;
+        archive(prepareArchive(mode, name));
     }
+
 }

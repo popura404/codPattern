@@ -4,6 +4,8 @@ import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.network.handler.ClientPacketBridge;
+import com.cdp.codpattern.network.map.MapAdminResponsePacket;
+import com.cdp.codpattern.client.gui.screen.MapManagementScreen;
 import com.cdp.codpattern.network.handler.ClientPacketHandler;
 import com.cdp.codpattern.network.match.RoomRosterDelta;
 import com.cdp.codpattern.network.match.RoomSyncInfo;
@@ -24,6 +26,11 @@ public final class ClientPacketBridgeInstaller {
 
     public static void install() {
         ClientPacketBridge.install(new ClientPacketBridge.Handler() {
+            @Override
+            public void mapAdminResponse(MapAdminResponsePacket packet) {
+                MapManagementScreen.receive(packet);
+            }
+
             @Override
             public void openBackpackScreen() {
                 ClientPacketHandler.handleOpenBackpackScreen();

@@ -23,6 +23,10 @@ public final class ServerMapStorage {
     });
     private final Set<String> locked = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean commandBusy = new AtomicBoolean();
+    private String managementMode;
+    private Thread managementOwner;
+    private boolean managementBlockedAll;
+    private final Set<String> managementRecovery = new HashSet<>();
     private final AtomicBoolean refreshing = new AtomicBoolean();
     private volatile boolean closing;
     private volatile long checkedAt;
@@ -41,16 +45,59 @@ public final class ServerMapStorage {
     public MapStorageMigration migration() { return migration; }
     public MapStoragePaths paths() { return migration.paths(); }
 
-    public boolean blocked(String mode) {
-        return locked.contains(mode) || ((mode.equals("frontline") || mode.equals("teamdeathmatch")) && migration.commonRulesPending());
+    public synchronized boolean managementReserved(String mode) {
+        return managementMode != null && managementMode.equals(mode);
+    }
+
+    public synchronized void blockManagement(String mode) { managementRecovery.add(mode); }
+
+    public synchronized boolean managementUnavailable(String mode) {
+        return managementBlockedAll || managementRecovery.contains(mode) || managementReserved(mode);
+    }
+
+    public synchronized void blockAllManagement(String reason) {
+        managementBlockedAll = true;
+        LogUtils.getLogger().error("Map management recovery blocks all maps: {}", reason);
+    }
+
+    public synchronized ManagementReservation beginManagement(String mode) {
+        if (closing || commandBusy.get() || managementMode != null || blocked(mode)) throw new IllegalStateException("Map management is busy or unavailable");
+        managementMode = mode;
+        managementOwner = Thread.currentThread();
+        return new ManagementReservation(mode);
+    }
+
+    public final class ManagementReservation implements AutoCloseable {
+        private final String mode;
+        private boolean closed;
+        private boolean unresolved;
+        private ManagementReservation(String mode) { this.mode = mode; }
+        public void unresolved() { unresolved = true; }
+        @Override public void close() {
+            synchronized (ServerMapStorage.this) {
+                if (closed) return;
+                closed = true;
+                if (unresolved) managementRecovery.add(mode);
+                managementMode = null;
+                managementOwner = null;
+            }
+        }
+    }
+
+    public synchronized boolean blocked(String mode) {
+        return managementUnavailable(mode) || locked.contains(mode)
+                || ((mode.equals("frontline") || mode.equals("teamdeathmatch")) && migration.commonRulesPending());
     }
 
     public void requireAvailable(String mode) {
-        if (blocked(mode)) throw new IllegalStateException("Map storage is awaiting migration/restart: " + mode);
+        boolean owner;
+        synchronized (this) { owner = managementReserved(mode) && managementOwner == Thread.currentThread(); }
+        if (blocked(mode) && !owner) throw new IllegalStateException("Map storage is awaiting migration/management: " + mode);
     }
 
     public void requireCreate(String mode, String name) {
         requireAvailable(mode);
+        if (managementReserved(mode)) throw new IllegalStateException("Map management is in progress");
         MapStorageRegistration registration = migration.registration(mode);
         MapStoragePaths.mapDirectory(name);
         try { StorageFiles.checkPath(paths().map(registration.directory(), name)); }

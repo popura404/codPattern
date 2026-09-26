@@ -11,6 +11,7 @@ public final class MapStorageMigrationCompatTest {
     private record Fixture(Path base, MapStoragePaths paths, MapStorageMigration migration) {}
     public static void main(String[] args) throws Exception {
         testReadOnlyAndMove();
+        testReversibleArchiveMetadata();
         testConflict();
         testInterruptedResume();
         testRestartBeforeConfirm();
@@ -55,6 +56,42 @@ public final class MapStorageMigrationCompatTest {
     private static void write(Path file, String text) throws Exception { Files.createDirectories(file.getParent()); Files.writeString(file, text); }
     private static MapStorageMigration.Result execute(MapStorageMigration engine) { return engine.execute(engine.inspect(), Map.of("codpattern", "test"), () -> false); }
     private static void require(boolean value, String message) { checks++; if (!value) throw new AssertionError(message); }
+
+    private static void testReversibleArchiveMetadata() throws Exception {
+        Fixture f = fixture();
+        oldMap(f, "frontline", "archive", "archive");
+        require(execute(f.migration).failed() == 0, "prepare existing migration metadata");
+        Path source = f.paths.map("builtin/frontline", "archive");
+        write(source.resolve("rules/custom.json"), "custom rules");
+        String key = "frontline/" + MapStoragePaths.mapDirectory("archive");
+        var marker = com.google.gson.JsonParser.parseString(Files.readString(f.migration.markerPath())).getAsJsonObject();
+        marker.addProperty("unrelated", "preserve me");
+        marker.getAsJsonObject("units").remove(key);
+        Files.writeString(f.migration.markerPath(), marker.toString());
+        var receipt = f.migration.prepareArchive("frontline", "archive");
+        f.migration.archive(receipt);
+        require(!Files.exists(source) && Files.readString(Path.of(receipt.target()).resolve("rules/custom.json")).equals("custom rules"),
+                "reversible archive includes nested rules");
+        MapStorageMigration restarted = engine(f.paths, false);
+        restarted.restoreArchive(receipt);
+        require(Files.isRegularFile(source.resolve("map.json")), "receipt restores files after reload");
+        var restoredMarker = com.google.gson.JsonParser.parseString(Files.readString(restarted.markerPath())).getAsJsonObject();
+        require(restoredMarker.equals(marker), "restore exact previous marker entry absence and unrelated metadata");
+        var restoredJournal = com.google.gson.JsonParser.parseString(Files.readString(restarted.journalPath())).getAsJsonObject();
+        require(restoredJournal.getAsJsonObject("units").getAsJsonObject(key).get("state").getAsString().equals("COMPLETE"),
+                "restore prior journal state independently of marker state");
+        restarted.restoreArchive(receipt);
+        require(Files.exists(source), "receipt compensation is idempotent");
+        Fixture fresh = fixture();
+        Path freshSource = fresh.paths.map("builtin/frontline", "fresh");
+        write(freshSource.resolve("map.json"), "{\"mapName\":\"fresh\",\"levelName\":\"minecraft:overworld\"}");
+        var freshReceipt = fresh.migration.prepareArchive("frontline", "fresh");
+        fresh.migration.archive(freshReceipt);
+        fresh.migration.restoreArchive(freshReceipt);
+        var freshJournal = com.google.gson.JsonParser.parseString(Files.readString(fresh.migration.journalPath())).getAsJsonObject();
+        require(freshJournal.getAsJsonObject("units").size() == 0 && !Files.exists(fresh.migration.markerPath()),
+                "compensation preserves prior journal entry and marker absence");
+    }
 
     private static void testReadOnlyAndMove() throws Exception {
         Fixture f = fixture();

@@ -71,6 +71,7 @@ public abstract class BaseMap {
     public abstract com.cdp.codpattern.app.match.runtime.termination.ModeForceEndHandler forceEndHandler();
 
     public final boolean recoveryBlocked() {
+        if (com.cdp.codpattern.config.storage.ServerMapStorage.get(getServerLevel().getServer()).managementUnavailable(getGameType())) return true;
         return com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.current()
                 .map(service -> service.blocked(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(this))).orElse(false);
     }

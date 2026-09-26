@@ -72,6 +72,16 @@ public interface ModeRoomReadPort extends ModeRoomSummaryPort {
     Optional<SpawnPointData> matchEndTeleportPoint();
 
     @Override
+    default boolean supportsConfiguredEndPoint() {
+        return true;
+    }
+
+    @Override
+    default Optional<SpawnPointData> configuredEndPoint() {
+        return matchEndTeleportPoint();
+    }
+
+    @Override
     default String lifecycleStateKey() {
         return phaseName();
     }

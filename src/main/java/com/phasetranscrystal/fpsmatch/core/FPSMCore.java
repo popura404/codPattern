@@ -238,6 +238,9 @@ public class FPSMCore {
         INSTANCE = new FPSMCore(event.getServer());
         MinecraftForge.EVENT_BUS.post((Event) new RegisterFPSMapEvent(INSTANCE));
         MinecraftForge.EVENT_BUS.post((Event) new RegisterFPSMSaveDataEvent(INSTANCE.fpsmDataManager));
+        new com.cdp.codpattern.app.match.management.MapManagementJournal(
+                event.getServer(), com.cdp.codpattern.config.storage.ServerMapStorage.get(event.getServer()))
+                .recoverAll();
         INSTANCE.fpsmDataManager.readData();
     }
 

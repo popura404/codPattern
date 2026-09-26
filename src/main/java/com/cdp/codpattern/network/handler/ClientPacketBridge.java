@@ -1,6 +1,7 @@
 package com.cdp.codpattern.network.handler;
 
 import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.network.map.MapAdminResponsePacket;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.network.match.RoomRosterDelta;
 import com.cdp.codpattern.network.match.RoomSyncInfo;
@@ -25,6 +26,10 @@ public final class ClientPacketBridge {
 
     public static void openBackpackScreen() {
         handler.openBackpackScreen();
+    }
+
+    public static void mapAdminResponse(MapAdminResponsePacket packet) {
+        handler.mapAdminResponse(packet);
     }
 
     public static void syncBackpackConfig(String configJson) {
@@ -116,6 +121,9 @@ public final class ClientPacketBridge {
     }
 
     public interface Handler {
+        default void mapAdminResponse(MapAdminResponsePacket packet) {
+        }
+
         default void openBackpackScreen() {
         }
 

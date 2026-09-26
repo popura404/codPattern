@@ -3,6 +3,9 @@ package com.cdp.codpattern.compat.fpsmatch.data;
 import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.match.persistence.CommonModeMapData;
 import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceProvider;
+import com.cdp.codpattern.app.match.persistence.ModeMapMutationProvider;
+import com.cdp.codpattern.app.match.persistence.MapDefinitionCodec;
+import com.google.gson.JsonObject;
 import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMap;
 import com.cdp.codpattern.compat.fpsmatch.map.FpsMatchMapRegistry;
 import com.cdp.codpattern.app.tdm.port.CodTdmReadPort;
@@ -177,7 +180,7 @@ public class CodTdmMapData {
         return new CodTdmMapPersistenceSupport.TeamPayload(data.teams(), data.matchEndTeleportPoint());
     }
 
-    private static final class FrontlinePersistenceProvider implements ModeMapPersistenceProvider {
+    private static final class FrontlinePersistenceProvider implements ModeMapMutationProvider {
         @Override
         public String gameType() {
             return BuiltInGameModes.FRONTLINE;
@@ -212,6 +215,28 @@ public class CodTdmMapData {
         @Override
         public FPSMDataManager.DeleteStatus delete(String mapName, FPSMDataManager manager) {
             return manager.deleteData(MapData.class, mapName);
+        }
+
+        @Override
+        public JsonObject captureDefinition(com.phasetranscrystal.fpsmatch.core.map.BaseMap map) {
+            return MapDefinitionCodec.encode(MapData.CODEC, mapToData(readPort(map)));
+        }
+
+        @Override
+        public com.phasetranscrystal.fpsmatch.core.map.BaseMap createRenamed(
+                ServerLevel level, JsonObject definition, String newName) {
+            MapData data = MapDefinitionCodec.decode(MapData.CODEC,
+                    MapDefinitionCodec.withName(definition, newName));
+            if (!data.levelName().equals(level.dimension().location().toString())) {
+                throw new IllegalArgumentException("Map dimension changed during rename");
+            }
+            return createMap(level, toCommonData(data), toPayload(data));
+        }
+
+        @Override
+        public void retire(com.phasetranscrystal.fpsmatch.core.map.BaseMap map) {
+            readPort(map); // Preserve the provider's concrete-type check.
+            map.getMapTeams().retireCreatedScoreboardTeams();
         }
 
         private CodTdmReadPort readPort(com.phasetranscrystal.fpsmatch.core.map.BaseMap map) {
