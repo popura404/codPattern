@@ -10,7 +10,6 @@ import com.phasetranscrystal.fpsmatch.common.item.tool.WorldToolItem;
 import com.phasetranscrystal.fpsmatch.common.packet.AddAreaDataS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenMapCreatorToolScreenS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.RemoveDebugDataByPrefixS2CPacket;
-import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.util.PreviewColorUtil;
 import net.minecraft.ChatFormatting;
@@ -39,7 +38,7 @@ public class MapCreatorTool extends CreatorToolItem implements WorldToolItem {
 
     @Override
     public Component getName(ItemStack stack) {
-        return TdmToolText.itemName("item.codpattern.map_creator_tool");
+        return Component.translatable("item.codpattern.map_creator_tool");
     }
 
     @Override
@@ -68,7 +67,7 @@ public class MapCreatorTool extends CreatorToolItem implements WorldToolItem {
             }
             case CTRL_RIGHT_CLICK -> FPSMatch.sendToPlayer(
                     player,
-                    OpenMapCreatorToolScreenS2CPacket.fromStack(stack, FPSMCore.getInstance().getGameTypes())
+                    OpenMapCreatorToolScreenS2CPacket.fromStack(stack, MapCreatorToolModes.availableTypes())
             );
         }
     }

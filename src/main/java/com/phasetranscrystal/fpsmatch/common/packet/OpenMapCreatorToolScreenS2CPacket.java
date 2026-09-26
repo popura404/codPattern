@@ -1,6 +1,7 @@
 package com.phasetranscrystal.fpsmatch.common.packet;
 
 import com.phasetranscrystal.fpsmatch.common.item.MapCreatorTool;
+import com.phasetranscrystal.fpsmatch.common.item.MapCreatorToolModes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.item.ItemStack;
@@ -19,8 +20,8 @@ public class OpenMapCreatorToolScreenS2CPacket {
 
     public OpenMapCreatorToolScreenS2CPacket(List<String> availableTypes, String selectedType, String draftMapName,
             BlockPos pos1, BlockPos pos2) {
-        this.availableTypes = List.copyOf(availableTypes);
-        this.selectedType = selectedType;
+        this.availableTypes = MapCreatorToolModes.availableTypes(availableTypes);
+        this.selectedType = MapCreatorToolModes.selectedType(selectedType, this.availableTypes);
         this.draftMapName = draftMapName;
         this.pos1 = pos1;
         this.pos2 = pos2;

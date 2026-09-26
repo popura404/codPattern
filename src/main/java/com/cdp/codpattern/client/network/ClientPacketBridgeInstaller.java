@@ -27,6 +27,14 @@ public final class ClientPacketBridgeInstaller {
     public static void install() {
         ClientPacketBridge.install(new ClientPacketBridge.Handler() {
             @Override
+            public void openMapManagementScreen() {
+                if (Minecraft.getInstance().player != null && Minecraft.getInstance().level != null
+                        && !(Minecraft.getInstance().screen instanceof MapManagementScreen)) {
+                    Minecraft.getInstance().setScreen(new MapManagementScreen(null));
+                }
+            }
+
+            @Override
             public void mapAdminResponse(MapAdminResponsePacket packet) {
                 MapManagementScreen.receive(packet);
             }

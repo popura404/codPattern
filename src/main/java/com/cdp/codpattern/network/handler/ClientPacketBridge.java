@@ -28,6 +28,10 @@ public final class ClientPacketBridge {
         handler.openBackpackScreen();
     }
 
+    public static void openMapManagementScreen() {
+        handler.openMapManagementScreen();
+    }
+
     public static void mapAdminResponse(MapAdminResponsePacket packet) {
         handler.mapAdminResponse(packet);
     }
@@ -121,6 +125,9 @@ public final class ClientPacketBridge {
     }
 
     public interface Handler {
+        default void openMapManagementScreen() {
+        }
+
         default void mapAdminResponse(MapAdminResponsePacket packet) {
         }
 

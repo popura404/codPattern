@@ -1,8 +1,12 @@
 {
+    "gui.fpsm.map_creator.title": "TDM / FTL 地圖建立工具",
+    "tooltip.codpattern.map_management.use": "右鍵：開啟地圖管理（需要管理員權限）",
+    "tooltip.codpattern.map_management.scope": "管理所有已註冊模式的地圖（包含附屬模式）",
+    "item.codpattern.map_management_tool": "地圖管理工具",
     "itemGroup.codpattern.tools_and_items": "codpattern工具與物品",
     "mode.codpattern.teamdeathmatch.tool_name": "戰術死鬥",
     "mode.codpattern.frontline.tool_name": "衝鋒死鬥",
-    "item.codpattern.map_creator_tool": "%1$s、%2$s地圖建立工具",
+    "item.codpattern.map_creator_tool": "TDM / FTL 地圖建立工具",
     "item.codpattern.spawn_point_tool": "%1$s、%2$s重生點工具",
     "tooltip.codpattern.applicable_modes": "適用於：%1$s、%2$s模式",
     "screen.codpattern.common.confirm": "確定",

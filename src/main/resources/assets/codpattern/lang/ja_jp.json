@@ -1,8 +1,12 @@
 {
+    "gui.fpsm.map_creator.title": "TDM / FTL マップ作成ツール",
+    "tooltip.codpattern.map_management.use": "右クリック：マップ管理を開く（管理者権限が必要）",
+    "tooltip.codpattern.map_management.scope": "アドオンを含む登録済みの全モードのマップを管理",
+    "item.codpattern.map_management_tool": "マップ管理ツール",
     "itemGroup.codpattern.tools_and_items": "codpattern ツールとアイテム",
     "mode.codpattern.teamdeathmatch.tool_name": "タクティカルデスマッチ",
     "mode.codpattern.frontline.tool_name": "フロントラインデスマッチ",
-    "item.codpattern.map_creator_tool": "%1$s・%2$s マップ作成ツール",
+    "item.codpattern.map_creator_tool": "TDM / FTL マップ作成ツール",
     "item.codpattern.spawn_point_tool": "%1$s・%2$s スポーン地点ツール",
     "tooltip.codpattern.applicable_modes": "対応モード：%1$s・%2$s",
     "screen.codpattern.common.confirm": "確認",

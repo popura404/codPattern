@@ -3,9 +3,9 @@ package com.phasetranscrystal.fpsmatch.common.packet;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.phasetranscrystal.fpsmatch.FPSMatch;
 import com.phasetranscrystal.fpsmatch.common.item.MapCreatorTool;
+import com.phasetranscrystal.fpsmatch.common.item.MapCreatorToolModes;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolAccessHelper;
 import com.phasetranscrystal.fpsmatch.common.service.MapCreationService;
-import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -55,26 +55,27 @@ public class MapCreatorToolActionC2SPacket {
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            ServerPlayer player = ctx.get().getSender();
-            if (player == null) {
-                return;
-            }
-
-            ItemStack stack = player.getMainHandItem();
-            if (!(stack.getItem() instanceof MapCreatorTool)) {
-                return;
-            }
-            if (!ToolAccessHelper.ensureAdminAccess(player)) {
-                return;
-            }
-
-            switch (action) {
-                case SAVE_DRAFT -> saveDraft(stack);
-                case CREATE -> createMap(player, stack);
-            }
-        });
+        ctx.get().enqueueWork(() -> process(ctx.get().getSender()));
         ctx.get().setPacketHandled(true);
+    }
+
+    /** Shared by the network handler and server integration checks. */
+    public void process(ServerPlayer player) {
+        if (player == null) return;
+        if (!player.server.isSameThread()) throw new IllegalStateException("Map tool request requires server thread");
+        ItemStack stack = player.getMainHandItem();
+        if (!(stack.getItem() instanceof MapCreatorTool) || !ToolAccessHelper.ensureAdminAccess(player)) return;
+
+        String canonical = GameModeRegistry.canonicalize(selectedType);
+        boolean emptyDraft = action == Action.SAVE_DRAFT && canonical.isBlank();
+        if (!emptyDraft && !MapCreatorToolModes.supports(canonical)) {
+            player.displayClientMessage(Component.translatable("message.fpsm.map_creator_tool.invalid_type"), false);
+            return;
+        }
+        switch (action) {
+            case SAVE_DRAFT -> saveDraft(stack);
+            case CREATE -> createMap(player, stack);
+        }
     }
 
     private void saveDraft(ItemStack stack) {
@@ -85,7 +86,6 @@ public class MapCreatorToolActionC2SPacket {
     }
 
     private void createMap(ServerPlayer player, ItemStack stack) {
-        FPSMCore core = FPSMCore.getInstance();
         MapCreationService.Result result = MapCreationService.instance().createMap(
                 player,
                 new MapCreationService.CreateRequest(selectedType, draftMapName, pos1, pos2));
@@ -100,7 +100,7 @@ public class MapCreatorToolActionC2SPacket {
         MapCreatorTool.setDraftMapName(stack, "");
 
         player.displayClientMessage(Component.translatable(result.messageKey(), result.arguments().toArray()), false);
-        FPSMatch.sendToPlayer(player, OpenMapCreatorToolScreenS2CPacket.fromStack(stack, core.getGameTypes()));
+        FPSMatch.sendToPlayer(player, OpenMapCreatorToolScreenS2CPacket.fromStack(stack, MapCreatorToolModes.availableTypes()));
     }
 
     private static void writeNullableBlockPos(FriendlyByteBuf buf, BlockPos pos) {

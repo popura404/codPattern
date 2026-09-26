@@ -224,6 +224,7 @@ apply from: 'gradle/mode-split-phase0.gradle'
 apply from: 'gradle/mode-split-phase6.gradle'
 apply from: 'gradle/mode-split-phase7.gradle'
 apply from: 'gradle/mode-split-main-only-distribution.gradle'
+apply from: 'gradle/snapshot.gradle'
 
 // 提取依赖到 libs-extracted，便于 Agent 和 IDE 访问
 // 运行: gradlew extractDependencyLibs

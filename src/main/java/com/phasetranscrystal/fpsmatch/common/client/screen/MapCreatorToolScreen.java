@@ -1,8 +1,8 @@
 package com.phasetranscrystal.fpsmatch.common.client.screen;
 
 import com.phasetranscrystal.fpsmatch.FPSMatch;
-import com.cdp.codpattern.client.gui.screen.MapManagementScreen;
 import com.phasetranscrystal.fpsmatch.common.item.MapCreatorTool;
+import com.phasetranscrystal.fpsmatch.common.item.MapCreatorToolModes;
 import com.phasetranscrystal.fpsmatch.common.item.tool.ToolInteractionAction;
 import com.phasetranscrystal.fpsmatch.common.packet.MapCreatorToolActionC2SPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenMapCreatorToolScreenS2CPacket;
@@ -29,7 +29,7 @@ import java.util.function.Predicate;
 
 public class MapCreatorToolScreen extends Screen {
     private static final int PANEL_WIDTH = 300;
-    private static final int PANEL_HEIGHT = 216;
+    private static final int PANEL_HEIGHT = 188;
     private static final int SCREEN_OVERLAY = 0x5A000000;
     private static final int PANEL_BACKGROUND = 0xD0191D22;
     private static final int PANEL_BORDER = 0xFF7DA3B8;
@@ -45,8 +45,7 @@ public class MapCreatorToolScreen extends Screen {
     private EditBox pos2YField;
     private EditBox pos2ZField;
     private Button typeButton;
-    private String[] managementReturnFields;
-    private String managementReturnType;
+    private Button createButton;
 
     public MapCreatorToolScreen(OpenMapCreatorToolScreenS2CPacket data) {
         super(Component.translatable("gui.fpsm.map_creator.title"));
@@ -72,7 +71,7 @@ public class MapCreatorToolScreen extends Screen {
         this.pos2YField = addIntField(left + 166, top + 120);
         this.pos2ZField = addIntField(left + 222, top + 120);
 
-        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.fpsm.map_creator.create"), button -> createMap())
+        this.createButton = this.addRenderableWidget(new Button.Builder(Component.translatable("gui.fpsm.map_creator.create"), button -> createMap())
                 .pos(left + 18, top + 154)
                 .size(122, 20)
                 .build());
@@ -80,23 +79,8 @@ public class MapCreatorToolScreen extends Screen {
                 .pos(left + 160, top + 154)
                 .size(122, 20)
                 .build());
-        if (Minecraft.getInstance().player != null && Minecraft.getInstance().player.hasPermissions(2)) {
-            this.addRenderableWidget(new Button.Builder(Component.translatable("screen.codpattern.map_admin.launch"),
-                    button -> openManagement())
-                    .pos(left + 18, top + 182)
-                    .size(264, 20)
-                    .build());
-        }
-
         updateTypeButton();
         loadFromHeldTool();
-        if (managementReturnFields != null) {
-            this.selectedType = managementReturnType;
-            this.mapNameField.setValue(managementReturnFields[0]);
-            List<EditBox> fields = getPosFields();
-            for (int i = 0; i < fields.size(); i++) fields.get(i).setValue(managementReturnFields[i + 1]);
-            updateTypeButton();
-        }
     }
 
     public void applyData(OpenMapCreatorToolScreenS2CPacket data) {
@@ -242,13 +226,12 @@ public class MapCreatorToolScreen extends Screen {
 
     private void updateTypeButton() {
         this.typeButton.setMessage(Component.literal(this.selectedType.isBlank() ? "-" : this.selectedType));
+        this.typeButton.active = !this.availableTypes.isEmpty();
+        if (this.createButton != null) this.createButton.active = this.availableTypes.contains(this.selectedType);
     }
 
     private String normalizeSelectedType(String type) {
-        if (type != null && !type.isBlank() && this.availableTypes.contains(type)) {
-            return type;
-        }
-        return this.availableTypes.isEmpty() ? "" : this.availableTypes.get(0);
+        return MapCreatorToolModes.selectedType(type, this.availableTypes);
     }
 
     private void loadFromHeldTool() {
@@ -299,16 +282,8 @@ public class MapCreatorToolScreen extends Screen {
         }
     }
 
-    private void openManagement() {
-        managementReturnType = selectedType;
-        managementReturnFields = new String[7];
-        managementReturnFields[0] = mapNameField.getValue();
-        List<EditBox> fields = getPosFields();
-        for (int i = 0; i < fields.size(); i++) managementReturnFields[i + 1] = fields.get(i).getValue();
-        Minecraft.getInstance().setScreen(new MapManagementScreen(this));
-    }
-
     private void createMap() {
+        if (!this.availableTypes.contains(this.selectedType)) return;
         FPSMatch.sendToServer(new MapCreatorToolActionC2SPacket(
                 MapCreatorToolActionC2SPacket.Action.CREATE,
                 this.selectedType,
