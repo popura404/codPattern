@@ -64,11 +64,12 @@ public final class MapCreationService {
         BaseMap newMap;
         try {
             newMap = factory.apply(player.serverLevel(), mapName, area.get());
-            core.registerMap(type, newMap);
-            CodMapPersistence.saveMapOrRollback(newMap, () -> core.unregisterMap(newMap));
+            com.cdp.codpattern.app.match.management.EndTeleportService.registerAndSaveNew(player.server, newMap);
         } catch (RuntimeException e) {
             com.mojang.logging.LogUtils.getLogger().error("Failed to create map {}/{}", type, mapName, e);
             com.cdp.codpattern.config.storage.ServerMapStorage.get(player.server).abandonCreation(type, mapName);
+            if (e instanceof com.cdp.codpattern.config.storage.MapDefaultsStore.Unavailable)
+                return Result.failure("defaults_unavailable", "screen.codpattern.end_teleport.defaults_unavailable");
             return Result.failure("save_failed_rolled_back", "message.codpattern.map.create_save_failed_rollback", type, mapName);
         }
 

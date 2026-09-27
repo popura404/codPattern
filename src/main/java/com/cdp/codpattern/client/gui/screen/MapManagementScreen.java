@@ -30,8 +30,8 @@ public final class MapManagementScreen extends Screen {
     private static final int PANEL_TOP = 57;
     private static final int ROW_HEIGHT = 31;
     private static final int INFO_LINE_HEIGHT = 15;
-    private static final int NAME_HINT_TOP = PANEL_TOP + 50;
-    private static final int DETAIL_TOP = PANEL_TOP + 66;
+    private static final int NAME_HINT_TOP = PANEL_TOP + 74;
+    private static final int DETAIL_TOP = PANEL_TOP + 90;
 
     private static java.lang.ref.WeakReference<MapManagementScreen> current = new java.lang.ref.WeakReference<>(null);
     private Screen confirmation;
@@ -74,6 +74,8 @@ public final class MapManagementScreen extends Screen {
     private Button saveButton;
     private Button deleteButton;
     private Button endButton;
+    private Button teleportButton;
+    private Button globalSettingsButton;
     private int leftX;
     private int leftWidth;
     private int rightX;
@@ -87,6 +89,7 @@ public final class MapManagementScreen extends Screen {
     }
 
     public static void receive(MapAdminResponsePacket response) {
+        EndTeleportScreen.receive(response);
         MapManagementScreen owner = current.get();
         Screen visible = Minecraft.getInstance().screen;
         if (owner != null && (visible == owner || (owner.confirmation != null && visible == owner.confirmation)))
@@ -109,7 +112,17 @@ public final class MapManagementScreen extends Screen {
         addRenderableWidget(Button.builder(Component.translatable(KEY + "back"), button -> onClose())
                 .bounds(width - MARGIN - 61, 5, 61, 20).build());
 
-        nameField = new EditBox(font, rightX + 8, PANEL_TOP + 28,
+        globalSettingsButton = addRenderableWidget(Button.builder(Component.translatable("screen.codpattern.end_teleport.global_title"),
+                button -> guardDraft(() -> Minecraft.getInstance().setScreen(new EndTeleportScreen(this, null))))
+                .bounds(rightX + Math.min(78, rightWidth / 2) + 4, 29, Math.max(40, rightWidth - Math.min(78, rightWidth / 2) - 4), 20).build());
+        int tabWidth = (rightWidth - 20) / 2;
+        var basicTab = addRenderableWidget(Button.builder(Component.translatable("screen.codpattern.end_teleport.basic_tab"), button -> {})
+                .bounds(rightX + 8, PANEL_TOP + 4, tabWidth, 20).build());
+        basicTab.active = false;
+        teleportButton = addRenderableWidget(Button.builder(Component.translatable("screen.codpattern.end_teleport.map_tab"),
+                button -> guardDraft(() -> Minecraft.getInstance().setScreen(new EndTeleportScreen(this, selected))))
+                .bounds(rightX + 12 + tabWidth, PANEL_TOP + 4, tabWidth, 20).build());
+        nameField = new EditBox(font, rightX + 8, PANEL_TOP + 52,
                 Math.max(80, rightWidth - 16), 18, Component.translatable(KEY + "name"));
         nameField.setMaxLength(100);
         nameField.setValue(draftName);
@@ -230,7 +243,7 @@ public final class MapManagementScreen extends Screen {
 
     private void drawDetails(GuiGraphics graphics, int mouseX, int mouseY) {
         int textX = rightX + 8;
-        graphics.drawString(font, Component.translatable(KEY + "name"), textX, PANEL_TOP + 9,
+        graphics.drawString(font, Component.translatable(KEY + "name"), textX, PANEL_TOP + 33,
                 CodTheme.TEXT_SECONDARY, false);
         Component hint = nameHint();
         if (hint != null) {
@@ -515,6 +528,10 @@ public final class MapManagementScreen extends Screen {
         requestDetail();
     }
 
+    public void refreshAfterTeleportEdit() {
+        if (selected != null) requestDetail();
+    }
+
     private void requestDetail() {
         if (selected == null) return;
         loadingDetail = true;
@@ -623,6 +640,8 @@ public final class MapManagementScreen extends Screen {
         endButton.active = ready && !detail.summary().disabledReason().equals("management_pending");
         endButton.setTooltip(detail != null && detail.summary().disabledReason().equals("management_pending")
                 ? Tooltip.create(Component.translatable(KEY + "disabled.management_pending")) : null);
+        teleportButton.active = ready;
+        globalSettingsButton.active = pendingAction < 0 && !loadingList;
         modeButton.active = pendingAction < 0 && !loadingList;
         refreshButton.active = pendingAction < 0 && !loadingList;
         endButton.setMessage(Component.translatable(KEY + (pendingEndGeneration == null ? "force_end" : "retry_end")));

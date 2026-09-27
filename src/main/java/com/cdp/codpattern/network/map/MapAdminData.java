@@ -60,19 +60,57 @@ public final class MapAdminData {
     }
 
     public record EndPoint(String dimensionId, BlockPos position, float yaw, float pitch) {
+        public SpawnPointData toPoint() {
+            var id = net.minecraft.resources.ResourceLocation.tryParse(dimensionId);
+            if (id == null) throw new IllegalArgumentException("Invalid dimension");
+            return new SpawnPointData(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, id),
+                    position, yaw, pitch);
+        }
+
         public static EndPoint from(SpawnPointData point) {
             return new EndPoint(point.getDimension().location().toString(), point.getPosition(), point.getYaw(), point.getPitch());
         }
 
         public void write(FriendlyByteBuf buf) {
             buf.writeUtf(dimensionId, 128);
-            buf.writeBlockPos(position);
+            buf.writeInt(position.getX());
+            buf.writeInt(position.getY());
+            buf.writeInt(position.getZ());
             buf.writeFloat(yaw);
             buf.writeFloat(pitch);
         }
 
         public static EndPoint read(FriendlyByteBuf buf) {
-            return new EndPoint(buf.readUtf(128), buf.readBlockPos(), buf.readFloat(), buf.readFloat());
+            return new EndPoint(buf.readUtf(128), new BlockPos(buf.readInt(), buf.readInt(), buf.readInt()), buf.readFloat(), buf.readFloat());
+        }
+    }
+
+    public record TeleportSettings(RoomId room, Optional<EndPoint> point, Optional<EndPoint> defaultPoint,
+                                   EndPoint currentPosition, String revision, boolean editable, String reason,
+                                   boolean defaultsAvailable) {
+        public static TeleportSettings from(com.cdp.codpattern.app.match.management.EndTeleportService.Settings value) {
+            return new TeleportSettings(value.room(), value.point().map(EndPoint::from), value.defaultPoint().map(EndPoint::from),
+                    EndPoint.from(value.currentPosition()), value.revision(), value.editable(), value.reason(), value.defaultsAvailable());
+        }
+        public void write(FriendlyByteBuf buf) {
+            buf.writeBoolean(room != null);
+            if (room != null) writeRoom(buf, room);
+            buf.writeBoolean(point.isPresent());
+            point.ifPresent(value -> value.write(buf));
+            buf.writeBoolean(defaultPoint.isPresent());
+            defaultPoint.ifPresent(value -> value.write(buf));
+            currentPosition.write(buf);
+            buf.writeUtf(revision, 128);
+            buf.writeBoolean(editable);
+            buf.writeUtf(reason, 128);
+            buf.writeBoolean(defaultsAvailable);
+        }
+        public static TeleportSettings read(FriendlyByteBuf buf) {
+            RoomId room = buf.readBoolean() ? readRoom(buf) : null;
+            Optional<EndPoint> point = buf.readBoolean() ? Optional.of(EndPoint.read(buf)) : Optional.empty();
+            Optional<EndPoint> defaults = buf.readBoolean() ? Optional.of(EndPoint.read(buf)) : Optional.empty();
+            return new TeleportSettings(room, point, defaults, EndPoint.read(buf), buf.readUtf(128),
+                    buf.readBoolean(), buf.readUtf(128), buf.readBoolean());
         }
     }
 

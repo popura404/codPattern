@@ -779,3 +779,7 @@ LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投�
 - `weapon_filter.json` 已改成你的枪包策略
 - `maps/builtin/rules/config.json` 已按你的节奏重启生效
 - 世界存档与 `fpsmatch/` 已备份
+
+## 结束传送图形设置
+
+地图管理工具现在提供「全局设置」和单张地图的「结束传送」页。全局值只用于之后新建的地图；坐标按钮只填入草稿，点击保存后生效。完整操作说明见 [结束传送与全局默认位置](end-teleport-settings.md)。

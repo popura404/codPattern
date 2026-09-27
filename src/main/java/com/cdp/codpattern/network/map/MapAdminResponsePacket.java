@@ -16,7 +16,26 @@ public record MapAdminResponsePacket(
         Code code, String result, int offset, int total, int fingerprint, int errorCount,
         List<MapAdminData.ModeRow> modes, List<MapAdminData.MapRow> maps,
         MapAdminData.DetailRow detail, RoomId newRoom, int onlinePending, int offlinePending,
-        int entitiesPending) {
+        int entitiesPending, MapAdminData.TeleportSettings teleportSettings, MapAdminData.EndPoint currentPosition) {
+    public MapAdminResponsePacket(MapAdminRequestPacket.Operation operation, UUID session, long requestId,
+            Code code, String result, int offset, int total, int fingerprint, int errorCount,
+            List<MapAdminData.ModeRow> modes, List<MapAdminData.MapRow> maps, MapAdminData.DetailRow detail,
+            RoomId newRoom, int onlinePending, int offlinePending, int entitiesPending) {
+        this(operation, session, requestId, code, result, offset, total, fingerprint, errorCount,
+                modes, maps, detail, newRoom, onlinePending, offlinePending, entitiesPending, null, null);
+    }
+
+    public static MapAdminResponsePacket teleport(MapAdminRequestPacket request, Code code, String result,
+                                                   MapAdminData.TeleportSettings settings) {
+        return new MapAdminResponsePacket(request.operation(), request.session(), request.requestId(), code, result,
+                0, 0, 0, 0, List.of(), List.of(), null, null, 0, 0, 0, settings, null);
+    }
+
+    public static MapAdminResponsePacket position(MapAdminRequestPacket request, MapAdminData.EndPoint point) {
+        return new MapAdminResponsePacket(request.operation(), request.session(), request.requestId(), Code.OK, "",
+                0, 0, 0, 0, List.of(), List.of(), null, null, 0, 0, 0, null, point);
+    }
+
     public static final int PAGE_SIZE = 32;
     public static final int MAX_MODES = 128;
 
@@ -75,6 +94,10 @@ public record MapAdminResponsePacket(
         buf.writeInt(onlinePending);
         buf.writeInt(offlinePending);
         buf.writeInt(entitiesPending);
+        buf.writeBoolean(teleportSettings != null);
+        if (teleportSettings != null) teleportSettings.write(buf);
+        buf.writeBoolean(currentPosition != null);
+        if (currentPosition != null) currentPosition.write(buf);
     }
 
     public static MapAdminResponsePacket decode(FriendlyByteBuf buf) {
@@ -102,7 +125,9 @@ public record MapAdminResponsePacket(
         int entitiesPending = buf.readInt();
         return new MapAdminResponsePacket(operation, session, requestId, code, result, offset, total,
                 fingerprint, errorCount, modes, maps, detail, newRoom,
-                onlinePending, offlinePending, entitiesPending);
+                onlinePending, offlinePending, entitiesPending,
+                buf.readBoolean() ? MapAdminData.TeleportSettings.read(buf) : null,
+                buf.readBoolean() ? MapAdminData.EndPoint.read(buf) : null);
     }
 
     public void handle(Supplier<NetworkEvent.Context> context) {

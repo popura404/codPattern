@@ -20,10 +20,10 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
 
-/** Server-authoritative administrator requests. Client fields are only selectors and expected revisions. */
+/** Administrator requests. The trusted sender supplies identity and permission; all edits are validated on the server. */
 public record MapAdminRequestPacket(Operation operation, UUID session, long requestId, int offset,
                                     int expectedFingerprint, RoomId room, String expectedRevision,
-                                    String newName, UUID generation) {
+                                    String newName, UUID generation, MapAdminData.EndPoint endPoint) {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<UUID, Window> REQUEST_WINDOWS = new HashMap<>();
     private static final int REQUESTS_PER_SECOND = 40;
@@ -32,7 +32,19 @@ public record MapAdminRequestPacket(Operation operation, UUID session, long requ
     private static final Map<net.minecraft.server.MinecraftServer, java.util.LinkedHashMap<RequestKey, Cached>> RESULTS
             = new java.util.WeakHashMap<>();
 
-    public enum Operation { LIST, DETAIL, RENAME, DELETE, FORCE_END, END_STATUS }
+    public enum Operation { LIST, DETAIL, RENAME, DELETE, FORCE_END, END_STATUS,
+        DEFAULTS, END_POINT_DETAIL, CURRENT_POSITION, SAVE_DEFAULTS, SAVE_END_POINT }
+
+    public MapAdminRequestPacket(Operation operation, UUID session, long requestId, int offset,
+                                 int fingerprint, RoomId room, String revision, String name, UUID generation) {
+        this(operation, session, requestId, offset, fingerprint, room, revision, name, generation, null);
+    }
+
+    public static MapAdminRequestPacket teleport(Operation operation, UUID session, long requestId, RoomId room,
+                                                 String revision, MapAdminData.EndPoint point) {
+        return new MapAdminRequestPacket(operation, session, requestId, 0, 0, room, revision, "", null, point);
+    }
+
 
     private record Window(long startedAt, int count) { }
 
@@ -86,6 +98,8 @@ public record MapAdminRequestPacket(Operation operation, UUID session, long requ
         buf.writeUtf(newName, 128);
         buf.writeBoolean(generation != null);
         if (generation != null) buf.writeUUID(generation);
+        buf.writeBoolean(endPoint != null);
+        if (endPoint != null) endPoint.write(buf);
     }
 
     public static MapAdminRequestPacket decode(FriendlyByteBuf buf) {
@@ -99,7 +113,7 @@ public record MapAdminRequestPacket(Operation operation, UUID session, long requ
         String name = buf.readUtf(128);
         UUID generation = buf.readBoolean() ? buf.readUUID() : null;
         return new MapAdminRequestPacket(operation, session, requestId, offset, fingerprint,
-                room, revision, name, generation);
+                room, revision, name, generation, buf.readBoolean() ? MapAdminData.EndPoint.read(buf) : null);
     }
 
     public void handle(Supplier<NetworkEvent.Context> context) {
@@ -122,10 +136,15 @@ public record MapAdminRequestPacket(Operation operation, UUID session, long requ
         } else {
             try {
                 response = executeOnce(player);
+            } catch (com.cdp.codpattern.config.storage.MapDefaultsStore.Unavailable failure) {
+                LOGGER.warn("Map defaults unavailable for administrator request {}", operation, failure);
+                response = MapAdminResponsePacket.status(this, MapAdminResponsePacket.Code.ERROR, "defaults_unavailable");
             } catch (SecurityException failure) {
                 response = MapAdminResponsePacket.status(this, MapAdminResponsePacket.Code.DENIED, "permission");
             } catch (IllegalArgumentException failure) {
-                response = MapAdminResponsePacket.status(this, MapAdminResponsePacket.Code.MISSING, "invalid_target");
+                response = MapAdminResponsePacket.status(this,
+                        operation == Operation.SAVE_DEFAULTS || operation == Operation.SAVE_END_POINT
+                                ? MapAdminResponsePacket.Code.ERROR : MapAdminResponsePacket.Code.MISSING, "invalid_target");
             } catch (RuntimeException | LinkageError failure) {
                 LOGGER.warn("Map administrator request {} failed for {}", operation, player.getGameProfile().getName(), failure);
                 response = MapAdminResponsePacket.status(this, MapAdminResponsePacket.Code.ERROR, "server_error");
@@ -135,7 +154,8 @@ public record MapAdminRequestPacket(Operation operation, UUID session, long requ
     }
 
     private MapAdminResponsePacket executeOnce(ServerPlayer player) {
-        if (operation != Operation.RENAME && operation != Operation.DELETE) return execute(player);
+        if (operation != Operation.RENAME && operation != Operation.DELETE
+                && operation != Operation.SAVE_DEFAULTS && operation != Operation.SAVE_END_POINT) return execute(player);
         var cache = RESULTS.computeIfAbsent(player.server, ignored -> new java.util.LinkedHashMap<>());
         long now = System.currentTimeMillis();
         cache.entrySet().removeIf(entry -> now - entry.getValue().created() > 300_000L);
@@ -153,6 +173,22 @@ public record MapAdminRequestPacket(Operation operation, UUID session, long requ
 
     private MapAdminResponsePacket execute(ServerPlayer player) {
         return switch (operation) {
+            case DEFAULTS, END_POINT_DETAIL -> MapAdminResponsePacket.teleport(this, MapAdminResponsePacket.Code.OK, "",
+                    MapAdminData.TeleportSettings.from(com.cdp.codpattern.app.match.management.EndTeleportService.read(
+                            player, operation == Operation.DEFAULTS ? null : requireRoom())));
+            case CURRENT_POSITION -> MapAdminResponsePacket.position(this,
+                    MapAdminData.EndPoint.from(com.cdp.codpattern.app.match.management.EndTeleportService.currentPosition(player)));
+            case SAVE_DEFAULTS, SAVE_END_POINT -> {
+                if (endPoint == null) throw new IllegalArgumentException("End point required");
+                var result = com.cdp.codpattern.app.match.management.EndTeleportService.save(player,
+                        operation == Operation.SAVE_DEFAULTS ? null : requireRoom(), expectedRevision, endPoint.toPoint());
+                var code = switch (result.code()) {
+                    case "saved", "unchanged" -> MapAdminResponsePacket.Code.OK;
+                    case "stale" -> MapAdminResponsePacket.Code.STALE;
+                    default -> MapAdminResponsePacket.Code.ERROR;
+                };
+                yield MapAdminResponsePacket.teleport(this, code, result.code(), MapAdminData.TeleportSettings.from(result.settings()));
+            }
             case LIST -> listPage(player);
             case DETAIL -> MapManagementService.detail(player.server, requireRoom())
                     .map(detail -> MapAdminResponsePacket.detail(this, MapAdminData.DetailRow.from(detail)))

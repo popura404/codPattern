@@ -18,6 +18,7 @@ public final class ServerMapStorage {
     private static final Map<MinecraftServer, ServerMapStorage> INSTANCES = new IdentityHashMap<>();
     private final MinecraftServer server;
     private final MapStorageMigration migration;
+    private final MapDefaultsStore defaults;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "codpattern-map-storage"); thread.setDaemon(true); return thread;
     });
@@ -36,6 +37,7 @@ public final class ServerMapStorage {
         this.server = server;
         migration = new MapStorageMigration(new MapStoragePaths(server.getWorldPath(LevelResource.ROOT), FMLLoader.getGamePath()),
                 server.getWorldData().getLevelName());
+        defaults = new MapDefaultsStore(migration.paths().defaults());
     }
 
     public static synchronized ServerMapStorage get(MinecraftServer server) {
@@ -43,6 +45,7 @@ public final class ServerMapStorage {
     }
     public static ServerMapStorage current() { return get(ServerLifecycleHooks.getCurrentServer()); }
     public MapStorageMigration migration() { return migration; }
+    public MapDefaultsStore defaults() { return defaults; }
     public MapStoragePaths paths() { return migration.paths(); }
 
     public synchronized boolean managementReserved(String mode) {

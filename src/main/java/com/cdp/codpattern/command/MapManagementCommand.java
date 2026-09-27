@@ -314,11 +314,12 @@ public final class MapManagementCommand {
         BaseMap newMap;
         try {
             newMap = factory.apply(source.getLevel(), mapName, new AreaData(from, to));
-            core.registerMap(type, newMap);
-            CodMapPersistence.saveMapOrRollback(newMap, () -> core.unregisterMap(newMap));
+            com.cdp.codpattern.app.match.management.EndTeleportService.registerAndSaveNew(source.getServer(), newMap);
         } catch (RuntimeException e) {
             com.mojang.logging.LogUtils.getLogger().error("Failed to create map {}/{}", type, mapName, e);
             com.cdp.codpattern.config.storage.ServerMapStorage.get(source.getServer()).abandonCreation(type, mapName);
+            if (e instanceof com.cdp.codpattern.config.storage.MapDefaultsStore.Unavailable)
+                source.sendFailure(Component.translatable("screen.codpattern.end_teleport.defaults_unavailable"));
             source.sendFailure(Component.translatable("message.codpattern.map.create_save_failed_rollback", type, mapName));
             return 0;
         }

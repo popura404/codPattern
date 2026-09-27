@@ -18,6 +18,7 @@ public final class MapStoragePaths {
     public Path world() { return world; }
     public Path legacy() { return legacy; }
     public Path root() { return world.resolve("serverconfig/codpattern/maps"); }
+    public Path defaults() { return root().resolve("defaults.json"); }
     public Path metadata() { return root().resolve(".storage"); }
     public Path commonRules() { return root().resolve("builtin/rules/config.json"); }
     public Path oldCommonRules() { return world.resolve("serverconfig/codpattern/tdm_rules/config.json"); }

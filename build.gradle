@@ -360,3 +360,13 @@ tasks.register('runMapRenameCompat', JavaExec) {
     dependsOn tasks.named('testClasses')
 }
 tasks.named('runMainCompatibilitySuite') { dependsOn tasks.named('runMapRenameCompat') }
+
+// Save-local end teleport defaults and shared editor state.
+tasks.register('runMapDefaultsCompat', JavaExec) {
+    group = 'verification'
+    description = 'Check isolated map defaults, failed writes and end position drafts.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.cdp.codpattern.config.storage.MapDefaultsCompatTest'
+    dependsOn tasks.named('testClasses')
+}
+tasks.named('runMainCompatibilitySuite') { dependsOn tasks.named('runMapDefaultsCompat') }

@@ -215,10 +215,21 @@ public final class MapManagementService {
         boolean occupied = players || termination.hasLease(id) || active;
         String status = processing ? "ending" : pending ? "recovery_pending"
                 : handle.summaryPort().isRunning() ? "running" : occupied ? "occupied" : "idle";
+        String reason = editBlockedReason(server, id, status, progress.offlinePending() > 0);
+        boolean available = reason.isEmpty();
+        boolean canRename = available && MapMutationService.supportsRename(server, id);
+        boolean canDelete = available && MapMutationService.supportsDelete(server, id);
+        if (available && !canRename && !canDelete) reason = "mutation_unsupported";
+        return new MapSummary(id, GameModeRegistry.getOrDefault(id.gameType()).displayNameKey(), status,
+                canRename, canDelete, reason);
+    }
+
+    /** Shared availability guard; independent of rename/delete provider capabilities. */
+    public static String editBlockedReason(MinecraftServer server, RoomId id, String status, boolean offlinePending) {
         String reason = "";
         if (ServerMapStorage.get(server).managementUnavailable(id.gameType())) reason = "management_pending";
         else if (!"idle".equals(status)) reason = status;
-        else if (progress.offlinePending() > 0 || modeResourcesPending(server, id)) reason = "recovery_pending";
+        else if (offlinePending || modeResourcesPending(server, id)) reason = "recovery_pending";
         else if (ServerMapStorage.get(server).blocked(id.gameType())) reason = "storage_unavailable";
         else if (ModeMapPersistenceRegistry.find(id.gameType()).isEmpty()) reason = "persistence_unavailable";
         else {
@@ -230,12 +241,7 @@ public final class MapManagementService {
                 reason = "storage_unavailable";
             }
         }
-        boolean available = reason.isEmpty();
-        boolean canRename = available && MapMutationService.supportsRename(server, id);
-        boolean canDelete = available && MapMutationService.supportsDelete(server, id);
-        if (available && !canRename && !canDelete) reason = "mutation_unsupported";
-        return new MapSummary(id, GameModeRegistry.getOrDefault(id.gameType()).displayNameKey(), status,
-                canRename, canDelete, reason);
+        return reason;
     }
 
     private static boolean modeResourcesPending(MinecraftServer server, RoomId room) {
@@ -290,6 +296,11 @@ public final class MapManagementService {
             ModeMapPersistenceRegistry.find(room.gameType()).filter(ModeMapMutationProvider.class::isInstance)
                     .map(ModeMapMutationProvider.class::cast).ifPresent(provider -> digest.update(
                             provider.captureDefinition(map).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            if (map instanceof com.cdp.codpattern.app.match.ModeRoomBackedMap backed) {
+                backed.roomHandle().mapEditPort().flatMap(port -> port.objectFeature(
+                        com.cdp.codpattern.app.match.editor.ModeMapEditorSchemas.MATCH_END_TELEPORT)).ifPresent(point ->
+                        digest.update(point.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            }
             long totalBytes = 0L;
             for (Path file : files) {
                 StorageFiles.checkPath(file);
