@@ -92,7 +92,7 @@ public final class MapManagementGameTests {
         Files.writeString(root.resolve("rules/custom.json"), "{\"sentinel\":37}");
         String revision = MapManagementService.revision(server, room);
         try {
-            var point = new SpawnPointData(Level.NETHER, new BlockPos(-4, 72, 14), 123F, 9F);
+            var point = new SpawnPointData(Level.NETHER, new BlockPos(-4, 72, 14), 12.3F, -9.7F);
             map.setMatchEndTeleportPoint(point);
             helper.assertTrue(MapMutationService.delete(server, room, revision).outcome() == MapMutationService.Outcome.STALE,
                     "unsaved definition edits invalidate old management revisions");
@@ -128,6 +128,7 @@ public final class MapManagementGameTests {
                     "failed constructor preserves source identity and removes provisional files");
             helper.assertTrue(scoreboard.getPlayerTeam(occupiedTeam) == existing, "pre-existing scoreboard resource survives rollback");
             scoreboard.removePlayerTeam(existing);
+            assertSavedFieldLossRollsBack(helper, room, target, map, revision, root, destination);
             var generation = RoomTerminationService.get(server).generation(room);
             try (var reservation = storage.beginManagement(room.gameType())) {
                 boolean rejected = false;
@@ -140,8 +141,9 @@ public final class MapManagementGameTests {
             helper.assertTrue(core.getMapByTypeWithName(room.gameType(), name).isEmpty() && !Files.exists(root),
                     "old active identity disappears");
             var replacement = core.getMapByTypeWithName(target.gameType(), target.mapName()).orElseThrow();
-            helper.assertTrue(MapManagementService.detail(server, target).orElseThrow().endPoint().orElseThrow().equals(point),
-                    "configured end point survives provider definition round-trip");
+            var renamedPoint = MapManagementService.detail(server, target).orElseThrow().endPoint().orElseThrow();
+            helper.assertTrue(renamedPoint.equals(point) && renamedPoint.getPitch() == point.getPitch(),
+                    "configured end point and fractional orientation survive provider definition round-trip");
             helper.assertTrue(Files.readString(destination.resolve("rules/custom.json")).equals("{\"sentinel\":37}"),
                     "mode-owned nested rules survive rename byte-for-byte");
             helper.assertTrue(MapMutationService.delete(server, target, revision).outcome() == MapMutationService.Outcome.STALE,
@@ -160,6 +162,50 @@ public final class MapManagementGameTests {
             });
             core.unregisterMap(map);
             map.getMapTeams().retireCreatedScoreboardTeams();
+        }
+    }
+
+    /** Replace only the save codec adapter during this synchronous test; always restore it. */
+    @SuppressWarnings("unchecked")
+    private static void assertSavedFieldLossRollsBack(GameTestHelper helper, RoomId room, RoomId target,
+                                                     BaseMap original, String revision, Path source, Path destination)
+            throws Exception {
+        var manager = FPSMCore.getInstance().getFPSMDataManager();
+        var field = manager.getClass().getDeclaredField("registry");
+        field.setAccessible(true);
+        var registry = (java.util.Map<Class<?>, com.mojang.datafixers.util.Pair<String,
+                com.phasetranscrystal.fpsmatch.core.data.save.ISavePort<?>>>) field.get(manager);
+        var dataClass = com.cdp.codpattern.compat.fpsmatch.data.CodTdmMapData.MapData.class;
+        var originalEntry = registry.get(dataClass);
+        String originalJson = Files.readString(source.resolve("map.json"));
+        var originalTeams = new java.util.HashSet<>(helper.getLevel().getScoreboard().getTeamNames());
+        var broken = new com.phasetranscrystal.fpsmatch.core.data.save.ISavePort<
+                com.cdp.codpattern.compat.fpsmatch.data.CodTdmMapData.MapData>() {
+            @Override public com.mojang.serialization.Codec<com.cdp.codpattern.compat.fpsmatch.data.CodTdmMapData.MapData> codec() {
+                return com.cdp.codpattern.compat.fpsmatch.data.CodTdmMapData.MapData.CODEC;
+            }
+            @Override public com.google.gson.JsonElement encodeToJson(
+                    com.cdp.codpattern.compat.fpsmatch.data.CodTdmMapData.MapData data) {
+                var json = com.phasetranscrystal.fpsmatch.core.data.save.ISavePort.super.encodeToJson(data).getAsJsonObject();
+                json.remove("matchEndTeleportPoint");
+                return json;
+            }
+        };
+        try {
+            registry.put(dataClass, com.mojang.datafixers.util.Pair.of(originalEntry.getFirst(), broken));
+            var result = MapMutationService.rename(helper.getLevel().getServer(), room, revision, target.mapName());
+            helper.assertTrue(result.outcome() == MapMutationService.Outcome.FAILED
+                            && result.detail().equals("Operation rolled back"), "saved field loss is rolled back: " + result);
+            helper.assertTrue(FPSMCore.getInstance().getMapByTypeWithName(room.gameType(), room.mapName()).orElseThrow() == original
+                            && FPSMCore.getInstance().getMapByTypeWithName(target.gameType(), target.mapName()).isEmpty(),
+                    "save mismatch preserves original registration");
+            helper.assertTrue(Files.readString(source.resolve("map.json")).equals(originalJson) && !Files.exists(destination),
+                    "save mismatch preserves original bytes and removes provisional destination");
+            helper.assertTrue(Files.readString(source.resolve("rules/custom.json")).equals("{\"sentinel\":37}")
+                            && originalTeams.equals(new java.util.HashSet<>(helper.getLevel().getScoreboard().getTeamNames())),
+                    "save mismatch preserves rules and cleans provisional scoreboard teams");
+        } finally {
+            registry.put(dataClass, originalEntry);
         }
     }
 

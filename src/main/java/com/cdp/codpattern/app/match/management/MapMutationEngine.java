@@ -7,7 +7,6 @@ import com.cdp.codpattern.app.match.persistence.MapDefinitionCodec;
 import com.cdp.codpattern.app.match.persistence.ModeMapMutationProvider;
 import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceRegistry;
 import com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService;
-import com.cdp.codpattern.config.storage.MapStoragePaths;
 import com.cdp.codpattern.config.storage.ServerMapStorage;
 import com.cdp.codpattern.config.storage.StorageFiles;
 import com.google.gson.JsonParser;
@@ -47,11 +46,9 @@ final class MapMutationEngine {
     }
 
     static String normalizeName(String name) {
-        String value = Objects.requireNonNullElse(name, "").trim();
-        MapStoragePaths.mapDirectory(value);
-        if (value.codePoints().anyMatch(c -> Character.isISOControl(c) || Character.getType(c) == Character.SURROGATE))
-            throw new IllegalArgumentException("Control characters and invalid Unicode are not allowed");
-        return value;
+        var validation = MapNameValidation.validate(name);
+        if (!validation.valid()) throw new IllegalArgumentException("Invalid map name: " + validation.status());
+        return validation.normalized();
     }
 
     private static Result mutate(MinecraftServer server, RoomId requested, String revision, String newName) {
@@ -108,13 +105,13 @@ final class MapMutationEngine {
                             replacement = provider.createRenamed(original.getServerLevel(), definition, target.mapName());
                         }
                         if (replacement == original || !target.mapName().equals(replacement.getMapName())
-                                || !target.gameType().equals(replacement.getGameType())
-                                || !renamed.equals(provider.captureDefinition(replacement)))
-                            throw new IllegalStateException("Replacement failed complete definition round-trip");
+                                || !target.gameType().equals(replacement.getGameType()))
+                            throw new IllegalStateException("Replacement identity mismatch");
+                        requireDefinition(room, target, "replacement", renamed, provider.captureDefinition(replacement));
                         provider.save(replacement, core.getFPSMDataManager());
                         var persisted = JsonParser.parseString(Files.readString(destination.resolve("map.json"))).getAsJsonObject();
+                        requireDefinition(room, target, "saved", renamed, persisted);
                         registration.validateMap().accept(persisted.deepCopy());
-                        if (!persisted.equals(renamed)) throw new IllegalStateException("Saved replacement lost definition fields");
                         verifyRules(source, destination, entries);
                         if (!Objects.equals(revision, MapManagementService.revision(server, room)))
                             throw new IllegalStateException("Source changed during replacement preparation");
@@ -171,6 +168,16 @@ final class MapMutationEngine {
             LogUtils.getLogger().warn("Map mutation preflight failed for {}", room, failure);
             return result(Outcome.FAILED, room, room, "Preflight failed");
         }
+    }
+
+    private static void requireDefinition(RoomId room, RoomId target, String stage,
+                                          com.google.gson.JsonObject expected, com.google.gson.JsonObject actual) {
+        var comparison = MapDefinitionComparison.compare(expected, actual);
+        if (comparison.matches()) return;
+        LogUtils.getLogger().error("Map definition mismatch: mode={}, oldName={}, newName={}, stage={}, differences={}, truncated={}",
+                room.gameType(), room.mapName(), target.mapName(), stage, comparison.differences(), comparison.truncated());
+        throw new IllegalStateException(stage.equals("saved")
+                ? "Saved map definition differs from expected" : "Replacement map definition differs from expected");
     }
 
     private static boolean destinationOccupied(MinecraftServer server, ServerMapStorage storage, RoomId target) throws IOException {

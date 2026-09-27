@@ -1,4 +1,9 @@
 {
+    "screen.codpattern.map_admin.name_hint.empty": "Enter a map name",
+    "screen.codpattern.map_admin.name_hint.too_long": "Name is too long; please shorten it",
+    "screen.codpattern.map_admin.name_hint.invalid_characters": "Name contains unsupported characters",
+    "screen.codpattern.map_admin.name_hint.unchanged": "Name unchanged",
+    "screen.codpattern.map_admin.name_hint.conflict": "This name already exists in this mode",
     "tooltip.codpattern.map_management.use": "Right-click: open map management (administrator required)",
     "tooltip.codpattern.map_management.scope": "Manage maps from all registered modes, including addons",
     "item.codpattern.map_management_tool": "Map Management Tool",

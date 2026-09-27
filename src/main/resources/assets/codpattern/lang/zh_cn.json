@@ -1,4 +1,9 @@
 {
+    "screen.codpattern.map_admin.name_hint.empty": "名称不能为空",
+    "screen.codpattern.map_admin.name_hint.too_long": "名称过长，请缩短后重试",
+    "screen.codpattern.map_admin.name_hint.invalid_characters": "名称包含不支持的字符",
+    "screen.codpattern.map_admin.name_hint.unchanged": "名称未变化",
+    "screen.codpattern.map_admin.name_hint.conflict": "该模式下名称已存在",
     "tooltip.codpattern.map_management.use": "右键：打开地图管理（需要管理员权限）",
     "tooltip.codpattern.map_management.scope": "管理所有已注册模式的地图（包括附属模式）",
     "item.codpattern.map_management_tool": "地图管理工具",

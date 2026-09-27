@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.management.MapNameValidation;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.network.map.MapAdminData;
 import com.cdp.codpattern.network.map.MapAdminRequestPacket;
@@ -29,6 +30,8 @@ public final class MapManagementScreen extends Screen {
     private static final int PANEL_TOP = 57;
     private static final int ROW_HEIGHT = 31;
     private static final int INFO_LINE_HEIGHT = 15;
+    private static final int NAME_HINT_TOP = PANEL_TOP + 50;
+    private static final int DETAIL_TOP = PANEL_TOP + 66;
 
     private static java.lang.ref.WeakReference<MapManagementScreen> current = new java.lang.ref.WeakReference<>(null);
     private Screen confirmation;
@@ -229,7 +232,14 @@ public final class MapManagementScreen extends Screen {
         int textX = rightX + 8;
         graphics.drawString(font, Component.translatable(KEY + "name"), textX, PANEL_TOP + 9,
                 CodTheme.TEXT_SECONDARY, false);
-        int contentTop = PANEL_TOP + 53;
+        Component hint = nameHint();
+        if (hint != null) {
+            int color = nameValidation().status() == MapNameValidation.Status.UNCHANGED
+                    ? CodTheme.TEXT_SECONDARY : CodTheme.TEXT_DANGER;
+            graphics.drawString(font, font.plainSubstrByWidth(hint.getString(), rightWidth - 16),
+                    textX, NAME_HINT_TOP, color, false);
+        }
+        int contentTop = DETAIL_TOP;
         int contentBottom = panelBottom - 31;
         graphics.enableScissor(rightX + 4, contentTop, rightX + rightWidth - 4, contentBottom);
         if (selected == null) {
@@ -280,7 +290,13 @@ public final class MapManagementScreen extends Screen {
     }
 
     private void drawTooltips(GuiGraphics graphics, int mouseX, int mouseY) {
-        int contentTop = PANEL_TOP + 53;
+        Component hint = nameHint();
+        if (hint != null && mouseX >= rightX + 8 && mouseX < rightX + rightWidth - 8
+                && mouseY >= NAME_HINT_TOP && mouseY < NAME_HINT_TOP + 12
+                && font.width(hint) > rightWidth - 16) {
+            graphics.renderTooltip(font, font.split(hint, Math.max(100, width - 24)), mouseX, mouseY);
+        }
+        int contentTop = DETAIL_TOP;
         if (detail != null && !loadingDetail && mouseX >= rightX + 4 && mouseX < rightX + rightWidth - 4
                 && mouseY >= contentTop && mouseY < panelBottom - 31) {
             var lines = detailLines();
@@ -510,10 +526,12 @@ public final class MapManagementScreen extends Screen {
     }
 
     private void rename() {
-        if (detail == null || !dirtyName() || pendingAction >= 0 || loadingList || loadingDetail || !detail.summary().canRename()) return;
+        if (detail == null || selected == null || !detail.summary().roomId().equals(selected)
+                || !nameValidation().valid() || pendingAction >= 0 || loadingList || loadingDetail
+                || !detail.summary().canRename()) return;
         pendingAction = nextRequest();
         pendingStartedAt = System.currentTimeMillis();
-        send(MapAdminRequestPacket.rename(session, pendingAction, selected, detail.revision(), draftName));
+        send(MapAdminRequestPacket.rename(session, pendingAction, selected, detail.revision(), nameValidation().normalized()));
         updateButtons();
     }
 
@@ -600,7 +618,7 @@ public final class MapManagementScreen extends Screen {
         boolean ready = detail != null && selected != null && detail.summary().roomId().equals(selected)
                 && pendingAction < 0 && !loadingList && !loadingDetail;
         nameField.setEditable(ready && detail.summary().canRename());
-        saveButton.active = ready && detail.summary().canRename() && dirtyName();
+        saveButton.active = ready && detail.summary().canRename() && nameValidation().valid();
         deleteButton.active = ready && detail.summary().canDelete();
         endButton.active = ready && !detail.summary().disabledReason().equals("management_pending");
         endButton.setTooltip(detail != null && detail.summary().disabledReason().equals("management_pending")
@@ -615,11 +633,26 @@ public final class MapManagementScreen extends Screen {
             Component tip = Component.translatable(KEY + "disabled." + disabled);
             saveButton.setTooltip(Tooltip.create(tip));
             deleteButton.setTooltip(Tooltip.create(tip));
+        } else if (nameHint() != null) {
+            saveButton.setTooltip(Tooltip.create(nameHint()));
         }
     }
 
+    private MapNameValidation.Result nameValidation() {
+        return MapNameValidation.rename(draftName, selected == null ? "" : selected.mapName(),
+                maps.stream().filter(row -> selected != null && row.roomId().gameType().equals(selected.gameType()))
+                        .map(row -> row.roomId().mapName()));
+    }
+
+    private Component nameHint() {
+        if (selected == null || loadingList || loadingDetail || detail == null) return null;
+        var validation = nameValidation();
+        return validation.valid() ? null
+                : Component.translatable(KEY + "name_hint." + validation.status().name().toLowerCase(Locale.ROOT));
+    }
+
     private boolean dirtyName() {
-        return selected != null && !draftName.equals(selected.mapName());
+        return selected != null && !MapNameValidation.validate(draftName).normalized().equals(selected.mapName());
     }
 
     private List<MapAdminData.MapRow> filteredMaps() {

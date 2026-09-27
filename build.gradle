@@ -350,3 +350,13 @@ tasks.register('runForceEndCompat', JavaExec) {
     dependsOn tasks.named('testClasses')
 }
 tasks.named('runMainCompatibilitySuite') { dependsOn tasks.named('runForceEndCompat') }
+
+// Regression coverage for map rename definitions and shared input rules.
+tasks.register('runMapRenameCompat', JavaExec) {
+    group = 'verification'
+    description = 'Check map rename serialization, diagnostics and name validation.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.cdp.codpattern.app.match.management.MapRenameCompatTest'
+    dependsOn tasks.named('testClasses')
+}
+tasks.named('runMainCompatibilitySuite') { dependsOn tasks.named('runMapRenameCompat') }
