@@ -108,6 +108,8 @@ public class FPSMCore {
         catch (LinkageError | RuntimeException failure) {
             throw new IllegalStateException("Mode " + type + " must implement the room termination API before registration", failure);
         }
+        com.cdp.codpattern.app.match.editor.ModeEndTeleportSupport.requireHandle(type,
+                map instanceof com.cdp.codpattern.app.match.ModeRoomBackedMap backed ? backed.roomHandle() : null);
         games.computeIfAbsent(type, key -> new ArrayList<>()).add(map);
     }
 

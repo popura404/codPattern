@@ -72,7 +72,7 @@ public final class SyntheticExternalModeContributorCompatTest {
                 JoinPolicy.MODE_DEFINED,
                 LifecycleKind.MODE_DEFINED,
                 ScoreboardKind.MODE_DEFINED,
-                Set.of(ModeCapability.READY_STATE),
+                Set.of(ModeCapability.READY_STATE, ModeCapability.MATCH_END_TELEPORT),
                 Optional.of(runtimeProvider),
                 Optional.of(persistenceProvider),
                 Optional.of(editorSchema),
@@ -210,7 +210,7 @@ public final class SyntheticExternalModeContributorCompatTest {
 
             @Override
             public List<ObjectFeatureDefinition> objectFeatures() {
-                return List.of();
+                return com.cdp.codpattern.app.match.editor.ModeEndTeleportSupport.schema().objectFeatures();
             }
         };
     }

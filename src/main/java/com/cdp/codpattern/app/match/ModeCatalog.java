@@ -126,6 +126,7 @@ public final class ModeCatalog {
         List<GameModeRuntimeProvider> runtimeProviders = new ArrayList<>();
         List<ModeMapPersistenceProvider> persistenceProviders = new ArrayList<>();
         for (GameModeDefinition definition : definitions) {
+            com.cdp.codpattern.app.match.editor.ModeEndTeleportSupport.requireDefinition(definition);
             definition.runtimeProvider().ifPresent(provider -> {
                 requireProviderMode("runtime", definition.gameType(), provider.gameType());
                 runtimeProviders.add(provider);

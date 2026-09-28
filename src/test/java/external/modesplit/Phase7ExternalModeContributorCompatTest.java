@@ -132,9 +132,10 @@ public final class Phase7ExternalModeContributorCompatTest {
 
         String ownSource = Files.readString(Path.of(
                 "src/test/java/external/modesplit/Phase7ExternalModeContributorCompatTest.java"));
-        require(!ownSource.contains("app.zombies")
-                        && !ownSource.contains("ZombiesBootstrap")
-                        && !ownSource.contains("com.cdp.codpattern.CodPattern"),
+        require(ownSource.lines().map(String::stripLeading).filter(line -> line.startsWith("import "))
+                        .noneMatch(line -> line.contains("app.zombies")
+                                || line.contains("ZombiesBootstrap")
+                                || line.contains("com.cdp.codpattern.CodPattern")),
                 "the external fixture must not depend on addon implementations or the composition shim");
     }
 
@@ -157,7 +158,7 @@ public final class Phase7ExternalModeContributorCompatTest {
         private final ModeNetworkPacketSlotRegistry networkRegistry = new ModeNetworkPacketSlotRegistry();
         private final GameModeRuntimeProvider runtimeProvider = new ExternalRuntimeProvider();
         private final ModeMapPersistenceProvider persistenceProvider = new ExternalPersistenceProvider();
-        private final ModeMapEditorSchema editorSchema = new EmptyEditorSchema();
+        private final ModeMapEditorSchema editorSchema = com.cdp.codpattern.app.match.editor.ModeEndTeleportSupport.schema();
         private final ModePlayerLoginContributor loginContributor = new ModePlayerLoginContributor() {
             @Override
             public String id() {
@@ -182,7 +183,7 @@ public final class Phase7ExternalModeContributorCompatTest {
                 JoinPolicy.MODE_DEFINED,
                 LifecycleKind.OBJECTIVE_LOOP,
                 ScoreboardKind.PLAYER_SCORE,
-                Set.of(ModeCapability.READY_STATE),
+                Set.of(ModeCapability.READY_STATE, ModeCapability.MATCH_END_TELEPORT),
                 Optional.of(runtimeProvider),
                 Optional.of(persistenceProvider),
                 Optional.of(editorSchema),
@@ -271,23 +272,6 @@ public final class Phase7ExternalModeContributorCompatTest {
         @Override
         public FPSMDataManager.DeleteStatus delete(String mapName, FPSMDataManager manager) {
             return null;
-        }
-    }
-
-    private static final class EmptyEditorSchema implements ModeMapEditorSchema {
-        @Override
-        public List<com.cdp.codpattern.app.match.editor.PointLayerDefinition> pointLayers() {
-            return List.of();
-        }
-
-        @Override
-        public List<com.cdp.codpattern.app.match.editor.AreaLayerDefinition> areaLayers() {
-            return List.of();
-        }
-
-        @Override
-        public List<com.cdp.codpattern.app.match.editor.ObjectFeatureDefinition> objectFeatures() {
-            return List.of();
         }
     }
 

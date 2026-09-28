@@ -34,6 +34,7 @@ public final class ModeRoomHandleBuilderCompatTest {
         builderPreservesEveryNamedPort();
         legacyConstructorMatchesBuilderComposition();
         capabilityAuditChecksOnlyCharacterizedDirectMappings();
+        endTeleportRegistrationContract();
         System.out.println("PASS mode room handle builder compat");
     }
 
@@ -177,6 +178,42 @@ public final class ModeRoomHandleBuilderCompatTest {
         require(missing.stream().allMatch(issue -> Set.of("teamPort", "readyPort", "votePort")
                         .contains(issue.portName())),
                 "only team, ready, and vote ports should be diagnosed");
+    }
+
+    private static void endTeleportRegistrationContract() {
+        var stored = new java.util.concurrent.atomic.AtomicReference<com.phasetranscrystal.fpsmatch.core.data.SpawnPointData>();
+        var editor = com.cdp.codpattern.app.match.editor.ModeEndTeleportSupport.editor(
+                () -> java.util.Optional.ofNullable(stored.get()), stored::set);
+        var summary = (ModeRoomSummaryPort) Proxy.newProxyInstance(ModeRoomSummaryPort.class.getClassLoader(),
+                new Class<?>[]{ModeRoomSummaryPort.class}, (proxy, method, args) ->
+                        method.getName().equals("supportsConfiguredEndPoint") ? true : defaultValue(method.getReturnType()));
+        var room = RoomId.of("fixture", "end-point");
+        var lifecycle = stub(ModeRoomLifecyclePort.class);
+        var complete = ModeRoomHandle.builder(room, summary, lifecycle).withMapEdit(editor).build();
+        com.cdp.codpattern.app.match.editor.ModeEndTeleportSupport.requireHandle("fixture", complete);
+        for (var invalid : java.util.List.of(
+                ModeRoomHandle.builder(room, summary, lifecycle).build(),
+                ModeRoomHandle.builder(room, summary, lifecycle).withMapEdit(stub(ModeMapEditPort.class)).build(),
+                ModeRoomHandle.builder(room, stub(ModeRoomSummaryPort.class), lifecycle).withMapEdit(editor).build())) {
+            try {
+                com.cdp.codpattern.app.match.editor.ModeEndTeleportSupport.requireHandle("fixture", invalid);
+                throw new AssertionError("missing end-point port must be rejected");
+            } catch (IllegalStateException expected) {
+                require(expected.getMessage().contains("match_end_teleport"), "error must name the required feature");
+            }
+        }
+        String key = com.cdp.codpattern.app.match.editor.ModeMapEditorSchemas.MATCH_END_TELEPORT;
+        var point = new com.phasetranscrystal.fpsmatch.core.data.SpawnPointData(net.minecraft.world.level.Level.NETHER,
+                new net.minecraft.core.BlockPos(12, 70, -4), 45, 7);
+        editor.setObjectFeature(key, com.cdp.codpattern.app.match.editor.ModeObjectData.fromSpawnPointData(key, point));
+        require(editor.objectFeature(key).orElseThrow().toSpawnPointData().equals(point), "editor preserves dimension, coordinates and rotation");
+        editor.setObjectFeature(key, null);
+        require(stored.get() == null && editor.objectFeature(key).isEmpty(), "rollback can restore an unset point");
+        require(!editor.supportsPointLayer("INITIAL") && !editor.supportsAreaLayer("barrier"), "end-point adapter does not expose addon-specific objects");
+        try {
+            editor.setObjectFeature("unknown", null);
+            throw new AssertionError("unsupported feature must be rejected");
+        } catch (IllegalArgumentException expected) { }
     }
 
     private static <T> T stub(Class<T> type) {

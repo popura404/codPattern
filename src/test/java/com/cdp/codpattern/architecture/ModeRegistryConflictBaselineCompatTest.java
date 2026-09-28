@@ -36,7 +36,28 @@ public final class ModeRegistryConflictBaselineCompatTest {
         parallelContributionsFreezeDeterministically();
         definitionAndAliasConflictsFail();
         providerAndExtensionConflictsFail();
+        runtimeModesRequireEndTeleport();
         System.out.println("PASS immutable mode catalog concurrency and conflict compat");
+    }
+
+    private static void runtimeModesRequireEndTeleport() {
+        var valid = withRuntime(definition("endpoint_fixture", List.of()), runtimeProvider("endpoint_fixture"));
+        ModeCatalog.create(List.of(module("valid", 0, valid)));
+        var feature = com.cdp.codpattern.app.match.editor.ModeEndTeleportSupport.schema();
+        for (int missing = 0; missing < 3; missing++) {
+            var schema = missing == 1 ? Optional.<com.cdp.codpattern.app.match.editor.ModeMapEditorSchema>empty()
+                    : Optional.of(missing == 2 ? new com.cdp.codpattern.app.match.editor.ModeMapEditorSchema() {
+                        public List<com.cdp.codpattern.app.match.editor.PointLayerDefinition> pointLayers() { return List.of(); }
+                        public List<com.cdp.codpattern.app.match.editor.AreaLayerDefinition> areaLayers() { return List.of(); }
+                        public List<com.cdp.codpattern.app.match.editor.ObjectFeatureDefinition> objectFeatures() { return List.of(); }
+                    } : feature);
+            var invalid = new GameModeDefinition(valid.gameType(), valid.aliases(), valid.displayNameKey(),
+                    valid.roomHeaderKey(), valid.createCommand(), valid.teams(), valid.family(), valid.teamPolicy(),
+                    valid.joinPolicy(), valid.lifecycleKind(), valid.scoreboardKind(),
+                    missing == 0 ? Set.of() : valid.capabilities(), valid.runtimeProvider(), valid.persistenceProvider(),
+                    schema, valid.clientPresentation());
+            expectFreezeFailure(List.of(module("invalid", 0, invalid)), "match_end_teleport");
+        }
     }
 
     private static void lifecycleAndIdentityRules() {
@@ -192,8 +213,8 @@ public final class ModeRegistryConflictBaselineCompatTest {
                 definition.gameType(), definition.aliases(), definition.displayNameKey(),
                 definition.roomHeaderKey(), definition.createCommand(), definition.teams(), definition.family(),
                 definition.teamPolicy(), definition.joinPolicy(), definition.lifecycleKind(),
-                definition.scoreboardKind(), definition.capabilities(), Optional.of(provider), Optional.empty(),
-                Optional.empty(), Optional.empty());
+                definition.scoreboardKind(), Set.of(com.cdp.codpattern.app.match.model.ModeCapability.MATCH_END_TELEPORT), Optional.of(provider), Optional.empty(),
+                Optional.of(com.cdp.codpattern.app.match.editor.ModeEndTeleportSupport.schema()), Optional.empty());
     }
 
     private static GameModeRuntimeProvider runtimeProvider(String gameType) {

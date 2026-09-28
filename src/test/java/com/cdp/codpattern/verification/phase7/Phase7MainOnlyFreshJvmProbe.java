@@ -96,10 +96,10 @@ public final class Phase7MainOnlyFreshJvmProbe {
                 JoinPolicy.MODE_DEFINED,
                 LifecycleKind.MODE_DEFINED,
                 ScoreboardKind.MODE_DEFINED,
-                Set.of(ModeCapability.READY_STATE),
+                Set.of(ModeCapability.READY_STATE, ModeCapability.MATCH_END_TELEPORT),
                 Optional.of(runtimeProvider),
                 Optional.empty(),
-                Optional.empty(),
+                Optional.of(com.cdp.codpattern.app.match.editor.ModeEndTeleportSupport.schema()),
                 Optional.of(presentation));
 
         AtomicInteger eventCalls = new AtomicInteger();
