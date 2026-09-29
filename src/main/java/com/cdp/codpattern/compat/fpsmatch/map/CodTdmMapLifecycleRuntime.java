@@ -81,6 +81,10 @@ final record CodTdmMapLifecycleRuntime(
         resetGameState();
     }
 
+    void evictRecoveredMember(java.util.UUID player) {
+        teamMembershipCoordinator.evictRecoveredMember(player);
+    }
+
     void leaveRoom(ServerPlayer player) {
         teamMembershipCoordinator.leaveRoom(player);
     }

@@ -71,6 +71,11 @@ public final class MapManagementService {
         return MAP_IDENTITIES.computeIfAbsent(map, ignored -> UUID.randomUUID());
     }
 
+    /** Retire confirmations when a deletion is cancelled/completed, even if the definition is unchanged. */
+    static synchronized void invalidateRevision(BaseMap map) {
+        if (map != null) MAP_IDENTITIES.put(map, UUID.randomUUID());
+    }
+
     private static void onServerThread(MinecraftServer server) {
         Objects.requireNonNull(server, "server");
         if (!server.isSameThread()) throw new IllegalStateException("Map management requires server thread");
@@ -152,6 +157,10 @@ public final class MapManagementService {
                 errors.add("Cannot list mode " + mode);
             }
         }
+        for (RoomId pending : MapDeletionCoordinator.get(server).pendingRooms()) {
+            if (maps.stream().noneMatch(row -> row.roomId().equals(pending)))
+                MapDeletionCoordinator.get(server).unavailableDetail(pending).ifPresent(detail -> maps.add(detail.summary()));
+        }
         maps.sort(Comparator.comparing((MapSummary value) -> value.roomId().gameType())
                 .thenComparing(value -> value.roomId().mapName(), String.CASE_INSENSITIVE_ORDER));
         return new ListResult(maps, errors);
@@ -170,13 +179,13 @@ public final class MapManagementService {
         if (!FPSMCore.initialized() || room == null) return Optional.empty();
         String mode = GameModeRegistry.canonicalize(room.gameType());
         if (GameModeRuntimeRegistry.find(mode).isEmpty() || !FPSMCore.getInstance().checkGameType(mode)) {
-            return Optional.empty();
+            return MapDeletionCoordinator.get(server).unavailableDetail(room);
         }
         RoomId id = RoomId.of(mode, room.mapName());
         Optional<BaseMap> map = FPSMCore.getInstance().getMapByTypeWithName(mode, id.mapName());
-        if (map.isEmpty()) return Optional.empty();
+        if (map.isEmpty()) return MapDeletionCoordinator.get(server).unavailableDetail(room);
         Optional<ModeRoomHandle> handle = GameModeRuntimeRegistry.find(mode).flatMap(provider -> provider.roomHandle(map.get()));
-        if (handle.isEmpty() || !id.equals(handle.get().roomId())) return Optional.empty();
+        if (handle.isEmpty() || !id.equals(handle.get().roomId())) return MapDeletionCoordinator.get(server).unavailableDetail(room);
         AreaData area = handle.get().summaryPort().mapArea();
         if (area == null) area = map.get().getMapArea();
         BlockPos one = area.pos1();
@@ -218,7 +227,8 @@ public final class MapManagementService {
         String reason = editBlockedReason(server, id, status, progress.offlinePending() > 0);
         boolean available = reason.isEmpty();
         boolean canRename = available && MapMutationService.supportsRename(server, id);
-        boolean canDelete = available && MapMutationService.supportsDelete(server, id);
+        boolean canDelete = available && MapMutationService.supportsDelete(server, id)
+                || MapDeletionCoordinator.get(server).canSubmit(id, map);
         if (available && !canRename && !canDelete) reason = "mutation_unsupported";
         return new MapSummary(id, GameModeRegistry.getOrDefault(id.gameType()).displayNameKey(), status,
                 canRename, canDelete, reason);
@@ -227,7 +237,8 @@ public final class MapManagementService {
     /** Shared availability guard; independent of rename/delete provider capabilities. */
     public static String editBlockedReason(MinecraftServer server, RoomId id, String status, boolean offlinePending) {
         String reason = "";
-        if (ServerMapStorage.get(server).managementUnavailable(id.gameType())) reason = "management_pending";
+        if (MapDeletionCoordinator.get(server).blocksEdits(id)) reason = "deletion_pending";
+        else if (ServerMapStorage.get(server).managementUnavailable(id.gameType())) reason = "management_pending";
         else if (!"idle".equals(status)) reason = status;
         else if (offlinePending || modeResourcesPending(server, id)) reason = "recovery_pending";
         else if (ServerMapStorage.get(server).blocked(id.gameType())) reason = "storage_unavailable";
@@ -268,6 +279,14 @@ public final class MapManagementService {
     }
 
     private static String revision(MinecraftServer server, RoomId room, BaseMap map) {
+        return revision(server, room, map, true);
+    }
+
+    static String definitionRevision(MinecraftServer server, RoomId room, BaseMap map) {
+        return revision(server, room, map, false);
+    }
+
+    private static String revision(MinecraftServer server, RoomId room, BaseMap map, boolean includeSession) {
         try {
             MapStorageRegistration registration;
             try { registration = ServerMapStorage.get(server).migration().registration(room.gameType()); }
@@ -291,8 +310,10 @@ public final class MapManagementService {
             }
             files.sort(Comparator.naturalOrder());
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            digest.update(sessionId(server).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            digest.update(mapIdentity(map).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            if (includeSession) {
+                digest.update(sessionId(server).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                digest.update(mapIdentity(map).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
             ModeMapPersistenceRegistry.find(room.gameType()).filter(ModeMapMutationProvider.class::isInstance)
                     .map(ModeMapMutationProvider.class::cast).ifPresent(provider -> digest.update(
                             provider.captureDefinition(map).toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));

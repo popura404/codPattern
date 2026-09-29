@@ -32,7 +32,7 @@ import java.util.*;
  * COD Team Deathmatch 地图核心类
  * 实现完整的团队死斗游戏逻辑
  */
-public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, EndTeleportMap<CodTdmMap>, ModeRoomBackedMap {
+public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, EndTeleportMap<CodTdmMap>, ModeRoomBackedMap, com.cdp.codpattern.app.match.port.ModeRoomEvictionPort {
     private final CodTdmMapLifecycleRuntime lifecycleRuntime;
     private final CodTdmActionPort actionPort;
     private final CodTdmReadPort readPort;
@@ -69,6 +69,18 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
         this.actionPort = bootstrapResult.actionPort();
         this.readPort = bootstrapResult.readPort();
         this.teamMatchRuntime = new TeamMatchRuntime(policy, readPort, actionPort);
+    }
+
+    @Override
+    public Set<UUID> deletionMembers() {
+        return Set.copyOf(getMapTeams().getJoinedPlayersWithSpec());
+    }
+
+    @Override
+    public void evictRecoveredMember(UUID player) {
+        lifecycleRuntime.evictRecoveredMember(player);
+        getMapTeams().removePlayer(player);
+        syncToClient();
     }
 
     // 基础方法覆盖
@@ -238,6 +250,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
 
             @Override
             public boolean addPointLayerPoint(String teamName, ModePointData point) {
+                requireDeletionIdle();
                 if (point == null || !supportsPointLayer(point.layerKey())) {
                     return false;
                 }
@@ -255,6 +268,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
 
             @Override
             public Optional<ModePointData> removePointLayerPoint(String teamName, String layerKey, int index) {
+                requireDeletionIdle();
                 Optional<BaseTeam> team = findTeam(teamName);
                 Optional<SpawnPointKind> kind = legacyKind(layerKey);
                 if (team.isEmpty() || kind.isEmpty()) {
@@ -273,6 +287,7 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
 
             @Override
             public void replacePointLayerPoints(String teamName, String layerKey, List<ModePointData> points) {
+                requireDeletionIdle();
                 Optional<BaseTeam> team = findTeam(teamName);
                 Optional<SpawnPointKind> kind = legacyKind(layerKey);
                 if (team.isEmpty() || kind.isEmpty()) {
@@ -306,12 +321,19 @@ public class CodTdmMap extends BaseMap implements GiveStartKitsMap<CodTdmMap>, E
 
             @Override
             public void setObjectFeature(String featureKey, ModeObjectData objectData) {
+                requireDeletionIdle();
                 if (!supportsObjectFeature(featureKey)) {
                     return;
                 }
                 actionPort.setMatchEndTeleportPoint(objectData == null ? null : objectData.toSpawnPointData());
             }
         };
+    }
+
+    private void requireDeletionIdle() {
+        if (com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(getServerLevel().getServer())
+                .blocks(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(this)))
+            throw new IllegalStateException("Map deletion is pending");
     }
 
     private Optional<BaseTeam> findTeam(String teamName) {

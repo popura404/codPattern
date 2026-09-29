@@ -35,6 +35,9 @@ public final class ModeRoomInteractionService {
             return new JoinResult(false, "", CODE_MAP_NOT_FOUND, "");
         }
 
+        if (player != null && com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(player.server).blocks(roomId))
+            return new JoinResult(false, roomId.encode(), "ROOM_DELETING",
+                    Component.translatable("screen.codpattern.map_admin.disabled.deletion_pending").getString());
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
         Optional<ModeRoomLifecyclePort> lifecyclePort = gateway.findRoomLifecyclePort(roomId);
         if (lifecyclePort.isEmpty()) {
@@ -64,6 +67,7 @@ public final class ModeRoomInteractionService {
         }
 
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
+        if (com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(player.server).blocks(roomId)) return;
         Optional<TeamRoomPort> teamPort = gateway.findRoomTeamPort(roomId);
         if (teamPort.isEmpty()) {
             return;
@@ -76,6 +80,7 @@ public final class ModeRoomInteractionService {
     }
 
     public static Component setReadyState(ServerPlayer player, boolean ready) {
+        if (deletionPending(player)) return Component.translatable("screen.codpattern.map_admin.disabled.deletion_pending");
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
         Optional<ReadyStatePort> readyPort = gateway.findPlayerReadyStatePort(player);
         if (readyPort.isEmpty()) {
@@ -89,6 +94,7 @@ public final class ModeRoomInteractionService {
     }
 
     public static void initiateStartVote(ServerPlayer player) {
+        if (deletionPending(player)) return;
         if (player == null) {
             return;
         }
@@ -102,15 +108,23 @@ public final class ModeRoomInteractionService {
     }
 
     public static void initiateEndVote(ServerPlayer player) {
+        if (deletionPending(player)) return;
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
         gateway.findPlayerVoteControlPort(player)
                 .ifPresent(port -> port.initiateEndVote(player.getUUID()));
     }
 
     public static void submitVoteResponse(ServerPlayer player, long voteId, boolean accepted) {
+        if (deletionPending(player)) return;
         FpsMatchGateway gateway = FpsMatchGatewayProvider.gateway();
         gateway.findPlayerVoteControlPort(player)
                 .ifPresent(port -> port.submitVoteResponse(player.getUUID(), voteId, accepted));
+    }
+
+    private static boolean deletionPending(ServerPlayer player) {
+        return player != null && FpsMatchGatewayProvider.gateway().findPlayerRoomLifecyclePort(player)
+                .map(port -> com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(player.server).blocks(port.roomId()))
+                .orElse(false);
     }
 
     private static JoinRoomRequest joinRequest(String teamName) {

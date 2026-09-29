@@ -38,7 +38,10 @@ public final class RoomTerminationEvents {
 
     @SubscribeEvent
     public static void tick(TickEvent.ServerTickEvent event) {
-        if (event.phase == TickEvent.Phase.END) RoomTerminationService.get(event.getServer()).tick();
+        if (event.phase == TickEvent.Phase.END) {
+            RoomTerminationService.get(event.getServer()).tick();
+            com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(event.getServer()).tick();
+        }
     }
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void login(PlayerEvent.PlayerLoggedInEvent event) {
@@ -83,5 +86,6 @@ public final class RoomTerminationEvents {
             RoomTerminationService.current().ifPresent(service -> service.acknowledgeEntity(event.getEntity().getUUID()));
     }
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void stop(ServerStoppingEvent event) { RoomTerminationService.close(event.getServer()); }
+    public static void stop(ServerStoppingEvent event) { RoomTerminationService.close(event.getServer());
+        com.cdp.codpattern.app.match.management.MapDeletionCoordinator.close(event.getServer()); }
 }

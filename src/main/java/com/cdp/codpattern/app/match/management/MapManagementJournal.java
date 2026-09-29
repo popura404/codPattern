@@ -31,6 +31,7 @@ public final class MapManagementJournal {
     public static final class Operation {
         public int version = VERSION;
         public String id;
+        public String deletionId;
         public String kind;
         public String state = "PREPARED";
         public String mode;
@@ -74,7 +75,13 @@ public final class MapManagementJournal {
 
     public Operation prepareDelete(String mode, String name, MapStorageMigration.ArchiveReceipt receipt,
                                    Set<String> retiringTeams) throws IOException {
+        return prepareDelete(mode, name, receipt, retiringTeams, null);
+    }
+
+    public Operation prepareDelete(String mode, String name, MapStorageMigration.ArchiveReceipt receipt,
+                                   Set<String> retiringTeams, UUID deletionId) throws IOException {
         Operation op = base("DELETE", mode, name);
+        op.deletionId = deletionId == null ? null : deletionId.toString();
         op.archiveReceipt = receipt;
         op.retiringTeams = new ArrayList<>(retiringTeams);
         write(op);
@@ -144,7 +151,7 @@ public final class MapManagementJournal {
                 || !Set.of("PREPARED", "COMMITTED", "COMPLETE").contains(op.state)) {
             throw new IOException("Invalid management operation");
         }
-        try { UUID.fromString(op.id); }
+        try { UUID.fromString(op.id); if (op.deletionId != null) UUID.fromString(op.deletionId); }
         catch (IllegalArgumentException failure) { throw new IOException("Invalid management operation ID", failure); }
         if (op.copiedFiles.size() > 512 || op.provisionalTeams.size() > 512 || op.retiringTeams.size() > 512)
             throw new IOException("Management record exceeds resource limit");
@@ -188,7 +195,7 @@ public final class MapManagementJournal {
         if (!op.state.equals("PREPARED")) throw new IOException("Cannot roll back a committed operation");
         if (op.kind.equals("RENAME")) rollbackRename(op);
         else storage.migration().restoreArchive(op.archiveReceipt);
-        finish(op);
+        finish(op, false);
     }
 
     private void rollbackRename(Operation op) throws IOException {
@@ -263,10 +270,11 @@ public final class MapManagementJournal {
                 throw new IOException("Committed delete identities are inconsistent");
         }
         removeTeams(op.retiringTeams);
-        finish(op);
+        finish(op, true);
     }
 
-    private void finish(Operation op) throws IOException {
+    private void finish(Operation op, boolean committed) throws IOException {
+        if (op.deletionId != null) MapDeletionCoordinator.writeReceipt(storage, op, committed);
         op.state = "COMPLETE";
         write(op);
         Files.deleteIfExists(file(op));

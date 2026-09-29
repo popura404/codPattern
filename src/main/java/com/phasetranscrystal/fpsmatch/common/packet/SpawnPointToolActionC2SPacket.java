@@ -523,6 +523,11 @@ public class SpawnPointToolActionC2SPacket {
         }
 
         BaseMap map = snapshot.map().get();
+        if (com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(player.server)
+                .blocks(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(map))) {
+            player.displayClientMessage(Component.translatable("screen.codpattern.map_admin.disabled.deletion_pending"), false);
+            return;
+        }
         BlockPos pos1 = SpawnPointTool.getAreaPos1(stack);
         BlockPos pos2 = SpawnPointTool.getAreaPos2(stack);
         if (pos1 == null || pos2 == null) {
@@ -608,6 +613,11 @@ public class SpawnPointToolActionC2SPacket {
         }
 
         BaseMap map = snapshot.map().get();
+        if (com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(player.server)
+                .blocks(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(map))) {
+            player.displayClientMessage(Component.translatable("screen.codpattern.map_admin.disabled.deletion_pending"), false);
+            return;
+        }
         if (!ModeMapEditorSchemas.supportsDynamicRespawnMerge(map.getGameType())) {
             player.displayClientMessage(Component.translatable(
                     "command.codpattern.map.spawn.merge.unsupported_mode",

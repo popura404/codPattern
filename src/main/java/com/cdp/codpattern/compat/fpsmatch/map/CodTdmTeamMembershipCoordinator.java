@@ -29,6 +29,14 @@ final class CodTdmTeamMembershipCoordinator {
         this.leaveRoomEffects = new CodTdmLeaveRoomEffects(port.serverLevel(), port::mapName);
     }
 
+    void evictRecoveredMember(UUID playerId) {
+        port.clearTransientPlayerState(playerId);
+        port.clearPlayerCombatStats(playerId);
+        port.removePlayerFromVote(playerId);
+        port.clearSpectatorPreferredTeam(playerId);
+        port.clearDisconnected(playerId);
+    }
+
     void leaveRoom(ServerPlayer player) {
         UUID playerId = player.getUUID();
         port.clearTransientPlayerState(playerId);

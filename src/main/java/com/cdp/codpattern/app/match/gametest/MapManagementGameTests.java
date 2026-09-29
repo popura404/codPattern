@@ -226,6 +226,9 @@ public final class MapManagementGameTests {
         var administrator = new net.minecraft.server.level.ServerPlayer(server, helper.getLevel(),
                 new com.mojang.authlib.GameProfile(UUID.randomUUID(), "map-admin")) {
             @Override public boolean hasPermissions(int permission) { return permission <= 2; }
+            @Override public net.minecraft.commands.CommandSourceStack createCommandSourceStack() {
+                return super.createCommandSourceStack().withPermission(2);
+            }
         };
         UUID session = UUID.randomUUID();
         try {
@@ -250,10 +253,10 @@ public final class MapManagementGameTests {
             helper.assertTrue(changedBody.code() == com.cdp.codpattern.network.map.MapAdminResponsePacket.Code.STALE,
                     "request ID reuse cannot select a different operation");
             var delete = com.cdp.codpattern.network.map.MapAdminRequestPacket.delete(session, 3, target,
-                    MapManagementService.revision(server, target));
+                    MapManagementService.revision(server, target), RoomTerminationService.get(server).generation(target));
             var deleted = delete.process(administrator);
             helper.assertTrue(deleted.result().equals("DELETED") && delete.process(administrator).equals(deleted),
-                    "duplicate delete returns original success without a second mutation");
+                    "duplicate delete returns original success without a second mutation: " + deleted);
             helper.succeed();
         } finally {
             core.getMapByTypeWithName("frontline", target.mapName()).ifPresent(value -> {

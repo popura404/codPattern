@@ -244,6 +244,7 @@ public class FPSMCore {
                 event.getServer(), com.cdp.codpattern.config.storage.ServerMapStorage.get(event.getServer()))
                 .recoverAll();
         INSTANCE.fpsmDataManager.readData();
+        com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(event.getServer()).reconcile();
     }
 
     @SubscribeEvent

@@ -16,7 +16,21 @@ public record MapAdminResponsePacket(
         Code code, String result, int offset, int total, int fingerprint, int errorCount,
         List<MapAdminData.ModeRow> modes, List<MapAdminData.MapRow> maps,
         MapAdminData.DetailRow detail, RoomId newRoom, int onlinePending, int offlinePending,
-        int entitiesPending, MapAdminData.TeleportSettings teleportSettings, MapAdminData.EndPoint currentPosition) {
+        int entitiesPending, MapAdminData.TeleportSettings teleportSettings, MapAdminData.EndPoint currentPosition,
+        com.cdp.codpattern.app.match.management.MapDeletionCoordinator.View deletion) {
+    public MapAdminResponsePacket(MapAdminRequestPacket.Operation operation, UUID session, long requestId,
+            Code code, String result, int offset, int total, int fingerprint, int errorCount,
+            List<MapAdminData.ModeRow> modes, List<MapAdminData.MapRow> maps, MapAdminData.DetailRow detail,
+            RoomId newRoom, int onlinePending, int offlinePending, int entitiesPending,
+            MapAdminData.TeleportSettings settings, MapAdminData.EndPoint position) {
+        this(operation, session, requestId, code, result, offset, total, fingerprint, errorCount,
+                modes, maps, detail, newRoom, onlinePending, offlinePending, entitiesPending, settings, position, null);
+    }
+
+    public MapAdminResponsePacket withDeletion(com.cdp.codpattern.app.match.management.MapDeletionCoordinator.View view) {
+        return new MapAdminResponsePacket(operation, session, requestId, code, result, offset, total, fingerprint, errorCount,
+                modes, maps, detail, newRoom, onlinePending, offlinePending, entitiesPending, teleportSettings, currentPosition, view);
+    }
     public MapAdminResponsePacket(MapAdminRequestPacket.Operation operation, UUID session, long requestId,
             Code code, String result, int offset, int total, int fingerprint, int errorCount,
             List<MapAdminData.ModeRow> modes, List<MapAdminData.MapRow> maps, MapAdminData.DetailRow detail,
@@ -98,6 +112,16 @@ public record MapAdminResponsePacket(
         if (teleportSettings != null) teleportSettings.write(buf);
         buf.writeBoolean(currentPosition != null);
         if (currentPosition != null) currentPosition.write(buf);
+        buf.writeBoolean(deletion != null);
+        if (deletion != null) {
+            buf.writeBoolean(deletion.id() != null);
+            if (deletion.id() != null) buf.writeUUID(deletion.id());
+            MapAdminData.writeRoom(buf, deletion.room());
+            buf.writeEnum(deletion.stage());
+            buf.writeUtf(deletion.reason(), 128);
+            buf.writeInt(deletion.members()); buf.writeInt(deletion.spectators());
+            buf.writeInt(deletion.onlinePending()); buf.writeInt(deletion.offlinePending()); buf.writeInt(deletion.entitiesPending());
+        }
     }
 
     public static MapAdminResponsePacket decode(FriendlyByteBuf buf) {
@@ -127,7 +151,15 @@ public record MapAdminResponsePacket(
                 fingerprint, errorCount, modes, maps, detail, newRoom,
                 onlinePending, offlinePending, entitiesPending,
                 buf.readBoolean() ? MapAdminData.TeleportSettings.read(buf) : null,
-                buf.readBoolean() ? MapAdminData.EndPoint.read(buf) : null);
+                buf.readBoolean() ? MapAdminData.EndPoint.read(buf) : null, readDeletion(buf));
+    }
+
+    private static com.cdp.codpattern.app.match.management.MapDeletionCoordinator.View readDeletion(FriendlyByteBuf buf) {
+        if (!buf.readBoolean()) return null;
+        UUID id = buf.readBoolean() ? buf.readUUID() : null;
+        return new com.cdp.codpattern.app.match.management.MapDeletionCoordinator.View(id, MapAdminData.readRoom(buf),
+                buf.readEnum(com.cdp.codpattern.app.match.management.MapDeletionCoordinator.Stage.class), buf.readUtf(128),
+                buf.readInt(), buf.readInt(), buf.readInt(), buf.readInt(), buf.readInt());
     }
 
     public void handle(Supplier<NetworkEvent.Context> context) {

@@ -333,29 +333,15 @@ public final class MapManagementCommand {
             return 0;
         }
 
-        FPSMDataManager.DeleteStatus deleteStatus = deletePersistedMapData(map.getGameType(), map.getMapName());
-        if (deleteStatus == FPSMDataManager.DeleteStatus.FAILED) {
-            source.sendFailure(Component.translatable(
-                    "command.codpattern.map.delete.save_failed",
-                    map.getGameType(),
-                    map.getMapName()));
-            return 0;
-        }
-
-        int removedPlayerCount = removePlayersFromMap(map);
-        map.resetGame();
-        if (!FPSMCore.getInstance().unregisterMap(map)) {
-            source.sendFailure(Component.translatable(
-                    "command.codpattern.map.delete.unregister_failed",
-                    map.getGameType(),
-                    map.getMapName()));
-            return 0;
-        }
-        source.sendSuccess(() -> Component.translatable(
-                "command.codpattern.map.delete.success",
-                map.getGameType(),
-                map.getMapName(),
-                removedPlayerCount), true);
+        var room = com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(map);
+        var service = com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(source.getServer());
+        var view = service.submit(source, room,
+                com.cdp.codpattern.app.match.management.MapManagementService.revision(source.getServer(), room),
+                com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(source.getServer()).generation(room),
+                UUID.randomUUID(), 0);
+        source.sendSuccess(() -> Component.translatable("screen.codpattern.map_admin.deletion_notification", mapName,
+                view.id().toString(), Component.translatable("screen.codpattern.map_admin.deletion." + view.stage().name()),
+                Component.translatable("screen.codpattern.map_admin.deletion_reason." + (view.reason().isEmpty() ? "none" : view.reason()))), false);
         return 1;
     }
 
@@ -405,7 +391,7 @@ public final class MapManagementCommand {
 
     private static int addSpawnPoint(CommandSourceStack source, String rawType, String mapName, String teamName,
             String rawKind, BlockPos pos) {
-        BaseMap map = requireMap(source, rawType, mapName);
+        BaseMap map = requireEditableMap(source, rawType, mapName);
         if (map == null) {
             return 0;
         }
@@ -453,7 +439,7 @@ public final class MapManagementCommand {
 
     private static int removeSpawnPoint(CommandSourceStack source, String rawType, String mapName, String teamName,
             String rawKind, int oneBasedIndex) {
-        BaseMap map = requireMap(source, rawType, mapName);
+        BaseMap map = requireEditableMap(source, rawType, mapName);
         if (map == null) {
             return 0;
         }
@@ -497,7 +483,7 @@ public final class MapManagementCommand {
 
     private static int clearSpawnPoints(CommandSourceStack source, String rawType, String mapName, String teamName,
             String rawKind) {
-        BaseMap map = requireMap(source, rawType, mapName);
+        BaseMap map = requireEditableMap(source, rawType, mapName);
         if (map == null) {
             return 0;
         }
@@ -534,7 +520,7 @@ public final class MapManagementCommand {
     }
 
     private static int mergeDynamicSpawnPoints(CommandSourceStack source, String rawType, String mapName) {
-        BaseMap map = requireMap(source, rawType, mapName);
+        BaseMap map = requireEditableMap(source, rawType, mapName);
         if (map == null) {
             return 0;
         }
@@ -629,7 +615,7 @@ public final class MapManagementCommand {
 
     private static int addAreaLayerArea(CommandSourceStack source, String rawType, String mapName, String rawLayerKey,
             BlockPos from, BlockPos to) {
-        BaseMap map = requireMap(source, rawType, mapName);
+        BaseMap map = requireEditableMap(source, rawType, mapName);
         if (map == null) {
             return 0;
         }
@@ -669,7 +655,7 @@ public final class MapManagementCommand {
 
     private static int removeAreaLayerArea(CommandSourceStack source, String rawType, String mapName, String rawLayerKey,
             int oneBasedIndex) {
-        BaseMap map = requireMap(source, rawType, mapName);
+        BaseMap map = requireEditableMap(source, rawType, mapName);
         if (map == null) {
             return 0;
         }
@@ -699,7 +685,7 @@ public final class MapManagementCommand {
     }
 
     private static int clearAreaLayerAreas(CommandSourceStack source, String rawType, String mapName, String rawLayerKey) {
-        BaseMap map = requireMap(source, rawType, mapName);
+        BaseMap map = requireEditableMap(source, rawType, mapName);
         if (map == null) {
             return 0;
         }
@@ -768,6 +754,13 @@ public final class MapManagementCommand {
                 currentYaw(source),
                 0.0F);
 
+        for (BaseMap map : maps) {
+            if (com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(source.getServer())
+                    .blocks(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(map))) {
+                source.sendFailure(Component.translatable("screen.codpattern.map_admin.disabled.deletion_pending"));
+                return 0;
+            }
+        }
         Map<BaseMap, SpawnPointData> previousPoints = new LinkedHashMap<>();
         List<BaseMap> savedMaps = new ArrayList<>();
         for (BaseMap map : maps) {
@@ -809,6 +802,16 @@ public final class MapManagementCommand {
             return null;
         }
         return type;
+    }
+
+    private static BaseMap requireEditableMap(CommandSourceStack source, String rawType, String mapName) {
+        BaseMap map = requireMap(source, rawType, mapName);
+        if (map != null && com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(source.getServer())
+                .blocks(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(map))) {
+            source.sendFailure(Component.translatable("screen.codpattern.map_admin.disabled.deletion_pending"));
+            return null;
+        }
+        return map;
     }
 
     private static BaseMap requireMap(CommandSourceStack source, String rawType, String mapName) {
@@ -912,27 +915,6 @@ public final class MapManagementCommand {
             return false;
         }
         return true;
-    }
-
-    private static FPSMDataManager.DeleteStatus deletePersistedMapData(String type, String mapName) {
-        FPSMDataManager manager = FPSMCore.getInstance().getFPSMDataManager();
-        return ModeMapPersistenceRegistry.find(type)
-                .map(provider -> provider.delete(mapName, manager))
-                .orElseThrow(() -> new IllegalArgumentException("Unsupported map type: " + type));
-    }
-
-    private static int removePlayersFromMap(BaseMap map) {
-        int removedCount = 0;
-        List<UUID> joinedPlayers = List.copyOf(map.getMapTeams().getJoinedPlayersWithSpec());
-        for (UUID playerId : joinedPlayers) {
-            Optional<ServerPlayer> player = FPSMCore.getInstance().getPlayerByUUID(playerId);
-            if (player.isEmpty()) {
-                continue;
-            }
-            map.leave(player.get());
-            removedCount++;
-        }
-        return removedCount;
     }
 
     private static Optional<ModeMapEditPort> mapEditPort(BaseMap map) {

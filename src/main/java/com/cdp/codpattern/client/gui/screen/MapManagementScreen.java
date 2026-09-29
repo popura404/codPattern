@@ -63,6 +63,11 @@ public final class MapManagementScreen extends Screen {
     private int pendingEntities;
     private int pollTicks;
     private UUID pendingEndGeneration;
+    private com.cdp.codpattern.app.match.management.MapDeletionCoordinator.View deletion;
+    private long pendingDeletionStatus = -1;
+    private long deletionStatusAt;
+    private int deletionPollTicks;
+    private MapAdminRequestPacket pendingDeleteRequest;
     private boolean initialized;
     private boolean loadingList;
     private boolean loadingDetail;
@@ -136,7 +141,7 @@ public final class MapManagementScreen extends Screen {
         int actionWidth = Math.max(31, (rightWidth - 16 - gap * 2) / 3);
         int actionY = panelBottom - 25;
         saveButton = addRenderableWidget(Button.builder(Component.translatable(KEY + "save"),
-                button -> rename()).bounds(rightX + 8, actionY, actionWidth, 20).build());
+                button -> { if (hasDeletion()) retryDeletion(); else rename(); }).bounds(rightX + 8, actionY, actionWidth, 20).build());
         deleteButton = addRenderableWidget(Button.builder(Component.translatable(KEY + "delete"),
                 button -> confirmDelete()).bounds(rightX + 8 + actionWidth + gap, actionY, actionWidth, 20).build());
         endButton = addRenderableWidget(Button.builder(Component.translatable(KEY + "force_end"),
@@ -155,7 +160,10 @@ public final class MapManagementScreen extends Screen {
         super.tick();
         if (nameField != null) nameField.tick();
         if (pendingAction >= 0 && System.currentTimeMillis() - pendingStartedAt > 15_000L) {
-            pendingAction = -1;
+            if (pendingDeleteRequest != null) {
+                pendingStartedAt = System.currentTimeMillis();
+                send(pendingDeleteRequest); // same authorized request; resolve an unknown outcome
+            } else pendingAction = -1;
             statusKey = "request_timeout";
             actionResult = "";
             updateButtons();
@@ -172,6 +180,14 @@ public final class MapManagementScreen extends Screen {
             pendingStatus = -1;
             pendingEndGeneration = null;
             statusKey = "request_timeout";
+        }
+        if (pendingDeletionStatus >= 0 && System.currentTimeMillis() - deletionStatusAt > 15_000L)
+            pendingDeletionStatus = -1;
+        if (hasDeletion() && selected != null && pendingDeletionStatus < 0 && pendingAction < 0 && ++deletionPollTicks >= 40) {
+            deletionPollTicks = 0;
+            pendingDeletionStatus = nextRequest(); deletionStatusAt = System.currentTimeMillis();
+            send(MapAdminRequestPacket.deletionControl(MapAdminRequestPacket.Operation.DELETE_STATUS,
+                    session, pendingDeletionStatus, selected, deletion.id(), ""));
         }
         if (pendingEndGeneration != null && selected != null && pendingStatus < 0 && pendingAction < 0) {
             if (++pollTicks >= 60) {
@@ -279,6 +295,9 @@ public final class MapManagementScreen extends Screen {
         List<Component> lines = new ArrayList<>();
         MapAdminData.MapRow row = detail.summary();
         lines.add(Component.translatable(KEY + "mode", modeName(row.modeNameKey(), row.roomId().gameType())));
+        if (detail.revision().isEmpty() && hasDeletion()) {
+            lines.add(Component.translatable(KEY + "map_unavailable"));
+        } else {
         lines.add(Component.translatable(KEY + "dimension", detail.dimensionId()));
         lines.add(Component.translatable(KEY + "lifecycle", Component.translatable(detail.lifecycleStateKey())));
         lines.add(Component.translatable(KEY + "status", Component.translatable(KEY + "status." + row.status())));
@@ -295,8 +314,18 @@ public final class MapManagementScreen extends Screen {
             lines.add(Component.translatable(KEY + "end_dimension", point.dimensionId()));
             lines.add(Component.translatable(KEY + "end_orientation", point.yaw(), point.pitch()));
         }
+        }
         if (pendingEndGeneration != null) {
             lines.add(Component.translatable(KEY + "pending_counts", pendingOnline, pendingOffline, pendingEntities));
+        }
+        if (deletion != null) {
+            lines.add(Component.translatable(KEY + "deletion_counts", deletion.members() - deletion.spectators(), deletion.spectators()));
+            if (hasDeletion()) {
+                lines.add(Component.translatable(KEY + "deletion." + deletion.stage().name()));
+                lines.add(Component.translatable(KEY + "deletion_reason." + (deletion.reason().isEmpty() ? "none" : deletion.reason())));
+                lines.add(Component.translatable(KEY + "pending_counts", deletion.onlinePending(), deletion.offlinePending(), deletion.entitiesPending()));
+                lines.add(Component.literal(deletion.id().toString()));
+            }
         }
         if (partialErrors > 0) lines.add(Component.translatable(KEY + "partial", partialErrors));
         return lines;
@@ -377,7 +406,8 @@ public final class MapManagementScreen extends Screen {
         switch (response.operation()) {
             case LIST -> acceptList(response);
             case DETAIL -> acceptDetail(response);
-            case RENAME, DELETE, FORCE_END -> acceptAction(response);
+            case RENAME, FORCE_END -> acceptAction(response);
+            case DELETE, DELETE_RETRY, DELETE_CANCEL, DELETE_STATUS -> acceptDeletion(response);
             case END_STATUS -> acceptEndStatus(response);
         }
     }
@@ -442,11 +472,53 @@ public final class MapManagementScreen extends Screen {
             return;
         }
         detail = response.detail();
+        deletion = response.deletion();
         if (!preserveDraft) draftName = selected.mapName();
         preserveDraft = false;
         nameField.setValue(draftName);
         detailScroll = 0;
         updateButtons();
+    }
+
+    private boolean hasDeletion() { return deletion != null && deletion.id() != null; }
+
+    private void acceptDeletion(MapAdminResponsePacket response) {
+        boolean status = response.operation() == MapAdminRequestPacket.Operation.DELETE_STATUS;
+        if ((status ? pendingDeletionStatus : pendingAction) != response.requestId()) return;
+        if (status) pendingDeletionStatus = -1;
+        else { pendingAction = -1; pendingDeleteRequest = null; }
+        if (response.code() != MapAdminResponsePacket.Code.OK) {
+            statusKey = errorKey(response); actionResult = ""; requestDetail(); updateButtons(); return;
+        }
+        deletion = response.deletion();
+        if (deletion != null && deletion.stage() == com.cdp.codpattern.app.match.management.MapDeletionCoordinator.Stage.DELETED) {
+            deletion = null; selected = null; detail = null; draftName = "";
+            actionResult = "DELETED"; requestList();
+        } else if (deletion == null || deletion.stage() == com.cdp.codpattern.app.match.management.MapDeletionCoordinator.Stage.CANCELLED) {
+            deletion = null; actionResult = "CANCELLED"; requestList();
+        } else {
+            actionResult = ""; statusKey = "deletion." + deletion.stage().name();
+            if (!status) requestDetail();
+        }
+        updateButtons();
+    }
+
+    private void retryDeletion() {
+        if (!hasDeletion() || detail == null) return;
+        confirm(Component.translatable(KEY + "confirm_delete_title"),
+                Component.translatable(KEY + "confirm_delete_occupied", selected.mapName(),
+                        modeName(detail.summary().modeNameKey(), selected.gameType()),
+                        deletion.members() - deletion.spectators(), deletion.spectators(),
+                        deletion.onlinePending() + deletion.offlinePending()),
+                () -> sendDeletionControl(MapAdminRequestPacket.Operation.DELETE_RETRY));
+    }
+
+    private void sendDeletionControl(MapAdminRequestPacket.Operation operation) {
+        if (!hasDeletion() || detail == null || pendingAction >= 0) return;
+        pendingAction = nextRequest(); pendingStartedAt = System.currentTimeMillis();
+        pendingDeleteRequest = MapAdminRequestPacket.deletionControl(operation, session, pendingAction,
+                selected, deletion.id(), detail.revision());
+        send(pendingDeleteRequest); updateButtons();
     }
 
     private void acceptAction(MapAdminResponsePacket response) {
@@ -518,6 +590,7 @@ public final class MapManagementScreen extends Screen {
 
     private void select(RoomId room) {
         selected = room;
+        deletion = null; pendingDeletionStatus = -1;
         detail = null;
         draftName = room.mapName();
         pendingEndGeneration = null;
@@ -553,17 +626,25 @@ public final class MapManagementScreen extends Screen {
     }
 
     private void confirmDelete() {
-        if (detail == null || pendingAction >= 0 || !detail.summary().canDelete()) return;
+        if (detail == null || pendingAction >= 0) return;
+        if (hasDeletion()) {
+            confirm(Component.translatable(KEY + "cancel_deletion"), Component.translatable(KEY + "confirm_cancel_deletion"),
+                    () -> sendDeletionControl(MapAdminRequestPacket.Operation.DELETE_CANCEL));
+            return;
+        }
+        if (!detail.summary().canDelete()) return;
         RoomId target = selected;
         String revision = detail.revision();
-        confirm(Component.translatable(KEY + "confirm_delete_title"),
-                Component.translatable(KEY + "confirm_delete", target.mapName(), modeName(detail.summary().modeNameKey(), target.gameType())),
-                () -> {
-                    pendingAction = nextRequest();
-                    pendingStartedAt = System.currentTimeMillis();
-                    send(MapAdminRequestPacket.delete(session, pendingAction, target, revision));
-                    updateButtons();
-                });
+        UUID generation = detail.generation();
+        Component message = Component.translatable(KEY + "confirm_delete_occupied", target.mapName(),
+                modeName(detail.summary().modeNameKey(), target.gameType()),
+                deletion == null ? 0 : deletion.members() - deletion.spectators(), deletion == null ? 0 : deletion.spectators(),
+                deletion == null ? 0 : deletion.onlinePending() + deletion.offlinePending());
+        confirm(Component.translatable(KEY + "confirm_delete_title"), message, () -> {
+            pendingAction = nextRequest(); pendingStartedAt = System.currentTimeMillis();
+            pendingDeleteRequest = MapAdminRequestPacket.delete(session, pendingAction, target, revision, generation);
+            send(pendingDeleteRequest); updateButtons();
+        });
     }
 
     private void confirmForceEnd() {
@@ -634,13 +715,18 @@ public final class MapManagementScreen extends Screen {
         if (nameField == null || saveButton == null) return;
         boolean ready = detail != null && selected != null && detail.summary().roomId().equals(selected)
                 && pendingAction < 0 && !loadingList && !loadingDetail;
-        nameField.setEditable(ready && detail.summary().canRename());
-        saveButton.active = ready && detail.summary().canRename() && nameValidation().valid();
-        deleteButton.active = ready && detail.summary().canDelete();
-        endButton.active = ready && !detail.summary().disabledReason().equals("management_pending");
+        boolean deleting = hasDeletion();
+        boolean controllable = deleting && deletion.stage() != com.cdp.codpattern.app.match.management.MapDeletionCoordinator.Stage.DELETING;
+        nameField.setEditable(ready && !deleting && detail.summary().canRename());
+        saveButton.setMessage(Component.translatable(KEY + (deleting ? "retry_deletion" : "save")));
+        deleteButton.setMessage(Component.translatable(KEY + (deleting ? "cancel_deletion" : "delete")));
+        saveButton.active = ready && (deleting ? controllable && !detail.revision().isEmpty()
+                : detail.summary().canRename() && nameValidation().valid());
+        deleteButton.active = ready && (deleting ? controllable : detail.summary().canDelete());
+        endButton.active = ready && !deleting && !detail.summary().disabledReason().equals("management_pending");
         endButton.setTooltip(detail != null && detail.summary().disabledReason().equals("management_pending")
                 ? Tooltip.create(Component.translatable(KEY + "disabled.management_pending")) : null);
-        teleportButton.active = ready;
+        teleportButton.active = ready && !deleting && !detail.revision().isEmpty();
         globalSettingsButton.active = pendingAction < 0 && !loadingList;
         modeButton.active = pendingAction < 0 && !loadingList;
         refreshButton.active = pendingAction < 0 && !loadingList;
@@ -648,10 +734,10 @@ public final class MapManagementScreen extends Screen {
         String disabled = detail == null ? "loading_detail" : detail.summary().disabledReason();
         saveButton.setTooltip(null);
         deleteButton.setTooltip(null);
-        if (!disabled.isEmpty()) {
+        if (!disabled.isEmpty() && !deleting) {
             Component tip = Component.translatable(KEY + "disabled." + disabled);
             saveButton.setTooltip(Tooltip.create(tip));
-            deleteButton.setTooltip(Tooltip.create(tip));
+            if (!deleteButton.active) deleteButton.setTooltip(Tooltip.create(tip));
         } else if (nameHint() != null) {
             saveButton.setTooltip(Tooltip.create(nameHint()));
         }

@@ -100,6 +100,9 @@ public final class ServerMapStorage {
 
     public void requireCreate(String mode, String name) {
         requireAvailable(mode);
+        if (com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(server)
+                .blocks(com.cdp.codpattern.app.match.model.RoomId.of(mode, name)))
+            throw new IllegalStateException("Map deletion is pending");
         if (managementReserved(mode)) throw new IllegalStateException("Map management is in progress");
         MapStorageRegistration registration = migration.registration(mode);
         MapStoragePaths.mapDirectory(name);

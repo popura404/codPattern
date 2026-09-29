@@ -33,7 +33,7 @@ public record MapAdminRequestPacket(Operation operation, UUID session, long requ
             = new java.util.WeakHashMap<>();
 
     public enum Operation { LIST, DETAIL, RENAME, DELETE, FORCE_END, END_STATUS,
-        DEFAULTS, END_POINT_DETAIL, CURRENT_POSITION, SAVE_DEFAULTS, SAVE_END_POINT }
+        DEFAULTS, END_POINT_DETAIL, CURRENT_POSITION, SAVE_DEFAULTS, SAVE_END_POINT, DELETE_STATUS, DELETE_RETRY, DELETE_CANCEL }
 
     public MapAdminRequestPacket(Operation operation, UUID session, long requestId, int offset,
                                  int fingerprint, RoomId room, String revision, String name, UUID generation) {
@@ -71,9 +71,14 @@ public record MapAdminRequestPacket(Operation operation, UUID session, long requ
                 room, revision, newName, null);
     }
 
-    public static MapAdminRequestPacket delete(UUID session, long requestId, RoomId room, String revision) {
+    public static MapAdminRequestPacket delete(UUID session, long requestId, RoomId room, String revision, UUID generation) {
         return new MapAdminRequestPacket(Operation.DELETE, session, requestId, 0, 0,
-                room, revision, "", null);
+                room, revision, "", generation);
+    }
+
+    public static MapAdminRequestPacket deletionControl(Operation operation, UUID session, long requestId,
+                                                          RoomId room, UUID id, String revision) {
+        return new MapAdminRequestPacket(operation, session, requestId, 0, 0, room, revision, "", id);
     }
 
     public static MapAdminRequestPacket forceEnd(UUID session, long requestId, RoomId room, UUID generation) {
@@ -139,6 +144,8 @@ public record MapAdminRequestPacket(Operation operation, UUID session, long requ
             } catch (com.cdp.codpattern.config.storage.MapDefaultsStore.Unavailable failure) {
                 LOGGER.warn("Map defaults unavailable for administrator request {}", operation, failure);
                 response = MapAdminResponsePacket.status(this, MapAdminResponsePacket.Code.ERROR, "defaults_unavailable");
+            } catch (com.cdp.codpattern.app.match.management.MapDeletionCoordinator.Stale failure) {
+                response = MapAdminResponsePacket.status(this, MapAdminResponsePacket.Code.STALE, "stale_request");
             } catch (SecurityException failure) {
                 response = MapAdminResponsePacket.status(this, MapAdminResponsePacket.Code.DENIED, "permission");
             } catch (IllegalArgumentException failure) {
@@ -162,8 +169,12 @@ public record MapAdminRequestPacket(Operation operation, UUID session, long requ
         RequestKey key = new RequestKey(player.getUUID(), session, requestId);
         Cached previous = cache.get(key);
         if (previous != null) {
-            return previous.request().equals(this) ? previous.response()
-                    : MapAdminResponsePacket.status(this, MapAdminResponsePacket.Code.STALE, "stale_request");
+            if (!previous.request().equals(this))
+                return MapAdminResponsePacket.status(this, MapAdminResponsePacket.Code.STALE, "stale_request");
+            if (operation == Operation.DELETE && previous.response().deletion() != null)
+                return deletionReport(com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(player.server)
+                        .find(player.createCommandSourceStack(), requireRoom(), previous.response().deletion().id()));
+            return previous.response();
         }
         MapAdminResponsePacket response = execute(player);
         if (cache.size() >= 256) cache.remove(cache.keySet().iterator().next());
@@ -191,11 +202,18 @@ public record MapAdminRequestPacket(Operation operation, UUID session, long requ
             }
             case LIST -> listPage(player);
             case DETAIL -> MapManagementService.detail(player.server, requireRoom())
-                    .map(detail -> MapAdminResponsePacket.detail(this, MapAdminData.DetailRow.from(detail)))
+                    .map(detail -> MapAdminResponsePacket.detail(this, MapAdminData.DetailRow.from(detail))
+                            .withDeletion(com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(player.server)
+                                    .preview(player.createCommandSourceStack(), requireRoom())))
                     .orElseGet(() -> MapAdminResponsePacket.status(this,
                             MapAdminResponsePacket.Code.MISSING, "map_missing"));
             case RENAME -> mutation(MapMutationService.rename(player.server, requireRoom(), expectedRevision, newName));
-            case DELETE -> mutation(MapMutationService.delete(player.server, requireRoom(), expectedRevision));
+            case DELETE -> deletionReport(com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(player.server)
+                    .submit(player.createCommandSourceStack(), requireRoom(), expectedRevision, requireGeneration(), session, requestId));
+            case DELETE_STATUS -> deletionReport(com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(player.server)
+                    .find(player.createCommandSourceStack(), requireRoom(), generation));
+            case DELETE_RETRY, DELETE_CANCEL -> deletionReport(com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(player.server)
+                    .control(player.createCommandSourceStack(), requireRoom(), requireGeneration(), operation == Operation.DELETE_CANCEL, expectedRevision));
             case FORCE_END -> {
                 RoomId target = requireRoom();
                 if (!MapManagementService.isRegistered(player.server, target)) {
@@ -216,6 +234,11 @@ public record MapAdminRequestPacket(Operation operation, UUID session, long requ
                 yield endReport(player, service.status(target));
             }
         };
+    }
+
+    private MapAdminResponsePacket deletionReport(com.cdp.codpattern.app.match.management.MapDeletionCoordinator.View view) {
+        return MapAdminResponsePacket.status(this, MapAdminResponsePacket.Code.OK,
+                view == null ? "NO_DELETION" : view.stage().name()).withDeletion(view);
     }
 
     private MapAdminResponsePacket listPage(ServerPlayer player) {

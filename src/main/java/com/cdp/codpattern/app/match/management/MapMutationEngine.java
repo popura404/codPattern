@@ -38,11 +38,16 @@ final class MapMutationEngine {
         String normalized;
         try { normalized = normalizeName(name); }
         catch (IllegalArgumentException invalid) { return result(Outcome.INVALID_NAME, room, room, invalid.getMessage()); }
-        return mutate(server, room, revision, normalized);
+        return mutate(server, room, revision, normalized, null);
     }
 
     static Result delete(MinecraftServer server, RoomId room, String revision) {
-        return mutate(server, room, revision, null);
+        return mutate(server, room, revision, null, null);
+    }
+
+    static Result deleteCoordinated(MinecraftServer server, RoomId room, String revision, java.util.UUID operation) {
+        if (!MapDeletionCoordinator.get(server).finalizing(room, operation)) throw new SecurityException("Invalid deletion owner");
+        return mutate(server, room, revision, null, operation);
     }
 
     static String normalizeName(String name) {
@@ -51,7 +56,7 @@ final class MapMutationEngine {
         return validation.normalized();
     }
 
-    private static Result mutate(MinecraftServer server, RoomId requested, String revision, String newName) {
+    private static Result mutate(MinecraftServer server, RoomId requested, String revision, String newName, java.util.UUID deletionId) {
         if (!server.isSameThread()) throw new IllegalStateException("Map mutations require the server thread");
         if (requested == null || !FPSMCore.initialized()) return result(Outcome.NOT_FOUND, requested, requested, "Unknown map");
         RoomId room = RoomId.of(GameModeRegistry.canonicalize(requested.gameType()), requested.mapName());
@@ -125,7 +130,7 @@ final class MapMutationEngine {
                     } else {
                         var receipt = storage.migration().prepareArchive(room.gameType(), room.mapName());
                         operation = journal.prepareDelete(room.gameType(), room.mapName(), receipt,
-                                original.getMapTeams().createdScoreboardTeamNames());
+                                original.getMapTeams().createdScoreboardTeamNames(), deletionId);
                         storage.migration().archive(receipt);
                         if (!core.unregisterMap(original)) throw new IllegalStateException("Original registration changed");
                         changedRegistration = true;
