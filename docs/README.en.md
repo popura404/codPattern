@@ -1,152 +1,164 @@
 # COD Pattern
 
-> Storage paths below were updated for `0.8.3b`. See [map storage and explicit OP migration](map-storage-operations.md) before upgrading an existing save.
+[Repository README](../README.md) | [中文文档](README.md) | [Detailed Guide (Chinese)](GUIDE.md) | [Q&A (Chinese)](QANDA.md) | [Changelog](CHANGES.md)
 
-
-[Repository README](../README.md) | [中文文档](README.md) | [Detailed Guide](GUIDE.md) | [Q&A (Chinese)](QANDA.md) | [Changelog](CHANGES.md)
-
-> Release status: Beta. This documentation currently covers `0.6.10b`. Validate in a staging environment before production rollout, and back up the world save, `serverconfig/codpattern/`, and `fpsmatch/` first.
+> Release status: Beta. This document covers `0.8.6b`. Before upgrading an existing world, back up the world save and the game directory's `fpsmatch/` folder. See [GUIDE.md](GUIDE.md) for migration steps.
 
 ## Overview
 
-COD Pattern is built around **TaCZ + an embedded FPSM-compatible core**, providing a COD-like workflow for:
+COD Pattern is a Forge mod built around **TaCZ + an embedded FPSM-compatible core**, providing COD-style loadout presets, weapon refit, room management, and team combat.
 
-- Loadout presets and respawn equipment distribution
-- In-match weapon refit with attachment preset persistence
-- `frontline / teamdeathmatch` maps, rooms, and match flow
-- Localized UI and system messages (`zh_cn / zh_tw / en_us / ja_jp`)
+The main mod independently provides `frontline` (FTL) and `teamdeathmatch` (TDM). Zombies is a separate addon: its gameplay implementation is not bundled with the main mod, and the main mod can start without it. When installed, the addon registers its mode with the shared entry points.
 
-The project uses a server-authoritative design. Loadouts, filters, room state, and match phases are decided on the server and synchronized to clients.
+Loadouts, weapon filters, room state, map edits, and match phases are validated on the server and synchronized to clients. The mod includes Simplified Chinese, Traditional Chinese, English, and Japanese language resources.
 
 ## Main Features
 
 ### Loadout Management and Equipment Distribution
 
-- Supports create / clone / rename / delete / select operations, up to `10` loadouts per player.
-- Each loadout has four fixed slots: `primary / secondary / tactical / lethal`.
-- New players automatically receive `3` default loadouts on first login.
-- The selected loadout is distributed automatically on respawn.
-- Normal auto-distribution only applies to players already joined to a room or match.
-- Admins can force distribution with `/cdp distribute [target]`.
+- Create, clone, rename, delete, and select loadouts, with up to `10` per player.
+- Players receive `3` default loadouts when their loadout data is first initialized.
+- Each loadout stores four equipment categories: `primary / secondary / tactical / lethal`.
+- Room equipment distribution and respawn supplies use the selected loadout; individual modes can provide their own distribution rules.
+- Administrators can force distribution with `/cdp distribute [target]`. Omitting the target applies it to all online players.
+- Without LR Tactical, related melee options, throwable candidates, dedicated throwable slots, and default throwable distribution are disabled automatically. With LR installed, throwables remain subject to the server's filter setting.
 
 ### Weapon Selection, Filtering, and Refit
 
-- Slot updates are validated server-side for slot name, item id, NBT, category, and blacklist rules.
-- Attachment refit is limited to `primary` / `secondary` and saved back into `attachmentPreset`.
-- Attachment blacklist rules apply to candidate listing, installed attachment cleanup, and save-time blocking.
-- TaCZ native refit UI is globally disabled and redirected to the COD Pattern backpack flow.
+- The server validates equipment slots, item IDs, NBT, weapon categories, and blacklists.
+- Primary and secondary weapons support attachment refit. Presets are saved with the loadout in `attachmentPreset`.
+- Attachment blacklists apply to candidate lists, installed attachment cleanup, and save validation.
+- TaCZ's native refit screen is disabled; use COD Pattern's loadout refit screen instead.
+- Attachment candidates combine attachments held by the player with compatible `tacz-addon` candidates. The server makes the final installation decision.
 
-### Rooms, Maps, and Match Flow
+### Rooms and Match Flow
 
-- Adds a unified room entry to the pause menu.
-- Supports both `frontline` and `teamdeathmatch`.
-- Supports map area creation, `INITIAL / DYNAMIC_CANDIDATE` spawn-point setup, dynamic candidate merging, match-end teleport setup, and persistence.
-- Room joining is only allowed during the `WAITING` phase.
-- Supports ready state, start vote, end vote, phase transitions, and room-list synchronization.
-- `teamdeathmatch` includes dynamic respawn candidate merging, looser spawn safety checks, and warnings for missing or unusable match-end teleports.
-- Includes kill feed, score display, death cam, respawn invincibility, combat regen, ally/enemy highlights, world-space enemy health bars, and result pages.
+- The pause menu provides a room entry for browsing maps, joining rooms, choosing a team, and readying up.
+- FTL/TDM rooms accept joins only during `WAITING`, with start votes, end votes, and synchronized match phases.
+- FTL and TDM use their respective respawn rules. TDM supports dynamic candidate spawn points and candidate merging.
+- Features include warmup, a pre-game countdown, scores and kill feed, death cam, respawn invincibility, combat regeneration, ally/enemy highlights, world-space enemy health bars, and a results screen.
+- Before a start vote, the room checks that an end point is configured. An unusable destination produces a failure message when the teleport is attempted.
+- Force End restores players and cleans up mode resources. Rooms with unfinished recovery show the corresponding status.
 
-### Persistence, Compatibility, and Localization
+### Map Creation and Management
 
-- Loadouts are stored in `serverconfig/codpattern/backpack_rules/backpack_config.json`
-- Weapon filters are stored in `serverconfig/codpattern/backpack_rules/weapon_filter.json`
-- TDM config is stored in `serverconfig/codpattern/maps/builtin/rules/config.json`
-- Map data is stored under `<world save>/serverconfig/codpattern/maps/`
-- Optional integrations: LR Tactical 0.3.0+, Physics Mod, and `tacz-addon 1.1.6`
-- Without LR Tactical, COD Pattern disables LR melee, throwable selection, dedicated throwable slots, and default throwable distribution. With it installed, those features are available.
-- Bundles `zh_cn / zh_tw / en_us / ja_jp` language resources
+- The Map Creator Tool selects a region and creates FTL/TDM maps.
+- The Spawn Point Tool shows the point and area layers supported by each mode, with previews, adding, deleting, clearing, and dynamic candidate merging.
+- The Map Management Tool provides filtered lists, dimensions and bounds, status, renaming, end-point settings, Force End, and deletion.
+- Renaming requires an idle map with its recovery completed. It validates names and conflicts, then updates the map identity and storage directory.
+- Deletion first ends the match, restores and removes members and spectators, then archives the map directory and unregisters the map after cleanup. Pending recovery retains the map; its progress, retry, and cancellation are available in Map Management.
+- A map's end point, the global default for future maps, and the command that updates existing maps have separate scopes. Changing the global default does not overwrite existing maps.
 
-## Commands and Entrypoints
+## Commands and Entry Points
+
+Permission levels below are server command permission levels. In-game map tools require level `2`; end-point settings in Map Management also require level `2`.
 
 ### `/cdp`
 
-- `/cdp test`: Prints a test message.
-- `/cdp screen`: Opens the backpack UI.
-- `/cdp update`: Reloads weapon-filter configuration and syncs backpack and filter data to online players.
-- `/cdp distribute [target]`: Forces equipment distribution.
-- `/cdp mode debug room|entities|clear_entities|state|areas ...`: Inspects mode state or clears owned entities; provide the room or mode/map arguments required by the subcommand.
+| Command | Permission | Purpose |
+|---|---:|---|
+| `/cdp test` | No additional restriction | Shows a test message to the executing player |
+| `/cdp screen` | No additional restriction | Opens the executing player's loadout screen |
+| `/cdp update` | `2` | Reloads weapon filters and synchronizes filters and loadout data to online players |
+| `/cdp distribute [target]` | `2` | Forces loadout distribution; omitting the target applies it to all online players |
+| `/cdp mode debug room` | `2` | Shows the executing player's current room |
+| `/cdp mode debug entities <room>` | `2` | Inspects entities owned by a room |
+| `/cdp mode debug clear_entities <room>` | `2` | Clears entities owned by a room |
+| `/cdp mode debug state <room>` | `2` | Inspects mode runtime state; player execution only |
+| `/cdp mode debug areas <type> <map>` | `2` | Inspects a map's area layers |
+
+`<room>` uses `mode|map`, passed as a quoted argument, for example `"frontline|arena"`. Use double quotes around map names as well, such as `"训练场"` or `"Training Arena"`, to avoid argument parsing errors with non-ASCII characters, spaces, or special characters. Equipment distribution clears and rebuilds the recipient's inventory; spectators are skipped.
 
 ### `/cdp map`
 
-- `/cdp map list [type]`: Lists registered types or maps under a type.
-- `/cdp map delete <type> <name>`: Submits map deletion. The server ends the match, recovers and removes members and spectators, then archives the map directory and unregisters it after cleanup completes. Pending recovery retains the map; use Map Management to inspect progress, retry, or cancel.
-- `/cdp map endtp show <map>`: Shows a map's match-end teleport point.
-- `/cdp map endtp set`: Uses the executor's current position and yaw to overwrite the end point of every existing map that supports it.
-- `/cdp map migrate check|confirm`: Run `check` to inspect legacy map storage, then `confirm` to approve migration.
+| Command | Permission | Purpose |
+|---|---:|---|
+| `/cdp map list [type]` | `2` | Lists registered modes or maps in a specified mode |
+| `/cdp map delete <type> <map>` | `2` | Submits map deletion; recovery and cleanup progress are shown in Map Management |
+| `/cdp map endtp show <map>` | `3` | Shows a map's end point; identical names across modes produce an ambiguity message |
+| `/cdp map endtp set` | `3` | Overwrites all supported existing maps' end points with the executor's position, dimension, and horizontal facing |
+| `/cdp map migrate check` | `4` | Inspects legacy storage and lists the migration plan and conflicts |
+| `/cdp map migrate confirm` | `4` | Inspects again and migrates eligible units; restart afterward |
+
+`endtp set` does not set the global default. Use Map Management to configure a default for future maps.
 
 ### Force End and Map Tools
 
-- `/roomforceend <mode> <map>`: Ends the match and recovers players while retaining room membership. Map Management also provides Force End.
-- Create FTL/TDM maps with the Map Creator Tool (`codpattern:map_creator_tool`). Select two corners, then use `Ctrl + right-click` to open its creation screen. Zombies uses the addon's deployment tool.
-- Use the Spawn Point Tool (`codpattern:spawn_point_tool`) to view, add, remove, or clear spawn points and areas. Select the map, team, and point or area layer in its screen. Modes with dynamic spawns also support merging candidates.
-- Creation, spawn editing, and area editing now use these tools; their former commands are no longer registered.
+- `/roomforceend <mode> <map>`: Requires permission level `2`; ends a match and restores players while retaining room membership. Map Management also provides this action.
+- `codpattern:map_management_tool`: Right-click to open Map Management.
+- `codpattern:map_creator_tool`: Left-click and right-click to select the two corners. Use `Ctrl + right-click` to open the creation screen, choose a mode, and enter a map name.
+- `codpattern:spawn_point_tool`: Use `Ctrl + right-click` to open its settings, then select the map, team, and available point or area layer.
+- Map creation, spawn editing, and area editing use tools; the former commands have been removed. Zombies map deployment uses tools supplied by the addon.
 
 ## Configuration and Directories
 
-### `backpack_rules/backpack_config.json`
+All paths below are relative to the current world directory, not the game directory.
 
-- Stores per-player loadouts, selected loadout id, and slot item data.
-- Attachment presets are embedded directly on each slot via `attachmentPreset`.
+### `serverconfig/codpattern/backpack_rules/`
 
-### `backpack_rules/weapon_filter.json`
+- `backpack_config.json`: Player loadouts, the selected loadout, and slot item data. Attachment presets are stored in each slot's `attachmentPreset`.
+- `weapon_filter.json`: Weapon categories, item and attachment blacklists, throwable enablement, and the ammo multiplier.
 
-- Controls weapon categories, blacklists, throwable enablement, and ammo multiplier.
-- Main fields:
-  - `primaryWeaponTabs`
-  - `secondaryWeaponTabs`
-  - `blockedItemNamespaces`
-  - `blockedWeaponIds`
-  - `blockedAttachmentNamespaces`
-  - `blockedAttachmentIds`
-  - `throwablesEnabled`
-  - `ammunitionPerMagazineMultiple`
+The main filter fields are `primaryWeaponTabs`, `secondaryWeaponTabs`, `blockedItemNamespaces`, `blockedWeaponIds`, `blockedAttachmentNamespaces`, `blockedAttachmentIds`, `throwablesEnabled`, and `ammunitionPerMagazineMultiple`. Use `/cdp update` to reload and synchronize filters after editing. It is not a general configuration reload command, and synchronizes cached loadout data rather than reloading `backpack_config.json` from disk.
 
-### `maps/builtin/rules/config.json`
+### `serverconfig/codpattern/maps/`
 
-These are the actual default fields in the current code:
+| Path | Contents |
+|---|---|
+| `defaults.json` | Global end-point default for future maps |
+| `builtin/rules/config.json` | Shared FTL/TDM match configuration |
+| `builtin/frontline/m-<encoded>/map.json` | FTL map definition |
+| `builtin/teamdeathmatch/m-<encoded>/map.json` | TDM map definition |
+| `builtin/frontline/records/` | FTL match exports |
+| `builtin/teamdeathmatch/records/` | TDM match exports |
+| `.storage/` | Migration records, management operation records, and archives |
+
+The encoded directory suffix is the hexadecimal representation of the map name's UTF-8 bytes. Use Map Management to rename maps. Addon map and rule directories are registered by their respective modes; not every mode uses `builtin/`.
+
+Legacy `fpsmatch/` maps and `serverconfig/codpattern/tdm_rules/config.json` are transferred through the migration flow. Back up first, then run `check` to inspect sources, destinations, and conflicts. Run `confirm` once affected rooms are empty and their matches have ended. Affected modes remain locked until the server restarts or the single-player world is reopened. See [GUIDE.md](GUIDE.md) for recovery details.
+
+### FTL/TDM Match Configuration
+
+The table lists code defaults for active settings in `builtin/rules/config.json`. Fields ending in `Ticks` use game ticks. The retained `warmupTimeTicks`, `preGameCountdownTicks`, and `blackoutStartTicks` fields do not currently control the corresponding PvP phase timings; see [GUIDE.md](GUIDE.md).
 
 | Field | Default | Description |
 |---|---:|---|
 | `timeLimitSeconds` | `420` | Playing-phase duration in seconds |
 | `scoreLimit` | `75` | Kill score cap |
-| `invincibilityTicks` | `30` | Respawn invincibility ticks |
-| `respawnDelayTicks` | `40` | Respawn delay ticks |
-| `warmupTimeTicks` | `400` | Warmup duration ticks |
-| `preGameCountdownTicks` | `200` | Pre-game countdown ticks |
-| `blackoutStartTicks` | `60` | End-of-countdown blackout ticks |
-| `deathCamTicks` | `30` | Death-cam duration ticks |
-| `minPlayersToStart` | `1` | Minimum players before start vote |
-| `votePercentageToStart` | `60` | Start-vote threshold |
-| `votePercentageToEnd` | `75` | End-vote threshold |
-| `combatRegenDelayTicks` | `120` | Delay before regen starts after damage |
+| `invincibilityTicks` | `30` | Respawn invincibility duration |
+| `respawnDelayTicks` | `40` | Respawn delay |
+| `deathCamTicks` | `30` | Death-cam duration |
+| `minPlayersToStart` | `1` | Minimum players for a start vote; the current default is intended for testing |
+| `votePercentageToStart` | `60` | Start-vote percentage threshold |
+| `votePercentageToEnd` | `75` | End-vote percentage threshold |
+| `combatRegenDelayTicks` | `120` | Delay before regeneration after damage |
 | `combatRegenHalfHeartsPerSecond` | `5.0` | Half-hearts restored per second |
-| `maxTeamDiff` | `1` | Maximum allowed team-size difference for auto join |
-| `markerFocusHalfAngleDegrees` | `30.0` | Enemy health-bar focus cone half-angle |
-| `markerFocusRequiredTicks` | `20` | Continuous ticks required to trigger the enemy health bar |
+| `maxTeamDiff` | `1` | Maximum team-size difference allowed for automatic assignment, explicit joining, and team switching |
+| `markerFocusHalfAngleDegrees` | `30.0` | Enemy health-bar detection cone half-angle |
+| `markerFocusRequiredTicks` | `20` | Detection duration required to show an enemy health bar |
 | `markerBarMaxDistance` | `96.0` | Maximum enemy health-bar detection distance |
-| `markerVisibleGraceTicks` | `3` | Anti-flicker grace ticks for enemy health bars |
-
-### Match Result Export Directories
-
-- `frontline` -> `serverconfig/codpattern/maps/builtin/frontline/records/`
-- `teamdeathmatch` -> `serverconfig/codpattern/maps/builtin/teamdeathmatch/records/`
+| `markerVisibleGraceTicks` | `3` | Enemy health-bar anti-flicker grace period |
 
 ## Documentation
 
-- Full implementation-oriented guide: [GUIDE.md](GUIDE.md)
-- Common questions: [QANDA.md](QANDA.md)
+- Installation, map setup, matches, map management, migration, and builds: [GUIDE.md](GUIDE.md)
+- Common questions and troubleshooting: [QANDA.md](QANDA.md)
 - Version history: [CHANGES.md](CHANGES.md)
-- Main-mod / Zombies addon build, run, and installation entry points:
-  [SPLIT_INSTALLATION_AND_UPGRADE.md](mode-split/physical/SPLIT_INSTALLATION_AND_UPGRADE.md)
+- Chinese documentation: [README.md](README.md)
 
 ## Compatibility and Dependencies
 
-- Minecraft: `1.20.1`
-- Forge: `47.4.0+`
-- Java: `17`
-- Required dependency: TaCZ `1.1.6+`
-- Embedded component: FPSM-compatible core, no external `fpsmatch.jar` required
+- Minecraft: The development and build target is `1.20.1`.
+- Forge: The project builds against `47.4.0`; mod metadata declares a minimum of `47`. Other combinations need verification; the declared range is not a fully tested range.
+- Java: `17`.
+- Required dependency: TaCZ `1.1.6+` on both client and server.
+- Embedded component: The FPSM-compatible core requires no separate `fpsmatch.jar`.
+- Optional integration: LR Tactical `0.3.0+`. FTL/TDM remain available without LR.
+- Optional mode: The `codpattern_zombies` addon. Main-mod metadata accepts `0.2.0b+`; the addon's own dependency requirements must also be satisfied. The main mod and addon are built and installed separately.
+- Physics Mod and `tacz-addon` appear in the client development runtime configuration. Neither is declared as a required dependency of the main mod.
+
+Clients and servers should use matching main-mod and required addon combinations. See [GUIDE.md](GUIDE.md) for source builds and development launches with optional LR support.
 
 ## License
 
-Licensed under **GPL-3.0-only**. See root `LICENSE.txt` for details.
+Licensed under **GPL-3.0-only**. See [LICENSE.txt](../LICENSE.txt) and [CREDITS.txt](../CREDITS.txt) in the repository root.

@@ -1,761 +1,417 @@
 # COD Pattern Guide
 
-> 本文地图目录已同步至 `0.8.3b`；旧存档升级请先阅读[地图存储与手动迁移](map-storage-operations.md)。其他章节仍保留原版本说明。
-
-
 [项目概览](README.md) | [Q&A](QANDA.md) | [更新日志](CHANGES.md)
 
-> 本文只描述当前仓库代码已经实现的行为。命令、目录、限制、校验与数据流均以当前版本源码为准。本文基于ai撰写，内容仅供参考
+> 本文对应 `0.8.6b`，说明主模组已经实现的玩法、配置和地图管理流程。Zombies 是可选独立附属，具体玩法与部署工具以附属仓库为准。
 
-## 1. 当前版本负责什么
+## 1. 安装与首次开局
 
-COD Pattern 当前把以下功能收在同一套服务端逻辑里：
+### 1.1 运行环境
 
-1. 玩家背包预设的创建、选择、修改、复制、重命名、删除与持久化。
-2. TaCZ 枪械与 LR Tactical 投掷物的背包配置、筛选与发放。
-3. 通过 COD Pattern 入口执行的 TaCZ 改枪流程与配件预设保存。
-4. `frontline` / `teamdeathmatch` 的地图、房间、准备、投票、阶段流转、复活与结算。
-5. 对局 HUD、击杀播报、敌我高光、敌方血条和战绩导出。
-
-对应实现入口：
-
-- 模组初始化：`com.cdp.codpattern.CodPattern`
-- 命令注册：`com.cdp.codpattern.command.CommandRegistration`
-- 房间列表推送：`com.cdp.codpattern.fpsmatch.room.CodTdmRoomManager`
-
-## 2. 运行环境与数据目录
-
-### 2.1 运行环境
-
-- Minecraft: `1.20.1`
-- Forge: `47.4.0+`
-- Java: `17`
-- 必需依赖: `TaCZ 1.1.6+`
-- 可选联动: `LR Tactical 0.3.0+`、`Physics Mod`、`tacz-addon 1.1.6`
-
-LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投掷物选择、投掷物专用槽和默认投掷物发放不可用，但服务端、客户端和非投掷物流程应继续正常运行。安装 LR Tactical 后，默认投掷物背包、投掷物槽位和 LR 物品选择恢复可用。
-
-本地运行矩阵：
-
-- 无 LR：`./gradlew runServer -PwithLrTactical=false`
-- 有 LR：`./gradlew runServer -PwithLrTactical=true`
-
-混装环境不推荐：服务器安装 LR Tactical 而客户端未安装时，客户端无法正常使用 LR 物品内容。
-
-### 2.2 主要数据目录
-
-| 路径 | 用途 |
+| 项目 | 要求 |
 |---|---|
-| `<世界>/serverconfig/codpattern/backpack_rules/backpack_config.json` | 玩家背包、槽位物品、配件预设 |
-| `<世界>/serverconfig/codpattern/backpack_rules/weapon_filter.json` | 武器分类、黑名单、投掷物开关、弹药倍率 |
-| `<世界>/serverconfig/codpattern/maps/builtin/rules/config.json` | 房间与 TDM 节奏配置 |
-| `<世界>/serverconfig/codpattern/maps/builtin/frontline/records/` | `frontline` 战绩导出 |
-| `<世界>/serverconfig/codpattern/maps/builtin/teamdeathmatch/records/` | `teamdeathmatch` 战绩导出 |
-| `<世界>/serverconfig/codpattern/maps/builtin/frontline/` | `frontline` 地图数据 |
-| `<世界>/serverconfig/codpattern/maps/builtin/teamdeathmatch/` | `teamdeathmatch` 地图数据 |
+| Minecraft | 开发与构建目标为 `1.20.1` |
+| Forge | 构建版本为 `47.4.0`，模组元数据声明 `47+` |
+| Java | `17` |
+| TaCZ | 必需，`1.1.6+` |
+| LR Tactical | 可选，`0.3.0+`；提供近战与投掷物 |
+| COD Pattern Zombies | 可选；安装时要求 `0.2.0b+` |
 
-要点：
+主模组提供 Frontline（FTL）和 TeamDeathMatch（TDM），包含背包预设、改枪、房间大厅、地图工具、对局 HUD 和战绩导出。FPSMatch 的相关代码已经在主模组中。
 
-- 背包和 TDM 配置在世界存档的 `serverconfig` 下面。
-- 地图定义与规则统一放在当前世界存档的 `serverconfig/codpattern/maps/` 下面；背包配置保持原位。
-- 迁移服务器时，世界存档和 `fpsmatch/` 目录要一起复制。
+没有 LR Tactical 时，主副武器、房间和对局继续工作；LR 近战、投掷物选择、专用槽和默认投掷物发放不可用。需要 LR 内容时，客户端与服务端应安装一致的依赖。
 
-## 3. 服务端启动和玩家进服时会发生什么
+`tacz-addon` 与 Physics Mod 属于可选联动。背包预设和配件保存由主模组提供，不要求安装 `tacz-addon`。
 
-### 3.1 服务端启动
+### 1.2 从安装到开局
 
-服务端启动后会执行两件事：
+1. 将主模组与 TaCZ 放入客户端、服务端的 `mods/`，按需要安装可选模组。
+2. 启动世界生成配置。升级旧存档时，先按第 8 节执行迁移检查。
+3. 修改武器筛选和对局配置；武器筛选用 `/cdp update` 同步，对局配置修改后重启服务器。
+4. 用地图创建工具选择范围，创建 `frontline` 或 `teamdeathmatch` 地图。
+5. 用复活点工具给 `kortac`、`specgru` 各添加至少一个 `INITIAL` 点。TDM 再配置 `DYNAMIC_CANDIDATE` 点。
+6. 用地图管理工具给地图设置结束传送点，或在创建地图前设置全局默认结束点。
+7. 玩家从暂停菜单进入房间，选队、准备并发起开始投票。
 
-1. 注册网络包。
-2. 加载 `maps/builtin/rules/config.json`。
+对局发放装备会清空玩家物品栏。进入对局前请存放随身物品；结束对局的恢复流程不提供入房前物品栏备份。
 
-对应实现：
+## 2. 背包、武器与投掷物
 
-- 网络注册：`CodPattern.setup` -> `ModNetworkChannel.register()`
-- TDM 配置加载：`CodPattern.onServerStarting` -> `CodTdmConfig.load(server)`
+### 2.1 背包入口与默认内容
 
-### 3.2 玩家登录
+暂停菜单底部提供背包设置和模式房间入口。玩家首次登录时生成 3 套背包，默认选择背包 1。
 
-玩家登录时服务端会：
+| 背包 | 主武器 | 副武器 |
+|---|---|---|
+| 1 | `tacz:hk_g3` | `tacz:glock_17` |
+| 2 | `tacz:ak47` | `tacz:deagle` |
+| 3 | `tacz:m4a1` | `tacz:p320` |
+| 新增背包 | `tacz:m4a1` | `tacz:p320` |
 
-1. 加载或创建 `weapon_filter.json`。
-2. 加载或创建该玩家的背包数据。
-3. 将筛选配置和该玩家的背包数据同步到客户端。
-4. 继续交给 FPSM 房间系统处理登录后的房间状态恢复。
+每套背包保存 `primary`、`secondary`、`tactical`、`lethal` 四个槽位。安装 LR Tactical 时，代码中的默认 `tactical` 为 `lrtactical:m67`，默认 `lethal` 为 `lrtactical:smoke_grenade`；未安装时保留这两个键，内容为空。
 
-对应实现：
+背包管理规则：
 
-- `PlayerLoggedInEventHandler.onPlayerJoin`
-- `SyncWeaponFilterPacket`
-- `SyncBackpackConfigPacket`
+- ID 使用 `1` 到 `10`，新增和复制优先填补空缺编号，最多 10 套。
+- 至少保留一套；删除当前背包后，切换到剩余编号最小的一套。
+- 新增背包保留原来的选中项。
+- 名称去除首尾空格，拒绝空名称，超过 32 个字符时截断。
+- 复制会保留槽位物品、数量、NBT 和配件预设。
 
-这意味着：
+选择背包是修改下次发放时使用的预设。地图开局、复活及管理员发放命令会读取当前选择。
 
-- 新玩家第一次进服时会立即生成默认背包。
-- 客户端武器选择界面看到的内容，以登录时或 `/cdp update` 后同步到本地的配置为准。
+### 2.2 武器选择与服务端校验
 
-## 4. 背包系统
+主副武器可用分类由 `weapon_filter.json` 决定。默认主武器分类为 `rifle`、`sniper`、`shotgun`、`smg`、`mg`；默认副武器分类为 `pistol`、`rpg`、`melee`。
 
-### 4.1 玩家背包数据如何创建
+服务端会检查背包与槽位是否存在、物品 ID 是否有效、NBT 能否解析、枪械分类是否匹配，以及枪械和已安装配件是否命中黑名单。主副武器只接受允许分类中的 TaCZ 枪械或 LR 近战物品。
 
-背包数据模型在 `BackpackConfig`，仓库在 `BackpackConfigRepository`。
+投掷物选择要求同时满足：
 
-当前实现固定规则：
+- LR Tactical 已安装。
+- `throwablesEnabled` 为 `true`。
+- 物品是 `lrtactical:throwable`，NBT 中包含 `ThrowableId`。
 
-- 每名玩家首次创建时自动生成 `3` 套默认背包。
-- 默认选中背包 `1`。
-- 每套背包固定 `4` 个槽位：
-  - `primary`
-  - `secondary`
-  - `tactical`
-  - `lethal`
-- 每个槽位保存三类信息：
-  - `item`
-  - `nbt`
-  - `attachmentPreset`
+校验通过后才保存物品和规范化的 SNBT。配件预设由独立改枪流程管理。
 
-默认背包内容写死在 `BackpackConfig` 的静态字段里：
+### 2.3 装备发放
 
-- 背包 1: `hk_g3` + `glock_17`
-- 背包 2: `ak47` + `deagle`
-- 背包 3: `m4a1` + `p320`
-- 新增背包默认主副武器: `m4a1` + `p320`
-- 默认投掷物: 安装 LR Tactical 时为 `lrtactical:m67` 与 `lrtactical:smoke_grenade`；未安装 LR Tactical 时，`tactical` / `lethal` 键仍保留，但值为空物品数据。
+装备发放前会清空整个玩家物品栏和投掷物运行状态，然后按当前背包配置发放：
 
-### 4.2 背包增删改选的实际规则
+| 配置槽位 | 发放位置 |
+|---|---|
+| `primary` | 热键栏第 1 格，内部索引 `0` |
+| `secondary` | 热键栏第 2 格，内部索引 `1` |
+| `tactical` | 投掷物专用槽 1 |
+| `lethal` | 投掷物专用槽 2 |
 
-对应实现：
+TaCZ 枪械按弹匣倍率配置备弹；命中武器黑名单的物品会被跳过，已有的禁用配件会在发放时移除。投掷物只有在 LR 可用且配置启用时发放。
 
-- 新增：`AddBackpackPacket` + `BackpackConfigRepository.addCustomBackpack`
-- 复制：`CloneBackpackPacket`
-- 重命名：`RenameBackpackPacket`
-- 删除：`DeleteBackpackPacket`
-- 选择：`SelectBackpackPacket`
+普通发放要求玩家在房间中，并且不是旁观者。管理员命令 `/cdp distribute [target]` 可绕过入房条件，但仍然跳过旁观者。省略 `target` 时发给所有在线玩家，不是只发给执行者。
 
-当前规则不是 UI 约定，而是服务端强制执行：
+### 2.4 投掷物专用槽
 
-- 背包 ID 只允许占用 `1` 到 `10`。
-- `getNextAvailableId()` 会找第一个空缺 ID。
-- 当 `1` 到 `10` 全部占满时，新增和复制都会失败。
-- 删除时至少要保留 `1` 套背包。
-- 删除当前选中的背包后，系统会自动切到剩余背包里编号最小的一套。
-- 重命名会先 `trim()`，空名直接拒绝，超过 `32` 个字符会被截断。
-- 复制会把源背包 4 个槽位的数据完整复制，包括 `attachmentPreset`。
-- 新增背包不会自动切换当前选中项，原选中背包会保留。
+两个投掷物按键默认都没有绑定。先在游戏控制设置的 COD Pattern 分类中绑定，再在房间内使用。
 
-### 4.3 背包装备是怎么发放的
+按住对应按键时，投掷物会临时放到当前手持栏位并开始准备；达到 LR 投掷物自身的准备时间后松开按键，执行投掷。过早松开或用滚轮取消时，会取消使用。结束后恢复原手持物品，剩余投掷物回到专用槽。
 
-对应实现：
+两个槽位独立于普通热键栏。专用投掷流程要求玩家有房间上下文，管理员在房间外发放物品不会解除这一限制。
 
-- 玩家重生事件：`PlayerRespawnHandler`
-- 发放服务：`BackpackDistributor`
-- 管理员命令：`/cdp distribute [target]`
+## 3. TaCZ 改枪与配件预设
 
-正常发放链路：
+### 3.1 从背包进入改枪
 
-1. 玩家重生触发 `PlayerRespawnEvent`。
-2. 服务端读取 `weapon_filter.json`。
-3. 非强制发放时，先检查玩家是否已经在房间或对局里。
-4. 读取玩家当前选中的背包。
-5. 先清空整个物品栏。
-6. 按槽位把配置物品写入固定栏位：
-   - `primary` -> 物品栏 `0`
-   - `secondary` -> 物品栏 `1`
-   - `tactical` -> 物品栏 `2`
-   - `lethal` -> 物品栏 `3`
-7. 如果物品是 TaCZ 枪械，按 `ammunitionPerMagazineMultiple` 重设备弹。
-8. 广播背包已装备提示。
+TaCZ 原生 `GunRefitScreen` 入口会被替换为背包菜单，并显示提示。请在背包装备页将鼠标移到主武器或副武器卡片上，再点击出现的「更换配件」按钮；直接点击武器卡片会进入更换武器列表。
 
-服务端限制：
+服务端从该槽位的物品数据构造枪械，重新应用已保存的配件预设，卸下禁用配件，并准备候选配件。候选来自玩家物品栏中可安装的配件，以及可选 `tacz-addon` 提供的兼容候选；附属候选会按配件 ID 去重，再执行兼容性与黑名单校验。
 
-- 玩家是旁观者时，不发放。
-- 非强制发放时，玩家不在房间内，不发放。
-- 枪械如果命中 `blockedItemNamespaces` 或 `blockedWeaponIds`，该槽位直接跳过。
-- `tactical` / `lethal` 只有在 `throwablesEnabled` 为 `true` 且 LR Tactical 已安装时才发放。
-- 发放前会防御性清理旧配置中已安装的黑名单配件，并在服务端日志记录玩家、槽位和物品 ID。
+已有配件预设的加载和保存不依赖 `tacz-addon`。该联动主要用于补充候选与处理改枪场景中的冲突数据。
 
-`/cdp distribute` 使用的是强制发放分支：
+### 3.2 改枪会话
 
-- 会跳过“必须在房间内”这条限制。
-- 不会跳过“玩家当前是旁观者”这条限制。
+每次改枪都会建立服务端编辑会话，记录背包 ID、槽位、物品栏快照与原手持栏位。玩家临时使用待改枪械和候选配件，物理沙盒物品栏至少保留一格空位供卸下配件，改枪操作另有服务端编辑库存。
 
-### 4.4 武器选择时服务端会校验什么
+按 `Esc` 返回背包或正常关闭改枪界面时，会自动向服务端提交保存；当前没有单独的“取消改装”入口，不能把退出界面当作撤销。会话正常结束或被服务端中止后，会恢复进入改枪前的物品栏与手持栏位。超时阈值为 120 秒，服务端在后续 tick 检查并中止在线会话，提示回滚。
 
-对应实现：`UpdateWeaponService`
+旁观者不能开启改枪会话，投掷物和近战槽内容也不能作为 TaCZ 枪械改装。
 
-玩家在背包界面改槽位时，服务端按下面的顺序校验：
+### 3.3 保存内容
 
-1. 背包是否存在。
-2. 槽位名是否是 `primary / secondary / tactical / lethal`。
-3. `itemId` 是否是合法注册物品。
-4. `nbt` 是否能被 `TagParser` 正常解析。
-5. 物品是否命中枪械黑名单。
-6. 槽位和物品分类是否匹配。
-7. `primary` / `secondary` 的已安装配件是否命中附件黑名单。
+保存以服务端编辑会话中的枪械为准。服务端检查会话、背包和槽位是否一致，确认枪械有效且没有禁用配件后，重新生成 `attachmentPreset`。
 
-分类匹配规则：
+正常保存保留原槽位的 `item`、`count`、`nbt`，更新配件预设；重新构造装备时再应用该预设。客户端提交的预设文本和枪械 NBT 不是最终保存依据。
 
-- `primary` / `secondary`
-  - 先尝试通过 TaCZ 能力解析枪械分类。
-  - 如果不是枪，但符合 LR Tactical 近战判定，则归到 `melee`。
-  - 最终分类必须包含在对应的 `primaryWeaponTabs` 或 `secondaryWeaponTabs` 里。
-- `tactical` / `lethal`
-  - 必须安装 LR Tactical
-  - 必须启用 `throwablesEnabled`
-  - 物品 ID 必须是 `lrtactical:throwable`
-  - `nbt` 里必须包含 `ThrowableId`
+保存失败会还原本次修改过的槽位数据并结束会话。改枪成功后的配件不会作为额外物品留在玩家物品栏中。
 
-写入方式：
+## 4. 房间与对局
 
-- 服务端通过校验后，把 `itemId` 和服务端解析后的规范 SNBT 写回 `backpack_config.json`
-- 如果武器 NBT 中已经安装了服务器禁用的配件，本次写入会被拒绝，背包配置不变
-- 配件预设不在这一步处理
+### 4.1 模式与大厅
 
-### 4.5 `/cdp update` 实际会做什么
+主模组注册两个模式：
 
-对应实现：`UpdateWeaponFilterConfigCommand`
+| 模式 | 标识 | 复活方式 |
+|---|---|---|
+| Frontline / FTL | `frontline` | 开局和死亡后使用本队 `INITIAL` 点 |
+| TeamDeathMatch / TDM | `teamdeathmatch` | 开局使用 `INITIAL`，死亡后优先动态候选点，失败时回退 `INITIAL` |
 
-`/cdp update` 只做两件事：
+旧标识 `cdptdm`、`cdptacticaltdm` 分别兼容映射到上述模式。默认队伍为 `kortac` 和 `specgru`。
 
-1. 重新读取服务端的 `weapon_filter.json`
-2. 逐个玩家读取各自背包数据并同步到客户端
+大厅展示已注册房间的阶段、人数、队伍、比分、剩余时间与结束点状态。进入大厅后订阅服务端房间快照，变更由服务端继续推送。安装附属后的额外模式通过模式注册接口接入。
 
-它不会做的事：
+### 4.2 入房、选队与投票
 
-- 不会重载 `maps/builtin/rules/config.json`
-- 不会重建地图
-- 不会替代重启服务器
+FTL／TDM 只在 `WAITING` 阶段接受入房。自动分队会检查人数差；指定队伍还会检查队伍存在、容量和 `maxTeamDiff`。入房后准备状态初始为未准备，房间内启用饱食度锁定。
 
-因此：
+开始投票需要：
 
-- 手改 `weapon_filter.json` 后，可以用 `/cdp update`
-- 手改 `backpack_config.json` 后，最稳妥的方式仍然是停服修改
-- 手改 `maps/builtin/rules/config.json` 后，需要重启服务器
+1. 当前处于 `WAITING`。
+2. 参赛人数达到 `minPlayersToStart`。
+3. 所有参赛玩家已准备。
+4. 地图已有结束传送点。
 
-## 5. TaCZ 改枪与配件预设
+准备状态只能在等待阶段修改。结束投票只能在 `WARMUP` 或 `PLAYING` 发起。投票最长持续 15 秒，开始和结束的默认通过比例分别为 `60%`、`75%`，人数门槛向上取整。成员离开时会移出投票并重新计算门槛。
 
-### 5.1 为什么 TaCZ 原生改枪界面打不开
+### 4.3 阶段流程
 
-当前版本全局拦截 TaCZ 原生 `GunRefitScreen`。
+| 阶段 | 行为 |
+|---|---|
+| `WAITING` | 入房、选队、准备和开始投票 |
+| `COUNTDOWN` | 固定 200 tick 倒计时，末段进入黑屏过渡 |
+| `WARMUP` | 固定 400 tick 准备阶段；恢复冒险模式、传送到开局点、静默发放装备，并锁定移动 |
+| `PLAYING` | 解锁移动、从零开始正式计时和计分；不再次传送或发放装备 |
+| `ENDED` | 导出战绩、清理本局装备和临时状态，显示 3 页结算，每页 100 tick；之后执行房间重置和玩家恢复 |
 
-对应实现：
+正常 20 TPS 下，倒计时 10 秒、准备 20 秒、结算 15 秒。黑屏在倒计时第 140 tick 开始，淡入、保持、淡出分别为 60、100、60 tick，横跨倒计时和准备阶段。
 
-- 客户端拦截：`TaczRefitScreenBlocker`
-- Mixin 过滤附件候选：`GunRefitScreenMixin`
+正式阶段默认最多 420 秒，击杀分上限 75。到达胜利条件或结束投票通过后进入结算。
 
-行为是固定的：
+### 4.4 复活、无敌与回血
 
-- 如果打开的是 TaCZ 原生改枪界面，客户端会把它替换成 `BackpackMenuScreen`
-- 玩家会收到“原生改枪界面已禁用”的系统消息
+死亡后进入死亡视角和复活倒计时。默认死亡视角 30 tick，复活等待 40 tick，成功复活后的无敌期 30 tick。
 
-### 5.2 背包改枪会怎样准备数据
+成功复活会回到冒险模式，恢复满血和 20 饱食度，清除状态效果，再发放当前背包装备。传送失败时保持旁观并再次尝试；连续失败达到 5 次后停止自动重试，清除死亡视角和倒计时提示，玩家仍保持旁观，需要管理员检查出生点。
 
-对应实现：`AttachmentPresetRequestService`
+TDM 动态点会先做落地、流体、碰撞和危险方块检查，再根据敌我距离、视线等因素评分。没有可用动态点时尝试本队 `INITIAL` 点，所以两种点都应设置在可安全站立的位置。
 
-玩家点击主武器或副武器的“更换配件”后，服务端执行以下链路：
+房间内饱食度固定为 20，自然回血、治疗药水等常规回血被拦截。呼吸回血仅在 `PLAYING` 执行：默认受伤后等待 120 tick，再以每秒 5 个生命值、即 2.5 颗心的速度恢复。
 
-1. 玩家当前不能是旁观者。
-2. 只允许改 `primary` 或 `secondary`。
-3. 从背包槽位的 `item` + `nbt` 重新构造枪械 `ItemStack`。
-4. 如果不是合法 TaCZ 枪械，直接结束。
-5. 调用 `TaczAddonRefitCompat` 清理 `tacz-addon` 在背包改枪场景下的冲突数据。
-6. 读取该槽位已有的 `attachmentPreset`。
-7. 把预设重新应用到枪上。
-8. 如果枪上已有被黑名单禁用的配件，先卸下。
-9. 收集玩家物品栏里“当前枪能装上、且不在配件黑名单里”的附件，作为改枪沙盒库存。
-10. 创建编辑会话，并把预设数据同步给客户端。
+### 4.5 HUD 与战绩
 
-### 5.3 改枪会话怎么保证可回滚
+HUD 显示队伍比分、计时、击杀播报、死亡倒计时和结算结果。准备阶段队友高光为白色、敌人为黄色；正式阶段保留队友高光，敌人改用视线与瞄准条件触发血条。
 
-对应实现：`AttachmentEditSessionManager`
+敌方血条要求目标存活、处于最大距离内且本地玩家能看到目标。准星直接命中敌人，或敌人持续处于视锥中达到阈值时显示。默认最大距离 96 格、视锥半角 30 度、持续判定 20 tick、可见缓冲 3 tick。
 
-开始改枪时，服务端会创建一个“沙盒物品栏”：
+结算导出 JSON 战绩，包含地图、起止时间、持续时长、胜队、队伍比分，以及参赛玩家 UUID、名字、队伍、击杀、死亡和 K/D。客户端结算展示 MVP、SVP 与全员战绩。
 
-1. 先完整快照玩家当前背包。
-2. 清空玩家当前物品栏。
-3. 把待改的枪放进当前热键栏位。
-4. 把允许使用的配件依次塞进主物品栏。
-5. 至少保留 `1` 个空格，确保 TaCZ 的卸下操作有空位可落地。
-6. 记录会话信息，包括：
-   - 背包 ID
-   - 槽位名
-   - 当前热键栏位
-   - 原先选中的热键栏位
-   - 整包快照
-   - 超时时间
-   - 实际塞入的配件数量
-   - 因空间不足被截断的配件数量
+## 5. 创建地图与配置复活点
 
-当前会话超时时间固定为 `120000ms`，也就是 `120` 秒。
+### 5.1 工具与权限
 
-会话结束逻辑：
+地图工具要求管理员权限等级 2。可用以下命令取得：
 
-- 正常保存：恢复原物品栏快照，结束会话
-- 失败或超时：恢复原物品栏快照，并提示已回滚
+```mcfunction
+/give @s codpattern:map_creator_tool
+/give @s codpattern:spawn_point_tool
+/give @s codpattern:map_management_tool
+```
 
-### 5.4 配件保存时服务端会校验什么
+地图创建、复活点和区域编辑使用工具界面。当前命令树不再提供这些操作的旧命令入口。
 
-对应实现：`AttachmentPresetSaveService`
+### 5.2 地图创建工具
 
-保存时服务端会检查：
+手持 `codpattern:map_creator_tool`：
 
-1. 当前玩家是否还持有有效会话。
-2. 会话里的背包 ID 和槽位是否与本次保存一致。
-3. 当前热键栏位物品是否仍然是一把枪。
-4. 枪上是否还存在被黑名单禁用的已安装配件。
+- 左键方块记录第一个角点。
+- 右键方块记录第二个角点。
+- `Ctrl + 右键` 打开界面，选择模式、填写地图名并创建。
 
-保存成功后会写回以下字段：
+选点时会显示区域预览，草稿保存在工具中。两个角点定义地图的三维范围，创建时需要有效范围、已注册的模式和未占用的地图名。
 
-- `item`: 当前枪械物品 ID
-- `nbt`: 当前枪械完整 NBT
-- `attachmentPreset`: 由当前枪状态重新构造出的配件预设字符串
+地图名会去除首尾空格，不能为空，不能含控制字符，UTF-8 编码长度最多 100 字节；创建界面另有 64 字符的输入限制。中文通常占多个字节。地图目录由名称编码生成，不直接使用显示名称作为目录名。
 
-如果保存失败：
+### 5.3 复活点工具
 
-- 槽位内容会恢复到保存前的旧值
-- 会话会被中止
-- 玩家物品栏会恢复到改枪前快照
+手持 `codpattern:spawn_point_tool`，`Ctrl + 右键` 打开界面，选择模式、地图、队伍和点类型，然后左键方块，在方块上方一格记录点位。
 
-## 6. 房间、地图与对局流程
+- FTL 配置双方的 `INITIAL` 点。
+- TDM 配置双方的 `INITIAL` 和 `DYNAMIC_CANDIDATE` 点。
+- 界面可查看、删除点位，或清空当前队伍的当前点位层。
+- TDM 选择动态候选点时，可合并双方动态点；该操作要求地图支持动态复活且恰好有两支队伍。
+- 手持工具会预览地图边界和当前点位层。
 
-### 6.1 房间入口在哪里
+服务端检查地图、队伍、当前维度、被点击方块是否在地图范围内，以及实际记录坐标是否重复。记录位置是该方块上方一格，选点时应留出顶部空间。实际复活还会检查安全性；成功写入坐标不代表运行时一定可以站立。
 
-对应实现：`CreateMenuButtonsHandler`
+工具另有通用区域编辑界面：左键、右键分别记录区域角点，再在界面添加、删除或清空区域。可选图层取决于模式注册内容，主模组的 FTL／TDM 当前没有区域图层。
 
-客户端打开暂停菜单后，会自动加两个按钮：
+## 6. 地图管理与结束传送
 
-- `背包设置`
-- `Frontline / TeamDeathMatch`
+### 6.1 管理界面
 
-这两个入口都不是命令面板，而是暂停菜单上的固定按钮。
+右键使用 `codpattern:map_management_tool` 打开管理页。按模式选择地图后，可以查看维度、范围、尺寸、运行状态和结束点，并执行改名、删除、强制结束或打开结束传送设置。
 
-### 6.2 房间列表如何同步
+管理请求会携带服务端会话与数据版本。地图被其他管理员修改、服务器重启或房间发生变化后，旧界面操作可能被拒绝，需要刷新后再提交。
 
-对应实现：`CodTdmRoomManager`
+### 6.2 改名
 
-房间列表来自当前 FPSMCore 已注册地图的读端口快照。每个房间同步的信息包括：
+改名要求地图空闲、无人占用、没有未完成的玩家恢复或模式资源清理，且存储可用。名称使用与创建相同的基本规则，并拒绝当前名称以及同模式中忽略大小写后重复的名称。
 
-- 当前阶段
-- 玩家人数
-- 最大人数
-- 各队人数
-- 各队比分
-- 剩余时间
-- 是否设置结束传送点
+服务端会更新地图定义、存储目录和运行时注册。保存或替换失败时执行回滚；不能完整回滚的操作进入恢复状态，需要检查服务端日志并重启完成恢复。
 
-同步策略：
+### 6.3 强制结束
 
-- 玩家订阅房间大厅后，立即收到一次完整快照
-- 房间脏标记会触发增量推送
-- 脏推送最短节流时间为 `350ms`
-- 即使没有脏更新，也会每 `1000ms` 做一次稳态刷新
+管理页的强制结束与以下命令使用同一个结束服务：
 
-### 6.3 入房、选队、准备和投票的规则
+```mcfunction
+/roomforceend <mode> <map>
+```
 
-对应实现：
+强制结束终止当前轮次、清理临时状态、处理本轮登记的实体与玩家恢复，保留房间成员。恢复内容包括游戏模式、视角、控制状态、重生位置和需要撤销的属性修改；已登记为对局装备的物品会清空。
 
-- 入房与离房：`TdmRoomInteractionService`
-- Ready 状态：`CodTdmVoteCoordinator`
-- 投票：`VoteService`
+传送优先尝试结束点，失败时尝试记录的返回位置，再尝试主世界出生点附近的安全位置。离线玩家、尚未复活的玩家或尚未加载的实体可能需要后续处理，管理页会显示恢复进度，并允许重试。未完成的恢复记录会保留，玩家重新登录或复活时继续处理。
 
-当前服务端规则：
+### 6.4 删除
 
-- 只有 `WAITING` 阶段允许加入房间。
-- 玩家加入时如果未指定队伍，会按 `maxTeamDiff` 自动找一个可加入队伍。
-- 指定队伍时会检查：
-  - 队伍是否存在
-  - 队伍是否已满
-  - 加入后是否超过 `maxTeamDiff`
-- 加入成功后：
-  - 初始化 Ready 状态为 `false`
-  - 立刻启用房间饱食度锁定
-  - 如果地图没设置结束传送点，立即提示
-- Ready 状态只能在 `WAITING` 阶段改。
-- 开始投票只能在 `WAITING` 阶段发起。
-- 开始投票发起前必须满足：
-  - 房间人数达到 `minPlayersToStart`
-  - 所有已加入玩家都已准备
-  - 当前地图已经设置结束传送点
-- 结束投票只能在 `WARMUP` 或 `PLAYING` 阶段发起。
-- 投票超时时间固定为 `15` 秒。
-- 通过人数按百分比阈值换算：
-  - 开始投票使用 `votePercentageToStart`
-  - 结束投票使用 `votePercentageToEnd`
+删除支持已有成员或正在运行的地图。确认后先保存删除请求并阻止新的加入、开局和编辑，再依次结束对局、恢复玩家、移出成员与观战者、回收实体并完成模式清理。
 
-### 6.4 对局阶段状态机
+全部前置工作完成后，地图目录归档到当前世界的 `serverconfig/codpattern/maps/.storage/trash/`，再从运行时注销。遇到恢复等待或保存失败时不会直接丢弃地图，管理员可查看进度、重试或取消删除。取消停止后续删除，不会重新启动已经结束的对局。
 
-对应实现：`PhaseStateMachine`
+### 6.5 单图结束点与全局默认值
 
-当前阶段固定为：
+管理页提供两个入口：
 
-1. `WAITING`
-2. `COUNTDOWN`
-3. `WARMUP`
-4. `PLAYING`
-5. `ENDED`
+- 选中地图后的「结束传送」：修改这张地图使用的结束点。
+- 「全局设置」：保存当前世界以后新建地图使用的默认结束点。
 
-各阶段的服务端动作：
+表单填写维度、方块坐标和朝向。使用当前位置或全局默认值按钮只会填入草稿，点击保存后才写入。服务端检查维度存在、坐标处于生成范围、建筑高度和世界边界内，朝向会规范化，俯仰角保存为 0。
 
-- `WAITING`
-  - 等待玩家入房、选队、准备、发起开始投票
-- `COUNTDOWN`
-  - 广播倒计时
-  - 最后 `blackoutStartTicks` 进入黑屏提示
-- `WARMUP`
-  - 房间成员切回 `ADVENTURE`
-  - 已加入队伍的玩家传送到开局出生点
-  - 已加入队伍的玩家发放装备
-- `PLAYING`
-  - 重置正式计时
-  - 已加入队伍的玩家再次传送到出生点
-  - 已加入队伍的玩家再次发放装备
-  - 开始正式计分
-- `ENDED`
-  - 触发结算通知与战绩导出
-  - 已加入队伍的玩家清空背包
-  - 房间成员回到 `ADVENTURE`
-  - 清理本局临时状态
-  - 经过 `300` tick 结算页后，若有结束传送点则把已加入队伍的玩家统一传送，否则逐个提示缺失
+全局默认值保存在当前世界的 `serverconfig/codpattern/maps/defaults.json`，只在地图首次创建时复制到地图中；修改全局值不会覆盖已有地图，旧地图缺少结束点时也不会自动补上。单图编辑要求地图空闲且没有待恢复状态。
 
-### 6.5 复活、无敌、死亡视角和回血
+`/cdp map endtp set` 仍保留为批量操作：把命令执行位置及朝向写入所有支持结束点的已有地图。它与 GUI 全局默认设置的作用不同，执行前请确认需要批量覆盖。
 
-对应实现：
+## 7. 配置文件
 
-- 复活计时与无敌：`RespawnService`
-- 死亡视角：`DeathCamService`
-- 呼吸回血：`CombatRegenService`
-- 饱食度锁定：`RoomFoodLockService` + `RoomFoodLockEventHandler`
+以下路径均相对于当前世界存档。
 
-当前逻辑：
+### 7.1 背包与筛选
 
-- 玩家死亡后进入复活倒计时，默认 `respawnDelayTicks = 40`
-- 复活成功后：
-  - 切回 `ADVENTURE`
-  - 回满生命值
-  - 食物值重置为 `20`
-  - 清除状态效果
-  - 重新发放装备
-  - 进入无敌期，默认 `invincibilityTicks = 30`
-- 死亡视角持续时间默认 `deathCamTicks = 30`
-- 呼吸回血只在 `PLAYING` 阶段执行
-- 玩家受伤后先进入冷却，默认 `combatRegenDelayTicks = 120`
-- 冷却结束后按 `combatRegenHalfHeartsPerSecond` 逐 tick 回血
+| 路径 | 内容 |
+|---|---|
+| `serverconfig/codpattern/backpack_rules/backpack_config.json` | 所有玩家背包与当前选择 |
+| `serverconfig/codpattern/backpack_rules/weapon_filter.json` | 武器分类、黑名单、投掷物开关与弹药倍率 |
 
-房间饱食度锁定的意义：
+背包文件以 `playerData` 保存 UUID 对应数据，玩家数据包含 `selectedBackpack` 和 `backpacks_MAP`，每套背包的 `item_MAP` 中保存 `item`、`count`、`nbt` 与 `attachmentPreset`。
 
-- 房间内玩家的饱食度被强制锁到 `20`
-- 原版自然回血会被拦截
-- 只有 `CombatRegenService` 通过白名单窗口触发的自定义回血可以生效
+背包仓库使用内存缓存，界面操作后写回文件。手动修改应停服进行；`/cdp update` 读取的是当前背包仓库，不保证重新读取外部修改过的背包 JSON。
 
-### 6.6 动态复活点如何选
+武器筛选字段与默认值：
 
-对应实现：
+| 字段 | 默认值 | 作用 |
+|---|---|---|
+| `primaryWeaponTabs` | `rifle, sniper, shotgun, smg, mg` | 主武器允许分类 |
+| `secondaryWeaponTabs` | `pistol, rpg, melee` | 副武器允许分类 |
+| `blockedItemNamespaces` | `example_gunpack` | 禁用枪包命名空间 |
+| `blockedWeaponIds` | `namespace:gunid` | 禁用具体枪械 ID |
+| `blockedAttachmentNamespaces` | `example_attachment_pack` | 禁用配件包命名空间 |
+| `blockedAttachmentIds` | `namespace:attachmentid` | 禁用具体配件 ID |
+| `throwablesEnabled` | `true` | 是否启用投掷物 |
+| `ammunitionPerMagazineMultiple` | `6` | 按弹匣容量配置备弹的倍率，发放时负值按 0 处理 |
 
-- 安全校验：`SpawnSafetyValidator`
-- 候选点评分：`DynamicRespawnSelector`
+分类和黑名单字段都是 JSON 字符串数组。黑名单中的默认项是占位示例，请替换为实际的枪械或配件 ID；不需要限制时使用空数组。TaCZ 的枪械与配件内容 ID 不等于通用物品 `tacz:modern_kinetic_gun` 的注册 ID。
 
-`DYNAMIC_CANDIDATE` 的选择不是随机点名，而是先做过滤，再做评分。
+修改筛选文件后执行 `/cdp update`，服务端会重新读取、规范化筛选配置，并将筛选配置与每位在线玩家的背包数据同步到客户端。该命令不会重载地图或对局节奏配置。
 
-安全过滤条件：
+### 7.2 FTL／TDM 共用配置
 
-- 出生点必须在可生成坐标范围内
-- 地面必须能站人
-- 脚下和头顶不能有流体
-- 脚下和头顶不能有碰撞体
-- 不能是火、灵魂火、岩浆、仙人掌、甜浆果丛、凋零玫瑰
-- 玩家碰撞箱必须能在该点无碰撞落地
+路径：`serverconfig/codpattern/maps/builtin/rules/config.json`。服务端启动时加载，修改后重启。
 
-通过安全过滤后，再按下列因素评分：
-
-- 离最近敌人越远越好
-- 敌人平均距离越远越好
-- 离队友的距离会参与平衡
-- 出生点被队友直视的比例会参与平衡
-- 如果敌人能直视该点，会被额外扣分
-
-如果当前没有任何可用动态点：
-
-- 玩家会暂时保持旁观
-- 复活服务会按重试间隔继续尝试
-
-### 6.7 敌我高光、敌方血条和 HUD
-
-对应实现：
-
-- 敌我关系追踪：`TdmCombatMarkerTracker`
-- HUD 绘制：`TdmHudOverlay`
-
-当前客户端表现：
-
-- `WARMUP`
-  - 队友高光为白色
-  - 敌人也会高光，颜色为黄色
-- `PLAYING`
-  - 队友维持高光
-  - 敌人不再常亮高光
-  - 敌方血条按“视线 + 瞄准”触发
-
-敌方血条触发条件：
-
-1. 目标必须是活着的敌人。
-2. 必须在最大距离内，默认 `96` 格。
-3. 本地玩家必须能看到目标。
-4. 满足以下任一条件：
-   - 准星直接命中该敌人
-   - 目标持续处于视锥内达到阈值
-
-默认视锥参数：
-
-- 半角 `30` 度
-- 连续判定 `20` tick
-- 可见缓冲 `3` tick
-
-### 6.8 战绩导出与结算页
-
-对应实现：`CodTdmMatchResultExporter`
-
-结算时服务端会导出 JSON，内容包括：
-
-- 地图名
-- 开始时间和结束时间
-- ISO 时间戳
-- 持续秒数
-- 胜利队伍
-- 各队比分
-- 每名参赛玩家的：
-  - UUID
-  - 名字
-  - 所属队伍
-  - 击杀
-  - 死亡
-  - K/D
-
-客户端结算 HUD 还会从房间玩家快照里展示 MVP、SVP 与全员面板。
-
-## 7. 地图创建、命令链和工具物品
-
-### 7.1 模式名和队伍名
-
-当前建议使用的模式名：
-
-- `frontline`
-- `teamdeathmatch`
-
-兼容旧别名：
-
-- `cdptdm` 会被规范化为 `frontline`
-- `cdptacticaltdm` 会被规范化为 `teamdeathmatch`
-
-当前默认队伍名：
-
-- `kortac`
-- `specgru`
-
-### 7.2 地图命令与管理入口
-
-对应实现：`MapManagementCommand`。创建、出生点和区域编辑使用下节的工具；这些操作原有的命令入口已移除。
-
-`/cdp map list [type]`
-
-- 不带参数时查看注册的模式；指定模式时列出该模式的地图。
-
-`/cdp map delete <type> <map>`
-
-- 与地图管理页共用服务端删除协调器。
-- 先记录删除意图并禁止加入、开局和编辑，再结束对局、恢复玩家、移出成员及观战者。
-- 玩家恢复、实体回收和模式清理全部完成后，归档地图目录并从 FPSMCore 注销。
-- 恢复未完成或保存失败时保留地图；管理员可在地图管理页查看进度、重试或取消。
-
-`/cdp map endtp show <地图名>`
-
-- 按地图名查看结束传送点；不同模式存在同名地图时提示歧义。
-- 地图管理页可按模式选中地图，查看或修改单图结束点。
-
-`/cdp map endtp set`
-
-- 用命令执行时所在维度、当前位置和朝向，覆盖所有支持结束点的已有地图。
-- 此命令仍保留；GUI 的全局默认设置只影响之后创建的地图。
-
-`/cdp map migrate check|confirm`
-
-- 先用 `check` 检查旧地图存储，再用 `confirm` 确认迁移。
-
-`/roomforceend <mode> <map>`
-
-- 结束对局并恢复玩家，保留房间成员；也可使用地图管理页的强制结束。
-
-`/cdp mode debug ...`、`/cdp test` 与背包命令 `screen`、`update`、`distribute` 保留。
-
-### 7.3 工具物品工作流
-
-#### 地图创建工具
-
-物品：`codpattern:map_creator_tool`
-
-对应实现：
-
-- 物品逻辑：`MapCreatorTool`
-- 创建动作：`MapCreatorToolActionC2SPacket`
-
-操作方式：
-
-- 左键方块：记录 `pos1`
-- 右键方块：记录 `pos2`
-- `Ctrl + 右键`：打开工具界面，填写模式和地图名并执行创建
-
-工具会保留草稿信息，并在手持时渲染区域预览。FTL／TDM 使用此工具；安装 Zombies 附属后，僵尸地图使用附属部署工具的创建页。
-
-#### 复活点工具
-
-物品：`codpattern:spawn_point_tool`
-
-对应实现：
-
-- 物品逻辑：`SpawnPointTool`
-- 工具界面动作：`SpawnPointToolActionC2SPacket`
-
-操作方式：
-
-- `Ctrl + 右键`：打开工具界面，选择模式、地图、队伍和点类型
-- 选择 `teamdeathmatch` 且当前点类型为 `DYNAMIC_CANDIDATE` 时，可直接在界面内对当前模式 + 地图执行动态点合并
-- 左键方块：在所点方块上方一格写入复活点
-- 界面内可查看点位列表、删除选中项或清空当前团队的当前点位层
-- 切换区域模式后，可查看区域列表、选取两个角点添加区域、删除选中项或清空当前区域层；可用图层由模式决定
-
-服务端负责校验：
-
-- 地图存在
-- 队伍存在
-- 当前维度匹配
-- 点击点在地图区域内
-- 坐标不能重复
-- 合并动态点时要求当前地图模式支持动态复活，且队伍数正好为 2
-
-这个工具也会在手持时渲染地图区域和现有复活点预览。
-
-## 8. 配置文件说明
-
-### 8.1 `backpack_config.json`
-
-路径：
-
-- `<世界>/serverconfig/codpattern/backpack_rules/backpack_config.json`
-
-当前用途：
-
-- 保存每名玩家的所有背包
-- 保存当前选中的背包编号
-- 保存 4 个槽位的物品 ID、NBT 和配件预设
-
-重要字段：
-
-- `playerData`
-- `selectedBackpack`
-- `backpacks_MAP`
-- `item_MAP`
-- `attachmentPreset`
-
-维护建议：
-
-- 运行中不要直接手改
-- 批量修改时先停服
-- 这个文件没有针对人工冲突编辑做额外保护
-
-### 8.2 `weapon_filter.json`
-
-路径：
-
-- `<世界>/serverconfig/codpattern/backpack_rules/weapon_filter.json`
-
-当前字段：
-
-- `primaryWeaponTabs`
-- `secondaryWeaponTabs`
-- `blockedItemNamespaces`
-- `blockedWeaponIds`
-- `blockedAttachmentNamespaces`
-- `blockedAttachmentIds`
-- `throwablesEnabled`
-- `ammunitionPerMagazineMultiple`
-
-默认文件里会带占位示例值：
-
-- `example_gunpack`
-- `namespace:gunid`
-- `example_attachment_pack`
-- `namespace:attachmentid`
-
-这些占位值不会自动替换成真实枪包名，需要你手动改成自己的内容。
-
-### 8.3 `maps/builtin/rules/config.json`
-
-路径：
-
-- `<世界>/serverconfig/codpattern/maps/builtin/rules/config.json`
-
-当前默认字段如下：
-
-| 字段 | 默认值 | 说明 |
+| 字段 | 默认值 | 当前作用 |
 |---|---:|---|
-| `timeLimitSeconds` | `420` | 正式阶段时长，单位秒 |
+| `timeLimitSeconds` | `420` | 正式对局时长，秒 |
 | `scoreLimit` | `75` | 击杀分上限 |
-| `invincibilityTicks` | `30` | 复活无敌时长 |
-| `respawnDelayTicks` | `40` | 复活等待时间 |
-| `warmupTimeTicks` | `400` | 热身阶段时长 |
-| `preGameCountdownTicks` | `200` | 开局倒计时时长 |
-| `blackoutStartTicks` | `60` | 倒计时末段黑屏时长 |
-| `deathCamTicks` | `30` | 死亡视角时长 |
-| `minPlayersToStart` | `1` | 开始投票前所需最少人数 |
-| `votePercentageToStart` | `60` | 开始投票通过阈值 |
-| `votePercentageToEnd` | `75` | 结束投票通过阈值 |
-| `combatRegenDelayTicks` | `120` | 受伤后开始回血前的等待时间 |
-| `combatRegenHalfHeartsPerSecond` | `5.0` | 每秒恢复的半颗心数量 |
-| `maxTeamDiff` | `1` | 自动分队允许的最大人数差 |
-| `markerFocusHalfAngleDegrees` | `30.0` | 敌方血条判定视锥半角 |
-| `markerFocusRequiredTicks` | `20` | 触发敌方血条需要的连续判定 tick |
-| `markerBarMaxDistance` | `96.0` | 敌方血条最大判定距离 |
-| `markerVisibleGraceTicks` | `3` | 敌方血条防闪烁缓冲 tick |
+| `invincibilityTicks` | `30` | 复活无敌时间 |
+| `respawnDelayTicks` | `40` | 复活等待及重试间隔 |
+| `deathCamTicks` | `30` | 死亡视角时间 |
+| `minPlayersToStart` | `1` | 开始投票所需最少参赛人数 |
+| `votePercentageToStart` | `60` | 开始投票通过比例 |
+| `votePercentageToEnd` | `75` | 结束投票通过比例 |
+| `combatRegenDelayTicks` | `120` | 受伤后回血等待时间 |
+| `combatRegenHalfHeartsPerSecond` | `5.0` | 每秒恢复的生命值，1 为半颗心 |
+| `maxTeamDiff` | `1` | 自动分队、指定入队和换队允许的最大人数差 |
+| `markerFocusHalfAngleDegrees` | `30.0` | 敌方血条判定视锥半角，度 |
+| `markerFocusRequiredTicks` | `20` | 持续处于视锥中的判定时间 |
+| `markerBarMaxDistance` | `96.0` | 敌方血条最大距离，格 |
+| `markerVisibleGraceTicks` | `3` | 血条可见缓冲时间 |
+| `warmupTimeTicks` | `400` | 字段保留；当前准备阶段使用固定 400 tick |
+| `preGameCountdownTicks` | `200` | 字段保留；当前倒计时使用固定 200 tick |
+| `blackoutStartTicks` | `60` | 字段保留；当前黑屏按第 4.3 节的固定时序执行 |
 
-这份配置只在服务端启动时加载一次。
+未标注单位的时间字段为 tick。最后三个字段仍会写入配置，但当前主模组的 PVP 状态机不读取它们来决定准备、倒计时和黑屏长度。
 
-### 8.4 地图数据文件
+### 7.3 地图与管理数据
 
-路径：
+| 路径 | 内容 |
+|---|---|
+| `serverconfig/codpattern/maps/builtin/frontline/m-<名称编码>/map.json` | FTL 地图定义 |
+| `serverconfig/codpattern/maps/builtin/teamdeathmatch/m-<名称编码>/map.json` | TDM 地图定义 |
+| `serverconfig/codpattern/maps/builtin/frontline/records/` | FTL 战绩 |
+| `serverconfig/codpattern/maps/builtin/teamdeathmatch/records/` | TDM 战绩 |
+| `serverconfig/codpattern/maps/defaults.json` | 当前世界的新地图默认结束点 |
+| `serverconfig/codpattern/maps/.storage/` | 迁移、地图管理日志和删除归档等内部数据 |
+| `data/codpattern/room-recovery.json` | 房间轮次、玩家恢复进度及待清理实体记录 |
 
-- `<世界>/serverconfig/codpattern/maps/builtin/frontline/<地图目录>/map.json`
-- `<世界>/serverconfig/codpattern/maps/builtin/teamdeathmatch/<地图目录>/map.json`
+地图目录名为 `m-` 加地图名 UTF-8 字节的十六进制编码。地图文件保存地图范围、队伍、可用复活点层与结束传送点。优先使用游戏内工具修改，避免手动重命名目录或删除管理日志。
 
-文件里保存的是：
+`defaults.json` 的格式版本为 `version: 1`，结束点字段为 `matchEndTeleportPoint`。文件不存在表示未设置默认值，可通过管理页首次保存。损坏的文件不会自动修复，并会阻止全局设置读取、保存及需要读取默认值的新建地图操作；应停服备份后修复文件或恢复有效备份，再打开管理页。
 
-- 地图区域
-- 队伍设置
-- `INITIAL` 复活点
-- `DYNAMIC_CANDIDATE` 复活点
-- 结束传送点
+## 8. 旧地图存储迁移与备份
 
-## 9. 首次部署到可开局的最短流程
+当前地图存储跟随世界存档。程序会检测旧目录，但不会在启动时自动搬迁。
 
-1. 把 `codpattern` 与依赖模组放进 `mods/`。
-2. 首次新建存档时启动服务器生成配置；旧存档升级时先按[迁移说明](map-storage-operations.md)检查，程序不会自动搬迁旧地图。
-3. 调整 `weapon_filter.json`，确认枪械分类和黑名单。
-4. 调整 `maps/builtin/rules/config.json`，然后重启服务器。
-5. 使用地图创建工具建立 FTL／TDM 地图；Zombies 使用附属部署工具。
-6. 使用出生点工具，给 `kortac` 和 `specgru` 至少各配置 `1` 个 `INITIAL` 点。
-7. 给双方继续配置足够数量的 `DYNAMIC_CANDIDATE` 点。
-8. 配置 `endtp`。
-9. 让玩家进房、选队、准备、发起开始投票。
+旧数据可能位于运行目录下的 `fpsmatch/<世界名称>/`，以及世界存档中的 `serverconfig/codpattern/tdm_rules/`、`tdm_match_records/`、`tactical_tdm_match_records/`。检测到旧规则、冲突或恢复问题时，相关模式可能处于不可用状态，应先检查迁移报告。
 
-## 10. 开服前检查清单
+迁移步骤：
 
-- TaCZ 版本不低于 `1.1.6`
-- 地图已经真正保存到当前存档的 `serverconfig/codpattern/maps/`
-- 双方都有 `INITIAL` 点
-- 双方都有足够的 `DYNAMIC_CANDIDATE` 点
-- `endtp` 已配置
-- `weapon_filter.json` 已改成你的枪包策略
-- `maps/builtin/rules/config.json` 已按你的节奏重启生效
-- 世界存档与 `fpsmatch/` 已备份
+1. 停服，完整备份世界存档和运行目录中的 `fpsmatch/`。
+2. 启动服务器，确保受影响的地图没有成员、观战者或进行中的对局。
+3. 以权限等级 4 执行 `/cdp map migrate check`，查看源目录、目标目录和冲突报告。
+4. 确认报告后执行 `/cdp map migrate confirm`。
+5. 等待迁移结果，检查报告中的失败项，然后重启服务器。
+6. 重启后确认地图列表、规则、复活点和结束点，再试开一局。
 
-## 结束传送图形设置
+迁移按单元处理，先暂存并校验内容，再写入目标，核验目标成功后删除对应旧文件。冲突数据不会直接覆盖，部分失败时可能已有其他单元完成迁移。执行后受影响模式持续锁定到重启；处理失败原因后，可重新检查并继续确认迁移。
 
-地图管理工具现在提供「全局设置」和单张地图的「结束传送」页。全局值只用于之后新建的地图；坐标按钮只填入草稿，点击保存后生效。完整操作说明见 [结束传送与全局默认位置](end-teleport-settings.md)。
+世界中的报告位于 `serverconfig/codpattern/maps/.storage/migration.json`，运行目录的迁移标记位于 `fpsmatch/.codpattern-migrations/`。请保留这些记录，不要仅复制地图 JSON 后就删除其余文件。
+
+日常备份应复制完整世界存档。仍保留旧地图或迁移标记的服务器也要备份 `fpsmatch/`，同时记录原世界和运行目录的绝对路径。Zombies 等附属的存储迁移能力由对应附属注册，主模组不会代替未安装的附属解释其全部数据。
+
+**已有迁移记录的存档不能直接搬到任意新路径后使用。** `migration.json` 绑定世界绝对路径，迁移文件清单也记录绝对路径，外部迁移标记按世界路径生成名称。改变路径后可能报 `Invalid or relocated migration journal`，并阻止地图加载或使用。当前 `check`／`confirm` 不会自动修复跨路径搬迁；恢复此类备份时应优先保持原绝对路径和配套目录，不要通过删除日志或标记绕过检查。
+
+## 9. 常用命令
+
+| 命令 | 权限等级 | 作用 |
+|---|---:|---|
+| `/cdp screen` | 无额外等级要求，限玩家执行 | 打开背包界面 |
+| `/cdp update` | 2 | 重读筛选并同步在线玩家配置 |
+| `/cdp distribute [target]` | 2 | 强制发放当前预设；省略目标时发给所有在线玩家 |
+| `/cdp map list [type]` | 2 | 列出模式，或列出指定模式的地图 |
+| `/cdp map delete <type> <map>` | 2 | 提交地图删除请求 |
+| `/roomforceend <mode> <map>` | 2 | 强制结束当前轮次并处理恢复 |
+| `/cdp map endtp show <map>` | 3 | 查看结束点；不同模式同名时提示歧义 |
+| `/cdp map endtp set` | 3 | 用执行位置覆盖所有支持结束点的已有地图 |
+| `/cdp map migrate check` | 4 | 检查迁移计划与冲突 |
+| `/cdp map migrate confirm` | 4 | 执行迁移 |
+
+命令中的地图名建议统一用双引号包住，例如 `/roomforceend frontline "训练场 A"`，避免中文、空格或特殊字符导致参数解析失败。`/cdp mode debug ...` 和 `/cdp test` 也保留，用于诊断；完整参数和权限见 [项目概览](README.md)。
+
+## 10. 本地构建与验证
+
+本仓库是独立主模组 Gradle 工程，不会自动发现、编译或打包相邻的 Zombies 附属源码。附属应在自己的仓库构建，并按附属说明开展联合开发。
+
+构建需要完整的 `gradle/` 目录，包括 Wrapper 文件和 `build.gradle` 引用的构建脚本。当前仓库的 `.gitignore` 忽略了整个 `gradle/`，这些文件尚未纳入版本管理，因此干净克隆不能直接构建。请先补齐与源码版本一致的 `gradle/`；仅重新生成 Wrapper 仍缺少项目构建脚本。
+
+以下命令适用于文件完整的源码目录。使用 Java 17，在仓库根目录运行：
+
+```bash
+bash ./gradlew build
+bash ./gradlew runClient
+bash ./gradlew runServer
+```
+
+Linux／WSL 示例通过 `bash` 运行 Wrapper，不要求脚本已有执行权限。Windows 命令提示符可将 `bash ./gradlew` 替换为 `gradlew.bat`，PowerShell 使用 `.\gradlew.bat`。构建产物位于 `build/libs/`，开发运行目录为 `run/`。
+
+LR Tactical 默认只加入编译依赖，不加入开发运行环境。需要测试 LR 联动时显式启用：
+
+```bash
+bash ./gradlew runClient -PwithLrTactical=true
+bash ./gradlew runServer -PwithLrTactical=true
+bash ./gradlew runServer -PwithLrTactical=false
+```
+
+非专服开发运行会加入 Physics Mod 与 `tacz-addon`；专服、GameTest 相关入口会排除这些开发运行依赖。默认主模组验证入口为：
+
+```bash
+bash ./gradlew runMainCompatibilitySuite
+bash ./gradlew runGameTestServer
+```
+
+需要独立 GameTest 运行目录时，可加 `-PgameTestRunDir=run-gametest`。这些入口验证主模组拥有的通用能力、FTL／TDM 与 PVP 行为，附属测试在附属仓库执行。
