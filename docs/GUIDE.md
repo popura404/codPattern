@@ -551,66 +551,40 @@ LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投�
 - `kortac`
 - `specgru`
 
-### 7.2 `/cdp map` 命令链的实际行为
+### 7.2 地图命令与管理入口
 
-对应实现：`MapManagementCommand`
+对应实现：`MapManagementCommand`。创建、出生点和区域编辑使用下节的工具；这些操作原有的命令入口已移除。
 
-`/cdp map create <type> <map> <from> <to>`
+`/cdp map list [type]`
 
-- 先校验模式是否合法
-- 再校验地图名非空且未重复
-- 用对应模式的工厂构造 `BaseMap`
-- 注册到 FPSMCore
-- 立即持久化
-- 持久化失败时回滚注册
+- 不带参数时查看注册的模式；指定模式时列出该模式的地图。
 
 `/cdp map delete <type> <map>`
 
-- 先删持久化文件
-- 再把房间里的人踢出该地图
-- 调用 `resetGame`
-- 最后从 FPSMCore 注销地图
-
-`/cdp map spawn add ...`
-
-- 要求当前维度和地图维度一致
-- 要求坐标在地图区域内
-- 要求队伍存在
-- 要求复活点类型合法
-- 不能添加重复坐标
-- 保存失败时回滚到旧的 `TeamSpawnProfile`
-
-`/cdp map spawn remove ...`
-
-- 按 1 基序号删除
-- 删除后会清空已分配的出生点缓存
-- 删除 `INITIAL` 点后如果还有剩余 `INITIAL` 点，会重新分配
-
-`/cdp map spawn clear ...`
-
-- 清空指定队伍下指定类型的全部点
-- 保存失败时同样回滚
-
-`/cdp map spawn merge <type> <map>`
-
-- 仅 `teamdeathmatch` 可用
-- 会收集当前地图两队下全部 `DYNAMIC_CANDIDATE` 点并先去重
-- 合并结果会把这份去重后的动态点并集分别写回两队
-- 例如红队有 `abcde`，蓝队有 `abjh`，合并后两队都会得到 `abcdejh`
-- 合并结果仍然写回两队各自独立的 `TeamSpawnProfile`
-- 合并完成后管理员依然可以继续对两队独立增删动态复活点
-- 保存失败时同样回滚
+- 与地图管理页共用服务端删除协调器。
+- 先记录删除意图并禁止加入、开局和编辑，再结束对局、恢复玩家、移出成员及观战者。
+- 玩家恢复、实体回收和模式清理全部完成后，归档地图目录并从 FPSMCore 注销。
+- 恢复未完成或保存失败时保留地图；管理员可在地图管理页查看进度、重试或取消。
 
 `/cdp map endtp show <地图名>`
 
-- `show` 只按地图名查找
-- 如果不同模式下存在同名地图，会报歧义错误
+- 按地图名查看结束传送点；不同模式存在同名地图时提示歧义。
+- 地图管理页可按模式选中地图，查看或修改单图结束点。
 
 `/cdp map endtp set`
 
-- `set` 不再查地图名
-- 会把命令执行时所在维度、当前位置和朝向统一写到所有地图
-- `set` 会直接覆盖已有结束传送点
+- 用命令执行时所在维度、当前位置和朝向，覆盖所有支持结束点的已有地图。
+- 此命令仍保留；GUI 的全局默认设置只影响之后创建的地图。
+
+`/cdp map migrate check|confirm`
+
+- 先用 `check` 检查旧地图存储，再用 `confirm` 确认迁移。
+
+`/roomforceend <mode> <map>`
+
+- 结束对局并恢复玩家，保留房间成员；也可使用地图管理页的强制结束。
+
+`/cdp mode debug ...`、`/cdp test` 与背包命令 `screen`、`update`、`distribute` 保留。
 
 ### 7.3 工具物品工作流
 
@@ -629,7 +603,7 @@ LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投�
 - 右键方块：记录 `pos2`
 - `Ctrl + 右键`：打开工具界面，填写模式和地图名并执行创建
 
-工具会保留草稿信息，并在手持时渲染区域预览。
+工具会保留草稿信息，并在手持时渲染区域预览。FTL／TDM 使用此工具；安装 Zombies 附属后，僵尸地图使用附属部署工具的创建页。
 
 #### 复活点工具
 
@@ -645,8 +619,10 @@ LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投�
 - `Ctrl + 右键`：打开工具界面，选择模式、地图、队伍和点类型
 - 选择 `teamdeathmatch` 且当前点类型为 `DYNAMIC_CANDIDATE` 时，可直接在界面内对当前模式 + 地图执行动态点合并
 - 左键方块：在所点方块上方一格写入复活点
+- 界面内可查看点位列表、删除选中项或清空当前团队的当前点位层
+- 切换区域模式后，可查看区域列表、选取两个角点添加区域、删除选中项或清空当前区域层；可用图层由模式决定
 
-服务端校验与命令链一致：
+服务端负责校验：
 
 - 地图存在
 - 队伍存在
@@ -763,8 +739,8 @@ LR Tactical 未安装时，COD Pattern 会降级为空功能：LR 近战、投�
 2. 首次新建存档时启动服务器生成配置；旧存档升级时先按[迁移说明](map-storage-operations.md)检查，程序不会自动搬迁旧地图。
 3. 调整 `weapon_filter.json`，确认枪械分类和黑名单。
 4. 调整 `maps/builtin/rules/config.json`，然后重启服务器。
-5. 用 `/cdp map create` 建图。
-6. 给 `kortac` 和 `specgru` 至少各配置 `1` 个 `INITIAL` 点。
+5. 使用地图创建工具建立 FTL／TDM 地图；Zombies 使用附属部署工具。
+6. 使用出生点工具，给 `kortac` 和 `specgru` 至少各配置 `1` 个 `INITIAL` 点。
 7. 给双方继续配置足够数量的 `DYNAMIC_CANDIDATE` 点。
 8. 配置 `endtp`。
 9. 让玩家进房、选队、准备、发起开始投票。

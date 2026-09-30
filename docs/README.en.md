@@ -60,27 +60,26 @@ The project uses a server-authoritative design. Loadouts, filters, room state, a
 
 ### `/cdp`
 
-- `/cdp screen`
-  - Opens the backpack UI, mainly as a debug entrypoint.
-- `/cdp update`
-  - Reloads `weapon_filter.json` and syncs weapon-filter plus loadout data to all online players.
-- `/cdp distribute [target]`
-  - Forces equipment distribution.
+- `/cdp test`: Prints a test message.
+- `/cdp screen`: Opens the backpack UI.
+- `/cdp update`: Reloads weapon-filter configuration and syncs backpack and filter data to online players.
+- `/cdp distribute [target]`: Forces equipment distribution.
+- `/cdp mode debug room|entities|clear_entities|state|areas ...`: Inspects mode state or clears owned entities; provide the room or mode/map arguments required by the subcommand.
 
 ### `/cdp map`
 
-- `/cdp map list [type]`
-  - Lists registered types or maps under a type.
-- `/cdp map create <frontline|teamdeathmatch> <name> <from> <to>`
-  - Creates a map area and persists it immediately.
-- `/cdp map delete <type> <name>`
-  - Deletes the map and its persisted data.
-- `/cdp map spawn <list|add|remove|clear|merge> ...`
-  - Manages `INITIAL` / `DYNAMIC_CANDIDATE` spawn points and supports merging dynamic respawn candidates for a specific mode/map.
-- `/cdp map endtp show <map>`
-  - Shows the current match-end teleport point for a specific map.
-- `/cdp map endtp set`
-  - Writes the executor's current position and yaw into every registered map as the match-end teleport point; runtime validation still checks that the landing spot is usable.
+- `/cdp map list [type]`: Lists registered types or maps under a type.
+- `/cdp map delete <type> <name>`: Submits map deletion. The server ends the match, recovers and removes members and spectators, then archives the map directory and unregisters it after cleanup completes. Pending recovery retains the map; use Map Management to inspect progress, retry, or cancel.
+- `/cdp map endtp show <map>`: Shows a map's match-end teleport point.
+- `/cdp map endtp set`: Uses the executor's current position and yaw to overwrite the end point of every existing map that supports it.
+- `/cdp map migrate check|confirm`: Run `check` to inspect legacy map storage, then `confirm` to approve migration.
+
+### Force End and Map Tools
+
+- `/roomforceend <mode> <map>`: Ends the match and recovers players while retaining room membership. Map Management also provides Force End.
+- Create FTL/TDM maps with the Map Creator Tool (`codpattern:map_creator_tool`). Select two corners, then use `Ctrl + right-click` to open its creation screen. Zombies uses the addon's deployment tool.
+- Use the Spawn Point Tool (`codpattern:spawn_point_tool`) to view, add, remove, or clear spawn points and areas. Select the map, team, and point or area layer in its screen. Modes with dynamic spawns also support merging candidates.
+- Creation, spawn editing, and area editing now use these tools; their former commands are no longer registered.
 
 ## Configuration and Directories
 

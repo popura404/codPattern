@@ -8,6 +8,8 @@ import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.cdp.codpattern.compat.fpsmatch.map.CodTdmMap;
 import com.cdp.codpattern.config.storage.ServerMapStorage;
 import com.cdp.codpattern.network.map.*;
+import com.phasetranscrystal.fpsmatch.common.item.FPSMItemRegister;
+import com.phasetranscrystal.fpsmatch.common.packet.MapCreatorToolActionC2SPacket;
 import com.phasetranscrystal.fpsmatch.common.service.MapCreationService;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
 import com.phasetranscrystal.fpsmatch.core.data.AreaData;
@@ -18,6 +20,8 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 import java.nio.file.Files;
@@ -77,14 +81,14 @@ public final class EndTeleportGameTests {
             var defaultRevision = EndTeleportService.read(admin, null).revision();
             helper.assertTrue(EndTeleportService.save(admin, null, defaultRevision, second).code().equals("saved"), "change default");
             helper.assertTrue(EndTeleportService.read(admin, room).point().orElseThrow().equals(first), "existing map retains old default");
-            String commandName = prefix + "-command";
-            int commandResult = server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput()
-                    .withLevel(helper.getLevel()), "cdp map create frontline " + commandName + " 0 64 0 4 68 4");
-            helper.assertTrue(commandResult == 1, "command creation succeeds");
-            BaseMap commandMap = core.getMapByTypeWithName("frontline", commandName).orElseThrow();
-            maps.add(commandMap);
-            helper.assertTrue(EndTeleportService.read(admin, RoomId.of("frontline", commandName)).point().orElseThrow().equals(second),
-                    "command copies changed default");
+            String laterName = prefix + "-later-tool";
+            admin.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(FPSMItemRegister.MAP_CREATOR_TOOL.get()));
+            new MapCreatorToolActionC2SPacket(MapCreatorToolActionC2SPacket.Action.CREATE, "frontline", laterName,
+                    BlockPos.ZERO, new BlockPos(4, 4, 4)).process(admin);
+            BaseMap laterMap = core.getMapByTypeWithName("frontline", laterName).orElseThrow();
+            maps.add(laterMap);
+            helper.assertTrue(EndTeleportService.read(admin, RoomId.of("frontline", laterName)).point().orElseThrow().equals(second),
+                    "GUI creation request copies changed default");
             var mapSnapshot = EndTeleportService.read(admin, room);
             helper.assertTrue(mapSnapshot.editable(), "idle map supports editing");
             var current = MapAdminRequestPacket.teleport(MapAdminRequestPacket.Operation.CURRENT_POSITION,
@@ -178,10 +182,7 @@ public final class EndTeleportGameTests {
     }
 
     private static ServerPlayer player(GameTestHelper helper, boolean admin) {
-        return new ServerPlayer(helper.getLevel().getServer(), helper.getLevel(),
-                new com.mojang.authlib.GameProfile(UUID.randomUUID(), "endtp-test")) {
-            @Override public boolean hasPermissions(int permission) { return admin && permission <= 2; }
-        };
+        return MapToolGameTests.player(helper, admin, new ArrayList<>());
     }
 
     private static void roundTrip(GameTestHelper helper, MapAdminRequestPacket request, MapAdminResponsePacket response) {

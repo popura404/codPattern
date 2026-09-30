@@ -38,6 +38,36 @@ public final class MapToolGameTests {
     private MapToolGameTests() { }
 
     @GameTest(template = "empty", batch = "map_tools", timeoutTicks = 100)
+    public static void commandTreeKeepsAdministrationAndRemovesToolEditing(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        var root = server.getCommands().getDispatcher().getRoot();
+        var cdp = root.getChild("cdp");
+        var map = cdp.getChild("map");
+        helper.assertTrue(map.getChild("create") == null && map.getChild("spawn") == null && map.getChild("area") == null,
+                "map creation and point/area editing are available through tools only");
+        for (String retained : List.of("list", "delete", "endtp", "migrate")) {
+            helper.assertTrue(map.getChild(retained) != null, "retained map command: " + retained);
+        }
+        helper.assertTrue(map.getChild("endtp").getChild("show") != null
+                && map.getChild("endtp").getChild("set") != null, "both end-point commands remain registered");
+        helper.assertTrue(map.getChild("migrate").getChild("check") != null
+                && map.getChild("migrate").getChild("confirm") != null, "migration commands remain registered");
+        helper.assertTrue(cdp.getChild("mode").getChild("debug") != null
+                && root.getChild("roomforceend") != null, "debug and force-end commands remain registered");
+        for (String retained : List.of("test", "screen", "update", "distribute")) {
+            helper.assertTrue(cdp.getChild(retained) != null, "retained utility command: " + retained);
+        }
+        var source = server.createCommandSourceStack();
+        helper.assertTrue(!map.canUse(source.withPermission(1)) && map.canUse(source.withPermission(2)),
+                "map administration still requires OP2");
+        helper.assertTrue(!map.getChild("endtp").canUse(source.withPermission(2))
+                && map.getChild("endtp").canUse(source.withPermission(3)), "end-point commands still require OP3");
+        helper.assertTrue(!map.getChild("migrate").canUse(source.withPermission(3))
+                && map.getChild("migrate").canUse(source.withPermission(4)), "migration still requires OP4");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", batch = "map_tools", timeoutTicks = 100)
     public static void creatorFiltersModesAndRecoversOldDrafts(GameTestHelper helper) {
         var all = List.of("zombies", "frontline", "teamdeathmatch", "addon-mode");
         helper.assertTrue(MapCreatorToolModes.availableTypes(all).equals(List.of("teamdeathmatch", "frontline")),
@@ -141,7 +171,7 @@ public final class MapToolGameTests {
         return sent.stream().filter(packet -> packet instanceof ClientboundCustomPayloadPacket).count();
     }
 
-    private static ServerPlayer player(GameTestHelper helper, boolean administrator, List<Packet<?>> sent) {
+    static ServerPlayer player(GameTestHelper helper, boolean administrator, List<Packet<?>> sent) {
         var server = helper.getLevel().getServer();
         var player = new ServerPlayer(server, helper.getLevel(), new GameProfile(UUID.randomUUID(), "map-tool-test")) {
             @Override public boolean hasPermissions(int permission) { return administrator && permission <= 2; }

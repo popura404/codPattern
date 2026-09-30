@@ -67,6 +67,8 @@
 /cdp map list teamdeathmatch
 ```
 
+也可打开地图管理页查看列表。需要新建地图时，FTL／TDM 使用地图创建工具，Zombies 使用附属部署工具；出生点和区域编辑使用出生点工具。
+
 再到当前世界存档中检查：
 
 - `serverconfig/codpattern/maps/builtin/frontline/`
@@ -172,12 +174,12 @@
 
 因为现在只有 `endtp show` 还会按地图名查找，且不带模式参数。
 
-如果 `frontline` 和 `teamdeathmatch` 下存在同名地图，`show` / `set` 都会报歧义。
+如果 `frontline` 和 `teamdeathmatch` 下存在同名地图，`show` 会报歧义；批量 `set` 不按名称查找，不受同名地图影响。
 
 处理方式：
 
-- 避免两个模式使用同名地图
-- 或先删掉其中一个重名地图再设置
+- 在地图管理页按模式选择地图，查看或修改单图结束点
+- 需要继续使用 `show` 时，可先在地图管理页重命名地图
 
 ## 12. 为什么新增背包后没有自动切过去
 

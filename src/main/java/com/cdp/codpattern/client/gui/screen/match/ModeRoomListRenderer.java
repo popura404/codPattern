@@ -171,7 +171,7 @@ public final class ModeRoomListRenderer {
             GuiTextHelper.drawReferenceString(
                     graphics,
                     mc.font,
-                    resolveCreateCommand(modeFilterGameType),
+                    resolveCreateHint(modeFilterGameType),
                     roomListX + panelPadding,
                     emptyY + (referenceLineHeight + GuiTextHelper.referenceScaled(3)) * 2,
                     scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
@@ -639,11 +639,16 @@ public final class ModeRoomListRenderer {
         return GuiTextHelper.referenceScaled(BASE_FOOTER_SECTION_HEIGHT);
     }
 
-    private static Component resolveCreateCommand(String modeFilterGameType) {
+    private static Component resolveCreateHint(String modeFilterGameType) {
         if (modeFilterGameType == null || modeFilterGameType.isBlank()) {
             return Component.translatable("screen.codpattern.room.create_command");
         }
-        return Component.translatable("screen.codpattern.room.create_command_filtered", modeFilterGameType);
+        return GameModeRegistry.find(modeFilterGameType)
+                .map(ModeDescriptor::createCommand)
+                .filter(hint -> !hint.isBlank())
+                .<Component>map(Component::translatable)
+                .orElseGet(() -> Component.translatable(
+                        "screen.codpattern.room.create_command_filtered", modeFilterGameType));
     }
 
     private static int scaleAlpha(int color, float factor) {

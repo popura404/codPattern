@@ -3,37 +3,23 @@ package com.cdp.codpattern.command;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.ModeRoomBackedMap;
 import com.cdp.codpattern.app.match.ModeRoomHandle;
-import com.cdp.codpattern.app.match.editor.ModeAreaData;
 import com.cdp.codpattern.app.match.editor.ModeMapEditorSchemas;
 import com.cdp.codpattern.app.match.editor.ModeObjectData;
-import com.cdp.codpattern.app.match.editor.ModePointData;
 import com.cdp.codpattern.app.match.port.ModeMapEditPort;
-import com.cdp.codpattern.app.match.persistence.ModeMapPersistenceRegistry;
-import com.cdp.codpattern.app.match.service.DynamicSpawnMergeService;
 import com.cdp.codpattern.compat.fpsmatch.data.CodMapPersistence;
 import com.mojang.brigadier.context.CommandContext;
-import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
-import com.mojang.brigadier.suggestion.Suggestions;
 import com.phasetranscrystal.fpsmatch.core.FPSMCore;
-import com.phasetranscrystal.fpsmatch.core.data.AreaData;
 import com.phasetranscrystal.fpsmatch.core.data.SpawnPointData;
-import com.phasetranscrystal.fpsmatch.core.data.SpawnPointKind;
-import com.phasetranscrystal.fpsmatch.core.data.TeamSpawnProfile;
-import com.phasetranscrystal.fpsmatch.core.data.save.FPSMDataManager;
 import com.phasetranscrystal.fpsmatch.core.map.BaseMap;
-import com.phasetranscrystal.fpsmatch.core.map.BaseTeam;
 import com.phasetranscrystal.fpsmatch.common.item.MapCreatorTool;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
-import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec2;
 
 import java.util.ArrayList;
@@ -45,7 +31,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 public final class MapManagementCommand {
     private static final int MAP_PERMISSION_LEVEL = 2;
@@ -57,22 +42,6 @@ public final class MapManagementCommand {
             (context, builder) -> SharedSuggestionProvider.suggest(mapNamesForContextType(context), builder);
     private static final SuggestionProvider<CommandSourceStack> ALL_MAP_SUGGESTIONS =
             (context, builder) -> SharedSuggestionProvider.suggest(allMapNames(), builder);
-    private static final SuggestionProvider<CommandSourceStack> TEAM_SUGGESTIONS =
-            (context, builder) -> {
-                BaseMap map = resolveMapFromContext(context);
-                if (map == null) {
-                    return Suggestions.empty();
-                }
-                List<String> teamNames = map.getMapTeams().getTeams().stream()
-                        .map(team -> team.name)
-                        .sorted(String.CASE_INSENSITIVE_ORDER)
-                        .toList();
-                return SharedSuggestionProvider.suggest(teamNames, builder);
-            };
-    private static final SuggestionProvider<CommandSourceStack> SPAWN_KIND_SUGGESTIONS =
-            (context, builder) -> SharedSuggestionProvider.suggest(spawnKindsForContextType(context), builder);
-    private static final SuggestionProvider<CommandSourceStack> AREA_LAYER_SUGGESTIONS =
-            (context, builder) -> SharedSuggestionProvider.suggest(areaLayersForContextType(context), builder);
 
     private MapManagementCommand() {
     }
@@ -91,19 +60,6 @@ public final class MapManagementCommand {
                                 context.getSource(),
                                 StringArgumentType.getString(context, "type")))));
 
-        root.then(Commands.literal("create")
-                .then(Commands.argument("type", StringArgumentType.word())
-                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                        .then(Commands.argument("map", StringArgumentType.string())
-                                .then(Commands.argument("from", BlockPosArgument.blockPos())
-                                        .then(Commands.argument("to", BlockPosArgument.blockPos())
-                                                .executes(context -> createMap(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "type"),
-                                                        StringArgumentType.getString(context, "map"),
-                                                        BlockPosArgument.getLoadedBlockPos(context, "from"),
-                                                        BlockPosArgument.getLoadedBlockPos(context, "to"))))))));
-
         root.then(Commands.literal("delete")
                 .then(Commands.argument("type", StringArgumentType.word())
                         .suggests(REGISTERED_TYPE_SUGGESTIONS)
@@ -113,139 +69,6 @@ public final class MapManagementCommand {
                                         context.getSource(),
                                         StringArgumentType.getString(context, "type"),
                                         StringArgumentType.getString(context, "map"))))));
-
-        LiteralArgumentBuilder<CommandSourceStack> spawn = Commands.literal("spawn");
-        spawn.then(Commands.literal("list")
-                .then(Commands.argument("type", StringArgumentType.word())
-                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                        .then(Commands.argument("map", StringArgumentType.string())
-                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                .then(Commands.argument("team", StringArgumentType.word())
-                                        .suggests(TEAM_SUGGESTIONS)
-                                        .then(Commands.argument("kind", StringArgumentType.word())
-                                                .suggests(SPAWN_KIND_SUGGESTIONS)
-                                                .executes(context -> listSpawnPoints(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "type"),
-                                                        StringArgumentType.getString(context, "map"),
-                                                        StringArgumentType.getString(context, "team"),
-                                                        StringArgumentType.getString(context, "kind"))))))));
-        spawn.then(Commands.literal("add")
-                .then(Commands.argument("type", StringArgumentType.word())
-                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                        .then(Commands.argument("map", StringArgumentType.string())
-                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                .then(Commands.argument("team", StringArgumentType.word())
-                                        .suggests(TEAM_SUGGESTIONS)
-                                        .then(Commands.argument("kind", StringArgumentType.word())
-                                                .suggests(SPAWN_KIND_SUGGESTIONS)
-                                                .then(Commands.argument("pos", BlockPosArgument.blockPos())
-                                                        .executes(context -> addSpawnPoint(
-                                                                context.getSource(),
-                                                                StringArgumentType.getString(context, "type"),
-                                                                StringArgumentType.getString(context, "map"),
-                                                                StringArgumentType.getString(context, "team"),
-                                                                StringArgumentType.getString(context, "kind"),
-                                                                BlockPosArgument.getLoadedBlockPos(context, "pos")))))))));
-        spawn.then(Commands.literal("remove")
-                .then(Commands.argument("type", StringArgumentType.word())
-                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                        .then(Commands.argument("map", StringArgumentType.string())
-                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                .then(Commands.argument("team", StringArgumentType.word())
-                                        .suggests(TEAM_SUGGESTIONS)
-                                        .then(Commands.argument("kind", StringArgumentType.word())
-                                                .suggests(SPAWN_KIND_SUGGESTIONS)
-                                                .then(Commands.argument("index", IntegerArgumentType.integer(1))
-                                                        .executes(context -> removeSpawnPoint(
-                                                                context.getSource(),
-                                                                StringArgumentType.getString(context, "type"),
-                                                                StringArgumentType.getString(context, "map"),
-                                                                StringArgumentType.getString(context, "team"),
-                                                                StringArgumentType.getString(context, "kind"),
-                                                                IntegerArgumentType.getInteger(context, "index")))))))));
-        spawn.then(Commands.literal("clear")
-                .then(Commands.argument("type", StringArgumentType.word())
-                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                        .then(Commands.argument("map", StringArgumentType.string())
-                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                .then(Commands.argument("team", StringArgumentType.word())
-                                        .suggests(TEAM_SUGGESTIONS)
-                                        .then(Commands.argument("kind", StringArgumentType.word())
-                                                .suggests(SPAWN_KIND_SUGGESTIONS)
-                                                .executes(context -> clearSpawnPoints(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "type"),
-                                                        StringArgumentType.getString(context, "map"),
-                                                        StringArgumentType.getString(context, "team"),
-                                                        StringArgumentType.getString(context, "kind"))))))));
-        spawn.then(Commands.literal("merge")
-                .then(Commands.argument("type", StringArgumentType.word())
-                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                        .then(Commands.argument("map", StringArgumentType.string())
-                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                .executes(context -> mergeDynamicSpawnPoints(
-                                        context.getSource(),
-                                        StringArgumentType.getString(context, "type"),
-                                        StringArgumentType.getString(context, "map"))))));
-        root.then(spawn);
-
-        LiteralArgumentBuilder<CommandSourceStack> area = Commands.literal("area");
-        area.then(Commands.literal("list")
-                .then(Commands.argument("type", StringArgumentType.word())
-                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                        .then(Commands.argument("map", StringArgumentType.string())
-                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                .then(Commands.argument("layer", StringArgumentType.word())
-                                        .suggests(AREA_LAYER_SUGGESTIONS)
-                                        .executes(context -> listAreaLayerAreas(
-                                                context.getSource(),
-                                                StringArgumentType.getString(context, "type"),
-                                                StringArgumentType.getString(context, "map"),
-                                                StringArgumentType.getString(context, "layer")))))));
-        area.then(Commands.literal("add")
-                .then(Commands.argument("type", StringArgumentType.word())
-                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                        .then(Commands.argument("map", StringArgumentType.string())
-                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                .then(Commands.argument("layer", StringArgumentType.word())
-                                        .suggests(AREA_LAYER_SUGGESTIONS)
-                                        .then(Commands.argument("from", BlockPosArgument.blockPos())
-                                                .then(Commands.argument("to", BlockPosArgument.blockPos())
-                                                        .executes(context -> addAreaLayerArea(
-                                                                context.getSource(),
-                                                                StringArgumentType.getString(context, "type"),
-                                                                StringArgumentType.getString(context, "map"),
-                                                                StringArgumentType.getString(context, "layer"),
-                                                                BlockPosArgument.getLoadedBlockPos(context, "from"),
-                                                                BlockPosArgument.getLoadedBlockPos(context, "to")))))))));
-        area.then(Commands.literal("remove")
-                .then(Commands.argument("type", StringArgumentType.word())
-                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                        .then(Commands.argument("map", StringArgumentType.string())
-                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                .then(Commands.argument("layer", StringArgumentType.word())
-                                        .suggests(AREA_LAYER_SUGGESTIONS)
-                                        .then(Commands.argument("index", IntegerArgumentType.integer(1))
-                                                .executes(context -> removeAreaLayerArea(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "type"),
-                                                        StringArgumentType.getString(context, "map"),
-                                                        StringArgumentType.getString(context, "layer"),
-                                                        IntegerArgumentType.getInteger(context, "index"))))))));
-        area.then(Commands.literal("clear")
-                .then(Commands.argument("type", StringArgumentType.word())
-                        .suggests(REGISTERED_TYPE_SUGGESTIONS)
-                        .then(Commands.argument("map", StringArgumentType.string())
-                                .suggests(MAP_BY_TYPE_SUGGESTIONS)
-                                .then(Commands.argument("layer", StringArgumentType.word())
-                                        .suggests(AREA_LAYER_SUGGESTIONS)
-                                        .executes(context -> clearAreaLayerAreas(
-                                                context.getSource(),
-                                                StringArgumentType.getString(context, "type"),
-                                                StringArgumentType.getString(context, "map"),
-                                                StringArgumentType.getString(context, "layer")))))));
-        root.then(area);
 
         LiteralArgumentBuilder<CommandSourceStack> endtp = Commands.literal("endtp")
                 .requires(source -> source.hasPermission(END_TELEPORT_PERMISSION_LEVEL));
@@ -287,46 +110,6 @@ public final class MapManagementCommand {
         return maps.size();
     }
 
-    private static int createMap(CommandSourceStack source, String rawType, String mapName, BlockPos from, BlockPos to) {
-        String type = resolveGameType(source, rawType);
-        if (type == null) {
-            return 0;
-        }
-        if (mapName == null || mapName.isBlank()) {
-            source.sendFailure(Component.translatable("message.fpsm.map_creator_tool.invalid_name"));
-            return 0;
-        }
-        FPSMCore core = FPSMCore.getInstance();
-        if (core.isRegistered(type, mapName)) {
-            source.sendFailure(Component.translatable("message.fpsm.map_creator_tool.duplicate_map", mapName));
-            return 0;
-        }
-        var factory = core.getPreBuildGame(type);
-        if (factory == null) {
-            source.sendFailure(Component.translatable("message.fpsm.map_creator_tool.invalid_type"));
-            return 0;
-        }
-        try {
-            com.cdp.codpattern.config.storage.ServerMapStorage.get(source.getServer()).requireCreate(type, mapName);
-        } catch (RuntimeException e) {
-            source.sendFailure(Component.literal(e.getMessage())); return 0;
-        }
-        BaseMap newMap;
-        try {
-            newMap = factory.apply(source.getLevel(), mapName, new AreaData(from, to));
-            com.cdp.codpattern.app.match.management.EndTeleportService.registerAndSaveNew(source.getServer(), newMap);
-        } catch (RuntimeException e) {
-            com.mojang.logging.LogUtils.getLogger().error("Failed to create map {}/{}", type, mapName, e);
-            com.cdp.codpattern.config.storage.ServerMapStorage.get(source.getServer()).abandonCreation(type, mapName);
-            if (e instanceof com.cdp.codpattern.config.storage.MapDefaultsStore.Unavailable)
-                source.sendFailure(Component.translatable("screen.codpattern.end_teleport.defaults_unavailable"));
-            source.sendFailure(Component.translatable("message.codpattern.map.create_save_failed_rollback", type, mapName));
-            return 0;
-        }
-        source.sendSuccess(() -> Component.translatable("commands.fpsm.create.success", mapName), true);
-        return 1;
-    }
-
     private static int deleteMap(CommandSourceStack source, String rawType, String mapName) {
         BaseMap map = requireMap(source, rawType, mapName);
         if (map == null) {
@@ -343,371 +126,6 @@ public final class MapManagementCommand {
                 view.id().toString(), Component.translatable("screen.codpattern.map_admin.deletion." + view.stage().name()),
                 Component.translatable("screen.codpattern.map_admin.deletion_reason." + (view.reason().isEmpty() ? "none" : view.reason()))), false);
         return 1;
-    }
-
-    private static int listSpawnPoints(CommandSourceStack source, String rawType, String mapName, String teamName, String rawKind) {
-        BaseMap map = requireMap(source, rawType, mapName);
-        if (map == null) {
-            return 0;
-        }
-        BaseTeam team = requireTeam(source, map, teamName);
-        if (team == null) {
-            return 0;
-        }
-        String layerKey = resolvePointLayer(source, map, rawKind);
-        if (layerKey == null) {
-            return 0;
-        }
-        ModeMapEditPort editPort = requireMapEditPort(source, map, layerKey);
-        if (editPort == null) {
-            return 0;
-        }
-        List<ModePointData> spawnPoints = editPort.pointLayerPoints(team.name, layerKey);
-        source.sendSuccess(() -> Component.translatable(
-                "command.codpattern.map.spawn.list.header",
-                map.getGameType(),
-                map.getMapName(),
-                team.name,
-                layerKey,
-                spawnPoints.size()), false);
-        if (spawnPoints.isEmpty()) {
-            source.sendSuccess(() -> Component.translatable("command.codpattern.map.spawn.list.none"), false);
-            return 0;
-        }
-        for (int i = 0; i < spawnPoints.size(); i++) {
-            ModePointData point = spawnPoints.get(i);
-            int index = i + 1;
-            source.sendSuccess(() -> Component.translatable(
-                    "command.codpattern.map.spawn.list.entry",
-                    index,
-                    point.dimension().location(),
-                    point.position().getX(),
-                    point.position().getY(),
-                    point.position().getZ(),
-                    formatAngle(point.yaw())), false);
-        }
-        return spawnPoints.size();
-    }
-
-    private static int addSpawnPoint(CommandSourceStack source, String rawType, String mapName, String teamName,
-            String rawKind, BlockPos pos) {
-        BaseMap map = requireEditableMap(source, rawType, mapName);
-        if (map == null) {
-            return 0;
-        }
-        if (!validateMapPosition(source, map, pos)) {
-            return 0;
-        }
-        BaseTeam team = requireTeam(source, map, teamName);
-        if (team == null) {
-            return 0;
-        }
-        String layerKey = resolvePointLayer(source, map, rawKind);
-        if (layerKey == null) {
-            return 0;
-        }
-        ModeMapEditPort editPort = requireMapEditPort(source, map, layerKey);
-        if (editPort == null) {
-            return 0;
-        }
-        List<ModePointData> previousPoints = editPort.pointLayerPoints(team.name, layerKey);
-
-        ModePointData spawnPoint = new ModePointData(
-                layerKey,
-                source.getLevel().dimension(),
-                pos,
-                currentYaw(source),
-                0.0F);
-        if (!editPort.addPointLayerPoint(team.name, spawnPoint)) {
-            source.sendFailure(Component.translatable("message.fpsm.spawn_point_tool.duplicate"));
-            return 0;
-        }
-        try {
-            CodMapPersistence.saveMapOrRollback(
-                    map,
-                    () -> editPort.replacePointLayerPoints(team.name, layerKey, previousPoints));
-        } catch (RuntimeException e) {
-            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
-            return 0;
-        }
-        map.syncToClient();
-        source.sendSuccess(() -> Component.translatable(
-                "message.fpsm.spawn_point_tool.added",
-                MapCreatorTool.formatPos(pos)), true);
-        return 1;
-    }
-
-    private static int removeSpawnPoint(CommandSourceStack source, String rawType, String mapName, String teamName,
-            String rawKind, int oneBasedIndex) {
-        BaseMap map = requireEditableMap(source, rawType, mapName);
-        if (map == null) {
-            return 0;
-        }
-        BaseTeam team = requireTeam(source, map, teamName);
-        if (team == null) {
-            return 0;
-        }
-        String layerKey = resolvePointLayer(source, map, rawKind);
-        if (layerKey == null) {
-            return 0;
-        }
-        ModeMapEditPort editPort = requireMapEditPort(source, map, layerKey);
-        if (editPort == null) {
-            return 0;
-        }
-        List<ModePointData> previousPoints = editPort.pointLayerPoints(team.name, layerKey);
-
-        int zeroBasedIndex = oneBasedIndex - 1;
-        Optional<ModePointData> removed = editPort.removePointLayerPoint(team.name, layerKey, zeroBasedIndex);
-        if (removed.isEmpty()) {
-            source.sendFailure(Component.translatable("command.codpattern.map.spawn.invalid_index", oneBasedIndex));
-            return 0;
-        }
-        try {
-            CodMapPersistence.saveMapOrRollback(
-                    map,
-                    () -> editPort.replacePointLayerPoints(team.name, layerKey, previousPoints));
-        } catch (RuntimeException e) {
-            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
-            return 0;
-        }
-        map.syncToClient();
-        ModePointData point = removed.get();
-        source.sendSuccess(() -> Component.translatable(
-                "command.codpattern.map.spawn.removed",
-                layerKey,
-                oneBasedIndex,
-                MapCreatorTool.formatPos(point.position())), true);
-        return 1;
-    }
-
-    private static int clearSpawnPoints(CommandSourceStack source, String rawType, String mapName, String teamName,
-            String rawKind) {
-        BaseMap map = requireEditableMap(source, rawType, mapName);
-        if (map == null) {
-            return 0;
-        }
-        BaseTeam team = requireTeam(source, map, teamName);
-        if (team == null) {
-            return 0;
-        }
-        String layerKey = resolvePointLayer(source, map, rawKind);
-        if (layerKey == null) {
-            return 0;
-        }
-        ModeMapEditPort editPort = requireMapEditPort(source, map, layerKey);
-        if (editPort == null) {
-            return 0;
-        }
-        List<ModePointData> previousPoints = editPort.pointLayerPoints(team.name, layerKey);
-
-        int removedCount = editPort.clearPointLayerPoints(team.name, layerKey);
-        try {
-            CodMapPersistence.saveMapOrRollback(
-                    map,
-                    () -> editPort.replacePointLayerPoints(team.name, layerKey, previousPoints));
-        } catch (RuntimeException e) {
-            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
-            return 0;
-        }
-        map.syncToClient();
-        source.sendSuccess(() -> Component.translatable(
-                "command.codpattern.map.spawn.cleared",
-                team.name,
-                layerKey,
-                removedCount), true);
-        return removedCount;
-    }
-
-    private static int mergeDynamicSpawnPoints(CommandSourceStack source, String rawType, String mapName) {
-        BaseMap map = requireEditableMap(source, rawType, mapName);
-        if (map == null) {
-            return 0;
-        }
-        if (!ModeMapEditorSchemas.supportsDynamicRespawnMerge(map.getGameType())) {
-            source.sendFailure(Component.translatable(
-                    "command.codpattern.map.spawn.merge.unsupported_mode",
-                    map.getGameType()));
-            return 0;
-        }
-
-        List<BaseTeam> teams = map.getMapTeams().getTeams();
-        if (teams.size() != 2) {
-            source.sendFailure(Component.translatable(
-                    "command.codpattern.map.spawn.merge.invalid_team_count",
-                    map.getGameType(),
-                    map.getMapName(),
-                    teams.size()));
-            return 0;
-        }
-
-        DynamicSpawnMergeService.MergeResult mergeResult =
-                DynamicSpawnMergeService.mergeDynamicSpawnCandidates(teams);
-        if (mergeResult.uniqueDynamicPointCount() <= 0) {
-            source.sendFailure(Component.translatable(
-                    "command.codpattern.map.spawn.merge.none",
-                    map.getGameType(),
-                    map.getMapName()));
-            return 0;
-        }
-
-        Map<BaseTeam, TeamSpawnProfile> previousProfiles = captureTeamSpawnProfiles(teams);
-        for (BaseTeam team : teams) {
-            TeamSpawnProfile currentProfile = team.getSpawnProfile();
-            team.setSpawnProfile(new TeamSpawnProfile(
-                    currentProfile.initialSpawnPoints(),
-                    mergeResult.dynamicPointsByTeam().getOrDefault(team.name, List.of())
-            ));
-            team.clearPlayerSpawnPointAssignments();
-        }
-
-        try {
-            CodMapPersistence.saveMapOrRollback(map, () -> restoreTeamSpawnProfiles(previousProfiles));
-        } catch (RuntimeException e) {
-            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
-            return 0;
-        }
-
-        map.syncToClient();
-        BaseTeam firstTeam = teams.get(0);
-        BaseTeam secondTeam = teams.get(1);
-        source.sendSuccess(() -> Component.translatable(
-                "command.codpattern.map.spawn.merge.success",
-                map.getGameType(),
-                map.getMapName(),
-                mergeResult.uniqueDynamicPointCount(),
-                firstTeam.name,
-                mergeResult.countForTeam(firstTeam.name),
-                secondTeam.name,
-                mergeResult.countForTeam(secondTeam.name)), true);
-        return mergeResult.uniqueDynamicPointCount();
-    }
-
-    private static int listAreaLayerAreas(CommandSourceStack source, String rawType, String mapName, String rawLayerKey) {
-        BaseMap map = requireMap(source, rawType, mapName);
-        if (map == null) {
-            return 0;
-        }
-        String layerKey = resolveAreaLayer(source, map, rawLayerKey);
-        if (layerKey == null) {
-            return 0;
-        }
-        ModeMapEditPort editPort = requireAreaEditPort(source, map, layerKey);
-        if (editPort == null) {
-            return 0;
-        }
-
-        List<ModeAreaData> areas = editPort.areaLayerAreas(layerKey);
-        source.sendSuccess(() -> Component.literal("Area layer " + map.getGameType() + "/" + map.getMapName()
-                + " " + layerKey + ": " + areas.size() + " area(s)"), false);
-        for (int i = 0; i < areas.size(); i++) {
-            ModeAreaData area = areas.get(i);
-            AreaData data = area.area();
-            int index = i + 1;
-            source.sendSuccess(() -> Component.literal(index + ". "
-                    + area.dimension().location()
-                    + " from " + MapCreatorTool.formatPos(data.pos1())
-                    + " to " + MapCreatorTool.formatPos(data.pos2())
-                    + (area.scopeKey().isBlank() ? "" : " scope=" + area.scopeKey())), false);
-        }
-        return areas.size();
-    }
-
-    private static int addAreaLayerArea(CommandSourceStack source, String rawType, String mapName, String rawLayerKey,
-            BlockPos from, BlockPos to) {
-        BaseMap map = requireEditableMap(source, rawType, mapName);
-        if (map == null) {
-            return 0;
-        }
-        if (!validateMapPosition(source, map, from) || !validateMapPosition(source, map, to)) {
-            return 0;
-        }
-        String layerKey = resolveAreaLayer(source, map, rawLayerKey);
-        if (layerKey == null) {
-            return 0;
-        }
-        ModeMapEditPort editPort = requireAreaEditPort(source, map, layerKey);
-        if (editPort == null) {
-            return 0;
-        }
-        List<ModeAreaData> previousAreas = editPort.areaLayerAreas(layerKey);
-        ModeAreaData area = new ModeAreaData(
-                layerKey,
-                source.getLevel().dimension(),
-                new AreaData(from, to),
-                "",
-                new CompoundTag());
-        if (!editPort.addAreaLayerArea(area)) {
-            source.sendFailure(Component.literal("Area layer rejected the new area: " + layerKey));
-            return 0;
-        }
-        try {
-            CodMapPersistence.saveMapOrRollback(map, () -> editPort.replaceAreaLayerAreas(layerKey, previousAreas));
-        } catch (RuntimeException e) {
-            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
-            return 0;
-        }
-        map.syncToClient();
-        source.sendSuccess(() -> Component.literal("Added area to " + layerKey + " from "
-                + MapCreatorTool.formatPos(from) + " to " + MapCreatorTool.formatPos(to)), true);
-        return 1;
-    }
-
-    private static int removeAreaLayerArea(CommandSourceStack source, String rawType, String mapName, String rawLayerKey,
-            int oneBasedIndex) {
-        BaseMap map = requireEditableMap(source, rawType, mapName);
-        if (map == null) {
-            return 0;
-        }
-        String layerKey = resolveAreaLayer(source, map, rawLayerKey);
-        if (layerKey == null) {
-            return 0;
-        }
-        ModeMapEditPort editPort = requireAreaEditPort(source, map, layerKey);
-        if (editPort == null) {
-            return 0;
-        }
-        List<ModeAreaData> previousAreas = editPort.areaLayerAreas(layerKey);
-        Optional<ModeAreaData> removed = editPort.removeAreaLayerArea(layerKey, oneBasedIndex - 1);
-        if (removed.isEmpty()) {
-            source.sendFailure(Component.literal("Invalid area index: " + oneBasedIndex));
-            return 0;
-        }
-        try {
-            CodMapPersistence.saveMapOrRollback(map, () -> editPort.replaceAreaLayerAreas(layerKey, previousAreas));
-        } catch (RuntimeException e) {
-            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
-            return 0;
-        }
-        map.syncToClient();
-        source.sendSuccess(() -> Component.literal("Removed area " + oneBasedIndex + " from " + layerKey), true);
-        return 1;
-    }
-
-    private static int clearAreaLayerAreas(CommandSourceStack source, String rawType, String mapName, String rawLayerKey) {
-        BaseMap map = requireEditableMap(source, rawType, mapName);
-        if (map == null) {
-            return 0;
-        }
-        String layerKey = resolveAreaLayer(source, map, rawLayerKey);
-        if (layerKey == null) {
-            return 0;
-        }
-        ModeMapEditPort editPort = requireAreaEditPort(source, map, layerKey);
-        if (editPort == null) {
-            return 0;
-        }
-        List<ModeAreaData> previousAreas = editPort.areaLayerAreas(layerKey);
-        int removedCount = editPort.clearAreaLayerAreas(layerKey);
-        try {
-            CodMapPersistence.saveMapOrRollback(map, () -> editPort.replaceAreaLayerAreas(layerKey, previousAreas));
-        } catch (RuntimeException e) {
-            source.sendFailure(Component.translatable("message.codpattern.map.save_failed", map.getGameType(), map.getMapName()));
-            return 0;
-        }
-        map.syncToClient();
-        source.sendSuccess(() -> Component.literal("Cleared " + removedCount + " area(s) from " + layerKey), true);
-        return removedCount;
     }
 
     private static int showMatchEndTeleport(CommandSourceStack source, String mapName) {
@@ -804,16 +222,6 @@ public final class MapManagementCommand {
         return type;
     }
 
-    private static BaseMap requireEditableMap(CommandSourceStack source, String rawType, String mapName) {
-        BaseMap map = requireMap(source, rawType, mapName);
-        if (map != null && com.cdp.codpattern.app.match.management.MapDeletionCoordinator.get(source.getServer())
-                .blocks(com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.id(map))) {
-            source.sendFailure(Component.translatable("screen.codpattern.map_admin.disabled.deletion_pending"));
-            return null;
-        }
-        return map;
-    }
-
     private static BaseMap requireMap(CommandSourceStack source, String rawType, String mapName) {
         if (!com.cdp.codpattern.config.storage.ServerMapStorage.canUse(GameModeRegistry.canonicalize(rawType))) {
             source.sendFailure(Component.translatable("message.codpattern.storage.locked")); return null;
@@ -847,74 +255,6 @@ public final class MapManagementCommand {
             return null;
         }
         return maps.get(0);
-    }
-
-    private static BaseTeam requireTeam(CommandSourceStack source, BaseMap map, String teamName) {
-        Optional<BaseTeam> team = map.getMapTeams().getTeamByName(teamName);
-        if (team.isEmpty()) {
-            source.sendFailure(Component.translatable("message.fpsm.spawn_point_tool.team_not_found", teamName));
-            return null;
-        }
-        return team.get();
-    }
-
-    private static String resolvePointLayer(CommandSourceStack source, BaseMap map, String rawLayerKey) {
-        Optional<String> layerKey = ModeMapEditorSchemas.resolvePointLayerKey(
-                map == null ? defaultGameType() : map.getGameType(),
-                rawLayerKey);
-        if (layerKey.isPresent()) {
-            return layerKey.get();
-        }
-        source.sendFailure(Component.translatable(
-                "command.codpattern.map.invalid_kind",
-                rawLayerKey == null || rawLayerKey.isBlank()
-                        ? SpawnPointKind.INITIAL.serializedName()
-                        : rawLayerKey));
-        return null;
-    }
-
-    private static String resolveAreaLayer(CommandSourceStack source, BaseMap map, String rawLayerKey) {
-        Optional<String> layerKey = ModeMapEditorSchemas.resolveAreaLayerKey(
-                map == null ? defaultGameType() : map.getGameType(),
-                rawLayerKey);
-        if (layerKey.isPresent()) {
-            return layerKey.get();
-        }
-        source.sendFailure(Component.literal("Unsupported area layer: "
-                + (rawLayerKey == null || rawLayerKey.isBlank() ? "<blank>" : rawLayerKey)));
-        return null;
-    }
-
-    private static ModeMapEditPort requireMapEditPort(CommandSourceStack source, BaseMap map, String layerKey) {
-        Optional<ModeMapEditPort> editPort = mapEditPort(map)
-                .filter(port -> port.supportsPointLayer(layerKey));
-        if (editPort.isPresent()) {
-            return editPort.get();
-        }
-        source.sendFailure(Component.translatable("command.codpattern.map.invalid_kind", layerKey));
-        return null;
-    }
-
-    private static ModeMapEditPort requireAreaEditPort(CommandSourceStack source, BaseMap map, String layerKey) {
-        Optional<ModeMapEditPort> editPort = mapEditPort(map)
-                .filter(port -> port.supportsAreaLayer(layerKey));
-        if (editPort.isPresent()) {
-            return editPort.get();
-        }
-        source.sendFailure(Component.literal("Unsupported area layer: " + layerKey));
-        return null;
-    }
-
-    private static boolean validateMapPosition(CommandSourceStack source, BaseMap map, BlockPos pos) {
-        if (!map.getServerLevel().dimension().equals(source.getLevel().dimension())) {
-            source.sendFailure(Component.translatable("message.fpsm.spawn_point_tool.dimension_mismatch"));
-            return false;
-        }
-        if (!map.getMapArea().isBlockPosInArea(pos)) {
-            source.sendFailure(Component.translatable("message.fpsm.spawn_point_tool.outside_map"));
-            return false;
-        }
-        return true;
     }
 
     private static Optional<ModeMapEditPort> mapEditPort(BaseMap map) {
@@ -972,58 +312,10 @@ public final class MapManagementCommand {
         }
     }
 
-    private static List<String> spawnKindsForContextType(CommandContext<CommandSourceStack> context) {
-        try {
-            String rawType = StringArgumentType.getString(context, "type");
-            String type = GameModeRegistry.canonicalize(rawType);
-            if (!FPSMCore.getInstance().checkGameType(type)) {
-                return List.of();
-            }
-            return ModeMapEditorSchemas.spawnPointLayerKeys(type);
-        } catch (IllegalArgumentException ignored) {
-            return ModeMapEditorSchemas.spawnPointLayerKeys(defaultGameType());
-        }
-    }
-
-    private static List<String> areaLayersForContextType(CommandContext<CommandSourceStack> context) {
-        try {
-            String rawType = StringArgumentType.getString(context, "type");
-            String type = GameModeRegistry.canonicalize(rawType);
-            if (!FPSMCore.getInstance().checkGameType(type)) {
-                return List.of();
-            }
-            return ModeMapEditorSchemas.areaLayerKeys(type);
-        } catch (IllegalArgumentException ignored) {
-            return List.of();
-        }
-    }
-
-    private static String defaultGameType() {
-        return FPSMCore.getInstance().getGameTypes().stream()
-                .map(GameModeRegistry::canonicalize)
-                .filter(type -> !type.isBlank())
-                .findFirst()
-                .orElse("");
-    }
-
     private static List<String> allMapNames() {
         Set<String> names = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         names.addAll(FPSMCore.getInstance().getMapNames());
         return List.copyOf(names);
-    }
-
-    private static BaseMap resolveMapFromContext(CommandContext<CommandSourceStack> context) {
-        try {
-            String rawType = StringArgumentType.getString(context, "type");
-            String mapName = StringArgumentType.getString(context, "map");
-            String type = GameModeRegistry.canonicalize(rawType);
-            if (!FPSMCore.getInstance().checkGameType(type)) {
-                return null;
-            }
-            return FPSMCore.getInstance().getMapByTypeWithName(type, mapName).orElse(null);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
     }
 
     private static List<BaseMap> findMapsByName(String mapName) {
@@ -1035,28 +327,5 @@ public final class MapManagementCommand {
                 .filter(map -> mapName.equals(map.getMapName()))
                 .forEach(matches::add));
         return matches;
-    }
-
-    private static Map<BaseTeam, TeamSpawnProfile> captureTeamSpawnProfiles(List<BaseTeam> teams) {
-        Map<BaseTeam, TeamSpawnProfile> previousProfiles = new LinkedHashMap<>();
-        for (BaseTeam team : teams) {
-            if (team != null) {
-                previousProfiles.put(team, team.getSpawnProfile());
-            }
-        }
-        return previousProfiles;
-    }
-
-    private static void restoreTeamSpawnProfiles(Map<BaseTeam, TeamSpawnProfile> previousProfiles) {
-        if (previousProfiles == null) {
-            return;
-        }
-        previousProfiles.forEach((team, profile) -> {
-            if (team == null) {
-                return;
-            }
-            team.setSpawnProfile(profile);
-            team.clearPlayerSpawnPointAssignments();
-        });
     }
 }

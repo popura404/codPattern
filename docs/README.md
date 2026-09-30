@@ -60,27 +60,26 @@ COD Pattern 是一个面向 **TaCZ + 内置 FPSM 兼容核心** 的模组，提�
 
 ### `/cdp`
 
-- `/cdp screen`
-  - 打开背包界面，主要用于调试入口。
-- `/cdp update`
-  - 重新读取 `weapon_filter.json`，并把背包与筛选配置同步给所有在线玩家。
-- `/cdp distribute [target]`
-  - 强制发放背包装备。
+- `/cdp test`：输出测试消息。
+- `/cdp screen`：打开背包界面。
+- `/cdp update`：重新读取武器筛选配置，并向在线玩家同步背包与筛选配置。
+- `/cdp distribute [target]`：强制发放背包装备。
+- `/cdp mode debug room|entities|clear_entities|state|areas ...`：模式诊断与实体清理；按子命令提供房间或模式、地图参数。
 
 ### `/cdp map`
 
-- `/cdp map list [type]`
-  - 查看模式列表或某模式下的地图列表。
-- `/cdp map create <frontline|teamdeathmatch> <name> <from> <to>`
-  - 创建地图区域并立即保存。
-- `/cdp map delete <type> <name>`
-  - 删除地图及其持久化数据。
-- `/cdp map spawn <list|add|remove|clear|merge> ...`
-  - 管理 `INITIAL` / `DYNAMIC_CANDIDATE` 复活点，并支持按指定模式与地图合并动态复活点。
-- `/cdp map endtp show <map>`
-  - 查看指定地图当前的结算阶段结束传送点。
-- `/cdp map endtp set`
-  - 将当前执行位置与朝向批量写入所有地图的结算阶段结束传送点；运行时仍会校验落点是否可用。
+- `/cdp map list [type]`：查看模式列表或某模式的地图列表。
+- `/cdp map delete <type> <name>`：提交地图删除。服务端先结束对局、恢复并移出成员及观战者，确认清理完成后归档地图目录并注销。恢复未完成时保留地图，可在地图管理页查看进度、重试或取消。
+- `/cdp map endtp show <map>`：查看指定地图的结束传送点。
+- `/cdp map endtp set`：用执行位置与朝向批量覆盖所有支持此功能的已有地图结束点。
+- `/cdp map migrate check|confirm`：先用 `check` 检查旧地图存储，再用 `confirm` 确认迁移。
+
+### 强制结束与地图工具
+
+- `/roomforceend <mode> <map>`：结束对局并恢复玩家，保留房间成员；地图管理页也提供强制结束。
+- 创建 FTL／TDM 地图：使用地图创建工具（`codpattern:map_creator_tool`），选择两个角点后按 `Ctrl + 右键` 打开创建界面。Zombies 使用附属的部署工具。
+- 出生点和区域：使用出生点工具（`codpattern:spawn_point_tool`），在界面选择地图、团队和点位层或区域层，执行查看、添加、删除、清空；支持动态出生点的模式还可合并候选点。
+- 创建、出生点和区域编辑已统一使用工具，不再注册对应命令。
 
 ## 配置与目录
 
