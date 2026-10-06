@@ -81,6 +81,14 @@ public final class MapStorageMigration {
         return paths.legacy().resolve(".codpattern-migrations").resolve(key + ".json");
     }
 
+    /** Only remind saves without any migration marker, regardless of marker validity. */
+    public boolean shouldNotifyAutomatically(Detection detection) {
+        return detection.pending() && !detection.uncertain()
+                && Files.isDirectory(paths.legacy(), LinkOption.NOFOLLOW_LINKS)
+                && Files.notExists(journalPath(), LinkOption.NOFOLLOW_LINKS)
+                && Files.notExists(markerPath(), LinkOption.NOFOLLOW_LINKS);
+    }
+
     public synchronized void register(MapStorageRegistration registration) {
         if (registrations.containsKey(registration.mode()) || registrations.values().stream()
                 .anyMatch(value -> value.directory().equalsIgnoreCase(registration.directory())

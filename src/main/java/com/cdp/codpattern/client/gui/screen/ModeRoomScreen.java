@@ -39,7 +39,7 @@ public class ModeRoomScreen extends Screen {
     private static final int BASE_PANEL_GAP = 14;
     private static final int BASE_HEADER_HEIGHT = 48;
     private static final int BASE_FOOTER_HEIGHT = 20;
-    private static final int BASE_ROOM_ITEM_HEIGHT = 38;
+    private static final int BASE_ROOM_HEADER_HEIGHT = 38;
     private static final float LEFT_PANEL_WIDTH_RATIO = 0.25f;
     private static final long ENTER_ANIMATION_MS = 180L;
     private static final long ROOM_LIST_APPLY_DEBOUNCE_MS = 60L;
@@ -116,7 +116,7 @@ public class ModeRoomScreen extends Screen {
 
         roomListX = pagePadding;
         roomListY = contentTop;
-        roomListHeight = contentHeight;
+        roomListHeight = Math.max(1, Math.min(contentHeight, this.height - contentTop - footerHeight));
 
         int availableContentWidth = Math.max(scaled(280), this.width - pagePadding * 2 - panelGap);
         int minRightPanelWidth = scaled(268);
@@ -346,9 +346,6 @@ public class ModeRoomScreen extends Screen {
             int mouseX,
             int mouseY,
             float enterProgress) {
-        roomListMaxScrollOffset = Math.max(0, roomState.rooms().size() - visibleRoomCapacity());
-        roomListScrollOffset = clamp(roomListScrollOffset, 0, roomListMaxScrollOffset);
-
         roomListRenderResult = ModeRoomListRenderer.render(
                 graphics,
                 mc,
@@ -356,7 +353,7 @@ public class ModeRoomScreen extends Screen {
                 roomListY,
                 roomListWidth,
                 roomListHeight,
-                roomItemHeight(),
+                scaled(BASE_ROOM_HEADER_HEIGHT),
                 roomState.lobbySummaryState(),
                 modeFilterGameType,
                 roomState.selectedRoom(),
@@ -371,6 +368,8 @@ public class ModeRoomScreen extends Screen {
                 actionController.isLeavePending(),
                 actionController.pendingSwitchTargetRoom(),
                 enterProgress);
+        roomListScrollOffset = roomListRenderResult.scrollOffset();
+        roomListMaxScrollOffset = roomListRenderResult.maxScrollOffset();
     }
 
     /**
@@ -440,14 +439,10 @@ public class ModeRoomScreen extends Screen {
                 && mouseX <= roomListX + roomListWidth
                 && mouseY >= listTop
                 && mouseY < listTop + roomListHeight) {
-            if (delta > 0 && roomListScrollOffset > 0) {
-                roomListScrollOffset--;
-                return true;
-            }
-            if (delta < 0 && roomListScrollOffset < roomListMaxScrollOffset) {
-                roomListScrollOffset++;
-                return true;
-            }
+            int scrollStep = Math.max(1, (int) Math.ceil(Math.abs(delta) * scaled(24)));
+            roomListScrollOffset = clamp(roomListScrollOffset - (int) Math.signum(delta) * scrollStep,
+                    0, roomListMaxScrollOffset);
+            roomListRenderResult = ModeRoomListRenderer.RenderResult.empty();
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, delta);
@@ -484,8 +479,7 @@ public class ModeRoomScreen extends Screen {
         roomEnteredAtMs.keySet().retainAll(roomState.rooms().keySet());
         roomHighlightProgress.keySet().retainAll(roomState.rooms().keySet());
 
-        roomListMaxScrollOffset = Math.max(0, roomState.rooms().size() - visibleRoomCapacity());
-        roomListScrollOffset = clamp(roomListScrollOffset, 0, roomListMaxScrollOffset);
+        roomListRenderResult = ModeRoomListRenderer.RenderResult.empty();
     }
 
     /**
@@ -712,10 +706,6 @@ public class ModeRoomScreen extends Screen {
         return 0.35f + (raw * 0.65f);
     }
 
-    private int visibleRoomCapacity() {
-        return Math.max(1, ModeRoomListRenderer.listViewportHeight(roomListHeight) / roomItemHeight());
-    }
-
     private float enterProgress() {
         if (openedAtMs <= 0L) {
             return 1.0f;
@@ -748,7 +738,4 @@ public class ModeRoomScreen extends Screen {
         return GuiTextHelper.referenceScaled(value);
     }
 
-    private static int roomItemHeight() {
-        return scaled(BASE_ROOM_ITEM_HEIGHT);
-    }
 }

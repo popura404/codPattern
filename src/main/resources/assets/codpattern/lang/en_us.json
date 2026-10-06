@@ -544,6 +544,7 @@
     "screen.codpattern.room.player_score": "K/D %s/%s",
     "screen.codpattern.room.switch_room_pending": "Switch to %s, click again to cancel (%ss)",
     "screen.codpattern.room.players": "Players: %s/%s",
+    "screen.codpattern.room.directory_code": "Directory code: %s",
     "screen.codpattern.room.scroll_hint": "Scroll to view more rooms",
     "screen.codpattern.room.stale_hint": "Sync is stale, last updated %s seconds ago",
     "screen.codpattern.room.ping.excellent": "Excellent",

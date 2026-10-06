@@ -414,6 +414,7 @@
     "screen.codpattern.room.player_score": "K/D %s/%s",
     "screen.codpattern.room.switch_room_pending": "切換到 %s（再點取消，%s秒）",
     "screen.codpattern.room.players": "玩家數: %s/%s",
+    "screen.codpattern.room.directory_code": "目錄編碼：%s",
     "screen.codpattern.room.scroll_hint": "滾輪可檢視更多房間",
     "screen.codpattern.room.stale_hint": "同步延遲，最後更新於 %s 秒前",
     "screen.codpattern.room.ping.excellent": "優",

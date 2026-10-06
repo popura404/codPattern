@@ -144,8 +144,7 @@ public final class ServerMapStorage {
     public void onLobbyRequest() {
         if (System.currentTimeMillis() - checkedAt > 30_000) refresh();
         MapStorageMigration.Detection snapshot = detection;
-        if (snapshot.uncertain()) broadcast("message.codpattern.storage.uncertain");
-        else if (snapshot.pending()) broadcast("message.codpattern.storage.legacy");
+        if (migration.shouldNotifyAutomatically(snapshot)) broadcast("message.codpattern.storage.legacy");
     }
 
     public void broadcast(String key, Object... args) {

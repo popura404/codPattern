@@ -11,6 +11,7 @@ public final class MapStorageMigrationCompatTest {
     private record Fixture(Path base, MapStoragePaths paths, MapStorageMigration migration) {}
     public static void main(String[] args) throws Exception {
         testReadOnlyAndMove();
+        testAutomaticReminders();
         testReversibleArchiveMetadata();
         testConflict();
         testInterruptedResume();
@@ -119,6 +120,48 @@ public final class MapStorageMigrationCompatTest {
         execute(f.migration);
         require(Files.exists(source) && Files.readString(target).equals(before), "no overwrite or source removal on conflict");
     }
+    private static void testAutomaticReminders() throws Exception {
+        Fixture f = fixture();
+        oldMap(f, "frontline", "arena", "arena");
+        var pending = f.migration.detect();
+        require(f.migration.shouldNotifyAutomatically(pending), "unmarked legacy map should remind");
+        require(!Files.exists(f.paths.root()), "reminder policy must not write storage metadata");
+        require(!f.migration.shouldNotifyAutomatically(new MapStorageMigration.Detection(false, true, "Detection pending")),
+                "initial detection should remain silent");
+        require(!f.migration.shouldNotifyAutomatically(new MapStorageMigration.Detection(true, true, "Uncertain")),
+                "uncertain detection should remain silent even when pending");
+        require(!f.migration.shouldNotifyAutomatically(new MapStorageMigration.Detection(false, false, "No pending legacy data")),
+                "completed detection without pending data should remain silent");
+
+        var other = engine(new MapStoragePaths(f.base.resolve("other-save"), f.base.resolve("game")), false);
+        write(other.markerPath(), "not json");
+        require(f.migration.shouldNotifyAutomatically(pending), "another save's marker must not suppress reminders");
+        Files.delete(other.markerPath());
+        write(f.migration.markerPath(), "not json");
+        require(!f.migration.shouldNotifyAutomatically(pending), "dirty mirror suppresses a cached pending reminder");
+        require(Files.readString(f.migration.markerPath()).equals("not json"), "reminder policy leaves dirty marker untouched");
+        Files.delete(f.migration.markerPath());
+        Files.createSymbolicLink(f.migration.markerPath(), f.base.resolve("missing-marker-target"));
+        require(!f.migration.shouldNotifyAutomatically(pending), "dangling marker symlink still counts as a marker");
+        Files.delete(f.migration.markerPath());
+        write(f.migration.journalPath(), "not json");
+        require(!f.migration.shouldNotifyAutomatically(pending), "dirty journal suppresses a cached pending reminder");
+        Files.delete(f.migration.journalPath());
+        require(execute(f.migration).completed() == 1, "prepare completed migration for reminder check");
+        oldMap(f, "frontline", "leftover", "leftover");
+        MapStorageMigration restarted = engine(f.paths, false);
+        var leftover = restarted.detect();
+        require(leftover.pending() && !restarted.shouldNotifyAutomatically(leftover), "completed migration suppresses reminders for remaining legacy data");
+        require(restarted.inspect().units().size() == 1, "remaining legacy data stays available for manual migration");
+
+        Fixture rules = fixture();
+        write(rules.paths.oldCommonRules(), "{\"scoreLimit\":123}");
+        var rulesPending = rules.migration.detect();
+        require(rulesPending.pending() && !Files.exists(rules.paths.legacy()), "legacy rules can exist without fpsmatch");
+        require(!rules.migration.shouldNotifyAutomatically(rulesPending), "missing fpsmatch suppresses reminders");
+        require(rules.migration.commonRulesPending() && rules.migration.inspect().units().size() == 1,
+                "silent reminders preserve rule protection and manual inspection");
+    }
     private static void testInterruptedResume() throws Exception {
         Fixture f = fixture(); Path source = oldMap(f, "frontline", "arena", "arena");
         AtomicInteger checkpoints = new AtomicInteger();
@@ -126,6 +169,7 @@ public final class MapStorageMigrationCompatTest {
         require(result.failed() > 0 && Files.exists(source), "interrupted source retained");
         MapStorageMigration restarted = engine(f.paths, false);
         require(restarted.blocksMap("frontline", "arena"), "partial target must not load on restart");
+        require(!restarted.shouldNotifyAutomatically(restarted.detect()), "recorded interrupted migration should not remind");
         require(Files.exists(source), "restart does not resume");
         var resumed = execute(restarted);
         require(resumed.completed() == 1 && resumed.failed() == 0, "explicit resume completes: " + resumed);
@@ -196,6 +240,8 @@ public final class MapStorageMigrationCompatTest {
         MapStorageMigration broken = engine(f.paths, false);
         require(broken.detect().uncertain(), "corrupt state not treated as no data");
         require(broken.inspect().units().isEmpty(), "corrupt journal must not permit migration");
+        require(!broken.shouldNotifyAutomatically(broken.detect()), "corrupt journal should not remind after restart");
+        require(broken.blocksMap("frontline", "arena") && broken.commonRulesPending(), "silent reminders preserve corrupt journal protection");
     }
     private static void testMarkerFailure() throws Exception {
         Fixture f = fixture(); oldMap(f, "frontline", "arena", "arena");

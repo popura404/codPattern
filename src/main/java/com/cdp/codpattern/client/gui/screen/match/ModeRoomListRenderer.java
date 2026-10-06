@@ -5,10 +5,12 @@ import com.cdp.codpattern.app.match.model.ModeCapability;
 import com.cdp.codpattern.app.match.model.ModeDescriptor;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
+import com.cdp.codpattern.config.storage.MapStoragePaths;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.util.FormattedCharSequence;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -35,24 +37,27 @@ public final class ModeRoomListRenderer {
             int height,
             boolean enabled
     ) {
-        public boolean contains(double mouseX, double mouseY) {return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+        public boolean contains(double mouseX, double mouseY) {
+            return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
         }
     }
 
     public record RoomHitbox(String roomName, int x, int y, int width, int height
     ) {
         public boolean contains(double mouseX, double mouseY) {
-            return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+            return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
         }
     }
 
     public record RenderResult(
             List<String> roomNames,
             List<RoomHitbox> roomHitboxes,
-            List<ActionHitbox> actionHitboxes
+            List<ActionHitbox> actionHitboxes,
+            int scrollOffset,
+            int maxScrollOffset
     ) {
         public static RenderResult empty() {
-            return new RenderResult(List.of(), List.of(), List.of());
+            return new RenderResult(List.of(), List.of(), List.of(), 0, 0);
         }
 
         public ActionHitbox actionAt(double mouseX, double mouseY) {
@@ -70,12 +75,15 @@ public final class ModeRoomListRenderer {
         }
     }
 
+    private record RoomRow(String roomKey, List<FormattedCharSequence> directoryCodeLines, int top, int height) {
+    }
+
     private ModeRoomListRenderer() {
     }
 
     public static int listViewportHeight(int panelHeight) {
         return Math.max(
-                GuiTextHelper.referenceScaled(40),
+                1,
                 panelHeight - headerSectionHeight() - footerSectionHeight());
     }
 
@@ -86,7 +94,7 @@ public final class ModeRoomListRenderer {
             int roomListY,
             int roomListWidth,
             int roomListHeight,
-            int roomItemHeight,
+            int roomHeaderHeight,
             LobbySummaryState lobbySummaryState,
             String modeFilterGameType,
             String selectedRoom,
@@ -112,8 +120,8 @@ public final class ModeRoomListRenderer {
         int headerHeight = headerSectionHeight();
         int footerHeight = footerSectionHeight();
         int listTop = roomListY + headerHeight;
-        int listBottom = roomListY + roomListHeight - footerHeight;
-        int listHeight = Math.max(GuiTextHelper.referenceScaled(40), listBottom - listTop);
+        int listHeight = listViewportHeight(roomListHeight);
+        int listBottom = listTop + listHeight;
         int footerY = roomListY + roomListHeight - footerHeight + GuiTextHelper.referenceScaled(3);
 
         graphics.fillGradient(frameLeft, frameTop, frameRight, frameBottom,
@@ -147,7 +155,7 @@ public final class ModeRoomListRenderer {
                     emptyY + referenceLineHeight + GuiTextHelper.referenceScaled(3),
                     scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
                     false);
-            return new RenderResult(roomNames, roomHitboxes, actionHitboxes);
+            return new RenderResult(roomNames, roomHitboxes, actionHitboxes, 0, 0);
         }
 
         if (roomNames.isEmpty()) {
@@ -176,27 +184,41 @@ public final class ModeRoomListRenderer {
                     emptyY + (referenceLineHeight + GuiTextHelper.referenceScaled(3)) * 2,
                     scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
                     false);
-            return new RenderResult(roomNames, roomHitboxes, actionHitboxes);
+            return new RenderResult(roomNames, roomHitboxes, actionHitboxes, 0, 0);
         }
 
-        int visibleCount = Math.max(1, listHeight / roomItemHeight);
-        int maxScrollOffset = Math.max(0, roomNames.size() - visibleCount);
-        int effectiveOffset = clamp(scrollOffset, 0, maxScrollOffset);
-        int endIndex = Math.min(roomNames.size(), effectiveOffset + visibleCount);
-
-        for (int index = effectiveOffset; index < endIndex; index++) {
-            int visibleIndex = index - effectiveOffset;
-            int y = listTop + visibleIndex * roomItemHeight;
-            String roomKey = roomNames.get(index);
+        // Use the full, fixed content width so hovering a button never reflows the code.
+        float textScale = GuiTextHelper.referenceScale();
+        int codeWidth = Math.max(1, (int) ((roomListWidth - panelPadding * 2) / textScale));
+        List<RoomRow> rows = new ArrayList<>();
+        int contentHeight = 0;
+        for (String roomKey : roomNames) {
             ModeRoomData room = rooms.get(roomKey);
-            if (room == null) {
-                continue;
-            }
+            if (room == null) continue;
+            List<FormattedCharSequence> codeLines = mc.font.split(Component.translatable(
+                    "screen.codpattern.room.directory_code", MapStoragePaths.mapDirectory(room.mapName)), codeWidth);
+            int codeHeight = (int) Math.ceil(codeLines.size() * mc.font.lineHeight * textScale);
+            int rowHeight = roomHeaderHeight + codeHeight + GuiTextHelper.referenceScaled(4);
+            rows.add(new RoomRow(roomKey, codeLines, contentHeight, rowHeight));
+            contentHeight += rowHeight;
+        }
+        int maxScrollOffset = Math.max(0, contentHeight - listHeight);
+        int effectiveOffset = clamp(scrollOffset, 0, maxScrollOffset);
 
-            roomHitboxes.add(new RoomHitbox(roomKey, roomListX, y, roomListWidth, roomItemHeight));
+        graphics.enableScissor(roomListX, listTop, roomListX + roomListWidth, listBottom);
+        for (RoomRow row : rows) {
+            int y = listTop + row.top() - effectiveOffset;
+            int roomItemHeight = row.height();
+            if (y + roomItemHeight <= listTop || y >= listBottom) continue;
+            String roomKey = row.roomKey();
+            ModeRoomData room = rooms.get(roomKey);
 
-            boolean hovered = mouseX >= roomListX && mouseX <= roomListX + roomListWidth
-                    && mouseY >= y && mouseY < y + roomItemHeight;
+            int hitTop = Math.max(listTop, y);
+            int hitBottom = Math.min(listBottom, y + roomItemHeight);
+            roomHitboxes.add(new RoomHitbox(roomKey, roomListX, hitTop, roomListWidth, hitBottom - hitTop));
+
+            boolean hovered = mouseX >= roomListX && mouseX < roomListX + roomListWidth
+                    && mouseY >= hitTop && mouseY < hitBottom;
             boolean selected = roomKey.equals(selectedRoom);
             boolean joined = roomKey.equals(joinedRoom);
 
@@ -252,15 +274,15 @@ public final class ModeRoomListRenderer {
             int contentRight = roomListX + roomListWidth - panelPadding;
             int actionGap = GuiTextHelper.referenceScaled(4);
             String actionLabel = showAction ? actionLabel(actionType) : "";
-            int actionHeight = Math.max(GuiTextHelper.referenceScaled(12), roomItemHeight - GuiTextHelper.referenceScaled(16));
+            int actionHeight = Math.max(GuiTextHelper.referenceScaled(12), roomHeaderHeight - GuiTextHelper.referenceScaled(16));
             int actionWidth = showAction
                     ? Math.max(
                             GuiTextHelper.referenceScaled(28),
                             GuiTextHelper.referenceWidth(mc.font, actionLabel) + GuiTextHelper.referenceScaled(10))
                     : 0;
             int actionX = contentRight - actionWidth;
-            int actionY = y + Math.max(0, (roomItemHeight - actionHeight) / 2);
-            boolean actionHovered = showAction
+            int actionY = y + Math.max(0, (roomHeaderHeight - actionHeight) / 2);
+            boolean actionHovered = showAction && hovered
                     && mouseX >= actionX
                     && mouseX <= actionX + actionWidth
                     && mouseY >= actionY
@@ -347,6 +369,15 @@ public final class ModeRoomListRenderer {
                     scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor),
                     false);
 
+            graphics.pose().pushPose();
+            graphics.pose().translate(contentLeft, y + roomHeaderHeight, 0.0f);
+            graphics.pose().scale(textScale, textScale, 1.0f);
+            for (int line = 0; line < row.directoryCodeLines().size(); line++) {
+                graphics.drawString(mc.font, row.directoryCodeLines().get(line), 0, line * mc.font.lineHeight,
+                        scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor), false);
+            }
+            graphics.pose().popPose();
+
             int barThickness = Math.max(1, GuiTextHelper.referenceScaled(2));
             int barLeft = contentLeft;
             int barRight = Math.max(barLeft + 1, textRight);
@@ -363,7 +394,12 @@ public final class ModeRoomListRenderer {
 
             if (showAction) {
                 boolean enabled = !hasPendingAction;
-                actionHitboxes.add(new ActionHitbox(roomKey, actionType, actionX, actionY, actionWidth, actionHeight, enabled));
+                int actionHitTop = Math.max(listTop, actionY);
+                int actionHitBottom = Math.min(listBottom, actionY + actionHeight);
+                if (actionHitBottom > actionHitTop) {
+                    actionHitboxes.add(new ActionHitbox(roomKey, actionType, actionX, actionHitTop,
+                            actionWidth, actionHitBottom - actionHitTop, enabled));
+                }
                 boolean confirmPending = (leavePending && actionType == ActionType.LEAVE)
                         || (actionType == ActionType.SWITCH
                         && pendingSwitchTargetRoom != null
@@ -372,14 +408,15 @@ public final class ModeRoomListRenderer {
                         actionHovered, enabled, confirmPending, panelAlphaFactor);
             }
         }
+        graphics.disableScissor();
 
-        if (roomNames.size() > visibleCount) {
+        if (maxScrollOffset > 0) {
             int trackX = roomListX + roomListWidth - GuiTextHelper.referenceScaled(2);
             graphics.fill(trackX, listTop, trackX + GuiTextHelper.referenceScaled(2), listBottom,
                     scaleAlpha(0x22FFFFFF, panelAlphaFactor));
 
-            int thumbHeight = Math.max(GuiTextHelper.referenceScaled(12),
-                    (int) (listHeight * (visibleCount / (float) roomNames.size())));
+            int thumbHeight = Math.min(listHeight, Math.max(GuiTextHelper.referenceScaled(12),
+                    (int) (listHeight * (listHeight / (float) contentHeight))));
             int thumbOffsetMax = Math.max(1, listHeight - thumbHeight);
             int thumbY = listTop + (int) (thumbOffsetMax * (effectiveOffset / (float) maxScrollOffset));
             graphics.fill(trackX, thumbY, trackX + GuiTextHelper.referenceScaled(2), thumbY + thumbHeight,
@@ -401,7 +438,7 @@ public final class ModeRoomListRenderer {
                 scaleAlpha(footerColor, panelAlphaFactor),
                 false);
 
-        return new RenderResult(roomNames, roomHitboxes, actionHitboxes);
+        return new RenderResult(roomNames, roomHitboxes, actionHitboxes, effectiveOffset, maxScrollOffset);
     }
 
     private static ActionType resolveActionType(String joinedRoom, String mapName, boolean hovered, boolean selected) {

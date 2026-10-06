@@ -414,6 +414,7 @@
     "screen.codpattern.room.player_score": "K/D %s/%s",
     "screen.codpattern.room.switch_room_pending": "%s に切り替え予定。もう一度押すとキャンセル (%s秒)",
     "screen.codpattern.room.players": "プレイヤー: %s/%s",
+    "screen.codpattern.room.directory_code": "ディレクトリコード：%s",
     "screen.codpattern.room.scroll_hint": "スクロールしてさらにルームを表示",
     "screen.codpattern.room.stale_hint": "同期が遅延しています。最終更新は %s 秒前です",
     "screen.codpattern.room.ping.excellent": "Excellent",

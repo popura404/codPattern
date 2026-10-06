@@ -544,6 +544,7 @@
     "screen.codpattern.room.player_score": "K/D %s/%s",
     "screen.codpattern.room.switch_room_pending": "切换到 %s（再点取消，%s秒）",
     "screen.codpattern.room.players": "玩家数: %s/%s",
+    "screen.codpattern.room.directory_code": "目录编码：%s",
     "screen.codpattern.room.scroll_hint": "滚轮可查看更多房间",
     "screen.codpattern.room.stale_hint": "同步延迟，最后更新于 %s 秒前",
     "screen.codpattern.room.ping.excellent": "优",
