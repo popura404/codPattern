@@ -1,5 +1,6 @@
 package com.cdp.codpattern.app.tdm.service;
 
+import com.cdp.codpattern.config.ConfigFailureFeedback;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
@@ -41,18 +42,24 @@ public final class KitDistributionService {
             return;
         }
 
-        player.getInventory().clearContent();
-        ThrowableInventoryService.clearRuntime(player);
-
-        BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(
-                player.getStringUUID(), ConfigPath.SERVERBACKPACK.getPath(player.server));
+        BackpackConfig.PlayerBackpackData playerData;
+        WeaponFilterConfig filterConfig;
+        try {
+            playerData = BackpackConfigRepository.loadOrCreatePlayer(
+                    player.getStringUUID(), ConfigPath.SERVERBACKPACK.getPath(player.server));
+            filterConfig = WeaponFilterConfigRepository.loadOrCreate(
+                    ConfigPath.SERVER_FILTER.getPath(player.server));
+        } catch (BackpackConfigRepository.RepositoryException | WeaponFilterConfigRepository.RepositoryException failure) {
+            ConfigFailureFeedback.report(player, failure);
+            return;
+        }
         if (playerData == null) {
             return;
         }
 
         BackpackConfig.Backpack backpack = resolveBackpack(playerData);
-        WeaponFilterConfig filterConfig = WeaponFilterConfigRepository.loadOrCreate(
-                ConfigPath.SERVER_FILTER.getPath(player.server));
+        player.getInventory().clearContent();
+        ThrowableInventoryService.clearRuntime(player);
 
         int ammoMultiple = (filterConfig != null && filterConfig.getAmmunitionPerMagazineMultiple() != null)
                 ? filterConfig.getAmmunitionPerMagazineMultiple()

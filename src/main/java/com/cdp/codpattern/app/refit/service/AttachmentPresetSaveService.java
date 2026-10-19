@@ -1,6 +1,7 @@
 package com.cdp.codpattern.app.refit.service;
 
 import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
+import com.cdp.codpattern.config.ConfigFailureFeedback;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
@@ -10,6 +11,7 @@ import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
+import com.mojang.logging.LogUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -36,6 +38,12 @@ public final class AttachmentPresetSaveService {
     }
 
     public static Result save(ServerPlayer player, int bagId, String slot, String presetPayload, String updatedGunNbtString) {
+        return save(player, bagId, slot, ConfigPath.SERVERBACKPACK.getPath(player.server),
+                ConfigPath.SERVER_FILTER.getPath(player.server), BackpackConfigRepository::save);
+    }
+
+    // Keep the final persistence step independently exercisable with real temporary-file IO.
+    static Result save(ServerPlayer player, int bagId, String slot, Path backpackPath, Path filterPath, Runnable persist) {
         AttachmentEditSession session = AttachmentEditSessionManager.getSession(player.getUUID());
         if (session == null) {
             return new Result(false, Component.translatable("message.codpattern.refit.save_failed_session_missing"), null,
@@ -66,8 +74,6 @@ public final class AttachmentPresetSaveService {
             String nbtString = gunStack.hasTag() ? gunStack.getTag().toString() : "";
 
             String uuid = player.getUUID().toString();
-            Path backpackPath = ConfigPath.SERVERBACKPACK.getPath(player.server);
-            Path filterPath = ConfigPath.SERVER_FILTER.getPath(player.server);
             playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, backpackPath);
             WeaponFilterConfig filterConfig = WeaponFilterConfigRepository.loadOrCreate(filterPath);
             BackpackConfig.Backpack backpack = playerData.getBackpacks_MAP().get(bagId);
@@ -86,7 +92,7 @@ public final class AttachmentPresetSaveService {
             String preservedNbt = previousItem != null ? previousItem.getNbt() : nbtString;
             backpack.getItem_MAP().put(slot,
                     new BackpackConfig.Backpack.ItemData(preservedItemId, preservedCount, preservedNbt, normalizedPreset));
-            BackpackConfigRepository.save();
+            persist.run();
 
             saved = true;
             finalPayloadLength = builtPresetPayload.length();
@@ -99,9 +105,19 @@ public final class AttachmentPresetSaveService {
                     mutatedBackpack.getItem_MAP().put(slot, previousItem);
                 }
             }
-            Component message = e instanceof SaveFailureException saveFailureException
-                    ? Component.translatable(saveFailureException.translationKey)
-                    : Component.translatable("message.codpattern.refit.save_failed_rollback");
+            Component message;
+            if (e instanceof SaveFailureException saveFailureException) {
+                message = Component.translatable(saveFailureException.translationKey);
+                LogUtils.getLogger().warn("Attachment preset save rejected: player={} session={} bag={} slot={} reason={}",
+                        player.getUUID(), session.getSessionId(), bagId, slot, saveFailureException.translationKey);
+            } else {
+                message = e instanceof BackpackConfigRepository.RepositoryException
+                        || e instanceof WeaponFilterConfigRepository.RepositoryException
+                        ? ConfigFailureFeedback.message(e)
+                        : Component.translatable("message.codpattern.refit.save_failed_rollback");
+                LogUtils.getLogger().error("Attachment preset save failed: player={} session={} bag={} slot={}",
+                        player.getUUID(), session.getSessionId(), bagId, slot, e);
+            }
             return new Result(false, message, playerData, 0);
         } finally {
             if (saved) {

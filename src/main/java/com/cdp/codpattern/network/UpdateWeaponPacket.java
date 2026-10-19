@@ -2,6 +2,9 @@ package com.cdp.codpattern.network;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.backpack.service.UpdateWeaponService;
+import com.cdp.codpattern.config.ConfigFailureFeedback;
+import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.network.NetworkEvent;
@@ -44,13 +47,20 @@ public class UpdateWeaponPacket {
                 return;
             }
 
-            UpdateWeaponService.Result result = UpdateWeaponService.process(
+            UpdateWeaponService.Result result;
+            try {
+                result = UpdateWeaponService.process(
                     player,
                     packet.backpackId,
                     packet.weaponSlot,
                     packet.itemId,
                     packet.nbt
-            );
+                );
+            } catch (BackpackConfigRepository.RepositoryException | WeaponFilterConfigRepository.RepositoryException failure) {
+                ModNetworkChannel.sendToPlayer(new UpdateWeaponResultPacket(false, packet.weaponSlot,
+                        ConfigFailureFeedback.resultCode(failure), ""), player);
+                return;
+            }
 
             ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(result.playerData()), player);
             ModNetworkChannel.sendToPlayer(

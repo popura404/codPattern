@@ -1,5 +1,6 @@
 package com.cdp.codpattern.app.backpack.service;
 
+import com.cdp.codpattern.config.ConfigFailureFeedback;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
@@ -54,8 +55,13 @@ public class BackpackDistributor {
         }
 
         // 加载武器筛选配置
-        WeaponFilterConfig filterConfig =
-                WeaponFilterConfigRepository.loadOrCreate(ConfigPath.SERVER_FILTER.getPath(player.server));
+        WeaponFilterConfig filterConfig;
+        try {
+            filterConfig = WeaponFilterConfigRepository.loadOrCreate(ConfigPath.SERVER_FILTER.getPath(player.server));
+        } catch (WeaponFilterConfigRepository.RepositoryException failure) {
+            ConfigFailureFeedback.report(player, failure);
+            return;
+        }
         if (filterConfig == null) {
             LOGGER.warn("WeaponFilterConfig is null. Skip distributing items for player {}", player.getGameProfile().getName());
             return;
@@ -71,8 +77,13 @@ public class BackpackDistributor {
         if (!forceDistribute && !FpsMatchGatewayProvider.gateway().isInMatch(player.getUUID())) return;
 
         String uuid = player.getUUID().toString();
-        BackpackConfig.PlayerBackpackData playerData =
-                BackpackConfigRepository.loadOrCreatePlayer(uuid, ConfigPath.SERVERBACKPACK.getPath(player.server));
+        BackpackConfig.PlayerBackpackData playerData;
+        try {
+            playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, ConfigPath.SERVERBACKPACK.getPath(player.server));
+        } catch (BackpackConfigRepository.RepositoryException failure) {
+            ConfigFailureFeedback.report(player, failure);
+            return;
+        }
         BackpackConfig.Backpack backpack = resolveBackpack(playerData);
         if (backpack == null) {
             LOGGER.warn("No available backpack for player {}", player.getGameProfile().getName());

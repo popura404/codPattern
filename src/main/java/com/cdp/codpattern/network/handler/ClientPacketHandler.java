@@ -407,6 +407,9 @@ public class ClientPacketHandler {
             return Component.literal(message);
         }
         return switch (code == null ? "" : code) {
+            case "CONFIG_READ_FAILED" -> Component.translatable("message.codpattern.config.read_failed");
+            case "CONFIG_PARSE_FAILED" -> Component.translatable("message.codpattern.config.parse_failed");
+            case "CONFIG_WRITE_FAILED" -> Component.translatable("message.codpattern.config.write_failed");
             case "BAG_NOT_FOUND" -> Component.translatable("message.codpattern.weapon_update.error.bag_not_found");
             case "SLOT_INVALID" -> Component.translatable("message.codpattern.weapon_update.error.slot_invalid");
             case "ITEM_ID_INVALID" -> Component.translatable("message.codpattern.weapon_update.error.item_id_invalid");

@@ -1,5 +1,7 @@
 package com.cdp.codpattern.network;
 
+import com.cdp.codpattern.config.ConfigFailureFeedback;
+
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
@@ -42,28 +44,36 @@ public class RenameBackpackPacket {
             if (player == null) {
                 return;
             }
-            String name = newName.trim();
-            if (name.isEmpty()) {
-                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.name_empty"));
-                return;
-            }
-            if (name.length() > 32) {
-                name = name.substring(0, 32);
-            }
+            ConfigFailureFeedback.run(player, () -> {
+                String name = newName.trim();
+                if (name.isEmpty()) {
+                    player.sendSystemMessage(Component.translatable("message.codpattern.backpack.name_empty"));
+                    return;
+                }
+                if (name.length() > 32) {
+                    name = name.substring(0, 32);
+                }
 
-            Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
-            String uuid = player.getStringUUID();
-            BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
-            BackpackConfig.Backpack backpack = playerData.getBackpacks_MAP().get(backpackId);
-            if (backpack == null) {
-                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.not_found", backpackId));
-                return;
-            }
+                Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
+                String uuid = player.getStringUUID();
+                BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
+                BackpackConfig.Backpack backpack = playerData.getBackpacks_MAP().get(backpackId);
+                if (backpack == null) {
+                    player.sendSystemMessage(Component.translatable("message.codpattern.backpack.not_found", backpackId));
+                    return;
+                }
 
-            backpack.setName(name);
-            BackpackConfigRepository.save();
-            ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
-            player.sendSystemMessage(Component.translatable("message.codpattern.backpack.renamed", backpackId, name));
+                String previousName = backpack.getName();
+                backpack.setName(name);
+                try {
+                    BackpackConfigRepository.save();
+                } catch (BackpackConfigRepository.RepositoryException failure) {
+                    backpack.setName(previousName);
+                    throw failure;
+                }
+                ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
+                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.renamed", backpackId, name));
+            });
         });
         ctx.get().setPacketHandled(true);
     }

@@ -1,5 +1,7 @@
 package com.cdp.codpattern.network;
 
+import com.cdp.codpattern.config.ConfigFailureFeedback;
+
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
@@ -37,38 +39,46 @@ public class SelectBackpackPacket {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
-                Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
-                String uuid = player.getUUID().toString();
-                BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
+                ConfigFailureFeedback.run(player, () -> {
+                    Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
+                    String uuid = player.getUUID().toString();
+                    BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
 
-                // 检查背包是否存在
-                if (playerData.getBackpacks_MAP().containsKey(backpackId)) {
-                    // 更新选中的背包
-                    playerData.setSelectedBackpack(backpackId);
-                    BackpackConfigRepository.save();
+                    // 检查背包是否存在
+                    if (playerData.getBackpacks_MAP().containsKey(backpackId)) {
+                        // 更新选中的背包
+                        int previousSelected = playerData.getSelectedBackpack();
+                        playerData.setSelectedBackpack(backpackId);
+                        try {
+                            BackpackConfigRepository.save();
+                        } catch (BackpackConfigRepository.RepositoryException failure) {
+                            playerData.setSelectedBackpack(previousSelected);
+                            throw failure;
+                        }
 
-                    // 获取背包名称
-                    Component backpackName = BackpackNameHelper.displayNameComponent(
-                            playerData.getBackpacks_MAP().get(backpackId),
-                            backpackId);
+                        // 获取背包名称
+                        Component backpackName = BackpackNameHelper.displayNameComponent(
+                                playerData.getBackpacks_MAP().get(backpackId),
+                                backpackId);
 
-                    // 发送提示
-                    player.connection.send(new ClientboundSetActionBarTextPacket(
-                            Component.translatable("message.codpattern.backpack.selected", backpackId, backpackName)
-                                    .withStyle(style -> style
-                                            .withColor(0xDDDDDD)
-                                            .withBold(true)
-                                            .withItalic(false))));
-                    FpsMatchGatewayProvider.gateway()
-                            .findPlayerKitDistributionPort(player)
-                            .ifPresent(port -> port.onBackpackSelected(player, backpackId));
-                } else {
-                    // 背包ID无效，发送错误提示
-                    player.connection.send(new ClientboundSetActionBarTextPacket(
-                            Component.translatable("message.codpattern.backpack.invalid_id", backpackId)
-                                    .append("\n")
-                                    .append(Component.translatable("message.codpattern.backpack.check_integrity"))));
-                }
+                        // 发送提示
+                        player.connection.send(new ClientboundSetActionBarTextPacket(
+                                Component.translatable("message.codpattern.backpack.selected", backpackId, backpackName)
+                                        .withStyle(style -> style
+                                                .withColor(0xDDDDDD)
+                                                .withBold(true)
+                                                .withItalic(false))));
+                        FpsMatchGatewayProvider.gateway()
+                                .findPlayerKitDistributionPort(player)
+                                .ifPresent(port -> port.onBackpackSelected(player, backpackId));
+                    } else {
+                        // 背包ID无效，发送错误提示
+                        player.connection.send(new ClientboundSetActionBarTextPacket(
+                                Component.translatable("message.codpattern.backpack.invalid_id", backpackId)
+                                        .append("\n")
+                                        .append(Component.translatable("message.codpattern.backpack.check_integrity"))));
+                    }
+                });
             }
         });
         ctx.get().setPacketHandled(true);

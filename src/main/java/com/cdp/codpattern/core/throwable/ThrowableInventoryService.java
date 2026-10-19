@@ -4,6 +4,7 @@ import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
 import com.cdp.codpattern.config.path.ConfigPath;
+import com.cdp.codpattern.config.ConfigFailureFeedback;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.network.SyncThrowableInventoryPacket;
@@ -261,8 +262,13 @@ public final class ThrowableInventoryService {
         if (player.server == null || !FpsMatchGatewayProvider.gateway().isInMatch(player.getUUID())) {
             return false;
         }
-        WeaponFilterConfig config = WeaponFilterConfigRepository.loadOrCreate(
-                ConfigPath.SERVER_FILTER.getPath(player.server));
+        WeaponFilterConfig config;
+        try {
+            config = WeaponFilterConfigRepository.loadOrCreate(ConfigPath.SERVER_FILTER.getPath(player.server));
+        } catch (WeaponFilterConfigRepository.RepositoryException failure) {
+            ConfigFailureFeedback.report(player, failure);
+            return false;
+        }
         return (config == null || config.isThrowablesEnabled())
                 && LrTacticalGatewayProvider.gateway().isLoaded();
     }

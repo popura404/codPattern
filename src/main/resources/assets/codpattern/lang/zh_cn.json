@@ -645,5 +645,9 @@
   "message.codpattern.refit.operation_wrong_type": "配件与目标槽位不匹配，操作已取消。",
   "message.codpattern.refit.operation_not_allowed": "当前武器不能安装这个配件。",
   "message.codpattern.refit.operation_empty_slot": "该槽位已没有可卸下的配件。",
-  "message.codpattern.refit.operation_failed": "改枪操作失败，界面已同步服务端状态。"
+  "message.codpattern.refit.operation_failed": "改枪操作失败，界面已同步服务端状态。",
+  "message.codpattern.config.read_failed": "无法读取服务器配置，操作已停止。请联系管理员检查日志。",
+  "message.codpattern.config.parse_failed": "服务器配置格式有误，操作已停止。请联系管理员修正配置。",
+  "message.codpattern.config.write_failed": "无法写入服务器配置，本次更改未保存。请联系管理员检查日志。",
+  "message.codpattern.command.sync_partial_failure": "配置同步未全部完成：%s 人成功，%s 人失败。请检查服务器日志。"
 }

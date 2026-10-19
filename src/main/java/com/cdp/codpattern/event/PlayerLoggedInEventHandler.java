@@ -1,5 +1,6 @@
 package com.cdp.codpattern.event;
 
+import com.cdp.codpattern.config.ConfigFailureFeedback;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
@@ -34,14 +35,14 @@ public class PlayerLoggedInEventHandler {
         Path backpackPath = ConfigPath.SERVERBACKPACK.getPath(server);
         Path filterPath = ConfigPath.SERVER_FILTER.getPath(server);
 
-        var fliterconfig = WeaponFilterConfigRepository.loadOrCreate(filterPath);
-        var playerBackpackData = BackpackConfigRepository.loadOrCreatePlayer(player.getStringUUID(), backpackPath);
-
-        // 同步到客户端
-        ModNetworkChannel.sendToPlayer(new SyncWeaponFilterPacket(fliterconfig), (ServerPlayer) player);
-        ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), (ServerPlayer) player);
-
         ServerPlayer serverPlayer = (ServerPlayer) player;
+        ConfigFailureFeedback.run(serverPlayer, () -> {
+            var filterConfig = WeaponFilterConfigRepository.loadOrCreate(filterPath);
+            var playerBackpackData = BackpackConfigRepository.loadOrCreatePlayer(player.getStringUUID(), backpackPath);
+            ModNetworkChannel.sendToPlayer(new SyncWeaponFilterPacket(filterConfig), serverPlayer);
+            ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), serverPlayer);
+        });
+
         if (com.cdp.codpattern.app.match.runtime.termination.RoomTerminationService.get(server)
                 .ownsRecovery(serverPlayer.getUUID())) return;
         if (ModePlayerLoginContributors.route(serverPlayer)

@@ -1,5 +1,7 @@
 package com.cdp.codpattern.network;
 
+import com.cdp.codpattern.config.ConfigFailureFeedback;
+
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
@@ -28,12 +30,14 @@ public class RequestBackpackConfigPacket {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
-                Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
-                String uuid = player.getUUID().toString();
-                BackpackConfig.PlayerBackpackData playerBackpackData = BackpackConfigRepository.loadOrCreatePlayer(uuid,path);
+                ConfigFailureFeedback.run(player, () -> {
+                    Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
+                    String uuid = player.getUUID().toString();
+                    BackpackConfig.PlayerBackpackData playerBackpackData = BackpackConfigRepository.loadOrCreatePlayer(uuid,path);
 
-                // 同步更新后的配置到客户端
-                ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), player);
+                    // 同步更新后的配置到客户端
+                    ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), player);
+                });
             }
         });
         ctx.get().setPacketHandled(true);

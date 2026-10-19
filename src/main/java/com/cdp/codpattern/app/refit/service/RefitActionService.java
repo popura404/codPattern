@@ -2,6 +2,8 @@ package com.cdp.codpattern.app.refit.service;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
+import com.cdp.codpattern.config.ConfigFailureFeedback;
+import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
@@ -92,6 +94,11 @@ public final class RefitActionService {
         } catch (RuntimeException failure) {
             LogUtils.getLogger().error("Attachment operation {} failed for session {}", action.kind(), sessionId, failure);
             // Never retry a partly executed operation through another backend.
+            if (failure instanceof BackpackConfigRepository.RepositoryException
+                    || failure instanceof WeaponFilterConfigRepository.RepositoryException) {
+                return new RefitOperationResultPacket(session.getSessionId(), false, false,
+                        ConfigFailureFeedback.message(failure), gun.copy(), session.getEditHotbarSlot());
+            }
             return result(session, false, "operation_failed");
         }
     }

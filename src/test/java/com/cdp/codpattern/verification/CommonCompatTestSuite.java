@@ -3,6 +3,7 @@ package com.cdp.codpattern.verification;
 import com.cdp.codpattern.client.refit.AttachmentRefitCandidateStaticContractCompatTest;
 import com.cdp.codpattern.client.refit.RefitOperationQueueCompatTest;
 import com.cdp.codpattern.mixin.CodPatternMixinPluginCompatTest;
+import com.cdp.codpattern.config.ConfigRepositoryFailureCompatTest;
 import com.cdp.codpattern.architecture.ModeDefinitionContributorCompatTest;
 import com.cdp.codpattern.architecture.ModeExtensionRuntimeRouterCompatTest;
 import com.cdp.codpattern.architecture.ModeRegistryConflictBaselineCompatTest;
@@ -35,6 +36,7 @@ public final class CommonCompatTestSuite {
         AttachmentRefitCandidateStaticContractCompatTest.main(args);
         RefitOperationQueueCompatTest.main(args);
         CodPatternMixinPluginCompatTest.main(args);
+        ConfigRepositoryFailureCompatTest.main(args);
         ModeRegistryConflictBaselineCompatTest.main(args);
         ModeRoomHandleBuilderCompatTest.main(args);
         ModeDefinitionContributorCompatTest.main(args);
@@ -46,6 +48,6 @@ public final class CommonCompatTestSuite {
         ModeObjectRuntimeCompatTest.main(args);
         Phase5ContributionPrimitivesCompatTest.main(args);
         GameModeFpsRegistrationCompatTest.main(args);
-        System.out.println("PASS future-main common compatibility suite (14/14)");
+        System.out.println("PASS future-main common compatibility suite (15/15)");
     }
 }

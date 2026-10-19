@@ -1,5 +1,7 @@
 package com.cdp.codpattern.network;
 
+import com.cdp.codpattern.config.ConfigFailureFeedback;
+
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
@@ -39,32 +41,41 @@ public class DeleteBackpackPacket {
             if (player == null) {
                 return;
             }
-            Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
-            String uuid = player.getStringUUID();
-            BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
+            ConfigFailureFeedback.run(player, () -> {
+                Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
+                String uuid = player.getStringUUID();
+                BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
 
-            if (!playerData.getBackpacks_MAP().containsKey(backpackId)) {
-                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.not_found", backpackId));
-                return;
-            }
-            if (playerData.getBackpacks_MAP().size() <= 1) {
-                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.keep_one"));
-                return;
-            }
+                if (!playerData.getBackpacks_MAP().containsKey(backpackId)) {
+                    player.sendSystemMessage(Component.translatable("message.codpattern.backpack.not_found", backpackId));
+                    return;
+                }
+                if (playerData.getBackpacks_MAP().size() <= 1) {
+                    player.sendSystemMessage(Component.translatable("message.codpattern.backpack.keep_one"));
+                    return;
+                }
 
-            playerData.getBackpacks_MAP().remove(backpackId);
+                int previousSelected = playerData.getSelectedBackpack();
+                BackpackConfig.Backpack removed = playerData.getBackpacks_MAP().remove(backpackId);
 
-            if (playerData.getSelectedBackpack() == backpackId) {
-                int nextId = playerData.getBackpacks_MAP().keySet()
-                        .stream()
-                        .min(Comparator.naturalOrder())
-                        .orElse(1);
-                playerData.setSelectedBackpack(nextId);
-            }
+                if (playerData.getSelectedBackpack() == backpackId) {
+                    int nextId = playerData.getBackpacks_MAP().keySet()
+                            .stream()
+                            .min(Comparator.naturalOrder())
+                            .orElse(1);
+                    playerData.setSelectedBackpack(nextId);
+                }
 
-            BackpackConfigRepository.save();
-            ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
-            player.sendSystemMessage(Component.translatable("message.codpattern.backpack.deleted", backpackId));
+                try {
+                    BackpackConfigRepository.save();
+                } catch (BackpackConfigRepository.RepositoryException failure) {
+                    playerData.getBackpacks_MAP().put(backpackId, removed);
+                    playerData.setSelectedBackpack(previousSelected);
+                    throw failure;
+                }
+                ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
+                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.deleted", backpackId));
+            });
         });
         ctx.get().setPacketHandled(true);
     }

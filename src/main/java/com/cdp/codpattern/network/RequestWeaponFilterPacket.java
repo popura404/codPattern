@@ -1,5 +1,7 @@
 package com.cdp.codpattern.network;
 
+import com.cdp.codpattern.config.ConfigFailureFeedback;
+
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
@@ -29,10 +31,12 @@ public class RequestWeaponFilterPacket {
             ServerPlayer player = ctx.get().getSender();
 
             if (player != null) {
-                Path path = ConfigPath.SERVER_FILTER.getPath(player.server);
-                // 服务端加载配置并发送给客户端
-                WeaponFilterConfig config = WeaponFilterConfigRepository.loadOrCreate(path);
-                ModNetworkChannel.sendToPlayer(new SyncWeaponFilterPacket(config), player);
+                ConfigFailureFeedback.run(player, () -> {
+                    Path path = ConfigPath.SERVER_FILTER.getPath(player.server);
+                    // 服务端加载配置并发送给客户端
+                    WeaponFilterConfig config = WeaponFilterConfigRepository.loadOrCreate(path);
+                    ModNetworkChannel.sendToPlayer(new SyncWeaponFilterPacket(config), player);
+                });
             }
         });
         ctx.get().setPacketHandled(true);

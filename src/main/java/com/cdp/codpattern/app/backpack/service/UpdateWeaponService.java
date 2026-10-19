@@ -86,8 +86,18 @@ public final class UpdateWeaponService {
         }
 
         String canonicalNbt = parsedNbt.isEmpty() ? "" : parsedNbt.toString();
-        backpack.getItem_MAP().put(weaponSlot, new BackpackConfig.Backpack.ItemData(itemId, 1, canonicalNbt));
-        BackpackConfigRepository.save();
+        BackpackConfig.Backpack.ItemData previousItem = backpack.getItem_MAP().put(weaponSlot,
+                new BackpackConfig.Backpack.ItemData(itemId, 1, canonicalNbt));
+        try {
+            BackpackConfigRepository.save();
+        } catch (BackpackConfigRepository.RepositoryException failure) {
+            if (previousItem == null) {
+                backpack.getItem_MAP().remove(weaponSlot);
+            } else {
+                backpack.getItem_MAP().put(weaponSlot, previousItem);
+            }
+            throw failure;
+        }
 
         return new Result(playerData, true, weaponSlot, "OK", "");
     }

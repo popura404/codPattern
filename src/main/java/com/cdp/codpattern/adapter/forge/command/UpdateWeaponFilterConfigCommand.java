@@ -1,7 +1,7 @@
 package com.cdp.codpattern.adapter.forge.command;
 
+import com.cdp.codpattern.config.ConfigFailureFeedback;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
-
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
@@ -40,11 +40,20 @@ public class UpdateWeaponFilterConfigCommand {
         Path filterPath = ConfigPath.SERVER_FILTER.getPath(server);
 
         // 过滤配置统一加载
-        WeaponFilterConfig filterConfig = WeaponFilterConfigRepository.loadOrCreate(filterPath);
+        WeaponFilterConfig filterConfig;
+        try {
+            filterConfig = WeaponFilterConfigRepository.loadOrCreate(filterPath);
+        } catch (WeaponFilterConfigRepository.RepositoryException failure) {
+            source.sendFailure(ConfigFailureFeedback.message(failure));
+            return 0;
+        }
 
         int successCount = 0;
+        int failureCount = 0;
 
         for (ServerPlayer player : players) {
+            // Filter updates also reach open editors when an unrelated backpack file
+            // cannot be read. Send all ordered fragments before publishing success.
             ModNetworkChannel.sendToPlayer(new SyncWeaponFilterPacket(filterConfig), player);
             AttachmentEditSessionManager.syncVisibleAttachmentCandidates(player, filterConfig);
             try {
@@ -56,9 +65,17 @@ public class UpdateWeaponFilterConfigCommand {
                 ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), player);
 
                 successCount++;
-            } catch (Exception e) {
-                e.printStackTrace();
+            } catch (BackpackConfigRepository.RepositoryException failure) {
+                ConfigFailureFeedback.report(player, failure);
+                source.sendFailure(ConfigFailureFeedback.message(failure));
+                failureCount++;
             }
+        }
+
+        if (failureCount > 0) {
+            source.sendFailure(Component.translatable("message.codpattern.command.sync_partial_failure",
+                    successCount, failureCount));
+            return 0;
         }
 
         // 对执行者反馈

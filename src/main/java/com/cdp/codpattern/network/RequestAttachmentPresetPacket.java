@@ -2,6 +2,9 @@ package com.cdp.codpattern.network;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.refit.service.AttachmentPresetRequestService;
+import com.cdp.codpattern.config.ConfigFailureFeedback;
+import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.mojang.logging.LogUtils;
 import net.minecraft.network.FriendlyByteBuf;
@@ -28,6 +31,7 @@ public record RequestAttachmentPresetPacket(UUID sessionId, int bagId, String sl
         ctx.enqueueWork(() -> {
             var player = ctx.getSender();
             if (player == null) return;
+            Component failureMessage = Component.translatable("message.codpattern.refit.open_failed");
             try {
                 var result = AttachmentPresetRequestService.prepare(player, packet.sessionId, packet.bagId, packet.slot);
                 if (result.isPresent()) {
@@ -35,6 +39,10 @@ public record RequestAttachmentPresetPacket(UUID sessionId, int bagId, String sl
                     AttachmentEditSessionManager.syncVisibleAttachmentCandidates(player);
                     return;
                 }
+            } catch (BackpackConfigRepository.RepositoryException | WeaponFilterConfigRepository.RepositoryException failure) {
+                failureMessage = ConfigFailureFeedback.message(failure);
+                LogUtils.getLogger().error("Unable to read attachment session configuration: player={} bag={} slot={}",
+                        player.getUUID(), packet.bagId, packet.slot, failure);
             } catch (RuntimeException failure) {
                 LogUtils.getLogger().error("Unable to start attachment session for {}", player.getUUID(), failure);
             }
@@ -43,7 +51,7 @@ public record RequestAttachmentPresetPacket(UUID sessionId, int bagId, String sl
                 AttachmentEditSessionManager.abortSession(player, "open_failed", false);
             }
             ModNetworkChannel.sendToPlayer(new RefitOperationResultPacket(packet.sessionId, false, true,
-                    Component.translatable("message.codpattern.refit.open_failed"), ItemStack.EMPTY, -1), player);
+                    failureMessage, ItemStack.EMPTY, -1), player);
         });
         ctx.setPacketHandled(true);
     }

@@ -645,5 +645,9 @@
   "message.codpattern.refit.operation_wrong_type": "The attachment does not match the target slot. Nothing was changed.",
   "message.codpattern.refit.operation_not_allowed": "This attachment cannot be installed on the current weapon.",
   "message.codpattern.refit.operation_empty_slot": "There is no attachment to remove from that slot.",
-  "message.codpattern.refit.operation_failed": "The refit operation failed. The screen now shows the server state."
+  "message.codpattern.refit.operation_failed": "The refit operation failed. The screen now shows the server state.",
+  "message.codpattern.config.read_failed": "Could not read the server configuration. The operation stopped. Ask an administrator to check the log.",
+  "message.codpattern.config.parse_failed": "The server configuration is invalid. The operation stopped. Ask an administrator to correct it.",
+  "message.codpattern.config.write_failed": "Could not write the server configuration. This change was not saved. Ask an administrator to check the log.",
+  "message.codpattern.command.sync_partial_failure": "Configuration sync was incomplete: %s succeeded, %s failed. Check the server log."
 }

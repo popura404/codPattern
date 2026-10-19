@@ -1,5 +1,7 @@
 package com.cdp.codpattern.network;
 
+import com.cdp.codpattern.config.ConfigFailureFeedback;
+
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
@@ -32,22 +34,22 @@ public class AddBackpackPacket {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player != null) {
-                String uuid = player.getStringUUID();
-                Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
-                BackpackConfigRepository.loadOrCreate(path);
+                ConfigFailureFeedback.run(player, () -> {
+                    String uuid = player.getStringUUID();
+                    Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
+                    BackpackConfigRepository.loadOrCreate(path);
 
-                // 添加新背包
-                int newId = BackpackConfigRepository.addCustomBackpack(uuid);
+                    // 添加新背包
+                    int newId = BackpackConfigRepository.addCustomBackpack(uuid);
 
-                if (newId != -1) {
-                    player.sendSystemMessage(Component.translatable("message.codpattern.backpack.added", newId));
-
-                    BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid,
-                            path);
-                    ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
-                } else {
-                    player.sendSystemMessage(Component.translatable("message.codpattern.backpack.add_failed"));
-                }
+                    if (newId != -1) {
+                        BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.getOrCreatePlayerData(uuid);
+                        ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
+                        player.sendSystemMessage(Component.translatable("message.codpattern.backpack.added", newId));
+                    } else {
+                        player.sendSystemMessage(Component.translatable("message.codpattern.backpack.add_failed"));
+                    }
+                });
             }
         });
         ctx.get().setPacketHandled(true);

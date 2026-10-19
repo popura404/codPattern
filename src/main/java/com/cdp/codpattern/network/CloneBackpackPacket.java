@@ -1,5 +1,7 @@
 package com.cdp.codpattern.network;
 
+import com.cdp.codpattern.config.ConfigFailureFeedback;
+
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackNameHelper;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
@@ -40,52 +42,59 @@ public class CloneBackpackPacket {
             if (player == null) {
                 return;
             }
-            Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
-            String uuid = player.getStringUUID();
-            BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
+            ConfigFailureFeedback.run(player, () -> {
+                Path path = ConfigPath.SERVERBACKPACK.getPath(player.server);
+                String uuid = player.getStringUUID();
+                BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, path);
 
-            BackpackConfig.Backpack source = playerData.getBackpacks_MAP().get(sourceId);
-            if (source == null) {
-                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.not_found", sourceId));
-                return;
-            }
-
-            int newId = playerData.getNextAvailableId();
-            if (newId == 0) {
-                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.clone_limit"));
-                return;
-            }
-
-            String copyName = "";
-            if (!BackpackNameHelper.isGeneratedName(source.getName())) {
-                String baseName = source.getName().trim();
-                String copySuffix = Component.translatable("message.codpattern.backpack.copy_suffix").getString();
-                copyName = baseName + copySuffix;
-                if (copyName.length() > 32) {
-                    copyName = copyName.substring(0, 32);
+                BackpackConfig.Backpack source = playerData.getBackpacks_MAP().get(sourceId);
+                if (source == null) {
+                    player.sendSystemMessage(Component.translatable("message.codpattern.backpack.not_found", sourceId));
+                    return;
                 }
-            }
-            BackpackConfig.Backpack clone = new BackpackConfig.Backpack(copyName);
 
-            for (Map.Entry<String, BackpackConfig.Backpack.ItemData> entry : source.getItem_MAP().entrySet()) {
-                BackpackConfig.Backpack.ItemData item = entry.getValue();
-                if (item != null) {
-                    clone.setItem_MAP(entry.getKey(),
-                            new BackpackConfig.Backpack.ItemData(
-                                    item.getItem(),
-                                    item.getCount(),
-                                    item.getNbt(),
-                                    item.getAttachmentPreset()));
+                int newId = playerData.getNextAvailableId();
+                if (newId == 0) {
+                    player.sendSystemMessage(Component.translatable("message.codpattern.backpack.clone_limit"));
+                    return;
                 }
-            }
 
-            if (playerData.addBackpack(newId, clone)) {
-                BackpackConfigRepository.save();
-                ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
-                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.cloned", sourceId, newId));
-            } else {
-                player.sendSystemMessage(Component.translatable("message.codpattern.backpack.clone_failed"));
-            }
+                String copyName = "";
+                if (!BackpackNameHelper.isGeneratedName(source.getName())) {
+                    String baseName = source.getName().trim();
+                    String copySuffix = Component.translatable("message.codpattern.backpack.copy_suffix").getString();
+                    copyName = baseName + copySuffix;
+                    if (copyName.length() > 32) {
+                        copyName = copyName.substring(0, 32);
+                    }
+                }
+                BackpackConfig.Backpack clone = new BackpackConfig.Backpack(copyName);
+
+                for (Map.Entry<String, BackpackConfig.Backpack.ItemData> entry : source.getItem_MAP().entrySet()) {
+                    BackpackConfig.Backpack.ItemData item = entry.getValue();
+                    if (item != null) {
+                        clone.setItem_MAP(entry.getKey(),
+                                new BackpackConfig.Backpack.ItemData(
+                                        item.getItem(),
+                                        item.getCount(),
+                                        item.getNbt(),
+                                        item.getAttachmentPreset()));
+                    }
+                }
+
+                if (playerData.addBackpack(newId, clone)) {
+                    try {
+                        BackpackConfigRepository.save();
+                    } catch (BackpackConfigRepository.RepositoryException failure) {
+                        playerData.getBackpacks_MAP().remove(newId);
+                        throw failure;
+                    }
+                    ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerData), player);
+                    player.sendSystemMessage(Component.translatable("message.codpattern.backpack.cloned", sourceId, newId));
+                } else {
+                    player.sendSystemMessage(Component.translatable("message.codpattern.backpack.clone_failed"));
+                }
+            });
         });
         ctx.get().setPacketHandled(true);
     }
