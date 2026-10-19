@@ -55,15 +55,24 @@ public final class RefitActionService {
 
         try {
             if (action.kind() == RefitAction.Kind.LASER) {
-                for (var entry : action.laserColors().entrySet()) {
-                    AttachmentType type = type(entry.getKey());
-                    if (type == null || type == AttachmentType.NONE) continue;
-                    ItemStack attachment = iGun.getAttachment(gun, type);
-                    IAttachment iAttachment = IAttachment.getIAttachmentOrNull(attachment);
-                    if (iAttachment != null) iAttachment.setLaserColor(attachment, entry.getValue());
+                try (var ignored = RefitPreviewContext.open(player, gun)) {
+                    for (var entry : action.laserColors().entrySet()) {
+                        AttachmentType type = type(entry.getKey());
+                        if (type == null || type == AttachmentType.NONE) continue;
+                        ItemStack attachment = iGun.getAttachment(gun, type);
+                        IAttachment iAttachment = IAttachment.getIAttachmentOrNull(attachment);
+                        if (iAttachment != null) {
+                            iAttachment.setLaserColor(attachment, entry.getValue());
+                            // getAttachment decodes an ItemStack copy; persist the changed color back into the gun.
+                            iGun.installAttachment(gun, attachment);
+                        }
+                    }
+                    if (action.applyGunColor()) {
+                        iGun.setLaserColor(gun, action.gunColor());
+                    }
+                    AttachmentPropertyManager.postChangeEvent(player, gun);
                 }
-                if (action.applyGunColor()) iGun.setLaserColor(gun, action.gunColor());
-                AttachmentPropertyManager.postChangeEvent(player, gun);
+                player.inventoryMenu.broadcastChanges();
                 return result(session, true, null);
             }
 

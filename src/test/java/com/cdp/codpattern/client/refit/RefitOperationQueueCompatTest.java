@@ -19,11 +19,11 @@ public final class RefitOperationQueueCompatTest {
                 "only the first operation is in flight");
         require(!queue.acknowledge(second) && queue.next() == null,
                 "a stale session's result cannot advance the current queue");
-        require(queue.close(List.of("laser", "save")) && !queue.enqueue("late click"),
+        require(queue.close(List.of("save")) && !queue.enqueue("late click"),
                 "closing retains accepted edits and seals the queue");
         require(!queue.begin(second) && !queue.close(List.of("duplicate save")),
                 "reopening and duplicate close cannot discard an outstanding save");
-        for (String next : List.of("scope B", "muzzle", "laser", "save")) {
+        for (String next : List.of("scope B", "muzzle", "save")) {
             require(queue.acknowledge(first) && next.equals(queue.next()) && queue.next() == null,
                     "ACK alone advances the next command: " + next);
         }
@@ -41,6 +41,22 @@ public final class RefitOperationQueueCompatTest {
         require(queue.acknowledge(second) && queue.next() == null && !queue.enqueue("edit after cancel"),
                 "cancellation leaves no queued edit or accidental save");
         require(queue.finish(second), "cancellation terminal result ends its session");
+
+        require(queue.begin(first) && queue.enqueue("laser red") && "laser red".equals(queue.next()),
+                "slider changes enter the ordered queue as they happen");
+        require(queue.enqueueReplacingTail("laser blue", (old, next) -> old.startsWith("laser"))
+                        && queue.enqueueReplacingTail("laser green", (old, next) -> old.startsWith("laser")),
+                "adjacent unsent slider changes can keep only the latest value");
+        require(queue.snapshot().equals(List.of("laser red", "laser green"))
+                        && "laser red".equals(queue.inFlight()),
+                "color coalescing never changes the in-flight value");
+        require(queue.enqueue("install scope")
+                        && queue.enqueueReplacingTail("laser yellow", (old, next) -> old.startsWith("laser")),
+                "a replacement preserves the color edits on its two sides");
+        require(queue.close(List.of("save"))
+                        && queue.snapshot().equals(List.of("laser red", "laser green", "install scope", "laser yellow", "save")),
+                "closing waits for true color edits and does not append a stale whole-gun color replay");
+        queue.reset();
 
         require(queue.begin(first), "start large click queue");
         for (int i = 0; i < 2048; i++) {

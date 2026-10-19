@@ -2,6 +2,8 @@ package com.cdp.codpattern.app.refit.gametest;
 
 import com.cdp.codpattern.app.refit.service.RefitActionService;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
+import com.cdp.codpattern.client.refit.RefitLaserPreview;
+import com.cdp.codpattern.client.refit.RefitOperationQueue;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
@@ -45,6 +47,63 @@ public final class RefitActionGameTests {
     private static final int FIRST_SLOT = 9;
 
     private RefitActionGameTests() {
+    }
+
+    @GameTest(template = "empty", templateNamespace = "codpattern_refit", batch = "refit_actions", timeoutTicks = 100)
+    public static void queuedColorEditsSurviveAcksWithoutReplayingOldColorsOnClose(GameTestHelper helper) {
+        Fixture fixture = findFixture(helper);
+        ItemStack clientGun = fixture.gun().copy();
+        IGun gunApi = IGun.getIGunOrNull(clientGun);
+        gunApi.installAttachment(clientGun, fixture.first().copy());
+        RefitOperationQueue<RefitAction> queue = new RefitOperationQueue<>();
+        UUID sessionId = UUID.randomUUID();
+        queue.begin(sessionId);
+        RefitAction red = RefitAction.laser(4, Map.of(fixture.type().name(), 0xFF0000), false, 0);
+        RefitAction blue = RefitAction.laser(4, Map.of(fixture.type().name(), 0x0000FF), false, 0);
+        RefitAction green = RefitAction.laser(4, Map.of(fixture.type().name(), 0x00FF00), false, 0);
+        queue.enqueueReplacingTail(red, RefitLaserPreview::sameTarget);
+        queue.next();
+        queue.enqueueReplacingTail(blue, RefitLaserPreview::sameTarget);
+        queue.enqueueReplacingTail(green, RefitLaserPreview::sameTarget);
+        helper.assertTrue(queue.snapshot().equals(List.of(red, green)),
+                "rapid slider changes coalesce adjacent unsent colors while retaining the in-flight color");
+        RefitLaserPreview.applyPending(clientGun, queue.snapshot());
+        assertLaserColor(helper, clientGun, fixture.type(), 0x00FF00);
+
+        ItemStack acknowledgedGun = fixture.gun().copy();
+        gunApi.installAttachment(acknowledgedGun, fixture.first().copy());
+        RefitLaserPreview.applyPending(acknowledgedGun, List.of(red));
+        queue.acknowledge(sessionId);
+        RefitLaserPreview.applyPending(acknowledgedGun, queue.snapshot());
+        assertLaserColor(helper, acknowledgedGun, fixture.type(), 0x00FF00);
+        helper.assertTrue(queue.close(List.of(RefitAction.save()))
+                        && queue.snapshot().equals(List.of(green, RefitAction.save())),
+                "closing appends only SAVE after real edits, not a whole-gun color snapshot");
+
+        queue.reset();
+        queue.begin(UUID.randomUUID());
+        queue.enqueue(RefitAction.install(11, 4, fixture.type()));
+        queue.next();
+        queue.enqueueReplacingTail(blue, RefitLaserPreview::sameTarget);
+        RefitLaserPreview.applyPending(acknowledgedGun, queue.snapshot());
+        assertLaserColor(helper, acknowledgedGun, fixture.type(), 0x00FF00);
+        helper.assertTrue(queue.snapshot().size() == 2,
+                "colors chosen after an unacknowledged replacement do not mutate the old installed attachment");
+        gunApi.installAttachment(acknowledgedGun, fixture.second().copy());
+        queue.acknowledge(queue.sessionId());
+        RefitLaserPreview.applyPending(acknowledgedGun, queue.snapshot());
+        assertLaserColor(helper, acknowledgedGun, fixture.type(), 0x0000FF);
+        helper.assertTrue(attachmentId(gunApi.getAttachment(acknowledgedGun, fixture.type()))
+                        .equals(attachmentId(fixture.second())),
+                "the queued delta colors the actual replacement once its state is acknowledged");
+        helper.succeed();
+    }
+
+    private static void assertLaserColor(GameTestHelper helper, ItemStack gun, AttachmentType type, int expected) {
+        ItemStack attachment = IGun.getIGunOrNull(gun).getAttachment(gun, type);
+        IAttachment api = IAttachment.getIAttachmentOrNull(attachment);
+        helper.assertTrue(api != null && api.hasCustomLaserColor(attachment) && api.getLaserColor(attachment) == expected,
+                "the pending color is stored in the gun attachment NBT, including when the accessor returns a copy");
     }
 
     @GameTest(template = "empty", templateNamespace = "codpattern_refit", batch = "refit_actions", timeoutTicks = 100)

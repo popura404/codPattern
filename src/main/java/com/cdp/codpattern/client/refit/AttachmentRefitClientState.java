@@ -11,6 +11,7 @@ import com.cdp.codpattern.core.refit.BackpackRefitSessionContext;
 import com.cdp.codpattern.core.refit.RefitAction;
 import com.cdp.codpattern.network.RefitActionPacket;
 import com.cdp.codpattern.network.SyncAttachmentCandidatesPacket;
+import com.tacz.guns.api.item.attachment.AttachmentType;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -21,6 +22,7 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /** Client lifecycle and the one-request-at-a-time queue for a server-owned refit session. */
@@ -156,6 +158,21 @@ public final class AttachmentRefitClientState {
         sendNextAction();
     }
 
+    public static void onLaserColorEdited(int targetSlot, AttachmentType type, int color) {
+        if (!acceptsTaczOperations() || operations.isClosing() || targetSlot != gunSlot || type == null) return;
+        RefitAction edit = type == AttachmentType.NONE
+                ? RefitAction.laser(gunSlot, Map.of(), true, color)
+                : RefitAction.laser(gunSlot, Map.of(type.name(), color), false, 0);
+        try {
+            operations.enqueueReplacingTail(edit, RefitLaserPreview::sameTarget);
+            ItemStack gun = Minecraft.getInstance().player.getInventory().getItem(gunSlot);
+            RefitLaserPreview.applyPending(gun, operations.snapshot());
+            sendNextAction();
+        } catch (RuntimeException failure) {
+            onOperationTranslationFailed(failure);
+        }
+    }
+
     public static void onRefitScreenClosed() {
         if (!activeSession || operations.sessionId() == null || operations.isClosing()) {
             return;
@@ -165,15 +182,9 @@ public final class AttachmentRefitClientState {
             reset();
             return;
         }
-        // ESC returns directly to the parent screen and bypasses TaCZ.onClose(). Always
-        // capture its local laser edits here, then save only after every operation's ACK.
-        try {
-            RefitAction laser = TaczRefitMessageRouter.captureLaser(mc.player.getInventory().getItem(gunSlot), gunSlot);
-            operations.close(laser == null ? List.of(RefitAction.save()) : List.of(laser, RefitAction.save()));
-        } catch (RuntimeException failure) {
-            onOperationTranslationFailed(failure);
-            return;
-        }
+        // Slider deltas are already queued in UI order. A close-time whole-gun color
+        // snapshot could belong to a gun state preceding an unacknowledged installation.
+        operations.close(List.of(RefitAction.save()));
         BackpackRefitSessionContext.setClientActive(false);
         sendNextAction();
     }
@@ -183,6 +194,7 @@ public final class AttachmentRefitClientState {
         if (!operations.matches(incomingSessionId)) {
             return;
         }
+        RefitAction completed = operations.inFlight();
         operations.acknowledge(incomingSessionId);
         if (!success && message != null && !message.getString().isBlank()) {
             showMessage(message);
@@ -202,7 +214,8 @@ public final class AttachmentRefitClientState {
             cancelSession();
             return;
         }
-        refreshScreen();
+        // Rebuilding sliders on every color ACK would interrupt an active drag.
+        if (!success || completed == null || completed.kind() != RefitAction.Kind.LASER) refreshScreen();
         sendNextAction();
     }
 
@@ -267,6 +280,7 @@ public final class AttachmentRefitClientState {
         }
         gunSlot = targetSlot;
         ItemStack authoritativeGun = workingGun.copy();
+        RefitLaserPreview.applyPending(authoritativeGun, operations.snapshot());
         mc.player.getInventory().setItem(targetSlot, authoritativeGun);
         mc.player.getInventory().selected = targetSlot;
         TaczGatewayProvider.gateway().postAttachmentChanged(mc.player, authoritativeGun);
@@ -281,6 +295,8 @@ public final class AttachmentRefitClientState {
     private static void refreshScreen() {
         Minecraft mc = Minecraft.getInstance();
         if (activeSession && !operations.isClosing() && mc.screen instanceof CodGunRefitScreen refitScreen) {
+            refitScreen.setFocused(null);
+            refitScreen.setDragging(false);
             refitScreen.init();
         }
     }

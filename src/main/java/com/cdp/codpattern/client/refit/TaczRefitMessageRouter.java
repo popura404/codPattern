@@ -1,10 +1,8 @@
 package com.cdp.codpattern.client.refit;
 
 import com.cdp.codpattern.compat.tacz.TaczRefitActionCodec;
-import com.cdp.codpattern.core.refit.RefitAction;
 import com.tacz.guns.network.NetworkHandler;
 import com.tacz.guns.network.message.ClientMessageLaserColor;
-import net.minecraft.world.item.ItemStack;
 
 /** The channel hook only redirects operations originating in the active CDP refit screen. */
 public final class TaczRefitMessageRouter {
@@ -16,6 +14,9 @@ public final class TaczRefitMessageRouter {
                 || !TaczRefitActionCodec.supports(message)) {
             return false;
         }
+        // Precise HSV value changes are already queued. TaCZ's onClose packet is a
+        // whole-gun snapshot that may predate pending installs, so consume it here.
+        if (message instanceof ClientMessageLaserColor) return true;
         try {
             AttachmentRefitClientState.enqueueOperation(TaczRefitActionCodec.decode(message));
         } catch (RuntimeException failure) {
@@ -25,10 +26,4 @@ public final class TaczRefitMessageRouter {
         return true;
     }
 
-    public static RefitAction captureLaser(ItemStack gun, int gunSlot) {
-        if (gun == null || gun.isEmpty()) {
-            return null;
-        }
-        return TaczRefitActionCodec.decode(new ClientMessageLaserColor(gun, gunSlot));
-    }
 }

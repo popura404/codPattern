@@ -21,7 +21,8 @@
     "accessor.AbstractContainerScreenAccessor",
     "client.MouseHandlerMixin",
     "inventory.InventoryScreenMixin",
-    "tacz.GunRefitScreenMixin"
+    "tacz.GunRefitScreenMixin",
+    "tacz.HSVSliderGroupMixin"
   ],
   "server": []
 }

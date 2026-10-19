@@ -1,10 +1,12 @@
 package com.cdp.codpattern.client.refit;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.BiPredicate;
 
 /** A session's commands are sent in order, with at most one awaiting a server result. */
 public final class RefitOperationQueue<T> {
@@ -39,6 +41,27 @@ public final class RefitOperationQueue<T> {
         }
         pending.addLast(Objects.requireNonNull(operation));
         return true;
+    }
+
+    /** Coalesces only an unsent adjacent edit; never moves edits across another operation. */
+    public boolean enqueueReplacingTail(T operation, BiPredicate<T, T> canReplace) {
+        if (sessionId == null || closing) return false;
+        Objects.requireNonNull(operation);
+        T tail = pending.peekLast();
+        if (tail != null && canReplace.test(tail, operation)) pending.removeLast();
+        pending.addLast(operation);
+        return true;
+    }
+
+    public T inFlight() {
+        return inFlight;
+    }
+
+    public List<T> snapshot() {
+        List<T> result = new ArrayList<>();
+        if (inFlight != null) result.add(inFlight);
+        result.addAll(pending);
+        return List.copyOf(result);
     }
 
     /** Appends final local edits and save after all operations already accepted from the UI. */
