@@ -1,5 +1,6 @@
 package com.cdp.codpattern.compat.tacz;
 
+import com.cdp.codpattern.compat.arcana.ArcanaRefitCompat;
 import com.tacz.guns.api.DefaultAssets;
 import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.api.item.IAttachment;
@@ -25,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 
 public final class TaczCoreGateway implements TaczGateway {
+    private static final String UNDERBARREL_LASER_PRESET = "CdpArcanaUnderBarrelLaserColor";
     @Override
     public boolean isGun(ItemStack stack) {
         return resolveGun(stack).isPresent();
@@ -46,6 +48,25 @@ public final class TaczCoreGateway implements TaczGateway {
                 .map(iGun -> iGun.getGunId(stack))
                 .filter(id -> id != null)
                 .map(ResourceLocation::toString);
+    }
+
+    @Override
+    public Optional<String> resolveRefitGunId(ItemStack stack) {
+        if (!ArcanaRefitCompat.isLoaded()) {
+            return resolveGunId(stack);
+        }
+        if (resolveGun(stack).isEmpty() || !stack.hasTag()) {
+            return Optional.empty();
+        }
+        ResourceLocation rootId = ResourceLocation.tryParse(stack.getTag().getString(GunItemDataAccessor.GUN_ID_TAG));
+        return rootId == null || DefaultAssets.EMPTY_GUN_ID.equals(rootId)
+                ? Optional.empty() : Optional.of(rootId.toString());
+    }
+
+    @Override
+    public boolean isValidRefitGun(ItemStack stack) {
+        return resolveRefitGunId(stack).map(ResourceLocation::tryParse)
+                .flatMap(TimelessAPI::getCommonGunIndex).isPresent();
     }
 
     @Override
@@ -135,7 +156,17 @@ public final class TaczCoreGateway implements TaczGateway {
             }
             preset.put(key, attachmentTag);
         }
-        if (iGun.hasCustomLaserColor(gunStack)) {
+        if (ArcanaRefitCompat.isLoaded()) {
+            // Laser accessors, unlike Attachment* accessors, are routed to the active underbarrel by Arcana.
+            // Preserve both colors without copying ammunition or the rest of Arcana's Extras state.
+            if (gunStack.hasTag() && gunStack.getTag().contains(GunItemDataAccessor.LASER_COLOR_TAG, Tag.TAG_INT)) {
+                preset.putInt(GunItemDataAccessor.LASER_COLOR_TAG, gunStack.getTag().getInt(GunItemDataAccessor.LASER_COLOR_TAG));
+            }
+            CompoundTag underbarrel = underbarrelRoot(gunStack);
+            if (underbarrel != null && underbarrel.contains(GunItemDataAccessor.LASER_COLOR_TAG, Tag.TAG_INT)) {
+                preset.putInt(UNDERBARREL_LASER_PRESET, underbarrel.getInt(GunItemDataAccessor.LASER_COLOR_TAG));
+            }
+        } else if (iGun.hasCustomLaserColor(gunStack)) {
             preset.putInt(GunItemDataAccessor.LASER_COLOR_TAG, iGun.getLaserColor(gunStack));
         }
         return preset;
@@ -148,6 +179,7 @@ public final class TaczCoreGateway implements TaczGateway {
             return;
         }
         IGun iGun = iGunOpt.get();
+        Object previousUnderbarrel = ArcanaRefitCompat.isLoaded() ? ArcanaRefitCompat.captureUnderbarrel(gunStack) : null;
 
         for (AttachmentType type : AttachmentType.values()) {
             if (type == AttachmentType.NONE) {
@@ -167,9 +199,27 @@ public final class TaczCoreGateway implements TaczGateway {
                 iGun.installAttachment(gunStack, attachment);
             }
         }
+        if (ArcanaRefitCompat.isLoaded()) ArcanaRefitCompat.resetUnderbarrelAfterPreset(gunStack, previousUnderbarrel);
         if (preset.contains(GunItemDataAccessor.LASER_COLOR_TAG, Tag.TAG_INT)) {
-            iGun.setLaserColor(gunStack, preset.getInt(GunItemDataAccessor.LASER_COLOR_TAG));
+            if (ArcanaRefitCompat.isLoaded()) {
+                gunStack.getOrCreateTag().putInt(GunItemDataAccessor.LASER_COLOR_TAG, preset.getInt(GunItemDataAccessor.LASER_COLOR_TAG));
+            } else {
+                iGun.setLaserColor(gunStack, preset.getInt(GunItemDataAccessor.LASER_COLOR_TAG));
+            }
         }
+        if (ArcanaRefitCompat.isLoaded() && preset.contains(UNDERBARREL_LASER_PRESET, Tag.TAG_INT)) {
+            CompoundTag underbarrel = underbarrelRoot(gunStack);
+            if (underbarrel == null) underbarrel = ArcanaRefitCompat.underbarrelRootForPreset(gunStack);
+            if (underbarrel != null) {
+                underbarrel.putInt(GunItemDataAccessor.LASER_COLOR_TAG, preset.getInt(UNDERBARREL_LASER_PRESET));
+            }
+        }
+    }
+
+    private static CompoundTag underbarrelRoot(ItemStack gunStack) {
+        if (!gunStack.hasTag() || !gunStack.getTag().contains("Extras", Tag.TAG_COMPOUND)) return null;
+        CompoundTag extras = gunStack.getTag().getCompound("Extras");
+        return extras.contains("UnderBarrelRoot", Tag.TAG_COMPOUND) ? extras.getCompound("UnderBarrelRoot") : null;
     }
 
     @Override

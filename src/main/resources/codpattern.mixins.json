@@ -14,7 +14,12 @@
     "taczaddon.LiberateAttachmentMixin",
     "network.RefitMessageRoutingMixin",
     "refit.RefitItemReturnMixin",
-    "refit.RefitRefreshPacketMixin"
+    "refit.RefitRefreshPacketMixin",
+    "refit.ArcanaSkillManagerMixin",
+    "refit.ArcanaSkillActionMixin",
+    "refit.ArcanaScheduledTaskMixin",
+    "refit.ArcanaEffectTimerMixin",
+    "refit.ArcanaRefitDrawPacketMixin"
   ],
   "client": [
     "accessor.EntityAccessor",

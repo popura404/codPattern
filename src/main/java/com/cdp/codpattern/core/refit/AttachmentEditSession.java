@@ -1,5 +1,6 @@
 package com.cdp.codpattern.core.refit;
 
+import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
@@ -14,6 +15,7 @@ public class AttachmentEditSession {
     private final int originalSelectedSlot;
     private final List<ItemStack> inventorySnapshot;
     private final AttachmentRefitInventory refitInventory;
+    private final String expectedGunId;
 
     public AttachmentEditSession(int bagId, String slot, int editHotbarSlot, int originalSelectedSlot,
             List<ItemStack> inventorySnapshot, AttachmentRefitInventory refitInventory) {
@@ -29,6 +31,7 @@ public class AttachmentEditSession {
         this.originalSelectedSlot = originalSelectedSlot;
         this.inventorySnapshot = new ArrayList<>(inventorySnapshot);
         this.refitInventory = refitInventory;
+        this.expectedGunId = TaczGatewayProvider.gateway().resolveRefitGunId(refitInventory.getSelected()).orElse("");
     }
 
     public UUID getSessionId() {
@@ -57,6 +60,15 @@ public class AttachmentEditSession {
 
     public AttachmentRefitInventory getRefitInventory() {
         return refitInventory;
+    }
+
+    public String getExpectedGunId() {
+        return expectedGunId;
+    }
+
+    public boolean matchesGunIdentity(ItemStack gun) {
+        return !expectedGunId.isEmpty()
+                && TaczGatewayProvider.gateway().resolveRefitGunId(gun).filter(expectedGunId::equals).isPresent();
     }
 
 }

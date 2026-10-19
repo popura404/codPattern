@@ -2,6 +2,7 @@ package com.cdp.codpattern.app.refit.service;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
+import com.cdp.codpattern.compat.arcana.ArcanaRefitCompat;
 import com.cdp.codpattern.config.ConfigFailureFeedback;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
@@ -37,6 +38,18 @@ public final class RefitActionService {
             AttachmentEditSessionManager.abortSession(player, "cancelled", false);
             return new RefitOperationResultPacket(sessionId, true, true, Component.empty(), ItemStack.EMPTY, -1);
         }
+        ItemStack gun = session.getRefitInventory().getSelected();
+        IGun iGun = IGun.getIGunOrNull(gun);
+        if (iGun == null || !session.matchesGunIdentity(gun)
+                || player.getInventory().getItem(session.getEditHotbarSlot()) != gun
+                || (action.kind() != RefitAction.Kind.SAVE && action.gunSlot() != session.getEditHotbarSlot())) {
+            if (action.kind() == RefitAction.Kind.SAVE) {
+                AttachmentEditSessionManager.abortSession(player, "wrong_working_gun", false);
+                return new RefitOperationResultPacket(sessionId, false, true,
+                        message("operation_wrong_gun"), ItemStack.EMPTY, -1);
+            }
+            return result(session, false, "operation_wrong_gun");
+        }
         if (action.kind() == RefitAction.Kind.SAVE) {
             var saved = AttachmentPresetSaveService.save(player, session.getBagId(), session.getSlot(), "", "");
             if (saved.success() && saved.playerData() != null) {
@@ -44,13 +57,6 @@ public final class RefitActionService {
             }
             return new RefitOperationResultPacket(sessionId, saved.success(), true,
                     saved.userMessage() == null ? Component.empty() : saved.userMessage(), ItemStack.EMPTY, -1);
-        }
-
-        ItemStack gun = session.getRefitInventory().getSelected();
-        IGun iGun = IGun.getIGunOrNull(gun);
-        if (action.gunSlot() != session.getEditHotbarSlot() || iGun == null
-                || player.getInventory().getItem(session.getEditHotbarSlot()) != gun) {
-            return result(session, false, "operation_wrong_gun");
         }
 
         try {
@@ -97,10 +103,17 @@ public final class RefitActionService {
                 return result(session, false, "operation_empty_slot");
             }
 
-            applyStandard(player, session, iGun, gun, candidate, type, action);
+            if (ArcanaRefitCompat.isLoaded()) {
+                boolean accepted = action.kind() == RefitAction.Kind.INSTALL
+                        ? ArcanaRefitCompat.install(player, gun, candidate, action.candidateSlot(), type, session.getRefitInventory())
+                        : ArcanaRefitCompat.unload(player, gun, type, session.getRefitInventory());
+                if (!accepted) return result(session, false, "operation_not_allowed");
+            } else {
+                applyStandard(player, session, iGun, gun, candidate, type, action);
+            }
             player.inventoryMenu.broadcastChanges();
             return result(session, true, null);
-        } catch (RuntimeException failure) {
+        } catch (RuntimeException | LinkageError failure) {
             LogUtils.getLogger().error("Attachment operation {} failed for session {}", action.kind(), sessionId, failure);
             // Never retry a partly executed operation through another backend.
             if (failure instanceof BackpackConfigRepository.RepositoryException
@@ -108,7 +121,8 @@ public final class RefitActionService {
                 return new RefitOperationResultPacket(session.getSessionId(), false, false,
                         ConfigFailureFeedback.message(failure), gun.copy(), session.getEditHotbarSlot());
             }
-            return result(session, false, "operation_failed");
+            return result(session, false, failure instanceof ArcanaRefitCompat.CompatibilityException
+                    ? "operation_arcana_unavailable" : "operation_failed");
         }
     }
 

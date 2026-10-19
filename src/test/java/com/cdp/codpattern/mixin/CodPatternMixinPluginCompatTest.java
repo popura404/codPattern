@@ -16,6 +16,7 @@ public final class CodPatternMixinPluginCompatTest {
         verifyAvailableAddonIsReadAsBytecode();
         verifyAbsentAddonIsOptional();
         verifyUnreadableAddonIsOptional();
+        verifyEachArcanaTargetIsOptional();
         verifyUnrelatedMixinsDoNotProbeAddon();
         System.out.println("PASS optional TaCZAddon mixin discovery");
     }
@@ -61,6 +62,37 @@ public final class CodPatternMixinPluginCompatTest {
             throw new AssertionError("unrelated mixins must not initialize Addon discovery");
         });
         require(plugin.shouldApplyMixin("some.Target", "some.OtherMixin"), "unrelated mixin was disabled");
+    }
+
+    private static void verifyEachArcanaTargetIsOptional() {
+        for (String[] pair : new String[][]{
+                {"group.taczexpands.dist.Gcj8PhOz", "ArcanaSkillManagerMixin"},
+                {"group.taczexpands.server.skill.SkillManager", "ArcanaSkillManagerMixin"},
+                {"group.taczexpands.dist.FkeGEJ2j", "ArcanaSkillActionMixin"},
+                {"group.taczexpands.server.skill.Skill", "ArcanaSkillActionMixin"},
+                {"group.taczexpands.dist.cvNhRCT1", "ArcanaScheduledTaskMixin"},
+                {"group.taczexpands.server.util.ScheduledTask", "ArcanaScheduledTaskMixin"},
+                {"group.taczexpands.dist.jZItwoCj", "ArcanaEffectTimerMixin"},
+                {"group.taczexpands.dist.ZKUfbeiQ", "ArcanaRefitDrawPacketMixin"},
+                {"group.taczexpands.server.network.NetworkManager", "ArcanaRefitDrawPacketMixin"}}) {
+            String target = pair[0];
+            String mixin = "com.cdp.codpattern.mixin.refit." + pair[1];
+            CodPatternMixinPlugin present = new CodPatternMixinPlugin(() -> new TestBytecodeProvider() {
+                @Override
+                public ClassNode getClassNode(String name) {
+                    require(target.equals(name), "Arcana must probe the selected shipped/source target only");
+                    return new ClassNode();
+                }
+            });
+            CodPatternMixinPlugin absent = new CodPatternMixinPlugin(() -> new TestBytecodeProvider() {
+                @Override
+                public ClassNode getClassNode(String name) throws ClassNotFoundException {
+                    throw new ClassNotFoundException(name);
+                }
+            });
+            require(present.shouldApplyMixin(target, mixin), "present Arcana target must be transformed");
+            require(!absent.shouldApplyMixin(target, mixin), "absent Arcana target must not be loaded");
+        }
     }
 
     private abstract static class TestBytecodeProvider implements IClassBytecodeProvider {

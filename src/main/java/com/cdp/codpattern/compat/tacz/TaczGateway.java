@@ -16,6 +16,15 @@ public interface TaczGateway {
 
     Optional<String> resolveGunId(ItemStack stack);
 
+    /** The configured base gun identity; Arcana's currently selected firing mode may have a different ID. */
+    default Optional<String> resolveRefitGunId(ItemStack stack) {
+        return resolveGunId(stack);
+    }
+
+    default boolean isValidRefitGun(ItemStack stack) {
+        return isValidGun(stack);
+    }
+
     Optional<String> resolveAttachmentId(ItemStack stack);
 
     List<ItemStack> listAttachmentCandidates();

@@ -1,0 +1,57 @@
+import groovy.json.JsonSlurper
+import java.security.MessageDigest
+
+// The bundle contains already mapped copies of the user's actual installed JARs.
+// Do not run fg.deobf on these files: Arcana's embedded JAR was remapped explicitly.
+gradle.beforeProject { project ->
+    project.pluginManager.withPlugin('net.minecraftforge.gradle') {
+        File bundle = project.file(project.findProperty('refitRuntimeDir') ?: 'build/refit-runtime')
+        File manifestFile = new File(bundle, 'manifest.json')
+        if (!manifestFile.isFile()) {
+            throw new GradleException("Missing actual-JAR runtime bundle; run tools/refit-runtime/prepare.py first: ${manifestFile}")
+        }
+        def manifest = new JsonSlurper().parse(manifestFile)
+        if (manifest.format != 1 || manifest.runtimeJars.size() < 3) {
+            throw new GradleException("Invalid refit runtime manifest: ${manifestFile}")
+        }
+        def runtimeJars = manifest.runtimeJars.collect { entry ->
+            File jar = new File(bundle, entry.path.toString())
+            if (!jar.isFile()) {
+                throw new GradleException("Missing prepared runtime JAR: ${jar}")
+            }
+            MessageDigest hash = MessageDigest.getInstance('SHA-256')
+            jar.withInputStream { stream ->
+                byte[] buffer = new byte[65536]
+                int read
+                while ((read = stream.read(buffer)) != -1) {
+                    hash.update(buffer, 0, read)
+                }
+            }
+            if (hash.digest().encodeHex().toString() != entry.sha256) {
+                throw new GradleException("Prepared runtime JAR hash mismatch; prepare the bundle again: ${jar}")
+            }
+            jar
+        }
+        project.dependencies.add('runtimeOnly', project.files(runtimeJars))
+        project.configurations.configureEach { configuration ->
+            if (configuration.name == 'runtimeClasspath') {
+                // Keep normal compile dependencies; the runtime must have exactly the prepared actual versions.
+                configuration.exclude group: 'curse.maven', module: 'timeless-and-classics-zero-1028108'
+                configuration.exclude group: 'maven.modrinth', module: 'taczaddon'
+            }
+        }
+        project.afterEvaluate {
+            String expectedMapping = "${project.mapping_channel}_${project.mapping_version}"
+            if (manifest.mapping != expectedMapping || manifest.minecraft != project.minecraft_version
+                    || manifest.forge != project.forge_version) {
+                throw new GradleException("Runtime bundle was prepared for different Minecraft/Forge mappings")
+            }
+            project.minecraft.runs.configureEach { run ->
+                // Arcana's original refmaps are preserved; Mixin remaps their SRG references at runtime.
+                run.property 'mixin.env.remapRefMap', 'true'
+                run.property 'mixin.env.refMapRemappingFile', manifest.refmapMappings.path.toString()
+            }
+            project.logger.lifecycle("Using actual-JAR refit runtime: TaCZ 1.1.8-hotfix2 + Arcana 1.1.4 + KFF 4.12.0; Addon=${manifest.withAddon}")
+        }
+    }
+}

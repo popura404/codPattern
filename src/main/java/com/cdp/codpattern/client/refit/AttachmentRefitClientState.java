@@ -63,7 +63,9 @@ public final class AttachmentRefitClientState {
         if (!matches(incomingSessionId, bagId, slot) || operations.isClosing()) {
             return;
         }
-        if (!applyWorkingGun(workingGun, gunSlot)) {
+        if (expectedGunId == null
+                || TaczGatewayProvider.gateway().resolveRefitGunId(workingGun).filter(expectedGunId::equals).isEmpty()
+                || !applyWorkingGun(workingGun, gunSlot)) {
             cancelSession();
             return;
         }

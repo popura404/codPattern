@@ -3,14 +3,18 @@ package com.cdp.codpattern.app.refit.service;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
+import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
+import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
 import com.cdp.codpattern.core.refit.RefitAction;
+import com.cdp.codpattern.core.refit.RefitPreviewContext;
 import com.mojang.authlib.GameProfile;
 import com.mojang.logging.LogUtils;
 import com.tacz.guns.api.TimelessAPI;
+import com.tacz.guns.api.event.common.AttachmentPropertyEvent;
 import com.tacz.guns.api.item.IAttachment;
 import com.tacz.guns.api.item.IGun;
 import com.tacz.guns.api.item.attachment.AttachmentType;
@@ -22,6 +26,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.common.util.FakePlayer;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -37,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /** Same package as the service to exercise its final persistence boundary using temporary files. */
 @GameTestHolder("codpattern_refit")
@@ -67,6 +74,42 @@ public final class AttachmentPresetPersistenceGameTests {
                                 && editing.previous().getNbt().equals(saved.getNbt()),
                         "saving attachments preserves the configured base item, count and unrelated gun NBT");
                 assertRestored(helper, player, original);
+
+                ItemStack distributedGun = BackpackItemStackFactory.create(saved);
+                assertConsumedPreset(helper, distributedGun, expectedPreset, slot + " distribution factory");
+
+                try (RequestPaths ignored = new RequestPaths(player, files)) {
+                    // Force prepare to consume the saved disk configuration, not this test's cached ItemData.
+                    Field cache = BackpackConfigRepository.class.getDeclaredField("serverConfig");
+                    cache.setAccessible(true);
+                    cache.set(null, null);
+                    UUID reopenedId = UUID.randomUUID();
+                    java.util.Optional<AttachmentPresetRequestService.Result> reopened;
+                    try (ReopenPropertyProbe properties = new ReopenPropertyProbe(player)) {
+                        reopened = AttachmentPresetRequestService.prepare(player, reopenedId, 1, slot);
+                        helper.assertTrue(properties.events > 0 && properties.allScoped && properties.beforeSession,
+                                "actual reopen retains property events inside the exact player/working-gun preview scope before starting the session");
+                    }
+                    helper.assertTrue(!RefitPreviewContext.isActiveFor(player),
+                            "actual reopen closes its preparation scope before returning the new session");
+                    helper.assertTrue(reopened.isPresent(), "actual RequestService.prepare reopens saved " + slot + " configuration");
+                    var packet = reopened.orElseThrow().packet();
+                    AttachmentEditSession session = AttachmentEditSessionManager.getSession(player.getUUID());
+                    helper.assertTrue(session != null && session.getSessionId().equals(reopenedId)
+                                    && session.getBagId() == 1 && session.getSlot().equals(slot)
+                                    && packet.sessionId().equals(reopenedId) && packet.slot().equals(slot),
+                            "reopening creates the correct authoritative session and client response for " + slot);
+                    assertConsumedPreset(helper, session.getRefitInventory().getSelected(), expectedPreset, slot + " reopened session");
+                    assertConsumedPreset(helper, packet.workingGun(), expectedPreset, slot + " reopen packet");
+                    helper.assertTrue(AttachmentPresetUtil.parsePresetString(expectedPreset).equals(
+                                    AttachmentPresetUtil.parsePresetString(packet.presetPayload())),
+                            "reopen response serializes the restored attachment state for " + slot);
+                    RefitActionService.execute(player, reopenedId, RefitAction.cancel());
+                    assertRestored(helper, player, original);
+                } finally {
+                    AttachmentEditSessionManager.endSession(player);
+                }
+                LogUtils.getLogger().info("Refit saved preset round trip verified through actual request and distribution entries: slot={}", slot);
             } finally {
                 AttachmentEditSessionManager.endSession(player);
             }
@@ -195,6 +238,14 @@ public final class AttachmentPresetPersistenceGameTests {
                 "failure must report the precise localizable result " + key);
     }
 
+    private static void assertConsumedPreset(GameTestHelper helper, ItemStack gun, String expectedPreset, String entry) {
+        helper.assertTrue(!gun.isEmpty() && TaczGatewayProvider.gateway().isGun(gun), entry + " reconstructs a real gun");
+        helper.assertTrue(AttachmentPresetUtil.parsePresetString(expectedPreset).equals(AttachmentPresetUtil.buildPresetFromGun(gun)),
+                entry + " consumes the saved preset and restores the complete installed attachment state");
+        helper.assertTrue(gun.getOrCreateTag().getInt("UnrelatedBaseMarker") == 73,
+                entry + " preserves unrelated base gun NBT while applying the preset");
+    }
+
     private static ServerPlayer player(GameTestHelper helper) {
         return new FakePlayer(helper.getLevel(), new GameProfile(UUID.randomUUID(), "refit-save"));
     }
@@ -227,6 +278,59 @@ public final class AttachmentPresetPersistenceGameTests {
             BackpackConfig.Backpack.ItemData previous) { }
 
     private record GunAndAttachment(ItemStack gun, ItemStack attachment, AttachmentType type) { }
+
+    private static final class ReopenPropertyProbe implements AutoCloseable {
+        private int events;
+        private boolean allScoped = true;
+        private boolean beforeSession = true;
+        private final Consumer<AttachmentPropertyEvent> listener;
+
+        private ReopenPropertyProbe(ServerPlayer player) {
+            listener = event -> {
+                ItemStack gun = event.getGunItem();
+                if (!gun.hasTag() || gun.getTag().getInt("UnrelatedBaseMarker") != 73) return;
+                events++;
+                allScoped &= RefitPreviewContext.isActiveFor(player) && RefitPreviewContext.isActiveFor(gun);
+                beforeSession &= !AttachmentEditSessionManager.hasSession(player.getUUID());
+            };
+            MinecraftForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, AttachmentPropertyEvent.class, listener);
+        }
+
+        @Override
+        public void close() {
+            MinecraftForge.EVENT_BUS.unregister(listener);
+        }
+    }
+
+    /** Scope the real request entry to test files without adding a production-only injection API. */
+    private static final class RequestPaths implements AutoCloseable {
+        private final Field pathField;
+        private final Map<ConfigPath, String> previous = new LinkedHashMap<>();
+
+        private RequestPaths(ServerPlayer player, RepositoryFiles files) throws Exception {
+            pathField = ConfigPath.class.getDeclaredField("path");
+            pathField.setAccessible(true);
+            for (ConfigPath path : List.of(ConfigPath.SERVERBACKPACK, ConfigPath.SERVER_FILTER)) {
+                previous.put(path, (String) pathField.get(path));
+            }
+            try {
+                pathField.set(ConfigPath.SERVERBACKPACK, files.backpackPath.toAbsolutePath().toString());
+                pathField.set(ConfigPath.SERVER_FILTER, files.filterPath.toAbsolutePath().toString());
+                if (!ConfigPath.SERVERBACKPACK.getPath(player.server).equals(files.backpackPath.toAbsolutePath())
+                        || !ConfigPath.SERVER_FILTER.getPath(player.server).equals(files.filterPath.toAbsolutePath())) {
+                    throw new IllegalStateException("Refit request test could not isolate its temporary configuration paths");
+                }
+            } catch (Exception failure) {
+                close();
+                throw failure;
+            }
+        }
+
+        @Override
+        public void close() throws Exception {
+            for (var entry : previous.entrySet()) pathField.set(entry.getKey(), entry.getValue());
+        }
+    }
 
     private static final class RepositoryFiles implements AutoCloseable {
         private final Map<Field, Object> previous = new LinkedHashMap<>();

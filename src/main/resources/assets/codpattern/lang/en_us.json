@@ -649,5 +649,6 @@
   "message.codpattern.config.read_failed": "Could not read the server configuration. The operation stopped. Ask an administrator to check the log.",
   "message.codpattern.config.parse_failed": "The server configuration is invalid. The operation stopped. Ask an administrator to correct it.",
   "message.codpattern.config.write_failed": "Could not write the server configuration. This change was not saved. Ask an administrator to check the log.",
-  "message.codpattern.command.sync_partial_failure": "Configuration sync was incomplete: %s succeeded, %s failed. Check the server log."
+  "message.codpattern.command.sync_partial_failure": "Configuration sync was incomplete: %s succeeded, %s failed. Check the server log.",
+  "message.codpattern.refit.operation_arcana_unavailable": "The Arcana attachment interface is unavailable. The operation stopped. Give an administrator the mod versions and server log."
 }

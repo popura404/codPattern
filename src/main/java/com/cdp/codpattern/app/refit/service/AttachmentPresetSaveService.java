@@ -68,6 +68,10 @@ public final class AttachmentPresetSaveService {
             if (!TaczGatewayProvider.gateway().isGun(gunStack)) {
                 throw new SaveFailureException("message.codpattern.refit.save_failed_not_gun");
             }
+            if (!session.matchesGunIdentity(gunStack)
+                    || player.getInventory().getItem(session.getEditHotbarSlot()) != gunStack) {
+                throw new SaveFailureException("message.codpattern.refit.operation_wrong_gun");
+            }
 
             String builtPresetPayload = AttachmentPresetUtil.buildPresetFromGun(gunStack).toString();
             String itemId = gunStack.getItem().builtInRegistryHolder().key().location().toString();

@@ -16,6 +16,12 @@ public final class CodPatternMixinPlugin implements IMixinConfigPlugin {
             "com.cdp.codpattern.mixin.taczaddon.LiberateAttachmentMixin";
     private static final String LIBERATE_ATTACHMENT_TARGET =
             "com.mafuyu404.taczaddon.common.LiberateAttachment";
+    private static final Set<String> ARCANA_MIXINS = Set.of(
+            "com.cdp.codpattern.mixin.refit.ArcanaSkillManagerMixin",
+            "com.cdp.codpattern.mixin.refit.ArcanaSkillActionMixin",
+            "com.cdp.codpattern.mixin.refit.ArcanaScheduledTaskMixin",
+            "com.cdp.codpattern.mixin.refit.ArcanaEffectTimerMixin",
+            "com.cdp.codpattern.mixin.refit.ArcanaRefitDrawPacketMixin");
     private final Supplier<IClassBytecodeProvider> bytecodeProvider;
 
     public CodPatternMixinPlugin() {
@@ -39,6 +45,9 @@ public final class CodPatternMixinPlugin implements IMixinConfigPlugin {
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
         if (LIBERATE_ATTACHMENT_MIXIN.equals(mixinClassName)) {
             return classExists(LIBERATE_ATTACHMENT_TARGET);
+        }
+        if (ARCANA_MIXINS.contains(mixinClassName)) {
+            return classExists(targetClassName);
         }
         return true;
     }

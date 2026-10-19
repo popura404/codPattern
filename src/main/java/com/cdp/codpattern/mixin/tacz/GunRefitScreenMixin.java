@@ -20,7 +20,8 @@ public abstract class GunRefitScreenMixin {
             method = "addInventoryAttachmentButtons",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/player/LocalPlayer;getInventory()Lnet/minecraft/world/entity/player/Inventory;"
+                    target = "Lnet/minecraft/client/player/LocalPlayer;getInventory()Lnet/minecraft/world/entity/player/Inventory;",
+                    remap = true
             )
     )
     private Inventory codpattern$useRefitInventoryForCandidates(LocalPlayer player) {
@@ -32,7 +33,8 @@ public abstract class GunRefitScreenMixin {
             method = "addAttachmentTypeButtons",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/player/LocalPlayer;getInventory()Lnet/minecraft/world/entity/player/Inventory;"
+                    target = "Lnet/minecraft/client/player/LocalPlayer;getInventory()Lnet/minecraft/world/entity/player/Inventory;",
+                    remap = true
             )
     )
     private Inventory codpattern$useRefitInventoryForSlots(LocalPlayer player) {
@@ -54,7 +56,8 @@ public abstract class GunRefitScreenMixin {
             method = "addInventoryAttachmentButtons",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/world/entity/player/Inventory;getItem(I)Lnet/minecraft/world/item/ItemStack;"
+                    target = "Lnet/minecraft/world/entity/player/Inventory;getItem(I)Lnet/minecraft/world/item/ItemStack;",
+                    remap = true
             )
     )
     private ItemStack codpattern$filterBlockedAttachmentCandidates(Inventory inventory, int slotIndex) {

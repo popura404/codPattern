@@ -10,6 +10,7 @@ import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
+import com.cdp.codpattern.core.refit.RefitPreviewContext;
 import com.cdp.codpattern.network.SyncAttachmentPresetPacket;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -66,7 +67,7 @@ public final class AttachmentPresetRequestService {
         }
 
         ItemStack originalGunStack = buildItemStack(itemData);
-        if (!TaczGatewayProvider.gateway().isValidGun(originalGunStack)) {
+        if (!TaczGatewayProvider.gateway().isValidRefitGun(originalGunStack)) {
             return Optional.empty();
         }
         ItemStack gunStack = originalGunStack.copy();
@@ -76,13 +77,17 @@ public final class AttachmentPresetRequestService {
                 ? Optional.empty()
                 : Optional.of(storedPreset);
         CompoundTag presetTag = storedPresetPayload.map(AttachmentPresetUtil::parsePresetString).orElseGet(CompoundTag::new);
-        if (!presetTag.isEmpty()) {
-            AttachmentPresetUtil.applyPresetToGun(gunStack, presetTag);
-        }
-        boolean sanitizedBlockedAttachments = BackpackAttachmentFilter.removeBlockedInstalledAttachments(filterConfig,
-                gunStack);
-        if (!presetTag.isEmpty() || sanitizedBlockedAttachments) {
-            TaczGatewayProvider.gateway().postAttachmentChanged(player, gunStack);
+        // Preparation can trigger property listeners before an editing session exists.
+        // Keep those updates, but isolate gameplay side effects on this working copy.
+        try (var ignored = RefitPreviewContext.open(player, gunStack)) {
+            if (!presetTag.isEmpty()) {
+                AttachmentPresetUtil.applyPresetToGun(gunStack, presetTag);
+            }
+            boolean sanitizedBlockedAttachments = BackpackAttachmentFilter.removeBlockedInstalledAttachments(filterConfig,
+                    gunStack);
+            if (!presetTag.isEmpty() || sanitizedBlockedAttachments) {
+                TaczGatewayProvider.gateway().postAttachmentChanged(player, gunStack);
+            }
         }
 
         String syncedPresetPayloadRaw = AttachmentPresetUtil.buildPresetFromGun(gunStack).toString();
@@ -90,7 +95,7 @@ public final class AttachmentPresetRequestService {
                 ? Optional.empty()
                 : Optional.of(syncedPresetPayloadRaw);
 
-        Optional<String> expectedGunIdOpt = TaczGatewayProvider.gateway().resolveGunId(gunStack);
+        Optional<String> expectedGunIdOpt = TaczGatewayProvider.gateway().resolveRefitGunId(gunStack);
         if (expectedGunIdOpt.isEmpty()) {
             return Optional.empty();
         }
