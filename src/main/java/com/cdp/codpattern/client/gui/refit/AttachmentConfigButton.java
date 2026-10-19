@@ -22,12 +22,15 @@ public class AttachmentConfigButton extends Button {
     public AttachmentConfigButton(int x, int y, int width, int height, int bagId, String slot, String requestedGunId) {
         super(x, y, width, height, Component.translatable("screen.codpattern.attachment_config.button"),
                 button -> {
-                    AttachmentRefitClientState.prepareOpenRequest(
-                            bagId,
-                            slot,
-                            requestedGunId,
-                            Minecraft.getInstance().screen);
-                    ModNetworkChannel.sendToServer(new RequestAttachmentPresetPacket(bagId, slot));
+                    if (AttachmentRefitClientState.prepareOpenRequest(
+                            bagId, slot, requestedGunId, Minecraft.getInstance().screen)) {
+                        try {
+                            ModNetworkChannel.sendToServer(new RequestAttachmentPresetPacket(
+                                    AttachmentRefitClientState.getSessionId(), bagId, slot));
+                        } catch (RuntimeException failure) {
+                            AttachmentRefitClientState.onRequestSendFailed(failure);
+                        }
+                    }
                 },
                 DEFAULT_NARRATION);
     }

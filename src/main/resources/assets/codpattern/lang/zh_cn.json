@@ -637,5 +637,13 @@
   "screen.codpattern.map_admin.map_unavailable": "地图未加载，保留删除记录供核查或取消",
   "screen.codpattern.map_admin.status.deletion_pending": "删除待处理",
   "screen.codpattern.end_teleport.reason.deletion_pending": "地图正在删除，暂不可修改",
-  "screen.codpattern.map_admin.result.cancelled": "已取消删除，必要恢复会继续"
+  "screen.codpattern.map_admin.result.cancelled": "已取消删除，必要恢复会继续",
+  "message.codpattern.refit.pending": "请等待当前改枪操作或保存完成。",
+  "message.codpattern.refit.request_failed": "改枪请求发送失败，请重新打开界面。",
+  "message.codpattern.refit.open_failed": "无法开始改枪，请检查当前武器和配置。",
+  "message.codpattern.refit.operation_wrong_gun": "改枪工作枪已变化，请重新打开界面。",
+  "message.codpattern.refit.operation_wrong_type": "配件与目标槽位不匹配，操作已取消。",
+  "message.codpattern.refit.operation_not_allowed": "当前武器不能安装这个配件。",
+  "message.codpattern.refit.operation_empty_slot": "该槽位已没有可卸下的配件。",
+  "message.codpattern.refit.operation_failed": "改枪操作失败，界面已同步服务端状态。"
 }

@@ -39,6 +39,7 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
 import java.util.Map;
 
 @OnlyIn(Dist.CLIENT)
@@ -115,12 +116,14 @@ public class ClientPacketHandler {
         }
     }
 
-    public static void handleSyncAttachmentPreset(int bagId, String slot, String presetPayload, String expectedGunId) {
-        AttachmentRefitClientState.onPresetSync(bagId, slot, presetPayload, expectedGunId);
+    public static void handleSyncAttachmentPreset(UUID sessionId, int bagId, String slot, String presetPayload,
+            String expectedGunId, ItemStack workingGun, int gunSlot) {
+        AttachmentRefitClientState.onPresetSync(sessionId, bagId, slot, presetPayload, expectedGunId, workingGun, gunSlot);
     }
 
-    public static void handleSyncAttachmentCandidates(int bagId, String slot, List<ItemStack> attachmentCandidates) {
-        AttachmentRefitClientState.onAttachmentCandidatesSync(bagId, slot, attachmentCandidates);
+    public static void handleSyncAttachmentCandidates(UUID sessionId, int bagId, String slot,
+            List<ItemStack> attachmentCandidates) {
+        AttachmentRefitClientState.onAttachmentCandidatesSync(sessionId, bagId, slot, attachmentCandidates);
     }
 
     public static void handleUpdateWeaponResult(boolean success, String code, String message) {

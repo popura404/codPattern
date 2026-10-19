@@ -11,7 +11,10 @@
     "inventory.InventoryMenuMixin",
     "tacz.ClientMessageRefitGunMixin",
     "tacz.ClientMessageUnloadAttachmentMixin",
-    "taczaddon.LiberateAttachmentMixin"
+    "taczaddon.LiberateAttachmentMixin",
+    "network.RefitMessageRoutingMixin",
+    "refit.RefitItemReturnMixin",
+    "refit.RefitRefreshPacketMixin"
   ],
   "client": [
     "accessor.EntityAccessor",

@@ -1,6 +1,8 @@
 package com.cdp.codpattern.core.refit;
 
 import com.mojang.logging.LogUtils;
+import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
+import com.cdp.codpattern.network.RefitOperationResultPacket;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetCarriedItemPacket;
 import net.minecraft.server.MinecraftServer;
@@ -21,6 +23,11 @@ public class AttachmentEditSessionManager {
 
     public static AttachmentEditSession startSession(ServerPlayer player, int bagId, String slot, ItemStack gunStack,
             List<ItemStack> attachmentCandidates) {
+        return startSession(player, UUID.randomUUID(), bagId, slot, gunStack, attachmentCandidates);
+    }
+
+    public static AttachmentEditSession startSession(ServerPlayer player, UUID sessionId, int bagId, String slot,
+            ItemStack gunStack, List<ItemStack> attachmentCandidates) {
         abortSession(player, "replace_session");
         Inventory inventory = player.getInventory();
         int originalSelected = inventory.selected;
@@ -44,6 +51,7 @@ public class AttachmentEditSessionManager {
                 inventory.getItem(editSlot),
                 new ArrayList<>(snapshotAttachments(attachmentCandidates)));
         AttachmentEditSession session = new AttachmentEditSession(
+                sessionId,
                 bagId,
                 slot,
                 editSlot,
@@ -113,7 +121,9 @@ public class AttachmentEditSessionManager {
         player.inventoryMenu.slotsChanged(player.getInventory());
 
         if (abnormal && notifyPlayer) {
-            player.sendSystemMessage(Component.translatable("message.codpattern.refit.session_rollback", reason));
+            ModNetworkChannel.sendToPlayer(new RefitOperationResultPacket(session.getSessionId(), false, true,
+                    Component.translatable("message.codpattern.refit.session_rollback", reason), ItemStack.EMPTY,
+                    session.getEditHotbarSlot()), player);
         }
         LOGGER.info("Attachment edit session ended: player={} bagId={} slot={} reason={} abnormal={}",
                 player.getGameProfile().getName(), session.getBagId(), session.getSlot(), reason, abnormal);

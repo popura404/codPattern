@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 public final class AttachmentPresetRequestService {
     public record Result(SyncAttachmentPresetPacket packet, boolean presetLoaded, int candidateCount) {
@@ -35,6 +36,10 @@ public final class AttachmentPresetRequestService {
     }
 
     public static Optional<Result> prepare(ServerPlayer player, int bagId, String slot) {
+        return prepare(player, UUID.randomUUID(), bagId, slot);
+    }
+
+    public static Optional<Result> prepare(ServerPlayer player, UUID sessionId, int bagId, String slot) {
         if (player.server == null) {
             return Optional.empty();
         }
@@ -91,12 +96,13 @@ public final class AttachmentPresetRequestService {
         }
         List<ItemStack> candidates = collectAttachmentCandidates(gunStack, filterConfig);
         AttachmentEditSession session = AttachmentEditSessionManager.startSession(
-                player, bagId, slot, gunStack, candidates);
+                player, sessionId, bagId, slot, gunStack, candidates);
         SyncAttachmentPresetPacket packet = new SyncAttachmentPresetPacket(
+                sessionId,
                 bagId,
                 slot,
                 syncedPresetPayload.orElse(""),
-                expectedGunIdOpt.get());
+                expectedGunIdOpt.get(), gunStack, session.getEditHotbarSlot());
         return Optional.of(new Result(
                 packet,
                 syncedPresetPayload.isPresent(),

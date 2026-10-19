@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.network;
 
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.client.refit.AttachmentRefitClientState;
+import com.cdp.codpattern.client.refit.TaczRefitMessageRouter;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.network.handler.ClientPacketBridge;
@@ -22,6 +23,7 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public final class ClientPacketBridgeInstaller {
     private ClientPacketBridgeInstaller() {
@@ -53,13 +55,27 @@ public final class ClientPacketBridgeInstaller {
             }
 
             @Override
-            public void syncAttachmentPreset(int bagId, String slot, String presetPayload, String expectedGunId) {
-                ClientPacketHandler.handleSyncAttachmentPreset(bagId, slot, presetPayload, expectedGunId);
+            public void syncAttachmentPreset(UUID sessionId, int bagId, String slot, String presetPayload,
+                    String expectedGunId, ItemStack workingGun, int gunSlot) {
+                ClientPacketHandler.handleSyncAttachmentPreset(sessionId, bagId, slot, presetPayload,
+                        expectedGunId, workingGun, gunSlot);
             }
 
             @Override
-            public void syncAttachmentCandidates(int bagId, String slot, List<ItemStack> attachmentCandidates) {
-                ClientPacketHandler.handleSyncAttachmentCandidates(bagId, slot, attachmentCandidates);
+            public void syncAttachmentCandidates(UUID sessionId, int bagId, String slot,
+                    List<ItemStack> attachmentCandidates) {
+                ClientPacketHandler.handleSyncAttachmentCandidates(sessionId, bagId, slot, attachmentCandidates);
+            }
+
+            @Override
+            public void refitOperationResult(UUID sessionId, boolean success, boolean finished, Component message,
+                    ItemStack workingGun, int gunSlot) {
+                AttachmentRefitClientState.onOperationResult(sessionId, success, finished, message, workingGun, gunSlot);
+            }
+
+            @Override
+            public boolean routeRefitMessage(Object channel, Object message) {
+                return TaczRefitMessageRouter.route(channel, message);
             }
 
             @Override

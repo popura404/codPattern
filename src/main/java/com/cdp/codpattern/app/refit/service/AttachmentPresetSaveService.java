@@ -107,7 +107,7 @@ public final class AttachmentPresetSaveService {
             if (saved) {
                 AttachmentEditSessionManager.endSession(player);
             } else {
-                AttachmentEditSessionManager.abortSession(player, "save_failed");
+                AttachmentEditSessionManager.abortSession(player, "save_failed", false);
             }
         }
     }

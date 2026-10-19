@@ -151,6 +151,7 @@ public final class AttachmentCandidateGameTests {
             SyncAttachmentCandidatesPacket.encode(new SyncAttachmentCandidatesPacket(7, "primary", candidates()), encoded);
             byte[] originalBytes = bytes(encoded);
 
+            helper.assertTrue(encoded.readUUID().equals(new UUID(0, 0)), "candidate packet retains its session identity");
             helper.assertTrue(encoded.readInt() == 7 && "primary".equals(encoded.readUtf()),
                     "candidate packet retains the target backpack and slot");
             helper.assertTrue(encoded.readVarInt() == CANDIDATE_COUNT,
@@ -181,6 +182,7 @@ public final class AttachmentCandidateGameTests {
             List<ItemStack> withHoles = List.of(candidate(0), ItemStack.EMPTY, candidate(2), ItemStack.EMPTY);
             SyncAttachmentCandidatesPacket.encode(new SyncAttachmentCandidatesPacket(7, "primary", withHoles), encoded);
             byte[] originalBytes = bytes(encoded);
+            encoded.readUUID();
             encoded.readInt();
             encoded.readUtf();
             helper.assertTrue(encoded.readVarInt() == 4, "packet count includes empty candidate positions");

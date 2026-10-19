@@ -11,6 +11,7 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public final class ClientPacketBridge {
     private static final Handler NOOP = new Handler() {
@@ -41,12 +42,22 @@ public final class ClientPacketBridge {
         handler.syncBackpackConfig(configJson);
     }
 
-    public static void syncAttachmentPreset(int bagId, String slot, String presetPayload, String expectedGunId) {
-        handler.syncAttachmentPreset(bagId, slot, presetPayload, expectedGunId);
+    public static void syncAttachmentPreset(UUID sessionId, int bagId, String slot, String presetPayload,
+            String expectedGunId, ItemStack workingGun, int gunSlot) {
+        handler.syncAttachmentPreset(sessionId, bagId, slot, presetPayload, expectedGunId, workingGun, gunSlot);
     }
 
-    public static void syncAttachmentCandidates(int bagId, String slot, List<ItemStack> attachmentCandidates) {
-        handler.syncAttachmentCandidates(bagId, slot, attachmentCandidates);
+    public static void syncAttachmentCandidates(UUID sessionId, int bagId, String slot, List<ItemStack> attachmentCandidates) {
+        handler.syncAttachmentCandidates(sessionId, bagId, slot, attachmentCandidates);
+    }
+
+    public static void refitOperationResult(UUID sessionId, boolean success, boolean finished, Component message,
+            ItemStack gun, int gunSlot) {
+        handler.refitOperationResult(sessionId, success, finished, message, gun, gunSlot);
+    }
+
+    public static boolean routeRefitMessage(Object channel, Object message) {
+        return handler.routeRefitMessage(channel, message);
     }
 
     public static Inventory resolveAttachmentRefitInventory(Inventory sourceInventory) {
@@ -142,10 +153,19 @@ public final class ClientPacketBridge {
         default void syncBackpackConfig(String configJson) {
         }
 
-        default void syncAttachmentPreset(int bagId, String slot, String presetPayload, String expectedGunId) {
+        default void syncAttachmentPreset(UUID sessionId, int bagId, String slot, String presetPayload,
+                String expectedGunId, ItemStack workingGun, int gunSlot) {
         }
 
-        default void syncAttachmentCandidates(int bagId, String slot, List<ItemStack> attachmentCandidates) {
+        default void syncAttachmentCandidates(UUID sessionId, int bagId, String slot, List<ItemStack> attachmentCandidates) {
+        }
+
+        default void refitOperationResult(UUID sessionId, boolean success, boolean finished, Component message,
+                ItemStack gun, int gunSlot) {
+        }
+
+        default boolean routeRefitMessage(Object channel, Object message) {
+            return false;
         }
 
         default Inventory resolveAttachmentRefitInventory(Inventory sourceInventory) {

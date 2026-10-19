@@ -1,7 +1,8 @@
 package com.cdp.codpattern.adapter.forge.network;
 
 import com.cdp.codpattern.network.RequestAttachmentPresetPacket;
-import com.cdp.codpattern.network.SaveAttachmentPresetPacket;
+import com.cdp.codpattern.network.RefitActionPacket;
+import com.cdp.codpattern.network.RefitOperationResultPacket;
 import com.cdp.codpattern.network.SyncAttachmentCandidatesPacket;
 import com.cdp.codpattern.network.SyncAttachmentPresetPacket;
 import com.cdp.codpattern.network.UpdateWeaponPacket;
@@ -37,10 +38,16 @@ final class RefitPacketRegistrar {
                 .consumerMainThread(SyncAttachmentCandidatesPacket::handle)
                 .add();
 
-        ModNetworkChannel.CHANNEL.messageBuilder(SaveAttachmentPresetPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_SERVER)
-                .decoder(SaveAttachmentPresetPacket::decode)
-                .encoder(SaveAttachmentPresetPacket::encode)
-                .consumerMainThread(SaveAttachmentPresetPacket::handle)
+        ModNetworkChannel.CHANNEL.messageBuilder(RefitActionPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_SERVER)
+                .decoder(RefitActionPacket::decode)
+                .encoder(RefitActionPacket::encode)
+                .consumerMainThread(RefitActionPacket::handle)
+                .add();
+
+        ModNetworkChannel.CHANNEL.messageBuilder(RefitOperationResultPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(RefitOperationResultPacket::decode)
+                .encoder(RefitOperationResultPacket::encode)
+                .consumerMainThread(RefitOperationResultPacket::handle)
                 .add();
 
         ModNetworkChannel.CHANNEL.messageBuilder(UpdateWeaponResultPacket.class, ModNetworkChannel.nextMessageId(), NetworkDirection.PLAY_TO_CLIENT)

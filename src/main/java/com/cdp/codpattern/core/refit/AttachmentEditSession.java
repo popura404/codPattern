@@ -4,8 +4,10 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class AttachmentEditSession {
+    private final UUID sessionId;
     private final int bagId;
     private final String slot;
     private final int editHotbarSlot;
@@ -15,12 +17,22 @@ public class AttachmentEditSession {
 
     public AttachmentEditSession(int bagId, String slot, int editHotbarSlot, int originalSelectedSlot,
             List<ItemStack> inventorySnapshot, AttachmentRefitInventory refitInventory) {
+        this(UUID.randomUUID(), bagId, slot, editHotbarSlot, originalSelectedSlot, inventorySnapshot, refitInventory);
+    }
+
+    public AttachmentEditSession(UUID sessionId, int bagId, String slot, int editHotbarSlot, int originalSelectedSlot,
+            List<ItemStack> inventorySnapshot, AttachmentRefitInventory refitInventory) {
+        this.sessionId = sessionId;
         this.bagId = bagId;
         this.slot = slot;
         this.editHotbarSlot = editHotbarSlot;
         this.originalSelectedSlot = originalSelectedSlot;
         this.inventorySnapshot = new ArrayList<>(inventorySnapshot);
         this.refitInventory = refitInventory;
+    }
+
+    public UUID getSessionId() {
+        return sessionId;
     }
 
     public int getBagId() {

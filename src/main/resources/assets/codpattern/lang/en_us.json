@@ -637,5 +637,13 @@
   "screen.codpattern.map_admin.map_unavailable": "Map unavailable; deletion record retained for inspection or cancellation",
   "screen.codpattern.map_admin.status.deletion_pending": "Deletion pending",
   "screen.codpattern.end_teleport.reason.deletion_pending": "Map deletion is pending",
-  "screen.codpattern.map_admin.result.cancelled": "Deletion cancelled; required recovery continues"
+  "screen.codpattern.map_admin.result.cancelled": "Deletion cancelled; required recovery continues",
+  "message.codpattern.refit.pending": "Please wait for the current refit operation or save to finish.",
+  "message.codpattern.refit.request_failed": "Could not send the refit request. Please reopen the screen.",
+  "message.codpattern.refit.open_failed": "Could not start refitting. Check the weapon and configuration.",
+  "message.codpattern.refit.operation_wrong_gun": "The editing weapon changed. Please reopen the refit screen.",
+  "message.codpattern.refit.operation_wrong_type": "The attachment does not match the target slot. Nothing was changed.",
+  "message.codpattern.refit.operation_not_allowed": "This attachment cannot be installed on the current weapon.",
+  "message.codpattern.refit.operation_empty_slot": "There is no attachment to remove from that slot.",
+  "message.codpattern.refit.operation_failed": "The refit operation failed. The screen now shows the server state."
 }

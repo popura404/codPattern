@@ -4,6 +4,7 @@ import com.cdp.codpattern.CodPatternConstants;
 import com.cdp.codpattern.compat.tacz.client.CodGunRefitScreen;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ScreenEvent;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -16,6 +17,11 @@ public class AttachmentRefitClientEvents {
         if (event.phase == TickEvent.Phase.END) {
             AttachmentRefitClientState.tryOpenIfReady();
         }
+    }
+
+    @SubscribeEvent
+    public static void onDisconnected(ClientPlayerNetworkEvent.LoggingOut event) {
+        AttachmentRefitClientState.onDisconnected();
     }
 
     @SubscribeEvent
