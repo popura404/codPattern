@@ -32,8 +32,7 @@ public record RequestAttachmentPresetPacket(UUID sessionId, int bagId, String sl
                 var result = AttachmentPresetRequestService.prepare(player, packet.sessionId, packet.bagId, packet.slot);
                 if (result.isPresent()) {
                     ModNetworkChannel.sendToPlayer(result.get().packet(), player);
-                    ModNetworkChannel.sendToPlayer(new SyncAttachmentCandidatesPacket(packet.sessionId,
-                            packet.bagId, packet.slot, AttachmentEditSessionManager.snapshotAttachmentCandidates(player)), player);
+                    AttachmentEditSessionManager.syncVisibleAttachmentCandidates(player);
                     return;
                 }
             } catch (RuntimeException failure) {

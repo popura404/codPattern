@@ -60,6 +60,11 @@ public final class ClientPacketBridge {
         return handler.routeRefitMessage(channel, message);
     }
 
+    public static void syncAttachmentCandidateChunk(UUID sessionId, int bagId, String slot,
+            int offset, int totalBytes, boolean complete, byte[] bytes) {
+        handler.syncAttachmentCandidateChunk(sessionId, bagId, slot, offset, totalBytes, complete, bytes);
+    }
+
     public static Inventory resolveAttachmentRefitInventory(Inventory sourceInventory) {
         return handler.resolveAttachmentRefitInventory(sourceInventory);
     }
@@ -166,6 +171,10 @@ public final class ClientPacketBridge {
 
         default boolean routeRefitMessage(Object channel, Object message) {
             return false;
+        }
+
+        default void syncAttachmentCandidateChunk(UUID sessionId, int bagId, String slot,
+                int offset, int totalBytes, boolean complete, byte[] bytes) {
         }
 
         default Inventory resolveAttachmentRefitInventory(Inventory sourceInventory) {

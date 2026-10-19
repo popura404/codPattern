@@ -6,9 +6,11 @@ import com.cdp.codpattern.client.gui.screen.WeaponMenuScreen;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.compat.tacz.client.CodGunRefitScreen;
 import com.cdp.codpattern.core.refit.AttachmentRefitInventory;
+import com.cdp.codpattern.core.refit.AttachmentCandidateTransfer;
 import com.cdp.codpattern.core.refit.BackpackRefitSessionContext;
 import com.cdp.codpattern.core.refit.RefitAction;
 import com.cdp.codpattern.network.RefitActionPacket;
+import com.cdp.codpattern.network.SyncAttachmentCandidatesPacket;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -32,6 +34,7 @@ public final class AttachmentRefitClientState {
     private static List<ItemStack> attachmentCandidates = List.of();
     private static Screen parentScreen;
     private static final RefitOperationQueue<RefitAction> operations = new RefitOperationQueue<>();
+    private static final AttachmentCandidateTransfer candidateTransfer = new AttachmentCandidateTransfer();
 
     private AttachmentRefitClientState() {
     }
@@ -75,6 +78,24 @@ public final class AttachmentRefitClientState {
         attachmentCandidates = snapshotCandidates(candidates);
         attachmentCandidatesReady = true;
         refreshScreen();
+    }
+
+    public static void onAttachmentCandidateChunk(UUID incomingSessionId, int bagId, String slot,
+            int offset, int totalBytes, boolean complete, byte[] bytes) {
+        if (!matches(incomingSessionId, bagId, slot)) {
+            return;
+        }
+        try {
+            byte[] snapshot = candidateTransfer.accept(offset, totalBytes, complete, bytes);
+            if (snapshot != null) {
+                onAttachmentCandidatesSync(incomingSessionId, bagId, slot,
+                        SyncAttachmentCandidatesPacket.readSnapshot(snapshot));
+            }
+        } catch (RuntimeException failure) {
+            LogUtils.getLogger().error("Could not assemble attachment candidate snapshot", failure);
+            showMessage(Component.translatable("message.codpattern.refit.request_failed"));
+            cancelSession();
+        }
     }
 
     public static List<ItemStack> getAttachmentCandidates() {
@@ -273,6 +294,7 @@ public final class AttachmentRefitClientState {
 
     private static void reset() {
         operations.reset();
+        candidateTransfer.reset();
         pendingOpen = false;
         activeSession = false;
         bagId = -1;

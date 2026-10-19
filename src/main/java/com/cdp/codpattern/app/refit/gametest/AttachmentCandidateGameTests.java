@@ -1,6 +1,8 @@
 package com.cdp.codpattern.app.refit.gametest;
 
 import com.cdp.codpattern.core.refit.AttachmentRefitInventory;
+import com.cdp.codpattern.core.refit.AttachmentCandidateTransfer;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.BackpackRefitSessionContext;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
@@ -37,7 +39,7 @@ import java.util.UUID;
 @GameTestHolder("codpattern_refit")
 @PrefixGameTestTemplate(false)
 public final class AttachmentCandidateGameTests {
-    private static final int CANDIDATE_COUNT = 1024;
+    private static final int CANDIDATE_COUNT = 2048;
     private static final int FIRST_CANDIDATE_SLOT = 9;
 
     private AttachmentCandidateGameTests() {
@@ -52,7 +54,7 @@ public final class AttachmentCandidateGameTests {
         AttachmentRefitInventory inventory = new AttachmentRefitInventory(player, 4, gunMarker, candidates);
 
         helper.assertTrue(inventory.getContainerSize() == FIRST_CANDIDATE_SLOT + CANDIDATE_COUNT + 1,
-                "virtual inventory retains all 1024 candidates and an empty unload slot");
+                "virtual inventory retains all 2048 candidates and an empty unload slot");
         helper.assertTrue(inventory.getSelected() == gunMarker && inventory.getItem(4) == gunMarker,
                 "candidate expansion preserves the selected gun slot");
         helper.assertTrue(inventory.items.size() >= inventory.getContainerSize(),
@@ -145,59 +147,114 @@ public final class AttachmentCandidateGameTests {
 
     @GameTest(template = "empty", templateNamespace = "codpattern_refit", batch = "attachment_candidates", timeoutTicks = 100)
     public static void attachmentCandidatePacketPreservesLargeList(GameTestHelper helper) {
-        FriendlyByteBuf encoded = new FriendlyByteBuf(Unpooled.buffer());
-        FriendlyByteBuf reencoded = new FriendlyByteBuf(Unpooled.buffer());
-        try {
-            SyncAttachmentCandidatesPacket.encode(new SyncAttachmentCandidatesPacket(7, "primary", candidates()), encoded);
-            byte[] originalBytes = bytes(encoded);
-
-            helper.assertTrue(encoded.readUUID().equals(new UUID(0, 0)), "candidate packet retains its session identity");
-            helper.assertTrue(encoded.readInt() == 7 && "primary".equals(encoded.readUtf()),
-                    "candidate packet retains the target backpack and slot");
-            helper.assertTrue(encoded.readVarInt() == CANDIDATE_COUNT,
-                    "candidate packet carries all 1024 entries");
-            for (int index = 0; index < CANDIDATE_COUNT; index++) {
-                assertCandidate(helper, encoded.readItem(), index, "packet candidate " + index);
-            }
-            helper.assertTrue(!encoded.isReadable(), "the packet contains exactly the declared candidates");
-
-            encoded.readerIndex(0);
-            SyncAttachmentCandidatesPacket decoded = SyncAttachmentCandidatesPacket.decode(encoded);
-            helper.assertTrue(!encoded.isReadable(), "production decoder consumes the entire candidate packet");
-            SyncAttachmentCandidatesPacket.encode(decoded, reencoded);
-            helper.assertTrue(Arrays.equals(originalBytes, bytes(reencoded)),
-                    "decode and re-encode preserve every candidate, its tag, and its order");
-        } finally {
-            encoded.release();
-            reencoded.release();
+        List<ItemStack> decoded = transfer(helper, candidates());
+        helper.assertTrue(decoded.size() == CANDIDATE_COUNT, "all 2048 candidates survive fragment assembly");
+        for (int index = 0; index < CANDIDATE_COUNT; index++) {
+            assertCandidate(helper, decoded.get(index), index, "assembled candidate " + index);
         }
         helper.succeed();
     }
 
     @GameTest(template = "empty", templateNamespace = "codpattern_refit", batch = "attachment_candidates", timeoutTicks = 100)
     public static void attachmentCandidatePacketPreservesEmptyPositions(GameTestHelper helper) {
-        FriendlyByteBuf encoded = new FriendlyByteBuf(Unpooled.buffer());
-        FriendlyByteBuf reencoded = new FriendlyByteBuf(Unpooled.buffer());
+        List<ItemStack> decoded = transfer(helper, List.of(candidate(0), ItemStack.EMPTY, candidate(2), ItemStack.EMPTY));
+        helper.assertTrue(decoded.size() == 4 && decoded.get(1).isEmpty() && decoded.get(3).isEmpty(),
+                "packet assembly preserves both middle and trailing empty slots");
+        assertCandidate(helper, decoded.get(0), 0, "first assembled slot");
+        assertCandidate(helper, decoded.get(2), 2, "assembled slot after a hole");
+        helper.assertTrue(transfer(helper, List.of()).isEmpty(), "an empty catalog is also a complete snapshot");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "codpattern_refit", batch = "attachment_candidates", timeoutTicks = 100)
+    public static void attachmentCandidateFragmentsSplitLargeIndividualItems(GameTestHelper helper) {
+        ItemStack large = candidate(37);
+        byte[] tagBytes = new byte[AttachmentCandidateTransfer.MAX_CHUNK_BYTES * 3 + 111];
+        for (int i = 0; i < tagBytes.length; i++) {
+            tagBytes[i] = (byte) (i * 17);
+        }
+        large.getOrCreateTag().putByteArray("LargeCandidateData", tagBytes);
+        List<ItemStack> original = new ArrayList<>(candidates());
+        original.set(CANDIDATE_COUNT / 2, ItemStack.EMPTY);
+        original.set(CANDIDATE_COUNT - 1, large);
+        List<ItemStack> decoded = transfer(helper, original);
+        helper.assertTrue(decoded.size() == CANDIDATE_COUNT && decoded.get(CANDIDATE_COUNT / 2).isEmpty(),
+                "large item fragmentation retains every candidate and existing holes");
+        assertCandidate(helper, decoded.get(CANDIDATE_COUNT - 1), 37, "large candidate at the final position");
+        helper.assertTrue(Arrays.equals(tagBytes, decoded.get(CANDIDATE_COUNT - 1).getTag().getByteArray("LargeCandidateData")),
+                "a single item larger than a packet is reassembled without truncation");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "codpattern_refit", batch = "attachment_candidates", timeoutTicks = 100)
+    public static void attachmentCandidateFragmentsRejectIncompleteOrOutOfOrderData(GameTestHelper helper) {
+        AttachmentCandidateTransfer assembler = new AttachmentCandidateTransfer();
+        helper.assertTrue(assembler.accept(0, 4, false, new byte[]{1, 2}) == null,
+                "an incomplete snapshot does not publish data");
+        boolean rejected = false;
         try {
-            List<ItemStack> withHoles = List.of(candidate(0), ItemStack.EMPTY, candidate(2), ItemStack.EMPTY);
-            SyncAttachmentCandidatesPacket.encode(new SyncAttachmentCandidatesPacket(7, "primary", withHoles), encoded);
-            byte[] originalBytes = bytes(encoded);
-            encoded.readUUID();
-            encoded.readInt();
-            encoded.readUtf();
-            helper.assertTrue(encoded.readVarInt() == 4, "packet count includes empty candidate positions");
-            assertCandidate(helper, encoded.readItem(), 0, "packet first slot");
-            helper.assertTrue(encoded.readItem().isEmpty(), "packet preserves the middle empty slot");
-            assertCandidate(helper, encoded.readItem(), 2, "packet slot after a hole");
-            helper.assertTrue(encoded.readItem().isEmpty() && !encoded.isReadable(),
-                    "packet preserves the trailing empty slot");
-            encoded.readerIndex(0);
-            SyncAttachmentCandidatesPacket.encode(SyncAttachmentCandidatesPacket.decode(encoded), reencoded);
-            helper.assertTrue(Arrays.equals(originalBytes, bytes(reencoded)),
-                    "packet decode and re-encode keep empty-slot numbering");
+            assembler.accept(3, 4, true, new byte[]{4});
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        helper.assertTrue(rejected, "missing fragment bytes cannot silently form a truncated list");
+        rejected = false;
+        try {
+            assembler.accept(2, 4, true, new byte[]{3, 4});
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        helper.assertTrue(rejected, "invalid transfers clear partial state before accepting another tail");
+        helper.assertTrue(assembler.accept(0, 4, false, new byte[]{1, 2}) == null,
+                "a fresh snapshot restarts cleanly");
+        helper.assertTrue(Arrays.equals(assembler.accept(0, 2, true, new byte[]{9, 8}), new byte[]{9, 8}),
+                "a new ordered snapshot start replaces unfinished data without a list version protocol");
+        rejected = false;
+        try {
+            assembler.accept(0, 4, true, new byte[]{1, 2});
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        helper.assertTrue(rejected, "an early completion flag cannot truncate the declared snapshot");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "codpattern_refit", batch = "attachment_candidates", timeoutTicks = 100)
+    public static void attachmentCandidateBlacklistRestoresOriginalNumbers(GameTestHelper helper) {
+        ServerPlayer player = fakePlayer(helper);
+        List<ItemStack> source = taczCandidates();
+        source.set(3, ItemStack.EMPTY);
+        WeaponFilterConfig filter = new WeaponFilterConfig();
+        filter.setBlockedAttachmentIds(List.of(attachmentId(0).toString(), attachmentId(CANDIDATE_COUNT - 1).toString()));
+        filter.setBlockedAttachmentNamespaces(List.of());
+        try {
+            AttachmentEditSessionManager.startSession(player, 7, "primary", new ItemStack(Items.EMERALD), source);
+            List<ItemStack> blocked = AttachmentEditSessionManager.snapshotVisibleAttachmentCandidates(player, filter);
+            helper.assertTrue(blocked.size() == CANDIDATE_COUNT && blocked.get(0).isEmpty()
+                            && blocked.get(3).isEmpty() && blocked.get(CANDIDATE_COUNT - 1).isEmpty(),
+                    "ID bans use holes at the first and final candidate without shrinking the directory");
+            assertAttachmentId(helper, blocked.get(1), 1, "neighbor after a blocked first candidate");
+            helper.assertTrue(!AttachmentEditSessionManager.snapshotAttachmentCandidates(player).get(0).isEmpty(),
+                    "server catalog retains initially blocked identities for future unbans");
+            filter.setBlockedAttachmentIds(List.of());
+            filter.setBlockedAttachmentNamespaces(List.of(" CODPATTERN_REFIT "));
+            List<ItemStack> namespaceBlocked = AttachmentEditSessionManager.snapshotVisibleAttachmentCandidates(player, filter);
+            helper.assertTrue(namespaceBlocked.size() == CANDIDATE_COUNT
+                            && namespaceBlocked.stream().allMatch(ItemStack::isEmpty),
+                    "namespace bans keep all original positions, including existing holes");
+            filter.setBlockedAttachmentNamespaces(List.of());
+            List<ItemStack> restored = transfer(helper,
+                    AttachmentEditSessionManager.snapshotVisibleAttachmentCandidates(player, filter));
+            helper.assertTrue(restored.size() == CANDIDATE_COUNT && restored.get(3).isEmpty(),
+                    "unbanning keeps the original empty slot");
+            assertAttachmentId(helper, restored.get(0), 0, "restored first candidate");
+            assertAttachmentId(helper, restored.get(CANDIDATE_COUNT - 1), CANDIDATE_COUNT - 1,
+                    "restored final candidate beyond vanilla and single-packet limits");
+            assertAttachmentId(helper, AttachmentEditSessionManager.getSession(player.getUUID()).getRefitInventory()
+                    .getItem(FIRST_CANDIDATE_SLOT + CANDIDATE_COUNT - 1), CANDIDATE_COUNT - 1,
+                    "server operation still uses the original final slot after every filter update");
         } finally {
-            encoded.release();
-            reencoded.release();
+            AttachmentEditSessionManager.endSession(player);
         }
         helper.succeed();
     }
@@ -217,7 +274,7 @@ public final class AttachmentCandidateGameTests {
         try {
             var session = AttachmentEditSessionManager.startSession(player, 7, "primary", gunMarker, taczCandidates());
             helper.assertTrue(session.getRefitInventory().getCandidateCount() == CANDIDATE_COUNT,
-                    "the actual session retains all 1024 TaCZ attachment candidates");
+                    "the actual session retains all 2048 TaCZ attachment candidates");
             helper.assertTrue(BackpackRefitSessionContext.isBackpackRefitActive(player),
                     "the actual session activates its inventory context");
             for (int slot = 0; slot < realInventory.getContainerSize(); slot++) {
@@ -396,6 +453,52 @@ public final class AttachmentCandidateGameTests {
                         && actual.getTag().contains("CandidateIndex")
                         && actual.getTag().getInt("CandidateIndex") == index,
                 context + " preserves candidate " + index);
+    }
+
+    private static List<ItemStack> transfer(GameTestHelper helper, List<ItemStack> candidates) {
+        UUID sessionId = UUID.randomUUID();
+        List<SyncAttachmentCandidatesPacket> fragments = SyncAttachmentCandidatesPacket.split(
+                sessionId, 7, "primary", candidates);
+        AttachmentCandidateTransfer assembler = new AttachmentCandidateTransfer();
+        byte[] complete = null;
+        int totalWireBytes = 0;
+        int expectedOffset = 0;
+        for (int i = 0; i < fragments.size(); i++) {
+            FriendlyByteBuf encoded = new FriendlyByteBuf(Unpooled.buffer());
+            FriendlyByteBuf reencoded = new FriendlyByteBuf(Unpooled.buffer());
+            try {
+                SyncAttachmentCandidatesPacket.encode(fragments.get(i), encoded);
+                helper.assertTrue(encoded.readableBytes() <= AttachmentCandidateTransfer.MAX_CHUNK_BYTES + 128,
+                        "each candidate fragment remains within its bounded wire budget");
+                totalWireBytes += encoded.readableBytes();
+                byte[] originalBytes = bytes(encoded);
+                SyncAttachmentCandidatesPacket decoded = SyncAttachmentCandidatesPacket.decode(encoded);
+                helper.assertTrue(!encoded.isReadable() && decoded.sessionId().equals(sessionId)
+                                && decoded.bagId() == 7 && decoded.slot().equals("primary")
+                                && decoded.offset() == expectedOffset,
+                        "fragment decoder retains its session, target, and contiguous byte offset");
+                expectedOffset += decoded.payload().length;
+                SyncAttachmentCandidatesPacket.encode(decoded, reencoded);
+                helper.assertTrue(Arrays.equals(originalBytes, bytes(reencoded)),
+                        "fragment re-encoding preserves its full payload");
+                complete = assembler.accept(decoded.offset(), decoded.totalBytes(), decoded.complete(), decoded.payload());
+                helper.assertTrue((complete != null) == (i == fragments.size() - 1),
+                        "no partial list is published before its final fragment");
+            } finally {
+                encoded.release();
+                reencoded.release();
+            }
+        }
+        helper.assertTrue(complete != null, "every snapshot has a completed fragment sequence");
+        LogUtils.getLogger().info("Attachment candidate transfer: candidates={} fragments={} snapshotBytes={} wireBytes={}",
+                candidates.size(), fragments.size(), complete.length, totalWireBytes);
+        return SyncAttachmentCandidatesPacket.readSnapshot(complete);
+    }
+
+    private static void assertAttachmentId(GameTestHelper helper, ItemStack stack, int index, String context) {
+        helper.assertTrue(TaczGatewayProvider.gateway().resolveAttachmentId(stack)
+                        .filter(attachmentId(index).toString()::equals).isPresent(),
+                context + " retains attachment " + index);
     }
 
     private static byte[] bytes(FriendlyByteBuf buffer) {

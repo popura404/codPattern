@@ -79,6 +79,13 @@ public final class ClientPacketBridgeInstaller {
             }
 
             @Override
+            public void syncAttachmentCandidateChunk(UUID sessionId, int bagId, String slot,
+                    int offset, int totalBytes, boolean complete, byte[] bytes) {
+                AttachmentRefitClientState.onAttachmentCandidateChunk(sessionId, bagId, slot,
+                        offset, totalBytes, complete, bytes);
+            }
+
+            @Override
             public Inventory resolveAttachmentRefitInventory(Inventory sourceInventory) {
                 if (sourceInventory != null && sourceInventory.player instanceof LocalPlayer player) {
                     Inventory refitInventory = AttachmentRefitClientState.resolveRefitScreenInventory(player);

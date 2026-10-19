@@ -59,6 +59,11 @@ public abstract class GunRefitScreenMixin {
     )
     private ItemStack codpattern$filterBlockedAttachmentCandidates(Inventory inventory, int slotIndex) {
         ItemStack stack = inventory.getItem(slotIndex);
+        // CDP snapshots already apply the current server rules at stable indices.
+        // A stale general client cache must not hide a newly unbanned candidate again.
+        if (BackpackRefitSessionContext.isBackpackRefitActive(inventory.player)) {
+            return stack;
+        }
         WeaponFilterConfig filterConfig = WeaponFilterClientCache.get();
         if (stack.isEmpty() || filterConfig == null) {
             return stack;

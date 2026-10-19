@@ -1,5 +1,7 @@
 package com.cdp.codpattern.adapter.forge.command;
 
+import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
+
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
@@ -43,13 +45,14 @@ public class UpdateWeaponFilterConfigCommand {
         int successCount = 0;
 
         for (ServerPlayer player : players) {
+            ModNetworkChannel.sendToPlayer(new SyncWeaponFilterPacket(filterConfig), player);
+            AttachmentEditSessionManager.syncVisibleAttachmentCandidates(player, filterConfig);
             try {
                 // 加载玩家的背包配置
                 var playerBackpackData = BackpackConfigRepository.loadOrCreatePlayer(player.getStringUUID(),
                         backpackPath);
 
                 // 同步到客户端
-                ModNetworkChannel.sendToPlayer(new SyncWeaponFilterPacket(filterConfig), player);
                 ModNetworkChannel.sendToPlayer(new SyncBackpackConfigPacket(playerBackpackData), player);
 
                 successCount++;

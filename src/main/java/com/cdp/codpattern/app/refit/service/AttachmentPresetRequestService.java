@@ -94,7 +94,9 @@ public final class AttachmentPresetRequestService {
         if (expectedGunIdOpt.isEmpty()) {
             return Optional.empty();
         }
-        List<ItemStack> candidates = collectAttachmentCandidates(gunStack, filterConfig);
+        // Keep all eligible identities in the server directory. Blacklist visibility is
+        // applied to the outbound snapshot so lifting a ban restores the original slot.
+        List<ItemStack> candidates = collectAttachmentCandidates(gunStack);
         AttachmentEditSession session = AttachmentEditSessionManager.startSession(
                 player, sessionId, bagId, slot, gunStack, candidates);
         SyncAttachmentPresetPacket packet = new SyncAttachmentPresetPacket(
@@ -109,8 +111,7 @@ public final class AttachmentPresetRequestService {
                 session.getRefitInventory().getCandidateCount()));
     }
 
-    private static List<ItemStack> collectAttachmentCandidates(ItemStack gunStack,
-            WeaponFilterConfig filterConfig) {
+    private static List<ItemStack> collectAttachmentCandidates(ItemStack gunStack) {
         List<ItemStack> candidates = new ArrayList<>();
         Set<String> existingAttachmentIds = new HashSet<>();
         for (ItemStack candidate : TaczGatewayProvider.gateway().listAttachmentCandidates()) {
@@ -122,9 +123,6 @@ public final class AttachmentPresetRequestService {
                 continue;
             }
             if (existingAttachmentIds.contains(attachmentIdOpt.get())) {
-                continue;
-            }
-            if (BackpackAttachmentFilter.isAttachmentBlocked(filterConfig, candidate)) {
                 continue;
             }
             if (!TaczGatewayProvider.gateway().canAttach(gunStack, candidate)) {

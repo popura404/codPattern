@@ -1,6 +1,10 @@
 package com.cdp.codpattern.core.refit;
 
 import com.mojang.logging.LogUtils;
+import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
+import com.cdp.codpattern.network.SyncAttachmentCandidatesPacket;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.RefitOperationResultPacket;
 import net.minecraft.network.chat.Component;
@@ -92,6 +96,28 @@ public class AttachmentEditSessionManager {
 
         return session.getRefitInventory() == null
                 ? List.of() : session.getRefitInventory().snapshotCandidates();
+    }
+
+    /** Hidden candidates occupy their original empty slot; the server catalog remains intact. */
+    public static List<ItemStack> snapshotVisibleAttachmentCandidates(ServerPlayer player, WeaponFilterConfig filter) {
+        List<ItemStack> candidates = snapshotAttachmentCandidates(player);
+        List<ItemStack> visible = new ArrayList<>(candidates.size());
+        for (ItemStack candidate : candidates) {
+            visible.add(BackpackAttachmentFilter.isAttachmentBlocked(filter, candidate) ? ItemStack.EMPTY : candidate);
+        }
+        return visible;
+    }
+
+    public static void syncVisibleAttachmentCandidates(ServerPlayer player) {
+        syncVisibleAttachmentCandidates(player, WeaponFilterConfigRepository.getConfig());
+    }
+
+    public static void syncVisibleAttachmentCandidates(ServerPlayer player, WeaponFilterConfig filter) {
+        AttachmentEditSession session = SESSIONS.get(player.getUUID());
+        if (session != null) {
+            SyncAttachmentCandidatesPacket.sendTo(player, session.getSessionId(), session.getBagId(), session.getSlot(),
+                    snapshotVisibleAttachmentCandidates(player, filter));
+        }
     }
 
     public static void endSession(ServerPlayer player) {
