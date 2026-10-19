@@ -184,10 +184,7 @@ public class AttachmentRefitClientState {
         }
         List<ItemStack> snapshot = new ArrayList<>(candidates.size());
         for (ItemStack candidate : candidates) {
-            if (candidate == null || candidate.isEmpty()) {
-                continue;
-            }
-            snapshot.add(candidate.copy());
+            snapshot.add(candidate == null ? ItemStack.EMPTY : candidate.copy());
         }
         return List.copyOf(snapshot);
     }

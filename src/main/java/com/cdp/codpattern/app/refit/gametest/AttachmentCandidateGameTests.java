@@ -65,28 +65,81 @@ public final class AttachmentCandidateGameTests {
 
         int lastSlot = FIRST_CANDIDATE_SLOT + CANDIDATE_COUNT - 1;
         inventory.setItem(lastSlot, candidate(CANDIDATE_COUNT));
-        assertCandidate(helper, inventory.getItem(lastSlot), CANDIDATE_COUNT, "last candidate replacement");
-        assertCandidate(helper, inventory.items.get(lastSlot), CANDIDATE_COUNT, "last backing replacement");
+        assertCandidate(helper, inventory.getItem(lastSlot), CANDIDATE_COUNT - 1, "last candidate after old-item return");
+        assertCandidate(helper, inventory.items.get(lastSlot), CANDIDATE_COUNT - 1, "last backing slot after return");
 
         int unloadSlot = inventory.getFreeSlot();
         helper.assertTrue(unloadSlot == lastSlot + 1 && inventory.getItem(unloadSlot).isEmpty(),
                 "a full candidate list still exposes an empty unload slot");
-        helper.assertTrue(inventory.add(candidate(CANDIDATE_COUNT + 1)),
-                "unloading another attachment succeeds beyond all 1024 candidates");
-        assertCandidate(helper, inventory.getItem(unloadSlot), CANDIDATE_COUNT + 1, "returned attachment");
-        assertCandidate(helper, inventory.items.get(unloadSlot), CANDIDATE_COUNT + 1, "returned backing attachment");
-        helper.assertTrue(inventory.getFreeSlot() == unloadSlot + 1
-                        && inventory.getContainerSize() == unloadSlot + 2
-                        && inventory.getItem(inventory.getFreeSlot()).isEmpty(),
-                "unloading grows the inventory and retains another empty slot");
-
-        inventory.setItem(unloadSlot, ItemStack.EMPTY);
-        helper.assertTrue(inventory.getContainerSize() == FIRST_CANDIDATE_SLOT + CANDIDATE_COUNT + 1
+        ItemStack returned = candidate(CANDIDATE_COUNT + 1);
+        helper.assertTrue(inventory.add(returned) && returned.isEmpty(),
+                "unloading acknowledges and consumes the returned preview item");
+        helper.assertTrue(inventory.getItem(unloadSlot).isEmpty() && inventory.items.get(unloadSlot).isEmpty()
                         && inventory.getFreeSlot() == unloadSlot
-                        && inventory.getItem(unloadSlot).isEmpty(),
-                "removing the appended candidate restores the empty tail");
-        assertCandidate(helper, inventory.getItem(lastSlot), CANDIDATE_COUNT,
-                "removing the tail preserves the previous last candidate");
+                        && inventory.getContainerSize() == unloadSlot + 1,
+                "unloading never appends a candidate or changes slot numbers");
+        inventory.setItem(lastSlot, ItemStack.EMPTY);
+        assertCandidate(helper, inventory.getItem(lastSlot), CANDIDATE_COUNT - 1,
+                "consuming the last candidate preserves its fixed template");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "codpattern_refit", batch = "attachment_candidates", timeoutTicks = 100)
+    public static void attachmentCandidateSlotsRemainStableAndIsolated(GameTestHelper helper) {
+        ServerPlayer player = fakePlayer(helper);
+        List<ItemStack> source = new ArrayList<>(Arrays.asList(candidate(0), ItemStack.EMPTY, candidate(2), null, candidate(4)));
+        ItemStack gun = new ItemStack(Items.EMERALD);
+        AttachmentRefitInventory inventory = new AttachmentRefitInventory(player, 2, gun, source);
+        source.get(0).getOrCreateTag().putInt("CandidateIndex", 99);
+        source.clear();
+
+        // Consecutive same-item selections used to consume a list element and shift the next one.
+        for (int index : new int[]{0, 2, 4, 2, 0, 4}) {
+            int slot = FIRST_CANDIDATE_SLOT + index;
+            ItemStack selected = inventory.getItem(slot);
+            assertCandidate(helper, selected, index, "repeated selection");
+            selected.shrink(1);
+            inventory.setItem(slot, candidate(99));
+            inventory.setItem(slot, ItemStack.EMPTY);
+            assertCandidate(helper, inventory.getItem(slot), index, "selection after consume and replacement");
+        }
+
+        ItemStack fromBacking = inventory.items.get(FIRST_CANDIDATE_SLOT + 2);
+        fromBacking.getOrCreateTag().putInt("CandidateIndex", 99);
+        fromBacking.shrink(1);
+        inventory.items.set(FIRST_CANDIDATE_SLOT + 2, candidate(99));
+        assertCandidate(helper, inventory.getItem(FIRST_CANDIDATE_SLOT + 2), 2, "direct backing writes");
+        assertCandidate(helper, inventory.removeItem(FIRST_CANDIDATE_SLOT + 2, 1), 2, "inventory consumption");
+        assertCandidate(helper, inventory.removeItemNoUpdate(FIRST_CANDIDATE_SLOT + 2), 2, "inventory removal");
+        assertCandidate(helper, inventory.items.get(FIRST_CANDIDATE_SLOT + 2), 2, "backing after removals");
+
+        ItemStack returned = candidate(99);
+        helper.assertTrue(inventory.add(inventory.getFreeSlot(), returned) && returned.isEmpty(),
+                "indexed add consumes a returned preview item without changing the catalog");
+        returned = candidate(99);
+        inventory.placeItemBackInInventory(returned, true);
+        helper.assertTrue(returned.isEmpty(), "vanilla return helper absorbs the preview without a real-inventory packet");
+        List<ItemStack> snapshot = inventory.snapshotCandidates();
+        helper.assertTrue(snapshot.size() == 5 && snapshot.get(1).isEmpty() && snapshot.get(3).isEmpty(),
+                "snapshot retains empty and null positions as empty slots");
+        assertCandidate(helper, snapshot.get(0), 0, "constructor snapshot isolation");
+        assertCandidate(helper, snapshot.get(2), 2, "middle snapshot slot");
+        assertCandidate(helper, snapshot.get(4), 4, "last snapshot slot");
+        snapshot.get(0).getOrCreateTag().putInt("CandidateIndex", 99);
+        snapshot.clear();
+        assertCandidate(helper, inventory.snapshotCandidates().get(0), 0, "outbound snapshot isolation");
+
+        ItemStack replacementGun = new ItemStack(Items.DIAMOND);
+        inventory.items.set(2, replacementGun);
+        helper.assertTrue(inventory.getSelected() == replacementGun && inventory.getItem(2) == replacementGun,
+                "the public backing view still updates the actual working gun");
+        replacementGun.getOrCreateTag().putBoolean("Changed", true);
+        helper.assertTrue(inventory.items.get(2).getOrCreateTag().getBoolean("Changed"),
+                "working gun mutations remain visible through both inventory interfaces");
+        inventory.clearContent();
+        helper.assertTrue(inventory.getSelected().isEmpty() && inventory.getCandidateCount() == 5,
+                "clearing inventory contents does not delete the session catalog");
+        assertCandidate(helper, inventory.getItem(FIRST_CANDIDATE_SLOT + 4), 4, "catalog after clear");
         helper.succeed();
     }
 
@@ -113,6 +166,33 @@ public final class AttachmentCandidateGameTests {
             SyncAttachmentCandidatesPacket.encode(decoded, reencoded);
             helper.assertTrue(Arrays.equals(originalBytes, bytes(reencoded)),
                     "decode and re-encode preserve every candidate, its tag, and its order");
+        } finally {
+            encoded.release();
+            reencoded.release();
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "codpattern_refit", batch = "attachment_candidates", timeoutTicks = 100)
+    public static void attachmentCandidatePacketPreservesEmptyPositions(GameTestHelper helper) {
+        FriendlyByteBuf encoded = new FriendlyByteBuf(Unpooled.buffer());
+        FriendlyByteBuf reencoded = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            List<ItemStack> withHoles = List.of(candidate(0), ItemStack.EMPTY, candidate(2), ItemStack.EMPTY);
+            SyncAttachmentCandidatesPacket.encode(new SyncAttachmentCandidatesPacket(7, "primary", withHoles), encoded);
+            byte[] originalBytes = bytes(encoded);
+            encoded.readInt();
+            encoded.readUtf();
+            helper.assertTrue(encoded.readVarInt() == 4, "packet count includes empty candidate positions");
+            assertCandidate(helper, encoded.readItem(), 0, "packet first slot");
+            helper.assertTrue(encoded.readItem().isEmpty(), "packet preserves the middle empty slot");
+            assertCandidate(helper, encoded.readItem(), 2, "packet slot after a hole");
+            helper.assertTrue(encoded.readItem().isEmpty() && !encoded.isReadable(),
+                    "packet preserves the trailing empty slot");
+            encoded.readerIndex(0);
+            SyncAttachmentCandidatesPacket.encode(SyncAttachmentCandidatesPacket.decode(encoded), reencoded);
+            helper.assertTrue(Arrays.equals(originalBytes, bytes(reencoded)),
+                    "packet decode and re-encode keep empty-slot numbering");
         } finally {
             encoded.release();
             reencoded.release();
@@ -164,6 +244,46 @@ public final class AttachmentCandidateGameTests {
             helper.assertTrue(actual.getItem() == expected.getItem() && actual.getCount() == expected.getCount()
                             && Objects.equals(actual.getTag(), expected.getTag()),
                     "ending the session restores original inventory slot " + slot);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "codpattern_refit", batch = "attachment_candidates", timeoutTicks = 100)
+    public static void attachmentSessionReplacementAndAbortRestoreOriginalInventory(GameTestHelper helper) {
+        ServerPlayer player = fakePlayer(helper);
+        Inventory realInventory = player.getInventory();
+        realInventory.selected = 4;
+        ItemStack original = candidate(73);
+        realInventory.setItem(0, original.copy());
+        realInventory.setItem(4, new ItemStack(Items.DIAMOND));
+        List<ItemStack> withHoles = List.of(
+                AttachmentItemBuilder.create().setId(attachmentId(0)).build(), ItemStack.EMPTY,
+                AttachmentItemBuilder.create().setId(attachmentId(2)).build());
+        try {
+            var first = AttachmentEditSessionManager.startSession(player, 7, "primary",
+                    new ItemStack(Items.EMERALD), withHoles);
+            List<ItemStack> snapshot = AttachmentEditSessionManager.snapshotAttachmentCandidates(player);
+            helper.assertTrue(snapshot.size() == 3 && snapshot.get(1).isEmpty()
+                            && TaczGatewayProvider.gateway().resolveAttachmentId(snapshot.get(2))
+                            .filter(attachmentId(2).toString()::equals).isPresent(),
+                    "session synchronization preserves the candidate position after an empty slot");
+            var second = AttachmentEditSessionManager.startSession(player, 8, "secondary",
+                    new ItemStack(Items.GOLD_INGOT), withHoles);
+            helper.assertTrue(second != first && realInventory.getSelected().is(Items.GOLD_INGOT),
+                    "opening another session replaces its working gun");
+            AttachmentEditSessionManager.abortSession(player, "test_abort", false);
+            helper.assertTrue(!AttachmentEditSessionManager.hasSession(player.getUUID())
+                            && !BackpackRefitSessionContext.isBackpackRefitActive(player)
+                            && realInventory.selected == 4 && realInventory.getSelected().is(Items.DIAMOND),
+                    "aborting the replacement restores the original selected item and context");
+            assertCandidate(helper, realInventory.getItem(0), 73, "original inventory after session replacement");
+            realInventory.setItem(1, new ItemStack(Items.IRON_INGOT));
+            AttachmentEditSessionManager.abortSession(player, "repeated_abort", false);
+            AttachmentEditSessionManager.endSession(player);
+            helper.assertTrue(realInventory.getItem(1).is(Items.IRON_INGOT),
+                    "repeated cleanup without a session does not overwrite later inventory changes");
+        } finally {
+            AttachmentEditSessionManager.endSession(player);
         }
         helper.succeed();
     }

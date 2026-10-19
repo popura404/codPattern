@@ -1,6 +1,5 @@
 package com.cdp.codpattern.core.refit;
 
-import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.mojang.logging.LogUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetCarriedItemPacket;
@@ -19,7 +18,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AttachmentEditSessionManager {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<UUID, AttachmentEditSession> SESSIONS = new ConcurrentHashMap<>();
-    private static final long SESSION_TIMEOUT_MS = 120_000L;
 
     public static AttachmentEditSession startSession(ServerPlayer player, int bagId, String slot, ItemStack gunStack,
             List<ItemStack> attachmentCandidates) {
@@ -45,16 +43,13 @@ public class AttachmentEditSessionManager {
                 editSlot,
                 inventory.getItem(editSlot),
                 new ArrayList<>(snapshotAttachments(attachmentCandidates)));
-        long now = System.currentTimeMillis();
         AttachmentEditSession session = new AttachmentEditSession(
                 bagId,
                 slot,
                 editSlot,
                 originalSelected,
                 snapshot,
-                refitInventory,
-                now,
-                now + SESSION_TIMEOUT_MS);
+                refitInventory);
         SESSIONS.put(player.getUUID(), session);
         BackpackRefitSessionContext.markServerActive(player.getUUID());
         LOGGER.info("Attachment edit session started: player={} bagId={} slot={} hotbar={} candidates={}",
@@ -87,25 +82,8 @@ public class AttachmentEditSessionManager {
             return List.of();
         }
 
-        List<ItemStack> snapshot = new ArrayList<>();
-        Inventory inventory = session.getRefitInventory();
-        if (inventory == null) {
-            return List.of();
-        }
-        for (int slot = 0; slot < inventory.getContainerSize(); slot++) {
-            if (slot == session.getEditHotbarSlot()) {
-                continue;
-            }
-            ItemStack stack = inventory.getItem(slot);
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            if (TaczGatewayProvider.gateway().resolveAttachmentId(stack).isEmpty()) {
-                continue;
-            }
-            snapshot.add(stack.copy());
-        }
-        return snapshot;
+        return session.getRefitInventory() == null
+                ? List.of() : session.getRefitInventory().snapshotCandidates();
     }
 
     public static void endSession(ServerPlayer player) {
@@ -141,23 +119,14 @@ public class AttachmentEditSessionManager {
                 player.getGameProfile().getName(), session.getBagId(), session.getSlot(), reason, abnormal);
     }
 
-    public static void tickTimeouts(MinecraftServer server) {
-        if (SESSIONS.isEmpty()) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        List<UUID> playerIds = new ArrayList<>(SESSIONS.keySet());
-        for (UUID playerId : playerIds) {
-            AttachmentEditSession session = SESSIONS.get(playerId);
-            if (session == null || !session.isExpired(now)) {
-                continue;
-            }
+    public static void abortAllSessions(MinecraftServer server) {
+        for (UUID playerId : new ArrayList<>(SESSIONS.keySet())) {
             ServerPlayer player = server.getPlayerList().getPlayer(playerId);
             if (player != null) {
-                abortSession(player, "timeout");
+                abortSession(player, "server_stopping", false);
             } else {
                 SESSIONS.remove(playerId);
-                LOGGER.warn("Attachment edit session dropped after timeout for offline player={}", playerId);
+                BackpackRefitSessionContext.clearServerActive(playerId);
             }
         }
     }
@@ -176,10 +145,7 @@ public class AttachmentEditSessionManager {
         }
         List<ItemStack> snapshot = new ArrayList<>(attachments.size());
         for (ItemStack attachment : attachments) {
-            if (attachment == null || attachment.isEmpty()) {
-                continue;
-            }
-            snapshot.add(attachment.copy());
+            snapshot.add(attachment == null ? ItemStack.EMPTY : attachment.copy());
         }
         return snapshot;
     }

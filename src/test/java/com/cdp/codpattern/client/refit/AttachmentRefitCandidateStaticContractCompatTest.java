@@ -48,10 +48,7 @@ public final class AttachmentRefitCandidateStaticContractCompatTest {
 
         requireContains(refitInventory, "return HOTBAR_SIZE + attachmentCandidates.size() + 1;",
                 "refit inventory size must grow with every attachment candidate");
-        requireContains(refitInventory, "NonNullList.withSize(Math.max(VANILLA_MAIN_INVENTORY_SIZE, getContainerSize())",
-                "refit inventory backing list must be large enough for candidates beyond vanilla slots");
-        requireContains(sessionManager, "for (int slot = 0; slot < inventory.getContainerSize(); slot++)",
-                "candidate sync snapshot must scan the virtual inventory size");
+        // Backing access and snapshot slot stability are covered by executable GameTests.
         requireContains(candidatePacket, "buffer.writeVarInt(packet.attachmentCandidates.size());",
                 "candidate packet must encode the full candidate count");
         requireContains(clientState, "if (!attachmentCandidatesReady) {\n            return;\n        }",

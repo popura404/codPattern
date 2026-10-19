@@ -6,9 +6,15 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
-/** TaCZ's Inventory interface over a candidate list with no player-inventory size limit. */
+/**
+ * TaCZ's Inventory interface over a fixed session catalog with no player-inventory size limit.
+ * Candidate slots are templates, not owned items: reads return copies and inventory writes
+ * never consume, replace, or append candidates. Only the working gun is mutable.
+ */
 public class AttachmentRefitInventory extends Inventory {
     private static final int HOTBAR_SIZE = 9;
     private static final int VANILLA_MAIN_INVENTORY_SIZE = 36;
@@ -20,10 +26,12 @@ public class AttachmentRefitInventory extends Inventory {
     public AttachmentRefitInventory(Player player, int gunSlot, ItemStack gunStack, List<ItemStack> attachmentCandidates) {
         super(player);
         this.gunSlot = Math.max(0, Math.min(HOTBAR_SIZE - 1, gunSlot));
-        this.gunStack = gunStack == null ? ItemStack.EMPTY : gunStack;
-        this.attachmentCandidates = attachmentCandidates;
+        this.gunStack = normalize(gunStack);
+        this.attachmentCandidates = copyCandidates(attachmentCandidates);
         this.selected = this.gunSlot;
-        syncBackingItems();
+        InventoryAccessor accessor = (InventoryAccessor) this;
+        accessor.codpattern$setItems(new CatalogItems());
+        accessor.codpattern$setCompartments(List.of(this.items, this.armor, this.offhand));
     }
 
     @Override
@@ -35,13 +43,18 @@ public class AttachmentRefitInventory extends Inventory {
         return attachmentCandidates.size();
     }
 
+    /** Includes empty positions so a snapshot cannot change any candidate's slot number. */
+    public List<ItemStack> snapshotCandidates() {
+        return copyCandidates(attachmentCandidates);
+    }
+
     @Override
     public boolean isEmpty() {
         if (!gunStack.isEmpty()) {
             return false;
         }
         for (ItemStack candidate : attachmentCandidates) {
-            if (candidate != null && !candidate.isEmpty()) {
+            if (!candidate.isEmpty()) {
                 return false;
             }
         }
@@ -53,45 +66,20 @@ public class AttachmentRefitInventory extends Inventory {
         if (slot == gunSlot) {
             return gunStack;
         }
-        if (slot < 0 || slot < HOTBAR_SIZE) {
-            return ItemStack.EMPTY;
-        }
         int candidateIndex = slot - HOTBAR_SIZE;
         if (candidateIndex < 0 || candidateIndex >= attachmentCandidates.size()) {
             return ItemStack.EMPTY;
         }
-        ItemStack candidate = attachmentCandidates.get(candidateIndex);
-        return candidate == null ? ItemStack.EMPTY : candidate;
+        return attachmentCandidates.get(candidateIndex).copy();
     }
 
     @Override
     public void setItem(int slot, ItemStack stack) {
-        ItemStack normalized = normalize(stack);
         if (slot == gunSlot) {
-            gunStack = normalized;
-            syncBackingItems();
-            return;
+            gunStack = normalize(stack);
         }
-        if (slot < HOTBAR_SIZE) {
-            return;
-        }
-        int candidateIndex = slot - HOTBAR_SIZE;
-        if (candidateIndex < 0) {
-            return;
-        }
-        if (candidateIndex < attachmentCandidates.size()) {
-            if (normalized.isEmpty()) {
-                attachmentCandidates.remove(candidateIndex);
-            } else {
-                attachmentCandidates.set(candidateIndex, normalized);
-            }
-            syncBackingItems();
-            return;
-        }
-        if (candidateIndex == attachmentCandidates.size() && !normalized.isEmpty()) {
-            attachmentCandidates.add(normalized);
-            syncBackingItems();
-        }
+        // TaCZ writes the previously installed attachment into the source slot.
+        // In a catalog session that return is acknowledged without replacing its template.
     }
 
     @Override
@@ -101,37 +89,102 @@ public class AttachmentRefitInventory extends Inventory {
 
     @Override
     public int getFreeSlot() {
+        // Keep a stable empty return slot for callers that use setItem instead of add.
         return HOTBAR_SIZE + attachmentCandidates.size();
     }
 
     @Override
     public boolean add(ItemStack stack) {
-        ItemStack normalized = normalize(stack);
-        if (normalized.isEmpty()) {
+        if (stack == null || stack.isEmpty()) {
             return false;
         }
-        attachmentCandidates.add(normalized);
-        syncBackingItems();
+        // Match Inventory's successful insertion contract, including consuming the input.
+        // These are preview returns; retaining them would mutate the catalog or spawn items.
+        stack.setCount(0);
         return true;
+    }
+
+    @Override
+    public boolean add(int slot, ItemStack stack) {
+        return add(stack);
+    }
+
+    @Override
+    public void placeItemBackInInventory(ItemStack stack) {
+        add(stack);
+    }
+
+    @Override
+    public void placeItemBackInInventory(ItemStack stack, boolean sendPacket) {
+        // Catalog slots must never be sent as slot updates for the real player inventory.
+        add(stack);
     }
 
     @Override
     public void clearContent() {
         gunStack = ItemStack.EMPTY;
-        attachmentCandidates.clear();
-        syncBackingItems();
+        armor.clear();
+        offhand.clear();
     }
 
-    private void syncBackingItems() {
-        NonNullList<ItemStack> backingItems = NonNullList.withSize(Math.max(VANILLA_MAIN_INVENTORY_SIZE, getContainerSize()),
-                ItemStack.EMPTY);
-        backingItems.set(gunSlot, gunStack);
-        for (int i = 0; i < attachmentCandidates.size(); i++) {
-            backingItems.set(HOTBAR_SIZE + i, normalize(attachmentCandidates.get(i)));
+    /**
+     * Some TaCZ/Addon code accesses Inventory.items directly. A read-through view gives
+     * that path exactly the same copy/write semantics as getItem/setItem, without keeping
+     * a second mutable candidate store. Like vanilla's fixed-size NonNullList, this view
+     * rejects structural list operations; callers return items through set/add on Inventory.
+     * The minimum backing size supports vanilla main-inventory iteration without imposing
+     * a catalog capacity limit.
+     */
+    private final class CatalogItems extends NonNullList<ItemStack> {
+        private CatalogItems() {
+            super(List.of(), ItemStack.EMPTY);
         }
-        InventoryAccessor accessor = (InventoryAccessor) this;
-        accessor.codpattern$setItems(backingItems);
-        accessor.codpattern$setCompartments(List.of(this.items, this.armor, this.offhand));
+
+        @Override
+        public int size() {
+            return Math.max(VANILLA_MAIN_INVENTORY_SIZE, getContainerSize());
+        }
+
+        @Override
+        public ItemStack get(int index) {
+            Objects.checkIndex(index, size());
+            return getItem(index);
+        }
+
+        @Override
+        public ItemStack set(int index, ItemStack element) {
+            Objects.checkIndex(index, size());
+            Objects.requireNonNull(element);
+            ItemStack previous = getItem(index);
+            setItem(index, element);
+            return previous;
+        }
+
+        @Override
+        public void add(int index, ItemStack element) {
+            throw new UnsupportedOperationException("Candidate slots are fixed for the session");
+        }
+
+        @Override
+        public ItemStack remove(int index) {
+            throw new UnsupportedOperationException("Candidate slots are fixed for the session");
+        }
+
+        @Override
+        public void clear() {
+            gunStack = ItemStack.EMPTY;
+        }
+    }
+
+    private static List<ItemStack> copyCandidates(List<ItemStack> candidates) {
+        if (candidates == null || candidates.isEmpty()) {
+            return List.of();
+        }
+        List<ItemStack> copy = new ArrayList<>(candidates.size());
+        for (ItemStack candidate : candidates) {
+            copy.add(normalize(candidate).copy());
+        }
+        return copy;
     }
 
     private static ItemStack normalize(ItemStack stack) {
