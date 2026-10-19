@@ -5,7 +5,9 @@ import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.api.item.IAttachment;
 import com.tacz.guns.api.item.IGun;
 import com.tacz.guns.api.item.attachment.AttachmentType;
+import com.tacz.guns.api.item.builder.AttachmentItemBuilder;
 import com.tacz.guns.api.item.nbt.GunItemDataAccessor;
+import com.tacz.guns.resource.index.CommonAttachmentIndex;
 import com.tacz.guns.resource.index.CommonGunIndex;
 import com.tacz.guns.resource.modifier.AttachmentPropertyManager;
 import com.tacz.guns.resource.pojo.data.gun.Bolt;
@@ -17,7 +19,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public final class TaczCoreGateway implements TaczGateway {
@@ -50,6 +54,24 @@ public final class TaczCoreGateway implements TaczGateway {
                 .map(iAttachment -> iAttachment.getAttachmentId(stack))
                 .filter(id -> id != null && !DefaultAssets.isEmptyAttachmentId(id))
                 .map(ResourceLocation::toString);
+    }
+
+    @Override
+    public List<ItemStack> listAttachmentCandidates() {
+        // Read the loaded common catalog, including types supplied by other mods.
+        // A deterministic order is useful for the UI; only the server builds the list.
+        Comparator<Map.Entry<ResourceLocation, CommonAttachmentIndex>> order = Comparator
+                .comparingInt((Map.Entry<ResourceLocation, CommonAttachmentIndex> entry) -> entry.getValue().getType().ordinal())
+                .thenComparingInt(entry -> entry.getValue().getSort())
+                .thenComparing(entry -> entry.getKey().toString());
+        return TimelessAPI.getAllCommonAttachmentIndex().stream()
+                .filter(entry -> entry.getValue().getType() != null
+                        && entry.getValue().getType() != AttachmentType.NONE
+                        && !entry.getValue().getPojo().isHidden()
+                        && !DefaultAssets.isEmptyAttachmentId(entry.getKey()))
+                .sorted(order)
+                .map(entry -> AttachmentItemBuilder.create().setId(entry.getKey()).build())
+                .toList();
     }
 
     @Override

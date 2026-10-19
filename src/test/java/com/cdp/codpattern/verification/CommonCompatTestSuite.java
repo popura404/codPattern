@@ -1,6 +1,7 @@
 package com.cdp.codpattern.verification;
 
 import com.cdp.codpattern.client.refit.AttachmentRefitCandidateStaticContractCompatTest;
+import com.cdp.codpattern.mixin.CodPatternMixinPluginCompatTest;
 import com.cdp.codpattern.architecture.ModeDefinitionContributorCompatTest;
 import com.cdp.codpattern.architecture.ModeExtensionRuntimeRouterCompatTest;
 import com.cdp.codpattern.architecture.ModeRegistryConflictBaselineCompatTest;
@@ -31,6 +32,7 @@ public final class CommonCompatTestSuite {
             throw new AssertionError("built-in registries failed to initialize for compatibility tests");
         }
         AttachmentRefitCandidateStaticContractCompatTest.main(args);
+        CodPatternMixinPluginCompatTest.main(args);
         ModeRegistryConflictBaselineCompatTest.main(args);
         ModeRoomHandleBuilderCompatTest.main(args);
         ModeDefinitionContributorCompatTest.main(args);
@@ -42,6 +44,6 @@ public final class CommonCompatTestSuite {
         ModeObjectRuntimeCompatTest.main(args);
         Phase5ContributionPrimitivesCompatTest.main(args);
         GameModeFpsRegistrationCompatTest.main(args);
-        System.out.println("PASS future-main common compatibility suite (12/12)");
+        System.out.println("PASS future-main common compatibility suite (13/13)");
     }
 }

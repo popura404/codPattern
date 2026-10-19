@@ -8,6 +8,7 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 
+/** TaCZ's Inventory interface over a candidate list with no player-inventory size limit. */
 public class AttachmentRefitInventory extends Inventory {
     private static final int HOTBAR_SIZE = 9;
     private static final int VANILLA_MAIN_INVENTORY_SIZE = 36;
@@ -28,6 +29,10 @@ public class AttachmentRefitInventory extends Inventory {
     @Override
     public int getContainerSize() {
         return HOTBAR_SIZE + attachmentCandidates.size() + 1;
+    }
+
+    public int getCandidateCount() {
+        return attachmentCandidates.size();
     }
 
     @Override

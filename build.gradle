@@ -66,7 +66,7 @@ minecraft {
 
         gameTestServer {
             workingDirectory project.file(findProperty('gameTestRunDir') ?: 'run')
-            property 'forge.enabledGameTestNamespaces', mod_id
+            property 'forge.enabledGameTestNamespaces', findProperty('gameTestNamespaces') ?: mod_id
             environment 'MOD_CLASSES', "${mod_id}%%${layout.buildDirectory.dir('gametestMod/codpattern').get().asFile.absolutePath}"
         }
 
@@ -108,6 +108,7 @@ def dedicatedServerRunRequested = requestedTaskNames.any { taskName ->
             || taskName.contains('runsplitround6verificationgate')
 }
 def withLrTactical = (findProperty('withLrTactical') ?: 'false').toString().toBoolean()
+def withTaczAddon = (findProperty('withTaczAddon') ?: (!dedicatedServerRunRequested).toString()).toString().toBoolean()
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
@@ -119,6 +120,8 @@ dependencies {
     //implementation fg.deobf("maven.modrinth:cloth-config:11.1.136+forge")
     if (!dedicatedServerRunRequested) {
         runtimeOnly fg.deobf("maven.modrinth:physicsmod:JkM3OTEl")
+    }
+    if (withTaczAddon) {
         runtimeOnly fg.deobf("maven.modrinth:taczaddon:1.1.6")
     }
     //runtimeOnly fg.deobf("curse.maven:embeddium-908741:5175031")

@@ -6,6 +6,7 @@ import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.network.match.RoomRosterDelta;
 import com.cdp.codpattern.network.match.RoomSyncInfo;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
@@ -46,6 +47,10 @@ public final class ClientPacketBridge {
 
     public static void syncAttachmentCandidates(int bagId, String slot, List<ItemStack> attachmentCandidates) {
         handler.syncAttachmentCandidates(bagId, slot, attachmentCandidates);
+    }
+
+    public static Inventory resolveAttachmentRefitInventory(Inventory sourceInventory) {
+        return handler.resolveAttachmentRefitInventory(sourceInventory);
     }
 
     public static void updateWeaponResult(boolean success, String code, String message) {
@@ -141,6 +146,10 @@ public final class ClientPacketBridge {
         }
 
         default void syncAttachmentCandidates(int bagId, String slot, List<ItemStack> attachmentCandidates) {
+        }
+
+        default Inventory resolveAttachmentRefitInventory(Inventory sourceInventory) {
+            return sourceInventory;
         }
 
         default void updateWeaponResult(boolean success, String code, String message) {

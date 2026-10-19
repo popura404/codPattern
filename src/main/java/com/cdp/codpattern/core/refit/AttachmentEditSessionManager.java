@@ -20,11 +20,9 @@ public class AttachmentEditSessionManager {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Map<UUID, AttachmentEditSession> SESSIONS = new ConcurrentHashMap<>();
     private static final long SESSION_TIMEOUT_MS = 120_000L;
-    private static final int SANDBOX_MAIN_INVENTORY_SIZE = 36;
-    private static final int SANDBOX_RESERVED_EMPTY_SLOTS = 1;
 
     public static AttachmentEditSession startSession(ServerPlayer player, int bagId, String slot, ItemStack gunStack,
-            List<ItemStack> sandboxAttachments) {
+            List<ItemStack> attachmentCandidates) {
         abortSession(player, "replace_session");
         Inventory inventory = player.getInventory();
         int originalSelected = inventory.selected;
@@ -34,27 +32,9 @@ public class AttachmentEditSessionManager {
         inventory.clearContent();
         inventory.setItem(editSlot, gunStack.copy());
 
-        int insertedAttachments = 0;
-        int truncatedAttachments = 0;
-        int writeCursor = 0;
-        int maxWritableSlotExclusive = Math.max(0, SANDBOX_MAIN_INVENTORY_SIZE - SANDBOX_RESERVED_EMPTY_SLOTS);
-        for (ItemStack attachment : sandboxAttachments) {
-            if (attachment == null || attachment.isEmpty()) {
-                continue;
-            }
-            // Keep at least one empty slot so TaCZ unload action can always proceed.
-            while (writeCursor < maxWritableSlotExclusive && writeCursor == editSlot) {
-                writeCursor++;
-            }
-            if (writeCursor >= maxWritableSlotExclusive) {
-                truncatedAttachments++;
-                continue;
-            }
-            inventory.setItem(writeCursor, attachment.copy());
-            insertedAttachments++;
-            writeCursor++;
-        }
-
+        // Only the working gun needs a real held slot for TaCZ rendering/state.
+        // Candidates live exclusively in the list-backed adapter below, never in
+        // the player's bounded inventory.
         inventory.selected = editSlot;
         player.connection.send(new ClientboundSetCarriedItemPacket(editSlot));
         player.inventoryMenu.broadcastChanges();
@@ -64,7 +44,7 @@ public class AttachmentEditSessionManager {
                 player,
                 editSlot,
                 inventory.getItem(editSlot),
-                new ArrayList<>(snapshotAttachments(sandboxAttachments)));
+                new ArrayList<>(snapshotAttachments(attachmentCandidates)));
         long now = System.currentTimeMillis();
         AttachmentEditSession session = new AttachmentEditSession(
                 bagId,
@@ -74,13 +54,11 @@ public class AttachmentEditSessionManager {
                 snapshot,
                 refitInventory,
                 now,
-                now + SESSION_TIMEOUT_MS,
-                insertedAttachments,
-                truncatedAttachments);
+                now + SESSION_TIMEOUT_MS);
         SESSIONS.put(player.getUUID(), session);
         BackpackRefitSessionContext.markServerActive(player.getUUID());
-        LOGGER.info("Attachment edit session started: player={} bagId={} slot={} hotbar={} attachments={} truncated={}",
-                player.getGameProfile().getName(), bagId, slot, editSlot, insertedAttachments, truncatedAttachments);
+        LOGGER.info("Attachment edit session started: player={} bagId={} slot={} hotbar={} candidates={}",
+                player.getGameProfile().getName(), bagId, slot, editSlot, refitInventory.getCandidateCount());
         return session;
     }
 

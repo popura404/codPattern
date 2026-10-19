@@ -7,7 +7,6 @@ import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
-import com.cdp.codpattern.compat.taczaddon.TaczAddonRefitCompat;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
@@ -61,8 +60,6 @@ public final class AttachmentPresetSaveService {
             if (!TaczGatewayProvider.gateway().isGun(gunStack)) {
                 throw new SaveFailureException("message.codpattern.refit.save_failed_not_gun");
             }
-
-            TaczAddonRefitCompat.sanitizeGunForBackpackRefitSession(gunStack);
 
             String builtPresetPayload = AttachmentPresetUtil.buildPresetFromGun(gunStack).toString();
             String itemId = gunStack.getItem().builtInRegistryHolder().key().location().toString();

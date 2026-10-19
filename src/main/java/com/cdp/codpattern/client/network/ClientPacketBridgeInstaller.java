@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.network;
 
 import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.client.refit.AttachmentRefitClientState;
 import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.network.handler.ClientPacketBridge;
@@ -14,7 +15,9 @@ import com.phasetranscrystal.fpsmatch.common.packet.FpsmClientPacketBridge;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenMapCreatorToolScreenS2CPacket;
 import com.phasetranscrystal.fpsmatch.common.packet.OpenSpawnPointToolScreenS2CPacket;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
@@ -57,6 +60,17 @@ public final class ClientPacketBridgeInstaller {
             @Override
             public void syncAttachmentCandidates(int bagId, String slot, List<ItemStack> attachmentCandidates) {
                 ClientPacketHandler.handleSyncAttachmentCandidates(bagId, slot, attachmentCandidates);
+            }
+
+            @Override
+            public Inventory resolveAttachmentRefitInventory(Inventory sourceInventory) {
+                if (sourceInventory != null && sourceInventory.player instanceof LocalPlayer player) {
+                    Inventory refitInventory = AttachmentRefitClientState.resolveRefitScreenInventory(player);
+                    if (refitInventory != null) {
+                        return refitInventory;
+                    }
+                }
+                return sourceInventory;
             }
 
             @Override

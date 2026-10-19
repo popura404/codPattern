@@ -34,6 +34,11 @@ public final class NoopTaczGateway implements TaczGateway {
     }
 
     @Override
+    public List<ItemStack> listAttachmentCandidates() {
+        return List.of();
+    }
+
+    @Override
     public List<String> resolveInstalledAttachmentIds(ItemStack gunStack) {
         return List.of();
     }

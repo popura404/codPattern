@@ -18,6 +18,8 @@ public interface TaczGateway {
 
     Optional<String> resolveAttachmentId(ItemStack stack);
 
+    List<ItemStack> listAttachmentCandidates();
+
     List<String> resolveInstalledAttachmentIds(ItemStack gunStack);
 
     boolean canAttach(ItemStack gunStack, ItemStack attachmentStack);

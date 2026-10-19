@@ -3,15 +3,28 @@ package com.cdp.codpattern.mixin;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
+import org.spongepowered.asm.service.IClassBytecodeProvider;
+import org.spongepowered.asm.service.MixinService;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
 public final class CodPatternMixinPlugin implements IMixinConfigPlugin {
     private static final String LIBERATE_ATTACHMENT_MIXIN =
             "com.cdp.codpattern.mixin.taczaddon.LiberateAttachmentMixin";
     private static final String LIBERATE_ATTACHMENT_TARGET =
             "com.mafuyu404.taczaddon.common.LiberateAttachment";
+    private final Supplier<IClassBytecodeProvider> bytecodeProvider;
+
+    public CodPatternMixinPlugin() {
+        this(() -> MixinService.getService().getBytecodeProvider());
+    }
+
+    CodPatternMixinPlugin(Supplier<IClassBytecodeProvider> bytecodeProvider) {
+        this.bytecodeProvider = bytecodeProvider;
+    }
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -47,11 +60,11 @@ public final class CodPatternMixinPlugin implements IMixinConfigPlugin {
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
     }
 
-    private static boolean classExists(String className) {
+    private boolean classExists(String className) {
         try {
-            Class.forName(className, false, CodPatternMixinPlugin.class.getClassLoader());
-            return true;
-        } catch (ClassNotFoundException ignored) {
+            // Loading a target class here can define it before its mixins are applied.
+            return bytecodeProvider.get().getClassNode(className) != null;
+        } catch (ClassNotFoundException | IOException ignored) {
             return false;
         }
     }

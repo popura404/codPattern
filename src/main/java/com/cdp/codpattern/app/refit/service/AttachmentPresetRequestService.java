@@ -7,7 +7,6 @@ import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
-import com.cdp.codpattern.compat.taczaddon.TaczAddonRefitCompat;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
@@ -29,8 +28,7 @@ import java.util.Optional;
 import java.util.Set;
 
 public final class AttachmentPresetRequestService {
-    public record Result(SyncAttachmentPresetPacket packet, boolean presetLoaded, int sandboxAttachmentCount,
-            int truncatedAttachmentCount) {
+    public record Result(SyncAttachmentPresetPacket packet, boolean presetLoaded, int candidateCount) {
     }
 
     private AttachmentPresetRequestService() {
@@ -68,8 +66,6 @@ public final class AttachmentPresetRequestService {
         }
         ItemStack gunStack = originalGunStack.copy();
 
-        TaczAddonRefitCompat.sanitizeGunForBackpackRefitSession(gunStack);
-
         String storedPreset = itemData.getAttachmentPreset();
         Optional<String> storedPresetPayload = storedPreset == null || storedPreset.isBlank()
                 ? Optional.empty()
@@ -93,16 +89,9 @@ public final class AttachmentPresetRequestService {
         if (expectedGunIdOpt.isEmpty()) {
             return Optional.empty();
         }
-        List<ItemStack> playerOwnedAttachments = collectPlayerOwnedAttachments(player, gunStack, filterConfig);
-        List<ItemStack> addonCompatibleAttachments = collectAddonCompatibleAttachments(
-                player,
-                originalGunStack,
-                gunStack,
-                filterConfig,
-                playerOwnedAttachments);
-        List<ItemStack> sandboxAttachments = mergeAttachmentCandidates(playerOwnedAttachments, addonCompatibleAttachments);
+        List<ItemStack> candidates = collectAttachmentCandidates(gunStack, filterConfig);
         AttachmentEditSession session = AttachmentEditSessionManager.startSession(
-                player, bagId, slot, gunStack, sandboxAttachments);
+                player, bagId, slot, gunStack, candidates);
         SyncAttachmentPresetPacket packet = new SyncAttachmentPresetPacket(
                 bagId,
                 slot,
@@ -111,39 +100,14 @@ public final class AttachmentPresetRequestService {
         return Optional.of(new Result(
                 packet,
                 syncedPresetPayload.isPresent(),
-                session.getSandboxAttachmentCount(),
-                session.getTruncatedAttachmentCount()));
+                session.getRefitInventory().getCandidateCount()));
     }
 
-    private static List<ItemStack> collectPlayerOwnedAttachments(ServerPlayer player,
-            ItemStack gunStack,
+    private static List<ItemStack> collectAttachmentCandidates(ItemStack gunStack,
             WeaponFilterConfig filterConfig) {
-        List<ItemStack> attachments = new ArrayList<>();
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack stack = player.getInventory().getItem(i);
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            if (TaczGatewayProvider.gateway().canAttach(gunStack, stack)
-                    && !BackpackAttachmentFilter.isAttachmentBlocked(filterConfig, stack)) {
-                attachments.add(stack.copy());
-            }
-        }
-        return attachments;
-    }
-
-    private static List<ItemStack> collectAddonCompatibleAttachments(ServerPlayer player,
-            ItemStack originalGunStack,
-            ItemStack workingGunStack,
-            WeaponFilterConfig filterConfig,
-            List<ItemStack> existingCandidates) {
         List<ItemStack> candidates = new ArrayList<>();
         Set<String> existingAttachmentIds = new HashSet<>();
-        for (ItemStack existing : existingCandidates) {
-            TaczGatewayProvider.gateway().resolveAttachmentId(existing).ifPresent(existingAttachmentIds::add);
-        }
-
-        for (ItemStack candidate : TaczAddonRefitCompat.resolveBackpackRefitCandidates(player, originalGunStack)) {
+        for (ItemStack candidate : TaczGatewayProvider.gateway().listAttachmentCandidates()) {
             if (candidate == null || candidate.isEmpty()) {
                 continue;
             }
@@ -157,24 +121,13 @@ public final class AttachmentPresetRequestService {
             if (BackpackAttachmentFilter.isAttachmentBlocked(filterConfig, candidate)) {
                 continue;
             }
-            if (!TaczGatewayProvider.gateway().canAttach(workingGunStack, candidate)) {
+            if (!TaczGatewayProvider.gateway().canAttach(gunStack, candidate)) {
                 continue;
             }
             candidates.add(candidate.copy());
             existingAttachmentIds.add(attachmentIdOpt.get());
         }
         return candidates;
-    }
-
-    private static List<ItemStack> mergeAttachmentCandidates(List<ItemStack> playerOwnedAttachments,
-            List<ItemStack> addonCompatibleAttachments) {
-        if (addonCompatibleAttachments.isEmpty()) {
-            return playerOwnedAttachments;
-        }
-        List<ItemStack> merged = new ArrayList<>(playerOwnedAttachments.size() + addonCompatibleAttachments.size());
-        merged.addAll(playerOwnedAttachments);
-        merged.addAll(addonCompatibleAttachments);
-        return merged;
     }
 
     private static ItemStack buildItemStack(BackpackConfig.Backpack.ItemData itemData) {
