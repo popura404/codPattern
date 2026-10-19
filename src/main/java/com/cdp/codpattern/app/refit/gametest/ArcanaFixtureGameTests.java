@@ -1,8 +1,10 @@
 package com.cdp.codpattern.app.refit.gametest;
 
+import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
 import com.cdp.codpattern.app.refit.service.RefitActionService;
 import com.cdp.codpattern.compat.arcana.ArcanaRefitCompat;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.RefitAction;
 import com.mojang.logging.LogUtils;
@@ -149,6 +151,86 @@ public final class ArcanaFixtureGameTests {
                 AttachmentEditSessionManager.endSession(player);
             }
         }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "codpattern_arcana_fixtures", batch = "arcana_fixtures", timeoutTicks = 100)
+    public static void actualBlacklistedGripCleanupResetsOldUnderbarrelState(GameTestHelper helper) throws Exception {
+        ArcanaRefitGameTests.requireArcana(helper);
+        var transition = findGripTransition(helper);
+        ItemStack gun = transition.gun().copy();
+        IGun api = IGun.getIGunOrNull(gun);
+        Class<?> extrasClass = Class.forName("group.taczexpands.dist.cSFSPogO");
+        Object extrasApi = extrasClass.getField("lYcekq0C").get(null);
+        extrasClass.getMethod("sTzrnRrP", ItemStack.class, boolean.class).invoke(extrasApi, gun, true);
+        CompoundTag oldRoot = ArcanaRefitCompat.underbarrelRootForPreset(gun);
+        helper.assertTrue(oldRoot != null, "the real installed GRIP supplies underbarrel state");
+        oldRoot.putInt("OldBlacklistedGripState", 73);
+        oldRoot.putInt("AmmoCurrent", 13);
+        gun.getOrCreateTag().putInt(GunItemDataAccessor.LASER_COLOR_TAG, 0x102030);
+        gun.getTag().getCompound("Extras").putInt("UnrelatedBlacklistState", 82);
+
+        WeaponFilterConfig filter = new WeaponFilterConfig();
+        filter.setBlockedAttachmentNamespaces(List.of());
+        filter.setBlockedAttachmentIds(List.of("codpattern:no_such_installed_attachment"));
+        CompoundTag beforeUnrelatedBan = gun.getTag().copy();
+        helper.assertTrue(!BackpackAttachmentFilter.removeBlockedInstalledAttachments(filter, gun)
+                        && beforeUnrelatedBan.equals(gun.getTag()),
+                "a ban that matches no installed attachment preserves all active underbarrel state");
+
+        String gripId = ArcanaRefitGameTests.attachmentId(api.getAttachment(gun, AttachmentType.GRIP));
+        helper.assertTrue(!gripId.isEmpty(), "the blacklist targets the actual installed GRIP identity");
+        filter.setBlockedAttachmentIds(List.of(gripId));
+        // Regression: before the fix this call removed the GRIP but retained UsingUnderBarrel and its old root.
+        helper.assertTrue(BackpackAttachmentFilter.removeBlockedInstalledAttachments(filter, gun)
+                        && api.getAttachment(gun, AttachmentType.GRIP).isEmpty(),
+                "the shared prepare/distribution cleanup removes the banned real GRIP");
+        CompoundTag extras = gun.getTag().getCompound("Extras");
+        helper.assertTrue(!extras.getBoolean("UsingUnderBarrel") && !extras.contains("UnderBarrelRoot"),
+                "blacklist removal must clear the old underbarrel mode and root just like a GRIP transition");
+        helper.assertTrue(extras.getInt("UnrelatedBlacklistState") == 82,
+                "blacklist cleanup preserves unrelated Extras fields");
+        api.setLaserColor(gun, 0x708090);
+        helper.assertTrue(gun.getTag().getInt(GunItemDataAccessor.LASER_COLOR_TAG) == 0x708090
+                        && !extras.contains("UnderBarrelRoot"),
+                "after GRIP cleanup Arcana's actual color accessor writes to the main gun, not a stale nested root");
+        CompoundTag afterCleanup = gun.getTag().copy();
+        helper.assertTrue(!BackpackAttachmentFilter.removeBlockedInstalledAttachments(filter, gun)
+                        && afterCleanup.equals(gun.getTag()),
+                "repeated blacklist cleanup preserves the already corrected state");
+        LogUtils.getLogger().info("Arcana real blacklist GRIP cleanup verified: grip={} old mode/root cleared; unrelated Extras preserved", gripId);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "codpattern_arcana_fixtures", batch = "arcana_fixtures", timeoutTicks = 100)
+    public static void actualBlacklistedScopeCleanupPreservesActiveUnderbarrelState(GameTestHelper helper) throws Exception {
+        ArcanaRefitGameTests.requireArcana(helper);
+        Class<?> extrasClass = Class.forName("group.taczexpands.dist.cSFSPogO");
+        Object extrasApi = extrasClass.getField("lYcekq0C").get(null);
+        Method underbarrel = extrasClass.getMethod("SMuDyDJd", ItemStack.class);
+        Method setActive = extrasClass.getMethod("sTzrnRrP", ItemStack.class, boolean.class);
+        var fixture = findUnderbarrelFixture(helper, extrasApi, underbarrel, setActive);
+        ItemStack gun = fixture.gun().copy();
+        IGun api = IGun.getIGunOrNull(gun);
+        api.installAttachment(gun, fixture.attachment());
+        setActive.invoke(extrasApi, gun, true);
+        CompoundTag root = ArcanaRefitCompat.underbarrelRootForPreset(gun);
+        helper.assertTrue(root != null, "an unrelated SCOPE cleanup starts with a real active underbarrel");
+        root.putInt("PreservedUnderbarrelState", 91);
+        root.putInt("AmmoCurrent", 17);
+        gun.getTag().getCompound("Extras").putInt("UnrelatedBlacklistState", 82);
+        CompoundTag before = gun.getTag().getCompound("Extras").copy();
+        String activeId = TaczGatewayProvider.gateway().resolveGunId(gun).orElseThrow();
+        WeaponFilterConfig filter = new WeaponFilterConfig();
+        filter.setBlockedAttachmentNamespaces(List.of());
+        filter.setBlockedAttachmentIds(List.of(ArcanaRefitGameTests.attachmentId(fixture.attachment())));
+
+        helper.assertTrue(BackpackAttachmentFilter.removeBlockedInstalledAttachments(filter, gun)
+                        && api.getAttachment(gun, AttachmentType.SCOPE).isEmpty(),
+                "the unrelated installed SCOPE is actually removed, rather than taking the no-change path");
+        helper.assertTrue(before.equals(gun.getTag().getCompound("Extras"))
+                        && activeId.equals(TaczGatewayProvider.gateway().resolveGunId(gun).orElseThrow()),
+                "removing an unrelated SCOPE preserves the complete active underbarrel state and identity");
         helper.succeed();
     }
 

@@ -1,5 +1,6 @@
 package com.cdp.codpattern.app.backpack.service;
 
+import com.cdp.codpattern.compat.arcana.ArcanaRefitCompat;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.tacz.guns.api.item.IGun;
@@ -38,6 +39,7 @@ public final class BackpackAttachmentFilter {
         }
 
         boolean changed = false;
+        Object previousUnderbarrel = null;
         for (AttachmentType type : AttachmentType.values()) {
             if (type == AttachmentType.NONE || !iGun.allowAttachmentType(gunStack, type)) {
                 continue;
@@ -46,8 +48,15 @@ public final class BackpackAttachmentFilter {
             if (attachmentStack.isEmpty() || !isAttachmentBlocked(filterConfig, attachmentStack)) {
                 continue;
             }
+            if (!changed && ArcanaRefitCompat.isLoaded()) {
+                previousUnderbarrel = ArcanaRefitCompat.captureUnderbarrel(gunStack);
+            }
             iGun.unloadAttachment(gunStack, type);
             changed = true;
+        }
+        if (changed && previousUnderbarrel != null) {
+            // Match preset/GRIP transitions without returning preview items or ammunition.
+            ArcanaRefitCompat.resetUnderbarrelAfterPreset(gunStack, previousUnderbarrel);
         }
         return changed;
     }
