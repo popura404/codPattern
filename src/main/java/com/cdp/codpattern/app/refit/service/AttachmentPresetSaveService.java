@@ -1,6 +1,7 @@
 package com.cdp.codpattern.app.refit.service;
 
 import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
+import com.cdp.codpattern.compat.arcana.ArcanaRefitCompat;
 import com.cdp.codpattern.config.ConfigFailureFeedback;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
@@ -13,6 +14,8 @@ import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
 import com.mojang.logging.LogUtils;
 import net.minecraft.network.chat.Component;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.TagParser;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
@@ -88,12 +91,26 @@ public final class AttachmentPresetSaveService {
                 throw new SaveFailureException("message.codpattern.refit.save_failed_attachment_blocked");
             }
 
-            mutatedBackpack = backpack;
             previousItem = backpack.getItem_MAP().get(slot);
             String normalizedPreset = builtPresetPayload.isBlank() ? null : builtPresetPayload;
             String preservedItemId = previousItem != null ? previousItem.getItem() : itemId;
             int preservedCount = previousItem != null ? Math.max(1, previousItem.getCount()) : 1;
             String preservedNbt = previousItem != null ? previousItem.getNbt() : nbtString;
+            if (ArcanaRefitCompat.isLoaded() && previousItem != null) {
+                CompoundTag configured = preservedNbt == null || preservedNbt.isBlank()
+                        ? new CompoundTag() : TagParser.parseTag(preservedNbt);
+                if (!session.getConfiguredGunId().equals(configured.getString("GunId"))
+                        || !preservedItemId.equals(itemId)) {
+                    throw new SaveFailureException("message.codpattern.refit.operation_wrong_gun");
+                }
+                // The session only accepts form changes derived from server-loaded rules.
+                // Persist that one configuration field; ammunition and all other base NBT stay intact.
+                if (!session.getExpectedGunId().equals(session.getConfiguredGunId())) {
+                    configured.putString("GunId", session.getExpectedGunId());
+                    preservedNbt = configured.toString();
+                }
+            }
+            mutatedBackpack = backpack;
             backpack.getItem_MAP().put(slot,
                     new BackpackConfig.Backpack.ItemData(preservedItemId, preservedCount, preservedNbt, normalizedPreset));
             persist.run();

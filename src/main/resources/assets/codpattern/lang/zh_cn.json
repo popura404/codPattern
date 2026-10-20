@@ -650,5 +650,6 @@
   "message.codpattern.config.parse_failed": "服务器配置格式有误，操作已停止。请联系管理员修正配置。",
   "message.codpattern.config.write_failed": "无法写入服务器配置，本次更改未保存。请联系管理员检查日志。",
   "message.codpattern.command.sync_partial_failure": "配置同步未全部完成：%s 人成功，%s 人失败。请检查服务器日志。",
+  "message.codpattern.refit.operation_arcana_form_unsupported": "这把枪使用了 CDP 暂不支持的 Arcana 形态转换规则，本次配件操作未执行。",
   "message.codpattern.refit.operation_arcana_unavailable": "Arcana 配件接口不可用，操作已停止。请向管理员提供模组版本及服务器日志。"
 }

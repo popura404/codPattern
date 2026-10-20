@@ -1,6 +1,7 @@
 package com.cdp.codpattern.compat.tacz;
 
 import com.cdp.codpattern.compat.arcana.ArcanaRefitCompat;
+import com.cdp.codpattern.compat.arcana.ArcanaGunFormCompat;
 import com.tacz.guns.api.DefaultAssets;
 import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.api.item.IAttachment;
@@ -18,6 +19,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.fml.util.thread.EffectiveSide;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -105,10 +107,13 @@ public final class TaczCoreGateway implements TaczGateway {
         IGun iGun = iGunOpt.get();
         List<String> attachmentIds = new ArrayList<>();
         for (AttachmentType type : AttachmentType.values()) {
-            if (type == AttachmentType.NONE || !iGun.allowAttachmentType(gunStack, type)) {
+            if (type == AttachmentType.NONE || (!ArcanaRefitCompat.isLoaded() && !iGun.allowAttachmentType(gunStack, type))) {
                 continue;
             }
-            ResourceLocation attachmentId = iGun.getAttachmentId(gunStack, type);
+            ResourceLocation attachmentId = ArcanaRefitCompat.isLoaded()
+                    ? resolveAttachmentId(ArcanaGunFormCompat.readStoredAttachment(gunStack, type))
+                            .map(ResourceLocation::tryParse).orElse(null)
+                    : iGun.getAttachmentId(gunStack, type);
             if (attachmentId == null || DefaultAssets.isEmptyAttachmentId(attachmentId)) {
                 continue;
             }
@@ -143,11 +148,12 @@ public final class TaczCoreGateway implements TaczGateway {
             if (type == AttachmentType.NONE) {
                 continue;
             }
-            if (!iGun.allowAttachmentType(gunStack, type)) {
+            if (!ArcanaRefitCompat.isLoaded() && !iGun.allowAttachmentType(gunStack, type)) {
                 continue;
             }
             String key = GunItemDataAccessor.GUN_ATTACHMENT_BASE + type.name();
-            ItemStack attachment = iGun.getAttachment(gunStack, type);
+            ItemStack attachment = ArcanaRefitCompat.isLoaded()
+                    ? ArcanaGunFormCompat.readStoredAttachment(gunStack, type) : iGun.getAttachment(gunStack, type);
             CompoundTag attachmentTag = new CompoundTag();
             if (attachment.isEmpty()) {
                 ItemStack.EMPTY.save(attachmentTag);
@@ -180,12 +186,24 @@ public final class TaczCoreGateway implements TaczGateway {
         }
         IGun iGun = iGunOpt.get();
         Object previousUnderbarrel = ArcanaRefitCompat.isLoaded() ? ArcanaRefitCompat.captureUnderbarrel(gunStack) : null;
+        // A client displays the server's persisted configuration; server-only Arcana skill rules
+        // are not distributed to it. Still require a real attachment with the matching slot type.
+        boolean arcanaClient = ArcanaRefitCompat.isLoaded() && EffectiveSide.get().isClient();
+        List<ItemStack> allowedForms = new ArrayList<>();
+        allowedForms.add(gunStack);
+        if (ArcanaRefitCompat.isLoaded()) {
+            for (String id : com.cdp.codpattern.compat.arcana.ArcanaGunFormRules.relatedGunIds(gunStack)) {
+                ItemStack form = gunStack.copy();
+                form.getOrCreateTag().putString("GunId", id);
+                allowedForms.add(form);
+            }
+        }
 
         for (AttachmentType type : AttachmentType.values()) {
             if (type == AttachmentType.NONE) {
                 continue;
             }
-            if (!iGun.allowAttachmentType(gunStack, type)) {
+            if (!arcanaClient && allowedForms.stream().noneMatch(form -> iGun.allowAttachmentType(form, type))) {
                 continue;
             }
             String key = GunItemDataAccessor.GUN_ATTACHMENT_BASE + type.name();
@@ -194,12 +212,24 @@ public final class TaczCoreGateway implements TaczGateway {
             }
             ItemStack attachment = ItemStack.of(preset.getCompound(key));
             if (attachment.isEmpty()) {
-                iGun.unloadAttachment(gunStack, type);
-            } else if (iGun.allowAttachment(gunStack, attachment)) {
-                iGun.installAttachment(gunStack, attachment);
+                if (ArcanaRefitCompat.isLoaded()) ArcanaGunFormCompat.writeStoredAttachment(gunStack, type, ItemStack.EMPTY);
+                else iGun.unloadAttachment(gunStack, type);
+            } else if (!ArcanaRefitCompat.isLoaded()) {
+                if (iGun.allowAttachment(gunStack, attachment)) iGun.installAttachment(gunStack, attachment);
+            } else {
+                IAttachment attachmentApi = IAttachment.getIAttachmentOrNull(attachment);
+                if (attachmentApi != null && attachmentApi.getType(attachment) == type
+                        && TimelessAPI.getCommonAttachmentIndex(attachmentApi.getAttachmentId(attachment)).isPresent()
+                        && (arcanaClient || allowedForms.stream().anyMatch(form -> iGun.allowAttachmentType(form, type)
+                                && iGun.allowAttachment(form, attachment)))) {
+                    ArcanaGunFormCompat.writeStoredAttachment(gunStack, type, attachment);
+                }
             }
         }
-        if (ArcanaRefitCompat.isLoaded()) ArcanaRefitCompat.resetUnderbarrelAfterPreset(gunStack, previousUnderbarrel);
+        if (ArcanaRefitCompat.isLoaded()) {
+            com.cdp.codpattern.compat.arcana.ArcanaGunFormCompat.normalize(gunStack);
+            ArcanaRefitCompat.resetUnderbarrelAfterPreset(gunStack, previousUnderbarrel);
+        }
         if (preset.contains(GunItemDataAccessor.LASER_COLOR_TAG, Tag.TAG_INT)) {
             if (ArcanaRefitCompat.isLoaded()) {
                 gunStack.getOrCreateTag().putInt(GunItemDataAccessor.LASER_COLOR_TAG, preset.getInt(GunItemDataAccessor.LASER_COLOR_TAG));

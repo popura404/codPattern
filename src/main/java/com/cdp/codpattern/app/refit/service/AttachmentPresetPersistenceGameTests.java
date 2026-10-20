@@ -303,11 +303,11 @@ public final class AttachmentPresetPersistenceGameTests {
     }
 
     /** Scope the real request entry to test files without adding a production-only injection API. */
-    private static final class RequestPaths implements AutoCloseable {
+    static final class RequestPaths implements AutoCloseable {
         private final Field pathField;
         private final Map<ConfigPath, String> previous = new LinkedHashMap<>();
 
-        private RequestPaths(ServerPlayer player, RepositoryFiles files) throws Exception {
+        RequestPaths(ServerPlayer player, RepositoryFiles files) throws Exception {
             pathField = ConfigPath.class.getDeclaredField("path");
             pathField.setAccessible(true);
             for (ConfigPath path : List.of(ConfigPath.SERVERBACKPACK, ConfigPath.SERVER_FILTER)) {
@@ -332,14 +332,14 @@ public final class AttachmentPresetPersistenceGameTests {
         }
     }
 
-    private static final class RepositoryFiles implements AutoCloseable {
+    static final class RepositoryFiles implements AutoCloseable {
         private final Map<Field, Object> previous = new LinkedHashMap<>();
         private final Path root;
-        private final Path backpackPath;
-        private final Path filterPath;
-        private final BackpackConfig backpack;
+        final Path backpackPath;
+        final Path filterPath;
+        final BackpackConfig backpack;
 
-        private RepositoryFiles() throws Exception {
+        RepositoryFiles() throws Exception {
             for (Class<?> type : List.of(BackpackConfigRepository.class, WeaponFilterConfigRepository.class)) {
                 for (String name : List.of("serverConfigPath", "serverConfig", "loadFailure")) {
                     Field field = type.getDeclaredField(name);

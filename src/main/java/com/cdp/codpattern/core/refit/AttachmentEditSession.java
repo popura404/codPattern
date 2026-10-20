@@ -15,7 +15,8 @@ public class AttachmentEditSession {
     private final int originalSelectedSlot;
     private final List<ItemStack> inventorySnapshot;
     private final AttachmentRefitInventory refitInventory;
-    private final String expectedGunId;
+    private final String configuredGunId;
+    private String expectedGunId;
 
     public AttachmentEditSession(int bagId, String slot, int editHotbarSlot, int originalSelectedSlot,
             List<ItemStack> inventorySnapshot, AttachmentRefitInventory refitInventory) {
@@ -24,6 +25,12 @@ public class AttachmentEditSession {
 
     public AttachmentEditSession(UUID sessionId, int bagId, String slot, int editHotbarSlot, int originalSelectedSlot,
             List<ItemStack> inventorySnapshot, AttachmentRefitInventory refitInventory) {
+        this(sessionId, bagId, slot, editHotbarSlot, originalSelectedSlot, inventorySnapshot, refitInventory,
+                TaczGatewayProvider.gateway().resolveRefitGunId(refitInventory.getSelected()).orElse(""));
+    }
+
+    public AttachmentEditSession(UUID sessionId, int bagId, String slot, int editHotbarSlot, int originalSelectedSlot,
+            List<ItemStack> inventorySnapshot, AttachmentRefitInventory refitInventory, String configuredGunId) {
         this.sessionId = sessionId;
         this.bagId = bagId;
         this.slot = slot;
@@ -31,6 +38,7 @@ public class AttachmentEditSession {
         this.originalSelectedSlot = originalSelectedSlot;
         this.inventorySnapshot = new ArrayList<>(inventorySnapshot);
         this.refitInventory = refitInventory;
+        this.configuredGunId = configuredGunId;
         this.expectedGunId = TaczGatewayProvider.gateway().resolveRefitGunId(refitInventory.getSelected()).orElse("");
     }
 
@@ -64,6 +72,20 @@ public class AttachmentEditSession {
 
     public String getExpectedGunId() {
         return expectedGunId;
+    }
+
+    public String getConfiguredGunId() {
+        return configuredGunId;
+    }
+
+    /** Only the server's verified form transition may advance the working-gun identity. */
+    public void acceptDerivedGunIdentity(String previousGunId, String derivedGunId) {
+        if (!expectedGunId.equals(previousGunId) || derivedGunId == null || derivedGunId.isEmpty()
+                || TaczGatewayProvider.gateway().resolveRefitGunId(refitInventory.getSelected())
+                        .filter(derivedGunId::equals).isEmpty()) {
+            throw new IllegalStateException("Arcana form transition does not match the working gun");
+        }
+        expectedGunId = derivedGunId;
     }
 
     public boolean matchesGunIdentity(ItemStack gun) {

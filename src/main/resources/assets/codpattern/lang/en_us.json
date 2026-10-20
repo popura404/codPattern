@@ -650,5 +650,6 @@
   "message.codpattern.config.parse_failed": "The server configuration is invalid. The operation stopped. Ask an administrator to correct it.",
   "message.codpattern.config.write_failed": "Could not write the server configuration. This change was not saved. Ask an administrator to check the log.",
   "message.codpattern.command.sync_partial_failure": "Configuration sync was incomplete: %s succeeded, %s failed. Check the server log.",
+  "message.codpattern.refit.operation_arcana_form_unsupported": "This gun uses an Arcana form rule that CDP cannot safely apply. The attachment change was not made.",
   "message.codpattern.refit.operation_arcana_unavailable": "The Arcana attachment interface is unavailable. The operation stopped. Give an administrator the mod versions and server log."
 }

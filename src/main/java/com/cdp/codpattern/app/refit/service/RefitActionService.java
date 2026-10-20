@@ -3,6 +3,8 @@ package com.cdp.codpattern.app.refit.service;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
 import com.cdp.codpattern.compat.arcana.ArcanaRefitCompat;
+import com.cdp.codpattern.compat.arcana.ArcanaGunFormCompat;
+import com.cdp.codpattern.compat.arcana.ArcanaGunFormRules;
 import com.cdp.codpattern.config.ConfigFailureFeedback;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
@@ -104,10 +106,20 @@ public final class RefitActionService {
             }
 
             if (ArcanaRefitCompat.isLoaded()) {
+                ArcanaGunFormCompat.requireSupportedChange(gun, candidate, type, action.kind() == RefitAction.Kind.INSTALL);
                 boolean accepted = action.kind() == RefitAction.Kind.INSTALL
                         ? ArcanaRefitCompat.install(player, gun, candidate, action.candidateSlot(), type, session.getRefitInventory())
                         : ArcanaRefitCompat.unload(player, gun, type, session.getRefitInventory());
                 if (!accepted) return result(session, false, "operation_not_allowed");
+                if (!session.matchesGunIdentity(gun)) return result(session, false, "operation_wrong_gun");
+                var form = ArcanaGunFormCompat.normalize(gun);
+                ArcanaGunFormCompat.requireResolved(form);
+                if (form.status() == ArcanaGunFormRules.Status.CHANGED) {
+                    session.acceptDerivedGunIdentity(form.originalGunId(), form.resultGunId());
+                    try (var ignored = RefitPreviewContext.open(player, gun)) {
+                        AttachmentPropertyManager.postChangeEvent(player, gun);
+                    }
+                }
             } else {
                 applyStandard(player, session, iGun, gun, candidate, type, action);
             }
@@ -120,6 +132,9 @@ public final class RefitActionService {
                     || failure instanceof WeaponFilterConfigRepository.RepositoryException) {
                 return new RefitOperationResultPacket(session.getSessionId(), false, false,
                         ConfigFailureFeedback.message(failure), gun.copy(), session.getEditHotbarSlot());
+            }
+            if (failure instanceof ArcanaGunFormCompat.FormException formFailure) {
+                return result(session, false, formFailure.messageKey());
             }
             return result(session, false, failure instanceof ArcanaRefitCompat.CompatibilityException
                     ? "operation_arcana_unavailable" : "operation_failed");

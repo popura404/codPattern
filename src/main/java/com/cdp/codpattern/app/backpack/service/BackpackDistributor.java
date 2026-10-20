@@ -128,6 +128,8 @@ public class BackpackDistributor {
                 if (BackpackAttachmentFilter.removeBlockedInstalledAttachments(filterConfig, stack)) {
                     LOGGER.warn("Removed blocked attachment from backpack item player={} slot={} item={}",
                             player.getGameProfile().getName(), weaponType, itemId);
+                    // Removing an Arcana conversion module can change the resulting gun identity.
+                    if (BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) continue;
                 }
                 TaczGatewayProvider.gateway().configureGunAmmo(stack, ammoMultiple);
             }

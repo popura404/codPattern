@@ -1,6 +1,7 @@
 package com.cdp.codpattern.app.backpack.service;
 
 import com.cdp.codpattern.compat.arcana.ArcanaRefitCompat;
+import com.cdp.codpattern.compat.arcana.ArcanaGunFormCompat;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.tacz.guns.api.item.IGun;
@@ -41,20 +42,23 @@ public final class BackpackAttachmentFilter {
         boolean changed = false;
         Object previousUnderbarrel = null;
         for (AttachmentType type : AttachmentType.values()) {
-            if (type == AttachmentType.NONE || !iGun.allowAttachmentType(gunStack, type)) {
+            if (type == AttachmentType.NONE || (!ArcanaRefitCompat.isLoaded() && !iGun.allowAttachmentType(gunStack, type))) {
                 continue;
             }
-            ItemStack attachmentStack = iGun.getAttachment(gunStack, type);
+            ItemStack attachmentStack = ArcanaRefitCompat.isLoaded()
+                    ? ArcanaGunFormCompat.readStoredAttachment(gunStack, type) : iGun.getAttachment(gunStack, type);
             if (attachmentStack.isEmpty() || !isAttachmentBlocked(filterConfig, attachmentStack)) {
                 continue;
             }
             if (!changed && ArcanaRefitCompat.isLoaded()) {
                 previousUnderbarrel = ArcanaRefitCompat.captureUnderbarrel(gunStack);
             }
-            iGun.unloadAttachment(gunStack, type);
+            if (ArcanaRefitCompat.isLoaded()) ArcanaGunFormCompat.writeStoredAttachment(gunStack, type, ItemStack.EMPTY);
+            else iGun.unloadAttachment(gunStack, type);
             changed = true;
         }
-        if (changed && previousUnderbarrel != null) {
+        if (changed && ArcanaRefitCompat.isLoaded()) {
+            com.cdp.codpattern.compat.arcana.ArcanaGunFormCompat.normalize(gunStack);
             // Match preset/GRIP transitions without returning preview items or ammunition.
             ArcanaRefitCompat.resetUnderbarrelAfterPreset(gunStack, previousUnderbarrel);
         }

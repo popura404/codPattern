@@ -21,7 +21,7 @@ def main():
     parser.add_argument("--world", required=True, type=Path, help="Stopped isolated test world to copy")
     parser.add_argument("--gradle-home", type=Path, default=Path.home() / ".gradle")
     parser.add_argument("--prepare-only", action="store_true")
-    parser.add_argument("--stage", choices=["world", "refit", "immediate-close", "duration", "hot-filter", "module", "large-catalog", "hsv"], default="refit")
+    parser.add_argument("--stage", choices=["world", "refit", "immediate-close", "duration", "hot-filter", "module", "large-catalog", "hsv", "form"], default="refit")
     parser.add_argument("--slot", choices=["primary", "secondary"], default="primary")
     parser.add_argument("--java", default="java")
     parser.add_argument("--javac", default="javac")
@@ -117,7 +117,8 @@ displayName="Isolated CDP client integration probe"
     result = json.loads(result_path.read_text()) if result_path.is_file() else {}
     expected_phase = {"world": "world_ready", "refit": "refit_saved_reopened", "immediate-close": "immediate_close_saved",
                       "duration": "duration_saved", "hot-filter": "hot_filter_refreshed", "module": "module_saved_reopened",
-                      "large-catalog": "large_catalog_last_page", "hsv": "hsv_saved_reopened"}[args.stage]
+                      "large-catalog": "large_catalog_last_page", "hsv": "hsv_saved_reopened",
+                      "form": "form_saved_reopened_reversed"}[args.stage]
     if code != 0 or result.get("success") is not True or result.get("phase") != expected_phase:
         raise RuntimeError(f"Client probe did not pass (exit {code}); inspect {console} and {result_path}")
     print(json.dumps(result, indent=2))

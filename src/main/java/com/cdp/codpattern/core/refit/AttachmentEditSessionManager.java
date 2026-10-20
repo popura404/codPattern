@@ -32,6 +32,12 @@ public class AttachmentEditSessionManager {
 
     public static AttachmentEditSession startSession(ServerPlayer player, UUID sessionId, int bagId, String slot,
             ItemStack gunStack, List<ItemStack> attachmentCandidates) {
+        return startSession(player, sessionId, bagId, slot, gunStack, attachmentCandidates,
+                com.cdp.codpattern.compat.tacz.TaczGatewayProvider.gateway().resolveRefitGunId(gunStack).orElse(""));
+    }
+
+    public static AttachmentEditSession startSession(ServerPlayer player, UUID sessionId, int bagId, String slot,
+            ItemStack gunStack, List<ItemStack> attachmentCandidates, String configuredGunId) {
         abortSession(player, "replace_session");
         Inventory inventory = player.getInventory();
         int originalSelected = inventory.selected;
@@ -61,7 +67,7 @@ public class AttachmentEditSessionManager {
                 editSlot,
                 originalSelected,
                 snapshot,
-                refitInventory);
+                refitInventory, configuredGunId);
         SESSIONS.put(player.getUUID(), session);
         BackpackRefitSessionContext.markServerActive(player.getUUID());
         LOGGER.info("Attachment edit session started: player={} bagId={} slot={} hotbar={} candidates={}",

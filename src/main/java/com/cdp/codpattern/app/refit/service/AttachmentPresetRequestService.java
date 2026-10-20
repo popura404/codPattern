@@ -1,6 +1,8 @@
 package com.cdp.codpattern.app.refit.service;
 
 import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
+import com.cdp.codpattern.compat.arcana.ArcanaGunFormRules;
+import com.cdp.codpattern.compat.arcana.ArcanaRefitCompat;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.path.ConfigPath;
@@ -103,7 +105,8 @@ public final class AttachmentPresetRequestService {
         // applied to the outbound snapshot so lifting a ban restores the original slot.
         List<ItemStack> candidates = collectAttachmentCandidates(gunStack);
         AttachmentEditSession session = AttachmentEditSessionManager.startSession(
-                player, sessionId, bagId, slot, gunStack, candidates);
+                player, sessionId, bagId, slot, gunStack, candidates,
+                TaczGatewayProvider.gateway().resolveRefitGunId(originalGunStack).orElse(""));
         SyncAttachmentPresetPacket packet = new SyncAttachmentPresetPacket(
                 sessionId,
                 bagId,
@@ -119,6 +122,15 @@ public final class AttachmentPresetRequestService {
     private static List<ItemStack> collectAttachmentCandidates(ItemStack gunStack) {
         List<ItemStack> candidates = new ArrayList<>();
         Set<String> existingAttachmentIds = new HashSet<>();
+        List<ItemStack> forms = new ArrayList<>();
+        forms.add(gunStack);
+        if (ArcanaRefitCompat.isLoaded()) {
+            for (String id : ArcanaGunFormRules.relatedGunIds(gunStack).stream().sorted().toList()) {
+                ItemStack form = gunStack.copy();
+                form.getOrCreateTag().putString("GunId", id);
+                forms.add(form);
+            }
+        }
         for (ItemStack candidate : TaczGatewayProvider.gateway().listAttachmentCandidates()) {
             if (candidate == null || candidate.isEmpty()) {
                 continue;
@@ -130,7 +142,7 @@ public final class AttachmentPresetRequestService {
             if (existingAttachmentIds.contains(attachmentIdOpt.get())) {
                 continue;
             }
-            if (!TaczGatewayProvider.gateway().canAttach(gunStack, candidate)) {
+            if (forms.stream().noneMatch(form -> TaczGatewayProvider.gateway().canAttach(form, candidate))) {
                 continue;
             }
             candidates.add(candidate.copy());

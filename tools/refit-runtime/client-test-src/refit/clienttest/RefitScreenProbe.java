@@ -82,6 +82,7 @@ final class RefitScreenProbe {
             expected.put(AttachmentType.STOCK, "");
             if (stage().equals("module")) expected.put(AttachmentType.valueOf("MODULE"), "");
             if (stage().equals("hsv")) expected.put(AttachmentType.LASER, "tacz:laser_lopro");
+            if (stage().equals("form")) FormProbe.registerExpected();
             fixtureReady = true;
             LogUtils.getLogger().info("CDP_CLIENT_PROBE fixture={} marker={}",
                     TaczGatewayProvider.gateway().resolveRefitGunId(gun), MARKER);
@@ -91,6 +92,7 @@ final class RefitScreenProbe {
     }
 
     private static ItemStack findFixture() {
+        if (stage().equals("form")) return FormProbe.createFixture();
         var attachments = TaczGatewayProvider.gateway().listAttachmentCandidates();
         if (stage().equals("hsv")) {
             ItemStack gun = GunItemBuilder.create().setId(new ResourceLocation("swpu:m4a1"))
@@ -156,6 +158,7 @@ final class RefitScreenProbe {
             if (stage().equals("hot-filter")) HotFilterProbe.tick(screen);
             else if (stage().equals("large-catalog")) LargeCatalogProbe.tick(screen);
             else if (stage().equals("hsv")) HsvSliderProbe.tick(screen);
+            else if (stage().equals("form")) FormProbe.tick(screen);
             else AdditionalRefitProbe.tick(screen);
             return;
         }
