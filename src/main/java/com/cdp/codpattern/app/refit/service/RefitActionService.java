@@ -49,7 +49,7 @@ public final class RefitActionService {
         ItemStack gun = session.getRefitInventory().getSelected();
         IGun iGun = IGun.getIGunOrNull(gun);
         if (action.gunSlot() != session.getEditHotbarSlot() || iGun == null
-                || player.getInventory().getItem(session.getEditHotbarSlot()) != gun) {
+                || !session.matchesWorkingGun(player.getInventory(), gun)) {
             return result(session, false, "operation_wrong_gun");
         }
 
@@ -100,7 +100,7 @@ public final class RefitActionService {
             applyStandard(player, session, iGun, gun, candidate, type, action);
             player.inventoryMenu.broadcastChanges();
             return result(session, true, null);
-        } catch (RuntimeException failure) {
+        } catch (RuntimeException | LinkageError failure) {
             LogUtils.getLogger().error("Attachment operation {} failed for session {}", action.kind(), sessionId, failure);
             // Never retry a partly executed operation through another backend.
             if (failure instanceof BackpackConfigRepository.RepositoryException

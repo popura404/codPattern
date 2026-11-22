@@ -10,6 +10,7 @@ import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
+import com.cdp.codpattern.core.refit.RefitPreviewContext;
 import com.cdp.codpattern.network.SyncAttachmentPresetPacket;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -51,9 +52,13 @@ public final class AttachmentPresetRequestService {
             return Optional.empty();
         }
 
+        return prepare(player, sessionId, bagId, slot,
+                ConfigPath.SERVERBACKPACK.getPath(player.server), ConfigPath.SERVER_FILTER.getPath(player.server));
+    }
+
+    static Optional<Result> prepare(ServerPlayer player, UUID sessionId, int bagId, String slot,
+            Path backpackPath, Path filterPath) {
         String uuid = player.getUUID().toString();
-        Path backpackPath = ConfigPath.SERVERBACKPACK.getPath(player.server);
-        Path filterPath = ConfigPath.SERVER_FILTER.getPath(player.server);
         BackpackConfig.PlayerBackpackData playerData = BackpackConfigRepository.loadOrCreatePlayer(uuid, backpackPath);
         WeaponFilterConfig filterConfig = WeaponFilterConfigRepository.loadOrCreate(filterPath);
         BackpackConfig.Backpack backpack = playerData.getBackpacks_MAP().get(bagId);
@@ -76,13 +81,15 @@ public final class AttachmentPresetRequestService {
                 ? Optional.empty()
                 : Optional.of(storedPreset);
         CompoundTag presetTag = storedPresetPayload.map(AttachmentPresetUtil::parsePresetString).orElseGet(CompoundTag::new);
-        if (!presetTag.isEmpty()) {
-            AttachmentPresetUtil.applyPresetToGun(gunStack, presetTag);
-        }
-        boolean sanitizedBlockedAttachments = BackpackAttachmentFilter.removeBlockedInstalledAttachments(filterConfig,
-                gunStack);
-        if (!presetTag.isEmpty() || sanitizedBlockedAttachments) {
-            TaczGatewayProvider.gateway().postAttachmentChanged(player, gunStack);
+        // Property listeners can return items or refresh the UI before the session is opened.
+        try (var ignored = RefitPreviewContext.open(player, gunStack)) {
+            if (!presetTag.isEmpty()) {
+                AttachmentPresetUtil.applyPresetToGun(gunStack, presetTag);
+            }
+            boolean sanitized = BackpackAttachmentFilter.removeBlockedInstalledAttachments(filterConfig, gunStack);
+            if (!presetTag.isEmpty() || sanitized) {
+                TaczGatewayProvider.gateway().postAttachmentChanged(player, gunStack);
+            }
         }
 
         String syncedPresetPayloadRaw = AttachmentPresetUtil.buildPresetFromGun(gunStack).toString();

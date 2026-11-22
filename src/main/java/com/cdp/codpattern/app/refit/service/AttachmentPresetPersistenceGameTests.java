@@ -8,9 +8,11 @@ import com.cdp.codpattern.core.refit.AttachmentEditSession;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
 import com.cdp.codpattern.core.refit.AttachmentPresetUtil;
 import com.cdp.codpattern.core.refit.RefitAction;
+import com.cdp.codpattern.core.refit.RefitPreviewContext;
 import com.mojang.authlib.GameProfile;
 import com.mojang.logging.LogUtils;
 import com.tacz.guns.api.TimelessAPI;
+import com.tacz.guns.api.event.common.AttachmentPropertyEvent;
 import com.tacz.guns.api.item.IAttachment;
 import com.tacz.guns.api.item.IGun;
 import com.tacz.guns.api.item.attachment.AttachmentType;
@@ -21,7 +23,9 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.util.FakePlayer;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -37,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /** Same package as the service to exercise its final persistence boundary using temporary files. */
 @GameTestHolder("codpattern_refit")
@@ -66,6 +71,55 @@ public final class AttachmentPresetPersistenceGameTests {
                                 && editing.previous().getCount() == saved.getCount()
                                 && editing.previous().getNbt().equals(saved.getNbt()),
                         "saving attachments preserves the configured base item, count and unrelated gun NBT");
+                assertRestored(helper, player, original);
+                try (ReopenPropertyProbe probe = new ReopenPropertyProbe(player)) {
+                    var reopened = AttachmentPresetRequestService.prepare(player, UUID.randomUUID(), 1, slot,
+                            files.backpackPath, files.filterPath);
+                    helper.assertTrue(reopened.isPresent() && probe.events > 0 && probe.allScoped,
+                            "reopening a saved preset prepares the player and working copy in preview scope before publishing a session");
+                }
+                helper.assertTrue(!RefitPreviewContext.isActiveFor(player), "the preparation scope closes after reopen");
+                ItemStack reopenedGun = AttachmentEditSessionManager.getSession(player.getUUID()).getRefitInventory().getSelected();
+                helper.assertTrue(expectedPreset.equals(AttachmentPresetUtil.buildPresetFromGun(reopenedGun).toString()),
+                        "the real reopened working gun retains the saved " + slot + " preset");
+            } finally {
+                AttachmentEditSessionManager.endSession(player);
+            }
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", templateNamespace = "codpattern_refit", batch = "refit_persistence", timeoutTicks = 100)
+    public static void changedGunIdAndReplacedHotbarStackRejectEditsAndSave(GameTestHelper helper) throws Exception {
+        for (boolean replaceStack : List.of(false, true)) {
+            ServerPlayer player = player(helper);
+            List<ItemStack> original = seedInventory(player);
+            try (RepositoryFiles files = new RepositoryFiles()) {
+                Editing editing = start(helper, player, files, "primary");
+                AttachmentEditSession session = editing.session();
+                ItemStack workingGun = session.getRefitInventory().getSelected();
+                if (replaceStack) {
+                    player.getInventory().setItem(session.getEditHotbarSlot(), workingGun.copy());
+                } else {
+                    IGun gun = IGun.getIGunOrNull(workingGun);
+                    var otherId = TimelessAPI.getAllCommonGunIndex().stream().map(Map.Entry::getKey)
+                            .filter(id -> !id.equals(gun.getGunId(workingGun))).findFirst().orElseThrow();
+                    gun.setGunId(workingGun, otherId);
+                }
+                ItemStack beforeEdit = workingGun.copy();
+                var edit = RefitActionService.execute(player, session.getSessionId(),
+                        RefitAction.laser(session.getEditHotbarSlot(), Map.of(), true, 0x2468AC));
+                helper.assertTrue(!edit.success() && !edit.finished()
+                                && edit.message().getContents() instanceof TranslatableContents message
+                                && "message.codpattern.refit.operation_wrong_gun".equals(message.getKey())
+                                && ItemStack.matches(beforeEdit, workingGun),
+                        "a changed working gun refuses the edit without changing its state");
+
+                var save = AttachmentPresetSaveService.save(player, 1, "primary", files.backpackPath, files.filterPath,
+                        () -> helper.fail("a stale working gun must not reach persistence"));
+                assertMessage(helper, save, "message.codpattern.refit.operation_wrong_gun");
+                helper.assertTrue(!save.success() && editing.backpack().getItem_MAP().get("primary") == editing.previous(),
+                        "a stale working gun must leave the original configured preset intact");
                 assertRestored(helper, player, original);
             } finally {
                 AttachmentEditSessionManager.endSession(player);
@@ -227,6 +281,28 @@ public final class AttachmentPresetPersistenceGameTests {
             BackpackConfig.Backpack.ItemData previous) { }
 
     private record GunAndAttachment(ItemStack gun, ItemStack attachment, AttachmentType type) { }
+
+    private static final class ReopenPropertyProbe implements AutoCloseable {
+        private final Consumer<AttachmentPropertyEvent> listener;
+        private int events;
+        private boolean allScoped = true;
+
+        private ReopenPropertyProbe(ServerPlayer player) {
+            listener = event -> {
+                ItemStack gun = event.getGunItem();
+                if (!gun.hasTag() || gun.getTag().getInt("UnrelatedBaseMarker") != 73) return;
+                events++;
+                allScoped &= RefitPreviewContext.isActiveFor(player) && RefitPreviewContext.isActiveFor(gun)
+                        && !AttachmentEditSessionManager.hasSession(player.getUUID());
+            };
+            MinecraftForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, AttachmentPropertyEvent.class, listener);
+        }
+
+        @Override
+        public void close() {
+            MinecraftForge.EVENT_BUS.unregister(listener);
+        }
+    }
 
     private static final class RepositoryFiles implements AutoCloseable {
         private final Map<Field, Object> previous = new LinkedHashMap<>();

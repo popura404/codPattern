@@ -128,6 +128,9 @@ public class BackpackDistributor {
                 if (BackpackAttachmentFilter.removeBlockedInstalledAttachments(filterConfig, stack)) {
                     LOGGER.warn("Removed blocked attachment from backpack item player={} slot={} item={}",
                             player.getGameProfile().getName(), weaponType, itemId);
+                    if (BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {
+                        continue;
+                    }
                 }
                 TaczGatewayProvider.gateway().configureGunAmmo(stack, ammoMultiple);
             }

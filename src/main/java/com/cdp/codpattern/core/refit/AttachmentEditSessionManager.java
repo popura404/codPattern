@@ -2,6 +2,7 @@ package com.cdp.codpattern.core.refit;
 
 import com.mojang.logging.LogUtils;
 import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
+import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.network.SyncAttachmentCandidatesPacket;
@@ -32,6 +33,8 @@ public class AttachmentEditSessionManager {
 
     public static AttachmentEditSession startSession(ServerPlayer player, UUID sessionId, int bagId, String slot,
             ItemStack gunStack, List<ItemStack> attachmentCandidates) {
+        ItemStack workingGun = gunStack.copy();
+        String expectedGunId = TaczGatewayProvider.gateway().resolveGunId(workingGun).orElse("");
         abortSession(player, "replace_session");
         Inventory inventory = player.getInventory();
         int originalSelected = inventory.selected;
@@ -39,7 +42,7 @@ public class AttachmentEditSessionManager {
         List<ItemStack> snapshot = snapshotInventory(inventory);
 
         inventory.clearContent();
-        inventory.setItem(editSlot, gunStack.copy());
+        inventory.setItem(editSlot, workingGun);
 
         // Only the working gun needs a real held slot for TaCZ rendering/state.
         // Candidates live exclusively in the list-backed adapter below, never in
@@ -61,7 +64,7 @@ public class AttachmentEditSessionManager {
                 editSlot,
                 originalSelected,
                 snapshot,
-                refitInventory);
+                refitInventory, expectedGunId);
         SESSIONS.put(player.getUUID(), session);
         BackpackRefitSessionContext.markServerActive(player.getUUID());
         LOGGER.info("Attachment edit session started: player={} bagId={} slot={} hotbar={} candidates={}",
