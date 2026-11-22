@@ -13,8 +13,8 @@ public final class TdmClientModePresentations {
     public static ClientModePresentation frontlinePresentation() {
         return new ClientModePresentation(
                 new ResourceLocation("codpattern", "textures/gui/modes/frontline_preview.png"),
-                16001,
-                9001,
+                3840,
+                2160,
                 FRONTLINE_ACCENT_COLOR,
                 "screen.codpattern.mode_select.hover_frontline",
                 "frontline");
@@ -23,8 +23,8 @@ public final class TdmClientModePresentations {
     public static ClientModePresentation teamDeathmatchPresentation() {
         return new ClientModePresentation(
                 new ResourceLocation("codpattern", "textures/gui/modes/team_death_match_preview.png"),
-                16047,
-                9001,
+                3840,
+                2160,
                 TEAM_DEATHMATCH_ACCENT_COLOR,
                 "screen.codpattern.mode_select.hover_teamdeathmatch",
                 "teamdeathmatch");

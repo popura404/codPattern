@@ -17,6 +17,10 @@ public final class GuiTextHelper {
     private static final String ELLIPSIS = "...";
 
     public static float referenceScale() {
+        return (float) referenceScaleFactor();
+    }
+
+    public static double referenceScaleFactor() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null || minecraft.getWindow() == null) {
             return 1.0f;
@@ -25,7 +29,7 @@ public final class GuiTextHelper {
         if (guiScale <= 0.0d) {
             return 1.0f;
         }
-        return (float) (REFERENCE_GUI_SCALE / guiScale);
+        return REFERENCE_GUI_SCALE / guiScale;
     }
 
     public static int referenceScaled(int value) {
@@ -33,6 +37,10 @@ public final class GuiTextHelper {
             return 0;
         }
         return Math.max(1, Math.round(value * referenceScale()));
+    }
+
+    public static int referenceViewportSize(int framebufferPixels) {
+        return (int) Math.ceil(framebufferPixels / (double) REFERENCE_GUI_SCALE);
     }
 
     public static int referenceLineHeight(Font font) {
@@ -434,10 +442,15 @@ public final class GuiTextHelper {
             float scaleMultiplier,
             int color,
             boolean shadow) {
+        drawScaledString(graphics, font, text, x, y, effectiveReferenceScale(scaleMultiplier), color, shadow);
+    }
+
+    public static void drawScaledString(
+            GuiGraphics graphics, Font font, FormattedCharSequence text, float x, float y,
+            float scale, int color, boolean shadow) {
         if (text == null) {
             return;
         }
-        float scale = effectiveReferenceScale(scaleMultiplier);
         graphics.pose().pushPose();
         graphics.pose().translate(x, y, 0.0f);
         graphics.pose().scale(scale, scale, 1.0f);

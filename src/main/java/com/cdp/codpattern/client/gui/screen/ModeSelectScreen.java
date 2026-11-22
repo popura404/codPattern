@@ -4,63 +4,43 @@ import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.model.ModeDescriptor;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
-import com.cdp.codpattern.client.gui.refit.ModeRoomActionButton;
+import com.cdp.codpattern.client.gui.screen.match.LobbyBackButton;
+import com.cdp.codpattern.client.gui.screen.match.LobbyCanvas;
+import com.cdp.codpattern.client.gui.screen.match.ModeLobbyCaption;
 import com.cdp.codpattern.client.gui.screen.match.ModePreviewPanel;
 import com.cdp.codpattern.client.gui.screen.match.ModeSelectButton;
-import net.minecraft.client.Minecraft;
+import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class ModeSelectScreen extends Screen {
-    private static final int BASE_PAGE_PADDING = 16;
-    private static final int BASE_HEADER_TOP = 18;
-    private static final int BASE_INFO_TOP = 66;
-    private static final int BASE_INFO_PANEL_WIDTH = 260;
-    private static final int BASE_INFO_PANEL_HEIGHT = 92;
-    private static final int BASE_MODE_BUTTON_WIDTH = 170;
-    private static final int BASE_MODE_BUTTON_HEIGHT = 50;
-    private static final int BASE_MODE_BUTTON_GAP = 8;
-    private static final int BASE_SCROLL_BUTTON_WIDTH = 22;
-    private static final int BASE_SCROLL_BUTTON_HEIGHT = 50;
-    private static final int BASE_MODE_BAND_BOTTOM = 48;
-    private static final int BASE_BACK_BUTTON_WIDTH = 68;
-    private static final int BASE_BACK_BUTTON_HEIGHT = 18;
-    private static final int BASE_BACK_BUTTON_BOTTOM = 16;
-    private static final int BASE_BAND_BACKDROP_PADDING = 14;
-    private static final long SCREEN_REVEAL_MS = 180L;
-    private static final long BACKGROUND_CROSS_FADE_MS = 220L;
+    private static final int CROSS_FADE_MS = 220;
+    private static final Component HEADER = Component.translatable("screen.codpattern.mode_select.header");
+
+    private static final int ROW_HEIGHT = 38;
+    private static final int ROW_GAP = 2;
+    private static final int SCROLL_HIT_WIDTH = 7;
 
     private final Screen previousScreen;
-    private final List<ModeDescriptor> availableModes = new ArrayList<>();
-    private final List<ModeSelectButton> modeButtons = new ArrayList<>();
+    private final List<ModeSelectButton> rows = new ArrayList<>();
+    private final List<ModeLobbyCaption> captions = new ArrayList<>();
 
-    private ModeRoomActionButton scrollLeftButton;
-    private ModeRoomActionButton scrollRightButton;
-
-    private int scrollOffset;
-    private int maxScrollOffset;
-    private int visibleModeCount;
-    private int modeButtonWidth;
-    private int modeButtonHeight;
-    private int modeButtonGap;
-    private int scrollButtonWidth;
-    private int scrollButtonHeight;
-    private int modeBandY;
-    private int bandVisibleWidth;
-    private int infoPanelX;
-    private int infoPanelY;
-    private int infoPanelWidth;
-    private int infoPanelHeight;
-    private long openedAtMs;
-
-    private ModeDescriptor currentBackgroundMode;
-    private ModeDescriptor previousBackgroundMode;
-    private long backgroundTransitionStartedAtMs;
+    private int canvasWidth, canvasHeight;
+    private int menuX, menuWidth, headerY, listY;
+    private int captionRight, captionBottom;
+    private int firstVisible, visibleCount;
+    private int previewIndex, previousIndex = -1;
+    private long transitionStart;
+    private boolean checkInitialHover;
 
     public ModeSelectScreen(Screen previousScreen) {
         super(Component.translatable("screen.codpattern.mode_select.title"));
@@ -71,66 +51,243 @@ public class ModeSelectScreen extends Screen {
     protected void init() {
         super.init();
         clearWidgets();
-        availableModes.clear();
-        availableModes.addAll(GameModeRegistry.orderedModes());
-        modeButtons.clear();
-        scrollOffset = 0;
-        openedAtMs = System.currentTimeMillis();
+        rows.clear();
+        captions.clear();
+        List<ModeDescriptor> modes = GameModeRegistry.orderedModes();
+        canvasWidth = GuiTextHelper.referenceViewportSize(minecraft.getWindow().getWidth());
+        canvasHeight = GuiTextHelper.referenceViewportSize(minecraft.getWindow().getHeight());
+        boolean compact = canvasWidth <= 350 || canvasWidth < canvasHeight;
+        int pageInset = Math.round(canvasWidth * 0.04f);
+        menuX = Math.round(canvasWidth * 0.03f);
+        headerY = Math.round(canvasHeight * (compact ? 0.01f : 0.03f));
+        // Leave room for the built-in six-character labels and the preview arrow at either breakpoint.
+        int idealWidth = compact ? Math.min(Math.round(canvasWidth * 0.47f), 135) : Math.round(canvasWidth * 0.26f);
+        menuWidth = Math.min(canvasWidth - 2 * menuX, Math.max(108, idealWidth));
+        listY = headerY + Math.round(font.lineHeight * ModeSelectButton.LABEL_SCALE) + ROW_GAP;
 
-        currentBackgroundMode = availableModes.isEmpty() ? null : availableModes.get(0);
-        previousBackgroundMode = null;
-        backgroundTransitionStartedAtMs = 0L;
+        int backHeight = 16;
+        int backBottom = Math.round(canvasHeight * (compact ? 0.96f : 0.95f));
+        int backY = backBottom - backHeight;
+        captionRight = canvasWidth - pageInset;
+        captionBottom = Math.round(canvasHeight * (compact ? 0.88f : 0.93f));
+        if (compact) {
+            captionBottom = Math.min(captionBottom, backY - ROW_GAP);
+        }
+        int preferredWidth = Math.round(canvasWidth * (compact ? 0.90f : 0.61f));
+        int maxWidth = canvasWidth - pageInset * 2;
+        int menuRight = menuX + menuWidth + SCROLL_HIT_WIDTH;
+        int firstRowBottom = listY + ROW_HEIGHT + ROW_GAP;
+        int listBottom = backY - ROW_GAP;
+        for (ModeDescriptor mode : modes) {
+            ModeLobbyCaption caption = ModeLobbyCaption.layout(font, mode, preferredWidth, maxWidth,
+                    captionBottom - headerY);
+            if (caption.firstLineOverlapping(menuRight, captionRight, captionBottom) < firstRowBottom) {
+                caption = ModeLobbyCaption.layout(font, mode, preferredWidth, maxWidth,
+                        Math.max(1, captionBottom - firstRowBottom));
+            }
+            listBottom = Math.min(listBottom,
+                    caption.firstLineOverlapping(menuRight, captionRight, captionBottom) - ROW_GAP);
+            captions.add(caption);
+            rows.add(addRenderableWidget(new ModeSelectButton(
+                    new ScreenRectangle(menuX, listY, menuWidth, ROW_HEIGHT), mode,
+                    ModePreviewPanel.accentColor(mode.gameType()),
+                    button -> minecraft.setScreen(new ModeRoomScreen(mode.gameType(), this)))));
+        }
 
-        computeLayout();
-        addScrollButtons();
-        rebuildModeButtons();
-        addBackButton();
-        refreshScrollButtons();
+        visibleCount = Math.min(rows.size(), Math.max(1, (listBottom - listY + ROW_GAP) / (ROW_HEIGHT + ROW_GAP)));
+        previewIndex = Mth.clamp(previewIndex, 0, Math.max(0, rows.size() - 1));
+        previousIndex = -1;
+        moveWindowToPreview(previewIndex);
+        if (!rows.isEmpty()) {
+            rows.get(previewIndex).setPreviewing(true);
+        }
+        addRenderableWidget(new LobbyBackButton(new ScreenRectangle(pageInset, backY, 66, backHeight), button -> onClose()));
+        if (!rows.isEmpty() && minecraft.getLastInputType().isKeyboard()) {
+            setFocused(rows.get(previewIndex));
+        }
+        checkInitialHover = true;
+    }
+
+    private void moveWindowToPreview(int index) {
+        if (visibleCount > 0) {
+            positionRows(Mth.clamp(firstVisible, index - visibleCount + 1, index));
+        } else {
+            firstVisible = 0;
+        }
+    }
+
+    private void positionRows(int offset) {
+        firstVisible = Mth.clamp(offset, 0, rows.size() - visibleCount);
+        for (int index = 0; index < rows.size(); index++) {
+            ModeSelectButton row = rows.get(index);
+            int slot = index - firstVisible;
+            row.visible = slot >= 0 && slot < visibleCount;
+            row.active = row.visible;
+            if (row.visible) {
+                row.setLobbyY(listY + slot * (ROW_HEIGHT + ROW_GAP));
+            } else if (getFocused() == row) {
+                setFocused(null);
+            }
+        }
     }
 
     @Override
     public void render(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        finishBackgroundTransitionIfComplete();
-        updateBackgroundPreview(currentHoveredMode(mouseX, mouseY));
+        if (checkInitialHover) {
+            checkInitialHover = false;
+            if (!minecraft.getLastInputType().isKeyboard()) {
+                previewUnderPointer(mouseX, mouseY);
+            }
+        }
 
-        float revealFactor = revealProgress();
-        renderModeBackground(graphics, revealFactor);
-        renderHeader(graphics, revealFactor);
-        renderModeBandBackdrop(graphics, revealFactor);
-        renderModeSpotlight(graphics, revealFactor);
-
+        ModePreviewPanel.renderFullscreenBase(graphics, width, height, 1.0f);
+        if (!rows.isEmpty()) {
+            float progress = transitionProgress();
+            if (progress < 1.0f) {
+                ModePreviewPanel.renderFullscreenModeLayer(graphics, width, height,
+                        rows.get(previousIndex).descriptor(), 1.0f - progress);
+            } else {
+                previousIndex = -1;
+            }
+            ModePreviewPanel.renderFullscreenModeLayer(graphics, width, height,
+                    rows.get(previewIndex).descriptor(), progress);
+        }
+        ModePreviewPanel.renderLobbyShade(graphics, width, height);
+        LobbyCanvas.begin(graphics);
+        GuiTextHelper.drawScaledString(graphics, font, HEADER.getVisualOrderText(), menuX, headerY,
+                ModeSelectButton.LABEL_SCALE, CodTheme.TEXT_PRIMARY, true);
+        if (rows.isEmpty()) {
+            graphics.drawCenteredString(font, Component.translatable("screen.codpattern.mode_select.empty"),
+                    canvasWidth / 2, (canvasHeight - font.lineHeight) / 2, CodTheme.TEXT_PRIMARY);
+        } else {
+            captions.get(previewIndex).draw(graphics, captionRight, captionBottom);
+        }
+        if (rows.size() > visibleCount) {
+            renderScrollbar(graphics);
+        }
+        graphics.pose().popPose();
         super.render(graphics, mouseX, mouseY, partialTick);
+    }
 
-        if (availableModes.isEmpty()) {
-            renderEmptyState(graphics, revealFactor);
+    private void renderScrollbar(GuiGraphics graphics) {
+        int x = menuX + menuWidth + ROW_GAP;
+        int height = listHeight();
+        int thumb = Math.max(5, height * visibleCount / rows.size());
+        int y = listY + (height - thumb) * firstVisible / (rows.size() - visibleCount);
+        graphics.fill(x, listY, x + 2, listY + height, 0x800B0F12);
+        graphics.fill(x, y, x + 2, y + thumb, 0xCCDEE4E4);
+    }
+
+    private int listHeight() {
+        return visibleCount * (ROW_HEIGHT + ROW_GAP) - ROW_GAP;
+    }
+
+    @Override
+    public void mouseMoved(double mouseX, double mouseY) {
+        super.mouseMoved(mouseX, mouseY);
+        previewUnderPointer(mouseX, mouseY);
+    }
+
+    private void previewUnderPointer(double mouseX, double mouseY) {
+        for (ModeSelectButton row : rows) {
+            if (row.isMouseOver(mouseX, mouseY)) {
+                setFocused(row);
+                return;
+            }
+        }
+    }
+
+    private void scrollTo(int offset, double mouseX, double mouseY) {
+        positionRows(offset);
+        previewUnderPointer(mouseX, mouseY);
+        if (!rows.get(previewIndex).visible) {
+            setFocused(rows.get(Mth.clamp(previewIndex, firstVisible, firstVisible + visibleCount - 1)));
         }
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (maxScrollOffset <= 0) {
-            return super.mouseScrolled(mouseX, mouseY, delta);
-        }
-        int bandTop = modeBandY - scaled(BASE_BAND_BACKDROP_PADDING);
-        int bandBottom = modeBandY + modeButtonHeight + scaled(BASE_BAND_BACKDROP_PADDING);
-        if (mouseY >= bandTop && mouseY <= bandBottom) {
-            if (delta > 0.0d) {
-                scrollLeft();
-            } else if (delta < 0.0d) {
-                scrollRight();
-            }
+        double x = LobbyCanvas.toReference(mouseX);
+        double y = LobbyCanvas.toReference(mouseY);
+        if (rows.size() > visibleCount && delta != 0 && x >= menuX && x < menuX + menuWidth + SCROLL_HIT_WIDTH
+                && y >= listY && y < listY + listHeight()) {
+            scrollTo(firstVisible + (delta > 0 ? -1 : 1), mouseX, mouseY);
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, delta);
     }
 
     @Override
-    public void onClose() {
-        if (this.minecraft != null) {
-            this.minecraft.setScreen(previousScreen);
-            return;
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        int trackX = menuX + menuWidth;
+        double x = LobbyCanvas.toReference(mouseX);
+        double y = LobbyCanvas.toReference(mouseY);
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && rows.size() > visibleCount
+                && x >= trackX && x < trackX + SCROLL_HIT_WIDTH && y >= listY && y < listY + listHeight()) {
+            int slot = (int) ((y - listY) * rows.size() / listHeight());
+            scrollTo(slot - visibleCount / 2, mouseX, mouseY);
+            return true;
         }
-        super.onClose();
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean keyPressed(int key, int scanCode, int modifiers) {
+        if (!rows.isEmpty() && (key == GLFW.GLFW_KEY_UP || key == GLFW.GLFW_KEY_DOWN)) {
+            int index = getFocused() instanceof ModeSelectButton
+                    ? previewIndex + (key == GLFW.GLFW_KEY_DOWN ? 1 : -1) : previewIndex;
+            index = Mth.clamp(index, 0, rows.size() - 1);
+            moveWindowToPreview(index);
+            setFocused(rows.get(index));
+            return true;
+        }
+        if (!rows.isEmpty() && getFocused() == null
+                && (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER)) {
+            setFocused(rows.get(previewIndex));
+        }
+        return super.keyPressed(key, scanCode, modifiers);
+    }
+
+    @Override
+    public void setFocused(GuiEventListener listener) {
+        super.setFocused(listener);
+        if (listener instanceof ModeSelectButton row) {
+            int index = rows.indexOf(row);
+            if (index >= 0 && index != previewIndex) {
+                changePreview(index);
+            }
+        }
+    }
+
+    private void changePreview(int index) {
+        long now = Util.getMillis();
+        float progress = transitionProgress();
+        int from = previewIndex;
+        if (index == previousIndex) {
+            // Reversing the same pair should continue from the current blend.
+            transitionStart = now - Math.round((1.0f - progress) * CROSS_FADE_MS);
+        } else {
+            if (progress < 0.5f) {
+                from = previousIndex;
+            }
+            transitionStart = now;
+        }
+        rows.get(previewIndex).setPreviewing(false);
+        previousIndex = from;
+        previewIndex = index;
+        rows.get(previewIndex).setPreviewing(true);
+    }
+
+    private float transitionProgress() {
+        return previousIndex < 0 ? 1.0f
+                : Mth.clamp((Util.getMillis() - transitionStart) / (float) CROSS_FADE_MS, 0.0f, 1.0f);
+    }
+
+    @Override
+    public void onClose() {
+        if (minecraft != null) {
+            minecraft.setScreen(previousScreen);
+        }
     }
 
     @Override
@@ -138,529 +295,4 @@ public class ModeSelectScreen extends Screen {
         return false;
     }
 
-    private void computeLayout() {
-        modeButtonWidth = Math.max(scaled(142), scaled(BASE_MODE_BUTTON_WIDTH));
-        modeButtonHeight = scaled(BASE_MODE_BUTTON_HEIGHT);
-        modeButtonGap = scaled(BASE_MODE_BUTTON_GAP);
-        scrollButtonWidth = scaled(BASE_SCROLL_BUTTON_WIDTH);
-        scrollButtonHeight = scaled(BASE_SCROLL_BUTTON_HEIGHT);
-        modeBandY = this.height - scaled(BASE_MODE_BAND_BOTTOM) - modeButtonHeight;
-
-        int pagePadding = scaled(BASE_PAGE_PADDING);
-        int availableBandWidth = Math.max(
-                modeButtonWidth,
-                this.width - pagePadding * 2 - scrollButtonWidth * 2 - modeButtonGap * 4);
-        visibleModeCount = availableModes.isEmpty()
-                ? 0
-                : Math.max(1, Math.min(availableModes.size(), (availableBandWidth + modeButtonGap) / (modeButtonWidth + modeButtonGap)));
-        bandVisibleWidth = visibleModeCount <= 0
-                ? 0
-                : visibleModeCount * modeButtonWidth + Math.max(0, visibleModeCount - 1) * modeButtonGap;
-        maxScrollOffset = visibleModeCount <= 0
-                ? 0
-                : Math.max(0, availableModes.size() - visibleModeCount);
-        scrollOffset = clamp(scrollOffset, 0, maxScrollOffset);
-
-        infoPanelX = pagePadding;
-        infoPanelY = scaled(BASE_INFO_TOP);
-        infoPanelWidth = clamp(this.width / 3, scaled(178), scaled(BASE_INFO_PANEL_WIDTH));
-        infoPanelHeight = scaled(BASE_INFO_PANEL_HEIGHT);
-    }
-
-    private void addScrollButtons() {
-        int bandStartX = bandStartX();
-        int scrollY = modeBandY + Math.max(0, (modeButtonHeight - scrollButtonHeight) / 2);
-
-        scrollLeftButton = addRenderableWidget(createScrollButton(
-                bandStartX - modeButtonGap - scrollButtonWidth,
-                scrollY,
-                Component.translatable("screen.codpattern.mode_select.scroll_left"),
-                "<",
-                button -> scrollLeft()));
-        scrollRightButton = addRenderableWidget(createScrollButton(
-                bandStartX + bandVisibleWidth + modeButtonGap,
-                scrollY,
-                Component.translatable("screen.codpattern.mode_select.scroll_right"),
-                ">",
-                button -> scrollRight()));
-    }
-
-    private void addBackButton() {
-        int pagePadding = scaled(BASE_PAGE_PADDING);
-        int backWidth = scaled(BASE_BACK_BUTTON_WIDTH);
-        int backHeight = scaled(BASE_BACK_BUTTON_HEIGHT);
-        int backY = this.height - scaled(BASE_BACK_BUTTON_BOTTOM) - backHeight;
-        addRenderableWidget(new ModeRoomActionButton(
-                pagePadding,
-                backY,
-                backWidth,
-                backHeight,
-                Component.translatable("screen.codpattern.common.back"),
-                button -> onClose(),
-                CodTheme.SELECTED_BORDER));
-    }
-
-    private ModeRoomActionButton createScrollButton(int x, int y, Component tooltip, String glyph, ModeRoomActionButton.OnPress onPress) {
-        ModeRoomActionButton button = new ModeRoomActionButton(
-                x,
-                y,
-                scrollButtonWidth,
-                scrollButtonHeight,
-                Component.empty(),
-                onPress,
-                CodTheme.SELECTED_BORDER);
-        button.setPrimaryStyle(true);
-        button.setPrimaryGlyph(glyph);
-        button.setTooltipText(tooltip);
-        return button;
-    }
-
-    private void rebuildModeButtons() {
-        for (ModeSelectButton button : modeButtons) {
-            removeWidget(button);
-        }
-        modeButtons.clear();
-
-        if (availableModes.isEmpty() || visibleModeCount <= 0) {
-            return;
-        }
-
-        int startIndex = clamp(scrollOffset, 0, maxScrollOffset);
-        int endIndex = Math.min(availableModes.size(), startIndex + visibleModeCount);
-        int visibleCount = Math.max(0, endIndex - startIndex);
-        int totalWidth = visibleCount <= 0
-                ? 0
-                : visibleCount * modeButtonWidth + Math.max(0, visibleCount - 1) * modeButtonGap;
-        int startX = (this.width - totalWidth) / 2;
-
-        for (int index = startIndex; index < endIndex; index++) {
-            ModeDescriptor descriptor = availableModes.get(index);
-            int visibleIndex = index - startIndex;
-            int x = startX + visibleIndex * (modeButtonWidth + modeButtonGap);
-            ModeSelectButton button = new ModeSelectButton(
-                    x,
-                    modeBandY,
-                    modeButtonWidth,
-                    modeButtonHeight,
-                    descriptor,
-                    ModePreviewPanel.accentColor(descriptor.gameType()),
-                    btn -> openModeRooms(descriptor));
-            modeButtons.add(addRenderableWidget(button));
-        }
-        refreshButtonPreviewState();
-        refreshScrollButtons();
-    }
-
-    private void renderModeBackground(GuiGraphics graphics, float revealFactor) {
-        renderDirtBackground(graphics);
-        ModePreviewPanel.renderFullscreenBase(
-                graphics,
-                this.width,
-                this.height,
-                0.84f + (0.16f * revealFactor));
-
-        float atmosphereAlpha = 0.45f + (0.55f * revealFactor);
-        if (currentBackgroundMode == null) {
-            renderGlobalScrim(graphics, revealFactor);
-            return;
-        }
-
-        if (isBackgroundTransitionActive()) {
-            float transition = backgroundTransitionProgress();
-            ModePreviewPanel.renderFullscreenModeLayer(
-                    graphics,
-                    this.width,
-                    this.height,
-                    previousBackgroundMode,
-                    atmosphereAlpha * (1.0f - transition));
-            ModePreviewPanel.renderFullscreenModeLayer(
-                    graphics,
-                    this.width,
-                    this.height,
-                    currentBackgroundMode,
-                    atmosphereAlpha * transition);
-        } else {
-            ModePreviewPanel.renderFullscreenModeLayer(
-                    graphics,
-                    this.width,
-                    this.height,
-                    currentBackgroundMode,
-                    atmosphereAlpha);
-        }
-
-        renderGlobalScrim(graphics, revealFactor);
-    }
-
-    private void renderGlobalScrim(GuiGraphics graphics, float revealFactor) {
-        int topShadowBottom = Math.max(scaled(82), this.height / 3);
-        graphics.fillGradient(
-                0,
-                0,
-                this.width,
-                topShadowBottom,
-                scaleAlpha(0x7A050607, revealFactor),
-                0x00000000);
-        graphics.fillGradient(
-                0,
-                this.height / 2,
-                this.width,
-                this.height,
-                0x00000000,
-                scaleAlpha(0xD8101010, revealFactor));
-    }
-
-    private void renderHeader(GuiGraphics graphics, float revealFactor) {
-        Minecraft mc = Minecraft.getInstance();
-        int pagePadding = scaled(BASE_PAGE_PADDING);
-        int titleY = scaled(BASE_HEADER_TOP);
-        int titleLineHeight = GuiTextHelper.referenceLineHeight(mc.font);
-        int headerRight = this.width - pagePadding;
-
-        graphics.fill(
-                pagePadding - scaled(6),
-                titleY - 1,
-                pagePadding - scaled(4),
-                titleY + titleLineHeight + 1,
-                scaleAlpha(CodTheme.HOVER_BORDER, 0.80f * revealFactor));
-        GuiTextHelper.drawReferenceString(
-                graphics,
-                mc.font,
-                Component.translatable("screen.codpattern.mode_select.header"),
-                pagePadding,
-                titleY,
-                scaleAlpha(CodTheme.TEXT_PRIMARY, revealFactor),
-                true);
-        GuiTextHelper.drawReferenceString(
-                graphics,
-                mc.font,
-                Component.translatable("screen.codpattern.mode_select.available_modes", availableModes.size()),
-                pagePadding,
-                titleY + titleLineHeight + scaled(8),
-                scaleAlpha(CodTheme.TEXT_HOVER, revealFactor),
-                false);
-
-        int hintWidth = Math.max(scaled(96), this.width / 3);
-        GuiTextHelper.drawReferenceRightAlignedEllipsizedString(
-                graphics,
-                mc.font,
-                Component.translatable("screen.codpattern.mode_select.hint").getString(),
-                headerRight,
-                titleY,
-                hintWidth,
-                scaleAlpha(CodTheme.TEXT_SECONDARY, revealFactor),
-                false);
-
-        if (maxScrollOffset > 0 && visibleModeCount > 0) {
-            int start = scrollOffset + 1;
-            int end = Math.min(availableModes.size(), scrollOffset + visibleModeCount);
-            String windowLabel = start + "-" + end + " / " + availableModes.size();
-            GuiTextHelper.drawReferenceRightAlignedEllipsizedString(
-                    graphics,
-                    mc.font,
-                    windowLabel,
-                    headerRight,
-                    titleY + titleLineHeight + scaled(8),
-                    hintWidth,
-                    scaleAlpha(CodTheme.SELECTED_TEXT, revealFactor),
-                    false);
-        }
-    }
-
-    private void renderModeBandBackdrop(GuiGraphics graphics, float revealFactor) {
-        int bandTop = modeBandY - scaled(BASE_BAND_BACKDROP_PADDING);
-        int bandBottom = modeBandY + modeButtonHeight + scaled(BASE_BAND_BACKDROP_PADDING);
-        graphics.fillGradient(
-                0,
-                bandTop,
-                this.width,
-                bandBottom,
-                0x00000000,
-                scaleAlpha(0xC4141414, revealFactor));
-        graphics.fillGradient(
-                0,
-                bandTop,
-                this.width,
-                bandTop + scaled(18),
-                scaleAlpha(0x28FFFFFF, revealFactor),
-                0x00000000);
-        graphics.fill(
-                0,
-                bandTop,
-                this.width,
-                bandTop + 1,
-                scaleAlpha(CodTheme.BORDER_SUBTLE, revealFactor));
-    }
-
-    private void renderModeSpotlight(GuiGraphics graphics, float revealFactor) {
-        if (currentBackgroundMode == null) {
-            return;
-        }
-        if (isBackgroundTransitionActive()) {
-            float transition = backgroundTransitionProgress();
-            renderModeSpotlightCard(graphics, previousBackgroundMode, revealFactor * (1.0f - transition));
-            renderModeSpotlightCard(graphics, currentBackgroundMode, revealFactor * transition);
-            return;
-        }
-        renderModeSpotlightCard(graphics, currentBackgroundMode, revealFactor);
-    }
-
-    private void renderModeSpotlightCard(GuiGraphics graphics, ModeDescriptor descriptor, float alphaFactor) {
-        if (descriptor == null || alphaFactor <= 0.0f) {
-            return;
-        }
-
-        Minecraft mc = Minecraft.getInstance();
-        int accentColor = ModePreviewPanel.accentColor(descriptor.gameType());
-        int left = infoPanelX;
-        int top = infoPanelY;
-        int right = left + infoPanelWidth;
-        int bottom = top + infoPanelHeight;
-        int innerLeft = left + scaled(14);
-        int innerRight = right - scaled(12);
-        int textWidth = Math.max(scaled(80), innerRight - innerLeft);
-        int titleY = top + scaled(24);
-        int titleHeight = GuiTextHelper.referenceLineHeight(mc.font, 1.8f);
-        int bodyY = titleY + titleHeight + scaled(6);
-        int footerY = bottom - GuiTextHelper.referenceLineHeight(mc.font) - scaled(10);
-
-        graphics.fillGradient(
-                left,
-                top,
-                right,
-                bottom,
-                scaleAlpha(0x52111214, alphaFactor),
-                scaleAlpha(0xA0141416, alphaFactor));
-        graphics.fill(left, top, left + scaled(3), bottom, scaleAlpha(withAlpha(accentColor, 220), alphaFactor));
-        graphics.fill(left, top, right, top + 1, scaleAlpha(withAlpha(0xFFFFFFFF, 126), alphaFactor));
-        graphics.fill(left, bottom - 1, right, bottom, scaleAlpha(withAlpha(accentColor, 185), alphaFactor));
-        graphics.fill(left, top, right, bottom, scaleAlpha(withAlpha(accentColor, 18), alphaFactor));
-        graphics.fillGradient(
-                left + scaled(3),
-                top + 1,
-                right - 1,
-                top + scaled(22),
-                scaleAlpha(withAlpha(accentColor, 52), alphaFactor),
-                0x00000000);
-
-        GuiTextHelper.drawReferenceEllipsizedString(
-                graphics,
-                mc.font,
-                descriptor.gameType().toUpperCase(),
-                innerLeft,
-                top + scaled(8),
-                textWidth,
-                scaleAlpha(withAlpha(accentColor, 235), alphaFactor),
-                false);
-        GuiTextHelper.drawReferenceScaledEllipsizedString(
-                graphics,
-                mc.font,
-                Component.translatable(descriptor.displayNameKey()),
-                innerLeft,
-                titleY,
-                textWidth,
-                1.8f,
-                scaleAlpha(CodTheme.TEXT_PRIMARY, alphaFactor),
-                true);
-        GuiTextHelper.drawReferenceEllipsizedString(
-                graphics,
-                mc.font,
-                ModePreviewPanel.resolveModeDescription(descriptor.gameType()),
-                innerLeft,
-                bodyY,
-                textWidth,
-                scaleAlpha(0xFFE7E7E7, alphaFactor),
-                false);
-        GuiTextHelper.drawReferenceRightAlignedEllipsizedString(
-                graphics,
-                mc.font,
-                Component.translatable("screen.codpattern.mode_select.preview_hint").getString(),
-                innerRight,
-                footerY,
-                textWidth,
-                scaleAlpha(CodTheme.TEXT_SECONDARY, alphaFactor),
-                false);
-    }
-
-    private void renderEmptyState(GuiGraphics graphics, float revealFactor) {
-        Minecraft mc = Minecraft.getInstance();
-        GuiTextHelper.drawReferenceCenteredString(
-                graphics,
-                mc.font,
-                Component.translatable("mode.codpattern.unknown"),
-                this.width / 2.0f,
-                this.height / 2.0f - scaled(8),
-                scaleAlpha(CodTheme.TEXT_PRIMARY, revealFactor),
-                false);
-        GuiTextHelper.drawReferenceCenteredString(
-                graphics,
-                mc.font,
-                Component.translatable("screen.codpattern.mode_select.preview_hint"),
-                this.width / 2.0f,
-                this.height / 2.0f + scaled(6),
-                scaleAlpha(CodTheme.TEXT_SECONDARY, revealFactor),
-                false);
-    }
-
-    private void openModeRooms(ModeDescriptor descriptor) {
-        currentBackgroundMode = descriptor;
-        previousBackgroundMode = null;
-        backgroundTransitionStartedAtMs = 0L;
-        Minecraft.getInstance().setScreen(new ModeRoomScreen(descriptor.gameType(), this));
-    }
-
-    private void scrollLeft() {
-        if (scrollOffset <= 0) {
-            return;
-        }
-        scrollOffset--;
-        rebuildModeButtons();
-    }
-
-    private void scrollRight() {
-        if (scrollOffset >= maxScrollOffset) {
-            return;
-        }
-        scrollOffset++;
-        rebuildModeButtons();
-    }
-
-    private void refreshScrollButtons() {
-        int bandStartX = bandStartX();
-        int scrollY = modeBandY + Math.max(0, (modeButtonHeight - scrollButtonHeight) / 2);
-        boolean showScrollButtons = maxScrollOffset > 0 && visibleModeCount > 0;
-
-        if (scrollLeftButton != null) {
-            scrollLeftButton.visible = showScrollButtons;
-            scrollLeftButton.active = showScrollButtons && scrollOffset > 0;
-            scrollLeftButton.setX(bandStartX - modeButtonGap - scrollButtonWidth);
-            scrollLeftButton.setY(scrollY);
-        }
-        if (scrollRightButton != null) {
-            scrollRightButton.visible = showScrollButtons;
-            scrollRightButton.active = showScrollButtons && scrollOffset < maxScrollOffset;
-            scrollRightButton.setX(bandStartX + bandVisibleWidth + modeButtonGap);
-            scrollRightButton.setY(scrollY);
-        }
-    }
-
-    private void updateBackgroundPreview(ModeDescriptor hoveredMode) {
-        if (hoveredMode == null) {
-            refreshButtonPreviewState();
-            return;
-        }
-        if (sameMode(hoveredMode, currentBackgroundMode)) {
-            refreshButtonPreviewState();
-            return;
-        }
-
-        finishBackgroundTransitionIfComplete();
-        if (isBackgroundTransitionActive()) {
-            ModeDescriptor interruptedMode = dominantTransitionMode();
-            if (sameMode(hoveredMode, interruptedMode)) {
-                currentBackgroundMode = interruptedMode;
-                previousBackgroundMode = null;
-                backgroundTransitionStartedAtMs = 0L;
-                refreshButtonPreviewState();
-                return;
-            }
-            previousBackgroundMode = interruptedMode;
-        } else {
-            previousBackgroundMode = currentBackgroundMode;
-        }
-        currentBackgroundMode = hoveredMode;
-        backgroundTransitionStartedAtMs = System.currentTimeMillis();
-        refreshButtonPreviewState();
-    }
-
-    private void refreshButtonPreviewState() {
-        String currentType = currentBackgroundMode == null ? "" : currentBackgroundMode.gameType();
-        for (ModeSelectButton button : modeButtons) {
-            button.setPreviewing(button.descriptor().gameType().equals(currentType));
-        }
-    }
-
-    private ModeDescriptor currentHoveredMode(int mouseX, int mouseY) {
-        for (ModeSelectButton button : modeButtons) {
-            if (mouseX >= button.getX()
-                    && mouseX < button.getX() + button.getWidth()
-                    && mouseY >= button.getY()
-                    && mouseY < button.getY() + button.getHeight()) {
-                return button.descriptor();
-            }
-        }
-        return null;
-    }
-
-    private void finishBackgroundTransitionIfComplete() {
-        if (previousBackgroundMode == null || backgroundTransitionStartedAtMs <= 0L) {
-            return;
-        }
-        if (System.currentTimeMillis() - backgroundTransitionStartedAtMs >= BACKGROUND_CROSS_FADE_MS) {
-            previousBackgroundMode = null;
-            backgroundTransitionStartedAtMs = 0L;
-        }
-    }
-
-    private boolean isBackgroundTransitionActive() {
-        return previousBackgroundMode != null && backgroundTransitionStartedAtMs > 0L;
-    }
-
-    private float backgroundTransitionProgress() {
-        if (!isBackgroundTransitionActive()) {
-            return 1.0f;
-        }
-        long elapsed = System.currentTimeMillis() - backgroundTransitionStartedAtMs;
-        return Math.min(1.0f, Math.max(0.0f, elapsed / (float) BACKGROUND_CROSS_FADE_MS));
-    }
-
-    private ModeDescriptor dominantTransitionMode() {
-        if (!isBackgroundTransitionActive()) {
-            return currentBackgroundMode;
-        }
-        return backgroundTransitionProgress() < 0.5f ? previousBackgroundMode : currentBackgroundMode;
-    }
-
-    private float revealProgress() {
-        if (openedAtMs <= 0L) {
-            return 1.0f;
-        }
-        long elapsed = System.currentTimeMillis() - openedAtMs;
-        float raw = Math.min(1.0f, Math.max(0.0f, elapsed / (float) SCREEN_REVEAL_MS));
-        return 0.22f + (raw * 0.78f);
-    }
-
-    private int bandStartX() {
-        return (this.width - bandVisibleWidth) / 2;
-    }
-
-    private static boolean sameMode(ModeDescriptor left, ModeDescriptor right) {
-        if (left == right) {
-            return true;
-        }
-        if (left == null || right == null) {
-            return false;
-        }
-        return left.gameType().equals(right.gameType());
-    }
-
-    private static int clamp(int value, int min, int max) {
-        if (max < min) {
-            return min;
-        }
-        return Math.max(min, Math.min(max, value));
-    }
-
-    private static int scaleAlpha(int color, float factor) {
-        int alpha = (color >>> 24) & 0xFF;
-        int scaledAlpha = Math.max(0, Math.min(255, (int) (alpha * Math.max(0.0f, Math.min(1.0f, factor)))));
-        return (scaledAlpha << 24) | (color & 0x00FFFFFF);
-    }
-
-    private static int withAlpha(int color, int alpha) {
-        return (Math.max(0, Math.min(255, alpha)) << 24) | (color & 0x00FFFFFF);
-    }
-
-    private static int scaled(int value) {
-        return GuiTextHelper.referenceScaled(value);
-    }
 }
