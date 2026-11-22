@@ -26,8 +26,9 @@ public class ModeSelectScreen extends Screen {
     private static final int CROSS_FADE_MS = 220;
     private static final Component HEADER = Component.translatable("screen.codpattern.mode_select.header");
 
-    private static final int ROW_HEIGHT = 38;
-    private static final int ROW_GAP = 2;
+    private static final int ROW_HEIGHT = 46;
+    private static final int ROW_GAP = 3;
+    private static final int CONTENT_GAP = 2;
     private static final int SCROLL_HIT_WIDTH = 7;
 
     private final Screen previousScreen;
@@ -62,8 +63,9 @@ public class ModeSelectScreen extends Screen {
         headerY = Math.round(canvasHeight * (compact ? 0.01f : 0.03f));
         // Leave room for the built-in six-character labels and the preview arrow at either breakpoint.
         int idealWidth = compact ? Math.min(Math.round(canvasWidth * 0.47f), 135) : Math.round(canvasWidth * 0.26f);
-        menuWidth = Math.min(canvasWidth - 2 * menuX, Math.max(108, idealWidth));
-        listY = headerY + Math.round(font.lineHeight * ModeSelectButton.LABEL_SCALE) + ROW_GAP;
+        int originalMenuWidth = Math.min(canvasWidth - 2 * menuX, Math.max(108, idealWidth));
+        menuWidth = Math.round(originalMenuWidth * 0.9f);
+        listY = headerY + Math.round(font.lineHeight * ModeSelectButton.LABEL_SCALE) + CONTENT_GAP;
 
         int backHeight = 16;
         int backBottom = Math.round(canvasHeight * (compact ? 0.96f : 0.95f));
@@ -71,13 +73,13 @@ public class ModeSelectScreen extends Screen {
         captionRight = canvasWidth - pageInset;
         captionBottom = Math.round(canvasHeight * (compact ? 0.88f : 0.93f));
         if (compact) {
-            captionBottom = Math.min(captionBottom, backY - ROW_GAP);
+            captionBottom = Math.min(captionBottom, backY - CONTENT_GAP);
         }
         int preferredWidth = Math.round(canvasWidth * (compact ? 0.90f : 0.61f));
         int maxWidth = canvasWidth - pageInset * 2;
         int menuRight = menuX + menuWidth + SCROLL_HIT_WIDTH;
-        int firstRowBottom = listY + ROW_HEIGHT + ROW_GAP;
-        int listBottom = backY - ROW_GAP;
+        int firstRowBottom = listY + ROW_HEIGHT + CONTENT_GAP;
+        int listBottom = backY - CONTENT_GAP;
         for (ModeDescriptor mode : modes) {
             ModeLobbyCaption caption = ModeLobbyCaption.layout(font, mode, preferredWidth, maxWidth,
                     captionBottom - headerY);
@@ -86,7 +88,7 @@ public class ModeSelectScreen extends Screen {
                         Math.max(1, captionBottom - firstRowBottom));
             }
             listBottom = Math.min(listBottom,
-                    caption.firstLineOverlapping(menuRight, captionRight, captionBottom) - ROW_GAP);
+                    caption.firstLineOverlapping(menuRight, captionRight, captionBottom) - CONTENT_GAP);
             captions.add(caption);
             rows.add(addRenderableWidget(new ModeSelectButton(
                     new ScreenRectangle(menuX, listY, menuWidth, ROW_HEIGHT), mode,
@@ -170,7 +172,7 @@ public class ModeSelectScreen extends Screen {
     }
 
     private void renderScrollbar(GuiGraphics graphics) {
-        int x = menuX + menuWidth + ROW_GAP;
+        int x = menuX + menuWidth + CONTENT_GAP;
         int height = listHeight();
         int thumb = Math.max(5, height * visibleCount / rows.size());
         int y = listY + (height - thumb) * firstVisible / (rows.size() - visibleCount);
