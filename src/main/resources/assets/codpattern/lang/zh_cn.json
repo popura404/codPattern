@@ -386,6 +386,7 @@
     "screen.codpattern.tdm_room.create_command_filtered": "§b使用 %s 对应的地图创建／部署工具",
     "screen.codpattern.mode_select.title": "模式",
     "screen.codpattern.mode_select.header": "模式",
+    "screen.codpattern.mode_select.in_room": "房间内",
     "screen.codpattern.mode_select.empty": "暂无可用模式",
     "screen.codpattern.mode_select.hint": "[悬停] 预览  [点击] 进入对应地图页",
     "screen.codpattern.mode_select.preview_hint": ">>>>>",

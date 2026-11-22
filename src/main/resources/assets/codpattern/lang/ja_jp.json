@@ -301,6 +301,7 @@
     "screen.codpattern.tdm_room.create_command_filtered": "§b%s 用のマップ作成／配置ツールを使用",
     "screen.codpattern.mode_select.title": "モード",
     "screen.codpattern.mode_select.header": "モード",
+    "screen.codpattern.mode_select.in_room": "ルーム参加中",
     "screen.codpattern.mode_select.empty": "利用できるモードはありません",
     "screen.codpattern.mode_select.hint": "[ホバー] プレビュー  [クリック] 対応マップ一覧へ",
     "screen.codpattern.mode_select.preview_hint": "選択後、ルーム画面にはそのモードのマップだけを表示します",

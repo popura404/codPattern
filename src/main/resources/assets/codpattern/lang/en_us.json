@@ -386,6 +386,7 @@
     "screen.codpattern.tdm_room.create_command_filtered": "§bUse the map creation / deployment tool for %s",
     "screen.codpattern.mode_select.title": "Modes",
     "screen.codpattern.mode_select.header": "Modes",
+    "screen.codpattern.mode_select.in_room": "In room",
     "screen.codpattern.mode_select.empty": "No modes available",
     "screen.codpattern.mode_select.hint": "[Hover] Preview  [Click] Open filtered room list",
     "screen.codpattern.mode_select.preview_hint": "The room screen only shows maps for the selected mode",

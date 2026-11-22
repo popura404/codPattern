@@ -301,6 +301,7 @@
     "screen.codpattern.tdm_room.create_command_filtered": "§b使用 %s 對應的地圖建立／部署工具",
     "screen.codpattern.mode_select.title": "模式",
     "screen.codpattern.mode_select.header": "模式",
+    "screen.codpattern.mode_select.in_room": "房間內",
     "screen.codpattern.mode_select.empty": "暫無可用模式",
     "screen.codpattern.mode_select.hint": "[懸停] 預覽  [點擊] 進入對應地圖頁",
     "screen.codpattern.mode_select.preview_hint": "選擇後，房間頁只顯示該模式對應地圖",

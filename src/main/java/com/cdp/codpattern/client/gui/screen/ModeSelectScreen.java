@@ -2,6 +2,8 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.model.ModeDescriptor;
+import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.client.ClientMatchState;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.client.gui.screen.match.LobbyBackButton;
@@ -10,6 +12,7 @@ import com.cdp.codpattern.client.gui.screen.match.ModeLobbyCaption;
 import com.cdp.codpattern.client.gui.screen.match.ModePreviewPanel;
 import com.cdp.codpattern.client.gui.screen.match.ModeSelectButton;
 import net.minecraft.Util;
+import net.minecraft.client.InputType;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -21,6 +24,7 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class ModeSelectScreen extends Screen {
     private static final int CROSS_FADE_MS = 220;
@@ -42,6 +46,9 @@ public class ModeSelectScreen extends Screen {
     private int previewIndex, previousIndex = -1;
     private long transitionStart;
     private boolean checkInitialHover;
+    private String lastRoomContext;
+    private ModeSelectButton pointedRow, pressedRow;
+    private long openRoomAt;
 
     public ModeSelectScreen(Screen previousScreen) {
         super(Component.translatable("screen.codpattern.mode_select.title"));
@@ -54,6 +61,9 @@ public class ModeSelectScreen extends Screen {
         clearWidgets();
         rows.clear();
         captions.clear();
+        pointedRow = null;
+        pressedRow = null;
+        lastRoomContext = null;
         List<ModeDescriptor> modes = GameModeRegistry.orderedModes();
         canvasWidth = GuiTextHelper.referenceViewportSize(minecraft.getWindow().getWidth());
         canvasHeight = GuiTextHelper.referenceViewportSize(minecraft.getWindow().getHeight());
@@ -93,21 +103,45 @@ public class ModeSelectScreen extends Screen {
             rows.add(addRenderableWidget(new ModeSelectButton(
                     new ScreenRectangle(menuX, listY, menuWidth, ROW_HEIGHT), mode,
                     ModePreviewPanel.accentColor(mode.gameType()),
-                    button -> minecraft.setScreen(new ModeRoomScreen(mode.gameType(), this)))));
+                    button -> pressMode((ModeSelectButton) button))));
         }
 
         visibleCount = Math.min(rows.size(), Math.max(1, (listBottom - listY + ROW_GAP) / (ROW_HEIGHT + ROW_GAP)));
         previewIndex = Mth.clamp(previewIndex, 0, Math.max(0, rows.size() - 1));
         previousIndex = -1;
         moveWindowToPreview(previewIndex);
-        if (!rows.isEmpty()) {
-            rows.get(previewIndex).setPreviewing(true);
-        }
         addRenderableWidget(new LobbyBackButton(new ScreenRectangle(pageInset, backY, 66, backHeight), button -> onClose()));
         if (!rows.isEmpty() && minecraft.getLastInputType().isKeyboard()) {
             setFocused(rows.get(previewIndex));
         }
         checkInitialHover = true;
+    }
+
+    private void refreshJoinedMode() {
+        String roomKey = ClientMatchState.roomContextName();
+        if (Objects.equals(lastRoomContext, roomKey)) {
+            return;
+        }
+        lastRoomContext = roomKey;
+        String joinedMode = null;
+        if (roomKey != null && !roomKey.isBlank()) {
+            try {
+                joinedMode = GameModeRegistry.canonicalize(RoomId.decode(roomKey).gameType());
+            } catch (IllegalArgumentException ignored) {
+                // A room key without a valid mode cannot identify a lobby row.
+            }
+        }
+        for (ModeSelectButton row : rows) {
+            row.setRoomJoined(joinedMode != null
+                    && joinedMode.equals(GameModeRegistry.canonicalize(row.descriptor().gameType())));
+        }
+    }
+
+    private void pressMode(ModeSelectButton row) {
+        if (pressedRow == null) {
+            pressedRow = row;
+            openRoomAt = 0;
+        }
     }
 
     private void moveWindowToPreview(int index) {
@@ -142,6 +176,15 @@ public class ModeSelectScreen extends Screen {
             }
         }
 
+        refreshJoinedMode();
+        GuiEventListener engaged = minecraft.getLastInputType().isKeyboard() ? getFocused() : pointedRow;
+        if (pressedRow != null) {
+            engaged = pressedRow;
+        }
+        for (ModeSelectButton row : rows) {
+            row.setEngaged(row.visible && row == engaged);
+        }
+
         ModePreviewPanel.renderFullscreenBase(graphics, width, height, 1.0f);
         if (!rows.isEmpty()) {
             float progress = transitionProgress();
@@ -168,7 +211,15 @@ public class ModeSelectScreen extends Screen {
             renderScrollbar(graphics);
         }
         graphics.pose().popPose();
+        if (pressedRow != null && openRoomAt == 0) {
+            // Start immediately before drawing the first pressed frame.
+            pressedRow.beginPress();
+            openRoomAt = Util.getMillis() + ModeSelectButton.PRESS_DURATION_MS;
+        }
         super.render(graphics, mouseX, mouseY, partialTick);
+        if (pressedRow != null && Util.getMillis() >= openRoomAt && minecraft.screen == this) {
+            minecraft.setScreen(new ModeRoomScreen(pressedRow.descriptor().gameType(), this));
+        }
     }
 
     private void renderScrollbar(GuiGraphics graphics) {
@@ -186,14 +237,22 @@ public class ModeSelectScreen extends Screen {
 
     @Override
     public void mouseMoved(double mouseX, double mouseY) {
+        if (pressedRow != null) {
+            return;
+        }
+        minecraft.setLastInputType(InputType.MOUSE);
         super.mouseMoved(mouseX, mouseY);
         previewUnderPointer(mouseX, mouseY);
     }
 
     private void previewUnderPointer(double mouseX, double mouseY) {
+        pointedRow = null;
         for (ModeSelectButton row : rows) {
             if (row.isMouseOver(mouseX, mouseY)) {
-                setFocused(row);
+                pointedRow = row;
+                if (getFocused() != row) {
+                    setFocused(row);
+                }
                 return;
             }
         }
@@ -209,10 +268,14 @@ public class ModeSelectScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (pressedRow != null) {
+            return true;
+        }
         double x = LobbyCanvas.toReference(mouseX);
         double y = LobbyCanvas.toReference(mouseY);
         if (rows.size() > visibleCount && delta != 0 && x >= menuX && x < menuX + menuWidth + SCROLL_HIT_WIDTH
                 && y >= listY && y < listY + listHeight()) {
+            minecraft.setLastInputType(InputType.MOUSE);
             scrollTo(firstVisible + (delta > 0 ? -1 : 1), mouseX, mouseY);
             return true;
         }
@@ -221,6 +284,9 @@ public class ModeSelectScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (pressedRow != null) {
+            return true;
+        }
         int trackX = menuX + menuWidth;
         double x = LobbyCanvas.toReference(mouseX);
         double y = LobbyCanvas.toReference(mouseY);
@@ -235,6 +301,9 @@ public class ModeSelectScreen extends Screen {
 
     @Override
     public boolean keyPressed(int key, int scanCode, int modifiers) {
+        if (pressedRow != null && key != GLFW.GLFW_KEY_ESCAPE) {
+            return true;
+        }
         if (!rows.isEmpty() && (key == GLFW.GLFW_KEY_UP || key == GLFW.GLFW_KEY_DOWN)) {
             int index = getFocused() instanceof ModeSelectButton
                     ? previewIndex + (key == GLFW.GLFW_KEY_DOWN ? 1 : -1) : previewIndex;
@@ -274,10 +343,8 @@ public class ModeSelectScreen extends Screen {
             }
             transitionStart = now;
         }
-        rows.get(previewIndex).setPreviewing(false);
         previousIndex = from;
         previewIndex = index;
-        rows.get(previewIndex).setPreviewing(true);
     }
 
     private float transitionProgress() {
@@ -290,6 +357,12 @@ public class ModeSelectScreen extends Screen {
         if (minecraft != null) {
             minecraft.setScreen(previousScreen);
         }
+    }
+
+    @Override
+    public void removed() {
+        pressedRow = null;
+        super.removed();
     }
 
     @Override
