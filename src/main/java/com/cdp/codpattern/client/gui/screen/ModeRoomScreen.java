@@ -2,11 +2,15 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.model.ModeCapability;
+import com.cdp.codpattern.app.match.model.ModeDescriptor;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.client.ClientMatchState;
-import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.client.gui.refit.ModeRoomActionButton;
+import com.cdp.codpattern.client.gui.screen.match.LobbyBackButton;
+import com.cdp.codpattern.client.gui.screen.match.LobbyCanvas;
+import com.cdp.codpattern.client.gui.screen.match.ModeLobbyCaption;
+import com.cdp.codpattern.client.gui.screen.match.ModePreviewPanel;
 import com.cdp.codpattern.client.network.ModeRoomClientPackets;
 import com.cdp.codpattern.client.gui.screen.match.ModeRoomActionController;
 import com.cdp.codpattern.client.gui.screen.match.ModeRoomButtonStateBinder;
@@ -22,7 +26,9 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FastColor;
 import org.jetbrains.annotations.NotNull;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,12 +41,8 @@ public class ModeRoomScreen extends Screen {
     private static final String LEGACY_KORTAC_TEAM = "kortac";
     private static final String LEGACY_SPECGRU_TEAM = "specgru";
 
-    private static final int BASE_PAGE_PADDING = 16;
-    private static final int BASE_PANEL_GAP = 14;
-    private static final int BASE_HEADER_HEIGHT = 48;
-    private static final int BASE_FOOTER_HEIGHT = 20;
     private static final int BASE_ROOM_HEADER_HEIGHT = 38;
-    private static final float LEFT_PANEL_WIDTH_RATIO = 0.25f;
+    private static final int BACKGROUND_SCRIM = 0x50000000;
     private static final long ENTER_ANIMATION_MS = 180L;
     private static final long ROOM_LIST_APPLY_DEBOUNCE_MS = 60L;
     private static final long INFO_CONTENT_FADE_MS = 85L;
@@ -50,6 +52,15 @@ public class ModeRoomScreen extends Screen {
     private final ModeRoomActionController actionController;
     private final String modeFilterGameType;
     private final Screen previousScreen;
+    private final ModeRoomListRenderer roomListRenderer = new ModeRoomListRenderer();
+    private final ModeRoomInfoPanelRenderer infoPanel = new ModeRoomInfoPanelRenderer();
+    private ModeDescriptor backdropMode;
+    private ModeLobbyCaption emptyCaption;
+    private Component header;
+    private Component roomCount = Component.empty();
+    private int headerY;
+    private boolean compact;
+    private boolean detailsOpen;
 
     // 房间列表区域
     private int roomListX;
@@ -65,10 +76,11 @@ public class ModeRoomScreen extends Screen {
     private int rightPanelY;
     private int rightPanelWidth;
     private int rightPanelHeight;
+    private int infoScrollOffset;
+    private int infoMaxScrollOffset;
 
     // 视觉状态
     private long openedAtMs = 0L;
-    private final Map<String, Float> roomHighlightProgress = new HashMap<>();
     private final Map<String, Long> roomEnteredAtMs = new HashMap<>();
     private Map<String, ModeRoomData> pendingRoomListUpdate = null;
     private long pendingRoomListSnapshotVersion = 0L;
@@ -82,9 +94,12 @@ public class ModeRoomScreen extends Screen {
     private Button readyButton;
     private Button voteStartButton;
     private Button voteEndButton;
-    private int infoActionBottomY;
-    private int collapsedActionBottomY;
-    private int fullActionBottomY;
+    private ModeRoomActionButton membershipButton;
+    private Button listFocus;
+    private Button cardLeaveButton;
+    private List<Button> teamActions = List.of();
+    private List<Button> matchActions = List.of();
+    private int actionTopY;
 
     public ModeRoomScreen() {
         this(null, null);
@@ -105,130 +120,95 @@ public class ModeRoomScreen extends Screen {
     protected void init() {
         super.init();
 
-        int pagePadding = scaled(BASE_PAGE_PADDING);
-        int panelGap = scaled(BASE_PANEL_GAP);
-        int headerHeight = scaled(BASE_HEADER_HEIGHT);
-        int footerHeight = scaled(BASE_FOOTER_HEIGHT);
+        compact = width < scaled(460);
+        roomListX = Math.max(scaled(6), Math.round(width * 0.035f));
+        headerY = Math.max(scaled(4), Math.round(height * 0.035f));
+        roomListY = headerY + GuiTextHelper.referenceLineHeight(font, 1.5f) + scaled(7);
+        int backY = height - Math.max(scaled(3), Math.round(height * 0.04f)) - scaled(16);
+        int contentBottom = backY - scaled(4);
+        int contentWidth = width - 2 * roomListX;
+        roomListHeight = Math.max(1, contentBottom - roomListY);
+        roomListWidth = compact ? contentWidth : clamp(Math.round(width * 0.30f), scaled(164), scaled(300));
+        rightPanelWidth = compact ? contentWidth
+                : Math.min(contentWidth - roomListWidth - scaled(14), scaled(420));
+        rightPanelX = width - roomListX - rightPanelWidth;
+        rightPanelY = roomListY;
+        rightPanelHeight = compact ? roomListHeight : ModeRoomListRenderer.listViewportHeight(roomListHeight);
 
-        int contentTop = headerHeight;
-        int contentBottom = Math.max(contentTop + scaled(156), this.height - footerHeight);
-        int contentHeight = Math.max(scaled(160), contentBottom - contentTop);
-
-        roomListX = pagePadding;
-        roomListY = contentTop;
-        roomListHeight = Math.max(1, Math.min(contentHeight, this.height - contentTop - footerHeight));
-
-        int availableContentWidth = Math.max(scaled(280), this.width - pagePadding * 2 - panelGap);
-        int minRightPanelWidth = scaled(268);
-        int desiredLeftWidth = (int) (availableContentWidth * LEFT_PANEL_WIDTH_RATIO);
-        int maxLeftWidth = Math.max(scaled(148), availableContentWidth - minRightPanelWidth);
-        roomListWidth = clamp(desiredLeftWidth, scaled(150), maxLeftWidth);
-
-        rightPanelX = roomListX + roomListWidth + panelGap;
-        rightPanelY = contentTop;
-        rightPanelWidth = this.width - rightPanelX - pagePadding;
-        rightPanelHeight = contentHeight;
-
-        if (rightPanelWidth < minRightPanelWidth) {
-            roomListWidth = Math.max(scaled(150), availableContentWidth - minRightPanelWidth);
-            rightPanelX = roomListX + roomListWidth + panelGap;
-            rightPanelWidth = this.width - rightPanelX - pagePadding;
+        backdropMode = modeFilterGameType == null ? null : GameModeRegistry.find(modeFilterGameType).orElse(null);
+        header = Component.translatable(resolveRoomHeaderKey());
+        emptyCaption = null;
+        if (!compact && backdropMode != null) {
+            int captionWidth = (int) LobbyCanvas.toReference(rightPanelWidth);
+            emptyCaption = ModeLobbyCaption.layout(font, backdropMode, captionWidth, captionWidth,
+                    (int) LobbyCanvas.toReference(rightPanelHeight));
         }
-
-        roomListScrollOffset = 0;
-        roomListMaxScrollOffset = 0;
         roomListRenderResult = ModeRoomListRenderer.RenderResult.empty();
         openedAtMs = System.currentTimeMillis();
-        infoContextKey = currentInfoContextKey();
-        infoContentTransitionAtMs = openedAtMs;
         restoreJoinedRoomFromClientStateIfNeeded();
-
-        // 请求房间列表
         actionController.requestRoomList();
-
-        // 添加 UI 按钮
         addButtons();
+        addRenderableWidget(new LobbyBackButton(roomListX, backY, scaled(72), scaled(16), btn -> onClose()));
+        if (listFocus.visible && minecraft.getLastInputType().isKeyboard()) {
+            setFocused(listFocus);
+        }
     }
 
     /**
      * 添加 UI 按钮
      */
     private void addButtons() {
-        int buttonHeight = scaled(20);
-        int spacing = scaled(6);
-        int actionPadding = scaled(10);
-
-        int actionX = rightPanelX + actionPadding;
-        int actionWidth = Math.max(scaled(120), rightPanelWidth - actionPadding * 2);
-        int halfWidth = Math.max(1, (actionWidth - spacing) / 2);
-        int headerY = rightPanelY + scaled(4);
-        int headerBottom = headerY + scaled(26);
-        int teamButtonY = headerBottom + scaled(8);
-
-        // KORTAC 队伍按钮
-        kortacButton = addRenderableWidget(new ModeRoomActionButton(
-                actionX,
-                teamButtonY,
-                halfWidth,
-                buttonHeight,
-                Component.translatable("screen.codpattern.room.join_kortac"),
-                btn -> actionController.selectTeam(LEGACY_KORTAC_TEAM),
-                0xFFE35A5A));
-
-        // SPECGRU 队伍按钮
-        specgruButton = addRenderableWidget(new ModeRoomActionButton(
-                actionX + halfWidth + spacing,
-                teamButtonY,
-                halfWidth,
-                buttonHeight,
-                Component.translatable("screen.codpattern.room.join_specgru"),
-                btn -> actionController.selectTeam(LEGACY_SPECGRU_TEAM),
-                0xFF66A6FF));
-
-        // Ready 按钮
-        int readyY = teamButtonY + buttonHeight + spacing;
-        readyButton = addRenderableWidget(new ModeRoomActionButton(
-                actionX,
-                readyY,
-                actionWidth,
-                buttonHeight,
-                Component.translatable("screen.codpattern.room.ready"),
-                btn -> actionController.toggleReady(),
-                0xFF6CCF8A));
-
-        // 开始/结束投票按钮
-        int voteY = readyY + buttonHeight + spacing;
-        voteStartButton = addRenderableWidget(new ModeRoomActionButton(
-                actionX,
-                voteY,
-                halfWidth,
-                buttonHeight,
-                Component.translatable("screen.codpattern.room.vote_start"),
-                btn -> actionController.voteStart(),
-                CodTheme.SELECTED_BORDER));
-        voteEndButton = addRenderableWidget(new ModeRoomActionButton(
-                actionX + halfWidth + spacing,
-                voteY,
-                halfWidth,
-                buttonHeight,
-                Component.translatable("screen.codpattern.room.vote_end"),
-                btn -> actionController.voteEnd(),
-                CodTheme.TEXT_DANGER));
-        collapsedActionBottomY = headerBottom;
-        fullActionBottomY = voteY + buttonHeight;
-        infoActionBottomY = collapsedActionBottomY;
-
+        listFocus = listControl(roomListX, roomListY, roomListWidth, roomListHeight, header, btn -> openSelectedRoom());
+        cardLeaveButton = listControl(0, 0, 0, 0, Component.translatable("screen.codpattern.room.action.leave"),
+                btn -> actionController.leaveRoom());
+        cardLeaveButton.visible = false;
+        kortacButton = actionButton("join_kortac", btn -> actionController.selectTeam(LEGACY_KORTAC_TEAM), 0xFFE88279);
+        specgruButton = actionButton("join_specgru", btn -> actionController.selectTeam(LEGACY_SPECGRU_TEAM), 0xFF91BFF0);
+        readyButton = actionButton("ready", btn -> actionController.toggleReady(), 0xFF98DDB7);
+        voteStartButton = actionButton("vote_start", btn -> actionController.voteStart(), 0xFFEAC489);
+        voteEndButton = actionButton("vote_end", btn -> actionController.voteEnd(), 0xFFE88279);
+        membershipButton = actionButton("action.join", btn -> activateMembership(), 0xFFCEDDDB);
+        membershipButton.setPrimaryStyle(true);
+        teamActions = List.of(kortacButton, specgruButton);
+        matchActions = List.of(readyButton, voteStartButton, voteEndButton, membershipButton);
         updateButtonStates();
+    }
+
+    private Button listControl(int x, int y, int width, int height, Component label, Button.OnPress press) {
+        return addRenderableWidget(new Button(x, y, width, height, label, press, narration -> narration.get()) {
+            @Override
+            public boolean mouseClicked(double mouseX, double mouseY, int button) {
+                return false; // Only the visible room rows accept pointer input.
+            }
+
+            @Override
+            public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+                if (isFocused() && minecraft.getLastInputType().isKeyboard()) {
+                    graphics.renderOutline(getX() - 1, getY() - 1, getWidth() + 2, getHeight() + 2, 0xBBFFFFFF);
+                }
+            }
+        });
+    }
+
+    private ModeRoomActionButton actionButton(String key, Button.OnPress press, int accent) {
+        int height = scaled(rightPanelHeight < scaled(175) ? 14 : 20);
+        return addRenderableWidget(new ModeRoomActionButton(0, 0, 1, height,
+                Component.translatable("screen.codpattern.room." + key), press, accent));
     }
 
     /**
      * 更新按钮状态
      */
     private void updateButtonStates() {
+        if (membershipButton == null) {
+            return;
+        }
         String currentRoomState = actionController.currentRoomState();
         boolean hasJoinedRoom = roomState.joinedRoom() != null;
-        boolean previewingOtherRoom = actionController.isPreviewingOtherRoom();
-        boolean showCurrentRoomControls = hasJoinedRoom && !previewingOtherRoom;
+        String target = displayedRoomKey();
+        boolean viewingJoined = hasJoinedRoom && roomState.joinedRoom().equals(target);
+        boolean showDetails = !compact || detailsOpen;
+        boolean showCurrentRoomControls = showDetails && viewingJoined;
         boolean hasTeamSelection = currentJoinedRoomHasCapability(ModeCapability.TEAM_SELECTION);
         boolean hasReadyState = currentJoinedRoomHasCapability(ModeCapability.READY_STATE);
         boolean hasStartVote = currentJoinedRoomHasCapability(ModeCapability.START_VOTE);
@@ -250,22 +230,97 @@ public class ModeRoomScreen extends Screen {
                 hasReadyState,
                 hasStartVote,
                 hasEndVote);
-        if (kortacButton != null) {
-            kortacButton.visible = showCurrentRoomControls && hasTeamSelection;
+        kortacButton.visible = specgruButton.visible = showCurrentRoomControls && hasTeamSelection;
+        readyButton.visible = showCurrentRoomControls && hasReadyState;
+        voteStartButton.visible = showCurrentRoomControls && hasStartVote;
+        voteEndButton.visible = showCurrentRoomControls && hasEndVote;
+        membershipButton.visible = target != null && !viewingJoined && (compact ? detailsOpen : hasJoinedRoom);
+        membershipButton.active = membershipButton.visible && !actionController.hasPendingAction();
+        boolean cancel = target != null && target.equals(actionController.pendingSwitchTargetRoom());
+        String actionKey = hasJoinedRoom ? "screen.codpattern.room.action.switch" : "screen.codpattern.room.action.join";
+        membershipButton.setMessage(Component.translatable(cancel ? "gui.cancel" : actionKey));
+        ModeRoomData selected = roomState.rooms().get(target);
+        int modeAccent = selected == null ? 0xFFCEDDDB : ModePreviewPanel.accentColor(selected.gameType);
+        membershipButton.setAccentColor(cancel ? 0xFFFFC68C
+                : FastColor.ARGB32.lerp(0.25f, modeAccent | 0xFF000000, 0xFFFFFFFF));
+        listFocus.visible = !compact || !detailsOpen;
+        listFocus.active = !roomState.rooms().isEmpty();
+        listFocus.setMessage(selected == null ? header : Component.literal(selected.mapName));
+        if (!listFocus.visible || !hasJoinedRoom) cardLeaveButton.visible = false;
+        cardLeaveButton.active = !actionController.hasPendingAction();
+        cardLeaveButton.setMessage(Component.translatable(actionController.isLeavePending()
+                ? "gui.cancel" : "screen.codpattern.room.action.leave"));
+        if (getFocused() instanceof Button focused && (!focused.visible || !focused.active)) {
+            if (listFocus.visible && listFocus.active) setFocused(listFocus);
+            else focusDetailAction();
         }
-        if (specgruButton != null) {
-            specgruButton.visible = showCurrentRoomControls && hasTeamSelection;
+        layoutActions();
+    }
+
+    private String displayedRoomKey() {
+        String selected = roomState.selectedRoom();
+        return selected != null && roomState.rooms().containsKey(selected) ? selected : roomState.joinedRoom();
+    }
+
+    private void activateMembership() {
+        String target = displayedRoomKey();
+        if (target == null || actionController.hasPendingAction()) {
+            return;
         }
-        if (readyButton != null) {
-            readyButton.visible = showCurrentRoomControls && hasReadyState;
+        if (roomState.joinedRoom() != null) {
+            actionController.switchToRoom(target);
+        } else {
+            actionController.joinSelectedRoom();
         }
-        if (voteStartButton != null) {
-            voteStartButton.visible = showCurrentRoomControls && hasStartVote;
+    }
+
+    private void layoutActions() {
+        int bottom = rightPanelY + rightPanelHeight;
+        boolean showTeams = kortacButton.visible;
+        List<Button> lower = matchActions.stream().filter(button -> button.visible).toList();
+        if (!showTeams && lower.isEmpty()) {
+            actionTopY = bottom;
+            return;
         }
-        if (voteEndButton != null) {
-            voteEndButton.visible = showCurrentRoomControls && hasEndVote;
+        int padding = scaled(8);
+        int gap = scaled(3);
+        int width = rightPanelWidth - padding * 2;
+        int widestLabel = lower.stream().mapToInt(button -> GuiTextHelper.referenceWidth(font, button.getMessage()))
+                .max().orElse(0);
+        int maxColumns = clamp((width + gap) / (widestLabel + scaled(8) + gap), 1, 3);
+        int rows = (showTeams ? 1 : 0) + (lower.size() + maxColumns - 1) / maxColumns;
+        int height = membershipButton.getHeight();
+        actionTopY = bottom - padding - rows * (height + gap) + gap;
+        int y = actionTopY;
+        if (showTeams) {
+            placeActionRow(teamActions, rightPanelX + padding, y, width, gap);
+            y += height + gap;
         }
-        infoActionBottomY = visibleActionBottomY();
+        for (int i = 0; i < lower.size(); i += maxColumns) {
+            placeActionRow(lower.subList(i, Math.min(i + maxColumns, lower.size())), rightPanelX + padding, y, width, gap);
+            y += height + gap;
+        }
+    }
+
+    private static void placeActionRow(List<Button> buttons, int x, int y, int width, int gap) {
+        for (int col = 0; col < buttons.size(); col++) {
+            int left = x + col * (width + gap) / buttons.size();
+            int right = x + (col + 1) * (width + gap) / buttons.size() - gap;
+            Button button = buttons.get(col);
+            button.setX(left);
+            button.setY(y);
+            button.setWidth(right - left);
+        }
+    }
+
+    private void focusDetailAction() {
+        for (Button team : teamActions) {
+            if (team.visible && team.active) {
+                setFocused(team);
+                return;
+            }
+        }
+        setFocused(matchActions.stream().filter(button -> button.visible && button.active).findFirst().orElse(null));
     }
 
     private boolean currentJoinedRoomHasCapability(ModeCapability capability) {
@@ -284,23 +339,6 @@ public class ModeRoomScreen extends Screen {
         }
     }
 
-    private int visibleActionBottomY() {
-        int bottom = collapsedActionBottomY;
-        bottom = Math.max(bottom, bottomOfVisible(kortacButton));
-        bottom = Math.max(bottom, bottomOfVisible(specgruButton));
-        bottom = Math.max(bottom, bottomOfVisible(readyButton));
-        bottom = Math.max(bottom, bottomOfVisible(voteStartButton));
-        bottom = Math.max(bottom, bottomOfVisible(voteEndButton));
-        return bottom;
-    }
-
-    private static int bottomOfVisible(Button button) {
-        if (button == null || !button.visible) {
-            return 0;
-        }
-        return button.getY() + button.getHeight();
-    }
-
     @Override
     public void render(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         this.renderBackground(graphics);
@@ -309,18 +347,29 @@ public class ModeRoomScreen extends Screen {
         float enterProgress = enterProgress();
         int titleColor = withAlpha(0xFFFFFFFF, Math.max(85, (int) (255.0f * enterProgress)));
 
-        GuiTextHelper.drawReferenceCenteredString(
-                graphics,
-                mc.font,
-                Component.translatable(resolveRoomHeaderKey()),
-                this.width / 2,
-                scaled(20),
-                titleColor,
-                false);
+        int countWidth = GuiTextHelper.referenceWidth(font, roomCount);
+        GuiTextHelper.drawReferenceScaledEllipsizedString(graphics, font, header, roomListX, headerY,
+                roomListWidth - countWidth - scaled(6), 1.5f, titleColor, true);
+        if (countWidth > 0) {
+            GuiTextHelper.drawReferenceString(graphics, font, roomCount, roomListX + roomListWidth - countWidth,
+                    headerY + scaled(4), withAlpha(0xFFD5DFDB, (int) (255 * enterProgress)), true);
+        }
 
-        renderRoomListPanel(graphics, mc, mouseX, mouseY, enterProgress);
+        if (listFocus.visible) {
+            renderRoomListPanel(graphics, mc, mouseX, mouseY, enterProgress);
+        }
         refreshInfoContextTransition(false);
-        renderInfoPanel(graphics, mc, enterProgress);
+        if (!compact || detailsOpen) {
+            if (displayedRoomKey() != null || actionController.hasRoomNotice() || actionController.hasConfirmPending()
+                    || emptyCaption == null) {
+                renderInfoPanel(graphics, mc, enterProgress);
+            } else {
+                LobbyCanvas.begin(graphics);
+                emptyCaption.draw(graphics, (int) LobbyCanvas.toReference(rightPanelX + rightPanelWidth),
+                        (int) LobbyCanvas.toReference(rightPanelY + rightPanelHeight));
+                graphics.pose().popPose();
+            }
+        }
 
         super.render(graphics, mouseX, mouseY, partialTick);
     }
@@ -346,7 +395,7 @@ public class ModeRoomScreen extends Screen {
             int mouseX,
             int mouseY,
             float enterProgress) {
-        roomListRenderResult = ModeRoomListRenderer.render(
+        roomListRenderResult = roomListRenderer.render(
                 graphics,
                 mc,
                 roomListX,
@@ -359,7 +408,6 @@ public class ModeRoomScreen extends Screen {
                 roomState.selectedRoom(),
                 roomState.joinedRoom(),
                 roomListScrollOffset,
-                roomHighlightProgress,
                 roomEnteredAtMs,
                 System.currentTimeMillis(),
                 mouseX,
@@ -370,20 +418,33 @@ public class ModeRoomScreen extends Screen {
                 enterProgress);
         roomListScrollOffset = roomListRenderResult.scrollOffset();
         roomListMaxScrollOffset = roomListRenderResult.maxScrollOffset();
+        // The renderer paints the card action. Expose that same clipped rectangle to keyboard navigation.
+        cardLeaveButton.visible = false;
+        for (ModeRoomListRenderer.ActionHitbox hit : roomListRenderResult.actionHitboxes()) {
+            if (hit.type() == ModeRoomListRenderer.ActionType.LEAVE) {
+                cardLeaveButton.setX(hit.x());
+                cardLeaveButton.setY(hit.y());
+                cardLeaveButton.setWidth(hit.width());
+                cardLeaveButton.setHeight(hit.height());
+                cardLeaveButton.visible = true;
+                break;
+            }
+        }
+        if (getFocused() == cardLeaveButton && !cardLeaveButton.visible) setFocused(listFocus);
     }
 
     /**
      * 渲染右侧信息面板
      */
     private void renderInfoPanel(GuiGraphics graphics, Minecraft mc, float enterProgress) {
-        ModeRoomInfoPanelRenderer.render(
+        infoMaxScrollOffset = infoPanel.render(
                 graphics,
                 mc,
                 rightPanelX,
                 rightPanelY,
                 rightPanelWidth,
                 rightPanelHeight,
-                infoActionBottomY,
+                actionTopY,
                 roomState.lobbySummaryState(),
                 roomState.joinedRoomLiveState(),
                 roomState.selectedRoomPreviewState(),
@@ -396,12 +457,14 @@ public class ModeRoomScreen extends Screen {
                 actionController.roomNoticeText(),
                 actionController.roomNoticeColor(),
                 enterProgress,
-                infoContentFadeProgress());
+                infoContentFadeProgress(),
+                infoScrollOffset);
+        infoScrollOffset = clamp(infoScrollOffset, 0, infoMaxScrollOffset);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0) {
+        if (button == 0 && listFocus.visible) {
             ModeRoomListRenderer.ActionHitbox actionHitbox = roomListRenderResult.actionAt(mouseX, mouseY);
             if (actionHitbox != null) {
                 handleRoomActionClick(actionHitbox);
@@ -409,8 +472,12 @@ public class ModeRoomScreen extends Screen {
             }
             String roomName = roomListRenderResult.roomAt(mouseX, mouseY);
             if (roomName != null) {
-                actionController.selectRoom(roomName);
-                refreshInfoContextTransition(true);
+                selectRoom(roomName);
+                if (compact) {
+                    openSelectedRoom();
+                } else {
+                    setFocused(listFocus);
+                }
                 return true;
             }
         }
@@ -421,28 +488,81 @@ public class ModeRoomScreen extends Screen {
         if (!actionHitbox.enabled()) {
             return;
         }
-        if (actionHitbox.type() != ModeRoomListRenderer.ActionType.LEAVE) {
-            actionController.selectRoom(actionHitbox.roomName());
-            refreshInfoContextTransition(true);
+        if (actionHitbox.type() != ModeRoomListRenderer.ActionType.LEAVE || compact) {
+            selectRoom(actionHitbox.roomName());
         }
         switch (actionHitbox.type()) {
             case JOIN -> actionController.joinSelectedRoom();
             case LEAVE -> actionController.leaveRoom();
             case SWITCH -> actionController.switchToRoom(actionHitbox.roomName());
         }
+        if (compact && actionHitbox.type() != ModeRoomListRenderer.ActionType.LEAVE) {
+            openSelectedRoom();
+        }
+    }
+
+    private void selectRoom(String roomKey) {
+        if (!roomKey.equals(roomState.selectedRoom())) {
+            actionController.selectRoom(roomKey);
+            refreshInfoContextTransition(false);
+        }
+    }
+
+    private void openSelectedRoom() {
+        if (displayedRoomKey() == null && !roomListRenderResult.roomNames().isEmpty()) {
+            selectRoom(roomListRenderResult.roomNames().get(0));
+        }
+        if (displayedRoomKey() == null) {
+            return;
+        }
+        if (!compact && roomState.joinedRoom() == null) {
+            actionController.joinSelectedRoom();
+            return;
+        }
+        if (!compact && displayedRoomKey().equals(roomState.joinedRoom())) {
+            actionController.leaveRoom();
+            return;
+        }
+        detailsOpen = compact;
+        updateButtonStates();
+        focusDetailAction();
+    }
+
+    @Override
+    public boolean keyPressed(int key, int scanCode, int modifiers) {
+        if (listFocus.visible && (getFocused() == listFocus || getFocused() == null)
+                && (key == GLFW.GLFW_KEY_UP || key == GLFW.GLFW_KEY_DOWN)) {
+            List<String> names = roomListRenderResult.roomNames();
+            if (!names.isEmpty()) {
+                int index = names.indexOf(roomState.selectedRoom());
+                String roomKey = names.get(clamp(index + (key == GLFW.GLFW_KEY_DOWN ? 1 : -1), 0, names.size() - 1));
+                setFocused(listFocus);
+                selectRoom(roomKey);
+                roomListScrollOffset = roomListRenderer.scrollToRoom(roomKey, roomListScrollOffset, roomListHeight);
+                return true;
+            }
+        }
+        if ((!compact || detailsOpen) && (key == GLFW.GLFW_KEY_PAGE_DOWN || key == GLFW.GLFW_KEY_PAGE_UP)) {
+            int step = Math.max(scaled(20), actionTopY - rightPanelY - scaled(40));
+            infoScrollOffset = clamp(infoScrollOffset + (key == GLFW.GLFW_KEY_PAGE_DOWN ? step : -step),
+                    0, infoMaxScrollOffset);
+            return true;
+        }
+        return super.keyPressed(key, scanCode, modifiers);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        int listTop = roomListY;
-        if (mouseX >= roomListX
-                && mouseX <= roomListX + roomListWidth
-                && mouseY >= listTop
-                && mouseY < listTop + roomListHeight) {
-            int scrollStep = Math.max(1, (int) Math.ceil(Math.abs(delta) * scaled(24)));
-            roomListScrollOffset = clamp(roomListScrollOffset - (int) Math.signum(delta) * scrollStep,
-                    0, roomListMaxScrollOffset);
+        int step = (int) Math.copySign(Math.ceil(Math.abs(delta) * scaled(24)), delta);
+        if (listFocus.visible && mouseX >= roomListX && mouseX < roomListX + roomListWidth
+                && mouseY >= roomListY && mouseY < roomListY + roomListHeight) {
+            roomListScrollOffset = clamp(roomListScrollOffset - step, 0, roomListMaxScrollOffset);
             roomListRenderResult = ModeRoomListRenderer.RenderResult.empty();
+            return true;
+        }
+        if ((!compact || detailsOpen) && mouseX >= rightPanelX && mouseX < rightPanelX + rightPanelWidth
+                && mouseY >= rightPanelY && mouseY < actionTopY) {
+            infoScrollOffset = clamp(infoScrollOffset - step, 0, infoMaxScrollOffset);
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, delta);
@@ -450,7 +570,17 @@ public class ModeRoomScreen extends Screen {
 
     @Override
     public void renderBackground(@NotNull GuiGraphics graphics) {
-        graphics.fillGradient(0, 0, this.width, this.height, CodTheme.BG_TOP, CodTheme.BG_BOTTOM);
+        ModePreviewPanel.renderFullscreenBase(graphics, width, height, 1f);
+        ModeDescriptor mode = backdropMode;
+        if (modeFilterGameType == null) {
+            ModeRoomData room = roomState.rooms().get(displayedRoomKey());
+            if (room != null) {
+                mode = GameModeRegistry.find(room.gameType).orElse(null);
+            }
+        }
+        ModePreviewPanel.renderFullscreenModeLayer(graphics, width, height, mode, 1f);
+        ModePreviewPanel.renderLobbyShade(graphics, width, height);
+        graphics.fill(0, 0, width, height, BACKGROUND_SCRIM);
     }
 
     /**
@@ -469,6 +599,15 @@ public class ModeRoomScreen extends Screen {
         Set<String> previous = new HashSet<>(roomState.rooms().keySet());
         actionController.updateRoomList(pendingRoomListSnapshotVersion, filterRoomsByMode(rooms));
         sanitizeRoomStateForModeFilter();
+        roomCount = Component.translatable("screen.codpattern.room.room_count", roomState.rooms().size());
+        if (displayedRoomKey() == null) {
+            if (!compact && !roomState.rooms().isEmpty()) {
+                selectRoom(ModeRoomListRenderer.orderedRoomNames(roomState.rooms(), null).get(0));
+            } else if (!actionController.hasRoomNotice()) {
+                detailsOpen = false;
+            }
+        }
+        updateButtonStates();
 
         long now = System.currentTimeMillis();
         for (String roomName : roomState.rooms().keySet()) {
@@ -477,7 +616,6 @@ public class ModeRoomScreen extends Screen {
             }
         }
         roomEnteredAtMs.keySet().retainAll(roomState.rooms().keySet());
-        roomHighlightProgress.keySet().retainAll(roomState.rooms().keySet());
 
         roomListRenderResult = ModeRoomListRenderer.RenderResult.empty();
     }
@@ -530,6 +668,12 @@ public class ModeRoomScreen extends Screen {
 
     @Override
     public void onClose() {
+        if (compact && detailsOpen) {
+            detailsOpen = false;
+            updateButtonStates();
+            setFocused(listFocus);
+            return;
+        }
         pendingRoomListUpdate = null;
         pendingRoomListSnapshotVersion = 0L;
         roomListRenderResult = ModeRoomListRenderer.RenderResult.empty();
@@ -566,6 +710,8 @@ public class ModeRoomScreen extends Screen {
         if (force || !currentKey.equals(infoContextKey)) {
             infoContextKey = currentKey;
             infoContentTransitionAtMs = System.currentTimeMillis();
+            infoScrollOffset = 0;
+            infoMaxScrollOffset = 0;
         }
     }
 
@@ -575,7 +721,8 @@ public class ModeRoomScreen extends Screen {
             return;
         }
         String restoredJoinedRoom = ClientMatchState.roomContextName();
-        if (!matchesModeFilter(restoredJoinedRoom, roomState.rooms().get(restoredJoinedRoom))) {
+        if (restoredJoinedRoom == null || restoredJoinedRoom.isBlank()
+                || !matchesModeFilter(restoredJoinedRoom, roomState.rooms().get(restoredJoinedRoom))) {
             return;
         }
         roomState.setJoinedRoom(restoredJoinedRoom);

@@ -3,33 +3,44 @@ package com.cdp.codpattern.client.gui.screen.match;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.model.ModeCapability;
 import com.cdp.codpattern.app.match.model.ModeDescriptor;
-import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
-import com.cdp.codpattern.config.storage.MapStoragePaths;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.util.FastColor;
 import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public final class ModeRoomListRenderer {
-    private static final float HIGHLIGHT_APPROACH_STEP = 0.44f;
-    private static final long NEW_ROOM_PULSE_MS = 550L;
-    private static final float MAP_TITLE_SCALE = 1.28f;
-    private static final float MODE_INFO_SCALE = 1.04f;
+    private static final float TITLE_SCALE = 1.32f;
+    private static final int TEXT = 0xFFF3F6F4;
+    private static final int SECONDARY = 0xFFBDC9C8;
+    private static final int MUTED = 0xFF9EAEB0;
+    private static final int WARNING = 0xFFFFC68C;
+    private static final int DARK_INK = 0xFF111414;
+    private static final int DARK_SECONDARY = 0xFF25302D;
+    private static final int GAP = 3;
+    private static final int PADDING = 9;
+    private static final int FOOTER_HEIGHT = 16;
+    private static final int NEW_ROOM_PULSE_MS = 550;
 
-    private static final int BASE_FRAME_INSET = 5;
-    private static final int BASE_PANEL_PADDING = 8;
-    private static final int BASE_HEADER_SECTION_HEIGHT = 8;
-    private static final int BASE_FOOTER_SECTION_HEIGHT = 20;
-    private static final int BASE_ROW_TOP_PADDING = 4;
-    private static final int BASE_ROW_SECONDARY_GAP = 1;
-    private static final int BASE_ROW_BAR_BOTTOM_PADDING = 2;
+    private Map<String, ModeRoomData> lastSnapshot;
+    private String lastJoinedRoom;
+    private List<String> roomNames = List.of();
+    private int rowHeight;
+    private int rowStride;
+    private final Map<String, LobbyModeEffects.Motion> rowMotion = new HashMap<>();
 
     public enum ActionType {JOIN, LEAVE, SWITCH}
 
@@ -75,475 +86,266 @@ public final class ModeRoomListRenderer {
         }
     }
 
-    private record RoomRow(String roomKey, List<FormattedCharSequence> directoryCodeLines, int top, int height) {
-    }
-
-    private ModeRoomListRenderer() {
-    }
-
     public static int listViewportHeight(int panelHeight) {
-        return Math.max(
-                1,
-                panelHeight - headerSectionHeight() - footerSectionHeight());
+        return Math.max(1, panelHeight - scaled(FOOTER_HEIGHT));
     }
 
-    public static RenderResult render(
-            GuiGraphics graphics,
-            Minecraft mc,
-            int roomListX,
-            int roomListY,
-            int roomListWidth,
-            int roomListHeight,
-            int roomHeaderHeight,
-            LobbySummaryState lobbySummaryState,
-            String modeFilterGameType,
-            String selectedRoom,
-            String joinedRoom,
-            int scrollOffset,
-            Map<String, Float> highlightProgress,
-            Map<String, Long> roomEnteredAtMs,
-            long nowMs,
-            int mouseX,
-            int mouseY,
-            boolean hasPendingAction,
-            boolean leavePending,
-            String pendingSwitchTargetRoom,
-            float panelAlphaFactor) {
-        Map<String, ModeRoomData> rooms = lobbySummaryState.rooms();
-        int referenceLineHeight = GuiTextHelper.referenceLineHeight(mc.font);
-        int frameInset = frameInset();
-        int panelPadding = panelPadding();
-        int frameLeft = roomListX - frameInset;
-        int frameTop = roomListY - frameInset;
-        int frameRight = roomListX + roomListWidth + frameInset;
-        int frameBottom = roomListY + roomListHeight + frameInset;
-        int headerHeight = headerSectionHeight();
-        int footerHeight = footerSectionHeight();
-        int listTop = roomListY + headerHeight;
+    public int scrollToRoom(String roomKey, int scrollOffset, int panelHeight) {
+        int index = roomKey == null ? -1 : roomNames.indexOf(roomKey);
+        if (index < 0) return scrollOffset;
+        int top = index * rowStride;
+        int viewport = listViewportHeight(panelHeight);
+        int offset = scrollOffset;
+        if (rowHeight > viewport && offset >= top && offset + viewport <= top + rowHeight) {
+            return offset;
+        }
+        if (top < offset || rowHeight >= viewport) {
+            offset = top;
+        } else if (top + rowHeight > offset + viewport) {
+            offset = top + rowHeight - viewport;
+        }
+        return Mth.clamp(offset, 0, Math.max(0, contentHeight() - viewport));
+    }
+
+    public RenderResult render(
+            GuiGraphics graphics, Minecraft mc, int roomListX, int roomListY, int roomListWidth,
+            int roomListHeight, int roomHeaderHeight, LobbySummaryState lobbySummaryState,
+            String modeFilterGameType, String selectedRoom, String joinedRoom, int scrollOffset,
+            Map<String, Long> roomEnteredAtMs, long nowMs,
+            int mouseX, int mouseY, boolean hasPendingAction, boolean leavePending,
+            String pendingSwitchTargetRoom, float panelAlphaFactor) {
+        Font font = mc.font;
         int listHeight = listViewportHeight(roomListHeight);
-        int listBottom = listTop + listHeight;
-        int footerY = roomListY + roomListHeight - footerHeight + GuiTextHelper.referenceScaled(3);
-
-        graphics.fillGradient(frameLeft, frameTop, frameRight, frameBottom,
-                scaleAlpha(CodTheme.PANEL_BG, panelAlphaFactor),
-                scaleAlpha(0xCC101010, panelAlphaFactor));
-        graphics.fill(frameLeft, frameTop, frameRight, frameTop + 1, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
-        graphics.fill(frameLeft, frameBottom - 1, frameRight, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
-        graphics.fill(frameLeft, frameTop, frameLeft + 1, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
-        graphics.fill(frameRight - 1, frameTop, frameRight, frameBottom, scaleAlpha(CodTheme.BORDER_SUBTLE, panelAlphaFactor));
-        List<String> roomNames = orderedRoomNames(rooms, joinedRoom);
-        List<RoomHitbox> roomHitboxes = new ArrayList<>();
-        List<ActionHitbox> actionHitboxes = new ArrayList<>();
-        highlightProgress.keySet().retainAll(roomNames);
-        roomEnteredAtMs.keySet().retainAll(roomNames);
-
-        if (lobbySummaryState.isLoading() && !lobbySummaryState.hasLoaded()) {
-            int emptyY = listTop + GuiTextHelper.referenceScaled(8);
-            GuiTextHelper.drawReferenceString(
-                    graphics,
-                    mc.font,
-                    Component.translatable("screen.codpattern.room.loading"),
-                    roomListX + panelPadding,
-                    emptyY,
-                    scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor),
-                    false);
-            GuiTextHelper.drawReferenceString(
-                    graphics,
-                    mc.font,
-                    Component.translatable("screen.codpattern.room.loading_hint"),
-                    roomListX + panelPadding,
-                    emptyY + referenceLineHeight + GuiTextHelper.referenceScaled(3),
-                    scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
-                    false);
-            return new RenderResult(roomNames, roomHitboxes, actionHitboxes, 0, 0);
+        int bottom = roomListY + listHeight;
+        int rowWidth = Math.max(1, roomListWidth - scaled(4));
+        rowHeight = Math.max(roomHeaderHeight, scaled(40));
+        rowStride = rowHeight + scaled(GAP);
+        Map<String, ModeRoomData> rooms = lobbySummaryState.rooms();
+        if (lastSnapshot != rooms || !Objects.equals(joinedRoom, lastJoinedRoom)) {
+            roomNames = orderedRoomNames(rooms, joinedRoom);
+            lastSnapshot = rooms;
+            lastJoinedRoom = joinedRoom;
+            rowMotion.keySet().retainAll(rooms.keySet());
+            roomEnteredAtMs.keySet().retainAll(rooms.keySet());
         }
 
         if (roomNames.isEmpty()) {
-            int emptyY = listTop + GuiTextHelper.referenceScaled(8);
-            GuiTextHelper.drawReferenceString(
-                    graphics,
-                    mc.font,
-                    Component.translatable("screen.codpattern.room.no_rooms"),
-                    roomListX + panelPadding,
-                    emptyY,
-                    scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor),
-                    false);
-            GuiTextHelper.drawReferenceString(
-                    graphics,
-                    mc.font,
-                    Component.translatable("screen.codpattern.room.create_hint"),
-                    roomListX + panelPadding,
-                    emptyY + referenceLineHeight + GuiTextHelper.referenceScaled(3),
-                    scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
-                    false);
-            GuiTextHelper.drawReferenceString(
-                    graphics,
-                    mc.font,
-                    resolveCreateHint(modeFilterGameType),
-                    roomListX + panelPadding,
-                    emptyY + (referenceLineHeight + GuiTextHelper.referenceScaled(3)) * 2,
-                    scaleAlpha(CodTheme.TEXT_DIM, panelAlphaFactor),
-                    false);
-            return new RenderResult(roomNames, roomHitboxes, actionHitboxes, 0, 0);
+            drawEmptyState(graphics, font, roomListX, roomListY, rowWidth, roomListHeight, modeFilterGameType,
+                    lobbySummaryState.isLoading() && !lobbySummaryState.hasLoaded(), panelAlphaFactor);
+            return RenderResult.empty();
         }
 
-        // Use the full, fixed content width so hovering a button never reflows the code.
-        float textScale = GuiTextHelper.referenceScale();
-        int codeWidth = Math.max(1, (int) ((roomListWidth - panelPadding * 2) / textScale));
-        List<RoomRow> rows = new ArrayList<>();
-        int contentHeight = 0;
-        for (String roomKey : roomNames) {
-            ModeRoomData room = rooms.get(roomKey);
-            if (room == null) continue;
-            List<FormattedCharSequence> codeLines = mc.font.split(Component.translatable(
-                    "screen.codpattern.room.directory_code", MapStoragePaths.mapDirectory(room.mapName)), codeWidth);
-            int codeHeight = (int) Math.ceil(codeLines.size() * mc.font.lineHeight * textScale);
-            int rowHeight = roomHeaderHeight + codeHeight + GuiTextHelper.referenceScaled(4);
-            rows.add(new RoomRow(roomKey, codeLines, contentHeight, rowHeight));
-            contentHeight += rowHeight;
-        }
-        int maxScrollOffset = Math.max(0, contentHeight - listHeight);
-        int effectiveOffset = clamp(scrollOffset, 0, maxScrollOffset);
-
-        graphics.enableScissor(roomListX, listTop, roomListX + roomListWidth, listBottom);
-        for (RoomRow row : rows) {
-            int y = listTop + row.top() - effectiveOffset;
-            int roomItemHeight = row.height();
-            if (y + roomItemHeight <= listTop || y >= listBottom) continue;
-            String roomKey = row.roomKey();
-            ModeRoomData room = rooms.get(roomKey);
-
-            int hitTop = Math.max(listTop, y);
-            int hitBottom = Math.min(listBottom, y + roomItemHeight);
-            roomHitboxes.add(new RoomHitbox(roomKey, roomListX, hitTop, roomListWidth, hitBottom - hitTop));
-
-            boolean hovered = mouseX >= roomListX && mouseX < roomListX + roomListWidth
-                    && mouseY >= hitTop && mouseY < hitBottom;
-            boolean selected = roomKey.equals(selectedRoom);
-            boolean joined = roomKey.equals(joinedRoom);
-
-            float targetHighlight = joined ? 1.0f : (selected ? 0.85f : (hovered ? 0.45f : 0.0f));
-            float currentHighlight = approach(
-                    highlightProgress.getOrDefault(roomKey, 0.0f),
-                    targetHighlight,
-                    HIGHLIGHT_APPROACH_STEP);
-            highlightProgress.put(roomKey, currentHighlight);
-
-            int rowBottom = y + roomItemHeight - 1;
-            int baseTop = withAlpha(CodTheme.CARD_BG_TOP, 74 + (int) (currentHighlight * 84.0f));
-            int baseBottom = withAlpha(CodTheme.CARD_BG_BOTTOM, 82 + (int) (currentHighlight * 96.0f));
-            graphics.fillGradient(roomListX, y, roomListX + roomListWidth, rowBottom,
-                    scaleAlpha(baseTop, panelAlphaFactor),
-                    scaleAlpha(baseBottom, panelAlphaFactor));
-
-            if (hovered || joined) {
-                int hoverTop = withAlpha(CodTheme.HOVER_BG_TOP, hovered ? 96 : 60);
-                int hoverBottom = withAlpha(CodTheme.HOVER_BG_BOTTOM, hovered ? 112 : 74);
-                graphics.fillGradient(roomListX, y, roomListX + roomListWidth, rowBottom,
-                        scaleAlpha(hoverTop, panelAlphaFactor),
-                        scaleAlpha(hoverBottom, panelAlphaFactor));
-                graphics.fill(roomListX, y, roomListX + roomListWidth, y + 1,
-                        scaleAlpha(withAlpha(CodTheme.HOVER_BORDER, hovered ? 142 : 96), panelAlphaFactor));
-                graphics.fill(roomListX, rowBottom - 1, roomListX + roomListWidth, rowBottom,
-                        scaleAlpha(withAlpha(CodTheme.HOVER_BORDER_SEMI, hovered ? 128 : 92), panelAlphaFactor));
+        int contentHeight = contentHeight();
+        int maxOffset = Math.max(0, contentHeight - listHeight);
+        int offset = Mth.clamp(scrollOffset, 0, maxOffset);
+        List<RoomHitbox> roomHits = new ArrayList<>();
+        List<ActionHitbox> actionHits = new ArrayList<>();
+        graphics.enableScissor(roomListX, roomListY, roomListX + rowWidth, bottom);
+        int first = (offset + rowStride - rowHeight) / rowStride;
+        int last = Math.min(roomNames.size() - 1, (offset + listHeight - 1) / rowStride);
+        int metaOffset = GuiTextHelper.referenceLineHeight(font, TITLE_SCALE) + scaled(4);
+        int titleInset = Math.round((rowHeight - metaOffset - GuiTextHelper.referenceLabelHeight(font, 1f)) / 2f);
+        int buttonHeight = Math.max(scaled(16), GuiTextHelper.referenceLineHeight(font) + scaled(4));
+        int buttonOffset = Math.round((GuiTextHelper.referenceLabelHeight(font, TITLE_SCALE) - buttonHeight) / 2f);
+        for (int index = first; index <= last; index++) {
+            int y = roomListY + index * rowStride - offset;
+            String key = roomNames.get(index);
+            int hitTop = Math.max(y, roomListY);
+            int hitBottom = Math.min(y + rowHeight, bottom);
+            RoomHitbox hit = new RoomHitbox(key, roomListX, hitTop, rowWidth, hitBottom - hitTop);
+            roomHits.add(hit);
+            ModeRoomData room = rooms.get(key);
+            boolean hovered = hit.contains(mouseX, mouseY);
+            boolean selected = key.equals(selectedRoom);
+            boolean joined = key.equals(joinedRoom);
+            int accent = 0xFF000000 | ModePreviewPanel.accentColor(room.gameType);
+            LobbyModeEffects.Motion motion = rowMotion.computeIfAbsent(key, ignored -> new LobbyModeEffects.Motion());
+            motion.update(hovered || selected, nowMs);
+            ScreenRectangle bounds = new ScreenRectangle(roomListX, y, rowWidth, rowHeight);
+            LobbyModeEffects.drawFace(graphics, bounds, accent, joined, motion, panelAlphaFactor, scaled(2));
+            float pulse = entryPulse(roomEnteredAtMs, key, nowMs);
+            if (pulse > 0f) {
+                graphics.fill(roomListX, y, bounds.right(), y + scaled(1), fade(accent, panelAlphaFactor * pulse));
             }
 
-            int edgeColor = joined ? CodTheme.HOVER_BORDER : (selected ? CodTheme.SELECTED_BORDER : 0);
-            if (edgeColor != 0) {
-                graphics.fill(roomListX, y, roomListX + GuiTextHelper.referenceScaled(2),
-                        rowBottom,
-                        scaleAlpha(edgeColor, panelAlphaFactor));
-            }
-
-            long enteredAt = roomEnteredAtMs.getOrDefault(roomKey, 0L);
-            if (enteredAt > 0L) {
-                long elapsed = nowMs - enteredAt;
-                if (elapsed >= NEW_ROOM_PULSE_MS) {
-                    roomEnteredAtMs.remove(roomKey);
-                } else {
-                    float pulse = 1.0f - (elapsed / (float) NEW_ROOM_PULSE_MS);
-                    int pulseColor = withAlpha(CodTheme.HOVER_BORDER, Math.max(0, (int) (95.0f * pulse)));
-                    graphics.fill(roomListX, y, roomListX + roomListWidth, rowBottom,
-                            scaleAlpha(pulseColor, panelAlphaFactor));
+            boolean darkInk = joined && usesDarkInk(accent);
+            int ink = darkInk ? DARK_INK : FastColor.ARGB32.lerp(motion.highlight(), 0xFFE0E6E3, 0xFFFFFFFF);
+            int left = roomListX + scaled(PADDING) + Math.round(scaled(2) * motion.highlight());
+            int right = roomListX + rowWidth - scaled(PADDING);
+            int titleY = y + titleInset;
+            ActionType action = resolveActionType(joinedRoom, key, hovered, selected);
+            int titleRight = right;
+            if (action != null) {
+                boolean confirming = action == ActionType.LEAVE && leavePending
+                        || action == ActionType.SWITCH && key.equals(pendingSwitchTargetRoom);
+                Component label = actionLabel(action, confirming);
+                int buttonWidth = Math.min(Math.max(1, (right - left) / 2),
+                        Math.max(scaled(35), GuiTextHelper.referenceWidth(font, label) + scaled(12)));
+                int buttonX = right - buttonWidth;
+                int buttonY = titleY + buttonOffset;
+                int buttonHitTop = Math.max(hitTop, buttonY);
+                int buttonHitBottom = Math.min(hitBottom, buttonY + buttonHeight);
+                if (buttonHitTop < buttonHitBottom) {
+                    ActionHitbox button = new ActionHitbox(key, action, buttonX, buttonHitTop, buttonWidth,
+                            buttonHitBottom - buttonHitTop, !hasPendingAction);
+                    actionHits.add(button);
+                    drawAction(graphics, font, buttonX, buttonY, buttonWidth, buttonHeight, label,
+                            button.enabled(), button.contains(mouseX, mouseY), confirming, darkInk, panelAlphaFactor);
                 }
+                titleRight = buttonX - scaled(5);
             }
 
-            ActionType actionType = resolveActionType(joinedRoom, roomKey, hovered, selected);
-            boolean showAction = actionType != null;
-            int contentLeft = roomListX + panelPadding;
-            int contentRight = roomListX + roomListWidth - panelPadding;
-            int actionGap = GuiTextHelper.referenceScaled(4);
-            String actionLabel = showAction ? actionLabel(actionType) : "";
-            int actionHeight = Math.max(GuiTextHelper.referenceScaled(12), roomHeaderHeight - GuiTextHelper.referenceScaled(16));
-            int actionWidth = showAction
-                    ? Math.max(
-                            GuiTextHelper.referenceScaled(28),
-                            GuiTextHelper.referenceWidth(mc.font, actionLabel) + GuiTextHelper.referenceScaled(10))
-                    : 0;
-            int actionX = contentRight - actionWidth;
-            int actionY = y + Math.max(0, (roomHeaderHeight - actionHeight) / 2);
-            boolean actionHovered = showAction && hovered
-                    && mouseX >= actionX
-                    && mouseX <= actionX + actionWidth
-                    && mouseY >= actionY
-                    && mouseY <= actionY + actionHeight;
-            int textRight = showAction ? actionX - actionGap : contentRight;
-
-            String badgeText = null;
-            int badgeAccent = 0;
-            int badgeTextColor = 0xFF081008;
-            if (joined) {
-                badgeText = Component.translatable("screen.codpattern.room.badge.current").getString();
-                badgeAccent = CodTheme.HOVER_BORDER;
-            } else if (selected) {
-                badgeText = Component.translatable("screen.codpattern.room.badge.selected").getString();
-                badgeAccent = CodTheme.SELECTED_BORDER;
-                badgeTextColor = 0xFF08121F;
-            }
-            if (badgeText != null) {
-                int badgePaddingX = GuiTextHelper.referenceScaled(4);
-                int badgePaddingY = GuiTextHelper.referenceScaled(1);
-                int badgeHeight = referenceLineHeight + badgePaddingY * 2;
-                int badgeWidth = GuiTextHelper.referenceWidth(mc.font, badgeText) + badgePaddingX * 2;
-                int badgeRight = showAction ? actionX - actionGap : contentRight;
-                int badgeX = Math.max(contentLeft + GuiTextHelper.referenceScaled(44), badgeRight - badgeWidth);
-                int badgeY = y + GuiTextHelper.referenceScaled(3);
-
-                graphics.fillGradient(
-                        badgeX,
-                        badgeY,
-                        badgeRight,
-                        badgeY + badgeHeight,
-                        scaleAlpha(withAlpha(badgeAccent, hovered ? 116 : 92), panelAlphaFactor),
-                        scaleAlpha(withAlpha(CodTheme.HOVER_BG_BOTTOM, hovered ? 168 : 148), panelAlphaFactor));
-                graphics.fill(
-                        badgeX,
-                        badgeY + badgeHeight - 1,
-                        badgeRight,
-                        badgeY + badgeHeight,
-                        scaleAlpha(withAlpha(badgeAccent, 210), panelAlphaFactor));
-                GuiTextHelper.drawReferenceCenteredEllipsizedString(
-                        graphics,
-                        mc.font,
-                        badgeText,
-                        badgeX + (badgeRight - badgeX) / 2,
-                        badgeY + badgePaddingY,
-                        Math.max(GuiTextHelper.referenceScaled(22), badgeRight - badgeX - badgePaddingX * 2),
-                        scaleAlpha(badgeTextColor, panelAlphaFactor),
-                        false);
-                textRight = Math.min(textRight, badgeX - actionGap);
-            }
-
-            int roomTextColor = joined
-                    ? CodTheme.TEXT_HOVER
-                    : (selected ? CodTheme.SELECTED_TEXT : CodTheme.TEXT_PRIMARY);
-
-            int primaryTextY = y + GuiTextHelper.referenceScaled(BASE_ROW_TOP_PADDING);
-            int roomTextMaxWidth = Math.max(
-                    GuiTextHelper.referenceScaled(34),
-                    textRight - contentLeft);
-            ModeDescriptor descriptor = GameModeRegistry.getOrDefault(room.gameType);
-            MutableComponent roomTitle = buildRoomTitle(room);
-            MutableComponent modeInfo = buildModeInfo(descriptor, room, joined, selected);
-            GuiTextHelper.drawReferenceScaledEllipsizedString(
-                    graphics,
-                    mc.font,
-                    roomTitle,
-                    contentLeft,
-                    primaryTextY,
-                    roomTextMaxWidth,
-                    MAP_TITLE_SCALE,
-                    scaleAlpha(roomTextColor, panelAlphaFactor),
-                    false);
-
-            int titleLineHeight = GuiTextHelper.referenceLineHeight(mc.font, MAP_TITLE_SCALE);
-            int playerTextY = primaryTextY + titleLineHeight + GuiTextHelper.referenceScaled(BASE_ROW_SECONDARY_GAP);
-            GuiTextHelper.drawReferenceScaledEllipsizedString(
-                    graphics,
-                    mc.font,
-                    modeInfo,
-                    contentLeft,
-                    playerTextY,
-                    Math.max(GuiTextHelper.referenceScaled(34), textRight - contentLeft),
-                    MODE_INFO_SCALE,
-                    scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor),
-                    false);
-
-            graphics.pose().pushPose();
-            graphics.pose().translate(contentLeft, y + roomHeaderHeight, 0.0f);
-            graphics.pose().scale(textScale, textScale, 1.0f);
-            for (int line = 0; line < row.directoryCodeLines().size(); line++) {
-                graphics.drawString(mc.font, row.directoryCodeLines().get(line), 0, line * mc.font.lineHeight,
-                        scaleAlpha(CodTheme.TEXT_SECONDARY, panelAlphaFactor), false);
-            }
-            graphics.pose().popPose();
-
-            int barThickness = Math.max(1, GuiTextHelper.referenceScaled(2));
-            int barLeft = contentLeft;
-            int barRight = Math.max(barLeft + 1, textRight);
-            int barY = y + roomItemHeight - GuiTextHelper.referenceScaled(BASE_ROW_BAR_BOTTOM_PADDING);
-            int barWidth = Math.max(1, barRight - barLeft);
-            int fillWidth = Math.min(barWidth,
-                    (int) (barWidth * (room.playerCount / (float) Math.max(1, room.maxPlayers))));
-            graphics.fill(barLeft, barY, barRight, barY + barThickness,
-                    scaleAlpha(0x26FFFFFF, panelAlphaFactor));
-            if (fillWidth > 0) {
-                graphics.fill(barLeft, barY, barLeft + fillWidth, barY + barThickness,
-                        scaleAlpha(withAlpha(joined ? CodTheme.HOVER_BORDER : CodTheme.SELECTED_BORDER, 160), panelAlphaFactor));
-            }
-
-            if (showAction) {
-                boolean enabled = !hasPendingAction;
-                int actionHitTop = Math.max(listTop, actionY);
-                int actionHitBottom = Math.min(listBottom, actionY + actionHeight);
-                if (actionHitBottom > actionHitTop) {
-                    actionHitboxes.add(new ActionHitbox(roomKey, actionType, actionX, actionHitTop,
-                            actionWidth, actionHitBottom - actionHitTop, enabled));
-                }
-                boolean confirmPending = (leavePending && actionType == ActionType.LEAVE)
-                        || (actionType == ActionType.SWITCH
-                        && pendingSwitchTargetRoom != null
-                        && pendingSwitchTargetRoom.equals(roomKey));
-                renderActionButton(graphics, mc, actionX, actionY, actionWidth, actionHeight, actionType, actionLabel,
-                        actionHovered, enabled, confirmPending, panelAlphaFactor);
-            }
+            GuiTextHelper.drawReferenceScaledEllipsizedString(graphics, font, roomTitle(room, darkInk), left, titleY,
+                    Math.max(0, titleRight - left), TITLE_SCALE, fade(ink, panelAlphaFactor), false);
+            int metaY = titleY + metaOffset;
+            int capacityX = drawCapacity(graphics, font, room, right, metaY, joined ? ink : accent, ink, panelAlphaFactor);
+            GuiTextHelper.drawReferenceEllipsizedString(graphics, font,
+                    metadata(room, joined, selected, modeFilterGameType, darkInk), left, metaY,
+                    Math.max(0, capacityX - scaled(5) - left), fade(darkInk ? DARK_SECONDARY : SECONDARY, panelAlphaFactor), false);
         }
         graphics.disableScissor();
 
-        if (maxScrollOffset > 0) {
-            int trackX = roomListX + roomListWidth - GuiTextHelper.referenceScaled(2);
-            graphics.fill(trackX, listTop, trackX + GuiTextHelper.referenceScaled(2), listBottom,
-                    scaleAlpha(0x22FFFFFF, panelAlphaFactor));
-
-            int thumbHeight = Math.min(listHeight, Math.max(GuiTextHelper.referenceScaled(12),
-                    (int) (listHeight * (listHeight / (float) contentHeight))));
-            int thumbOffsetMax = Math.max(1, listHeight - thumbHeight);
-            int thumbY = listTop + (int) (thumbOffsetMax * (effectiveOffset / (float) maxScrollOffset));
-            graphics.fill(trackX, thumbY, trackX + GuiTextHelper.referenceScaled(2), thumbY + thumbHeight,
-                    scaleAlpha(CodTheme.SELECTED_BORDER, panelAlphaFactor));
+        if (maxOffset > 0) {
+            int trackX = roomListX + roomListWidth - scaled(2);
+            int thumb = Math.min(listHeight, Math.max(scaled(7), Math.round(listHeight * (listHeight / (float) contentHeight))));
+            int thumbY = roomListY + Math.round((listHeight - thumb) * (offset / (float) maxOffset));
+            graphics.fill(trackX, roomListY, roomListX + roomListWidth, bottom, fade(0x800B0F12, panelAlphaFactor));
+            graphics.fill(trackX, thumbY, roomListX + roomListWidth, thumbY + thumb, fade(0xDCE1E8E6, panelAlphaFactor));
         }
-
-        Component footerText = lobbySummaryState.isStale(nowMs)
-                ? Component.translatable(
-                        "screen.codpattern.room.stale_hint",
-                        Math.max(1, lobbySummaryState.secondsSinceLastUpdate(nowMs)))
-                : Component.translatable("screen.codpattern.room.scroll_hint");
-        int footerColor = lobbySummaryState.isStale(nowMs) ? CodTheme.TEXT_DANGER : CodTheme.TEXT_DIM;
-        GuiTextHelper.drawReferenceString(
-                graphics,
-                mc.font,
-                footerText,
-                roomListX + panelPadding,
-                footerY,
-                scaleAlpha(footerColor, panelAlphaFactor),
-                false);
-
-        return new RenderResult(roomNames, roomHitboxes, actionHitboxes, effectiveOffset, maxScrollOffset);
+        boolean stale = lobbySummaryState.isStale(nowMs);
+        if (stale || maxOffset > 0) {
+            Component footer = stale ? Component.translatable("screen.codpattern.room.stale_hint",
+                    lobbySummaryState.secondsSinceLastUpdate(nowMs)) : Component.translatable("screen.codpattern.room.scroll_hint");
+            GuiTextHelper.drawReferenceEllipsizedString(graphics, font, footer, roomListX, bottom + scaled(3),
+                    roomListWidth, fade(stale ? WARNING : SECONDARY, panelAlphaFactor), true);
+        }
+        return new RenderResult(roomNames, roomHits, actionHits, offset, maxOffset);
     }
 
-    private static ActionType resolveActionType(String joinedRoom, String mapName, boolean hovered, boolean selected) {
-        if (mapName.equals(joinedRoom)) {
-            return ActionType.LEAVE;
-        }
-        if (!hovered && !selected) {
-            return null;
-        }
-        if (joinedRoom == null || joinedRoom.isBlank()) {
-            return ActionType.JOIN;
-        }
-        return ActionType.SWITCH;
+    private int contentHeight() {
+        return roomNames.isEmpty() ? 0 : (roomNames.size() - 1) * rowStride + rowHeight;
     }
 
-    private static void renderActionButton(
-            GuiGraphics graphics,
-            Minecraft mc,
-            int x,
-            int y,
-            int width,
-            int height,
-            ActionType type,
-            String label,
-            boolean hovered,
-            boolean enabled,
-            boolean confirmPending,
-            float panelAlphaFactor) {
-        int accentColor = switch (type) {
-            case JOIN -> CodTheme.HOVER_BORDER;
-            case LEAVE -> CodTheme.TEXT_DANGER;
-            case SWITCH -> CodTheme.SELECTED_BORDER;
-        };
-
-        int bgTop = enabled ? withAlpha(CodTheme.CARD_BG_TOP, hovered ? 224 : 208) : withAlpha(CodTheme.DISABLED_BG, 214);
-        int bgBottom = enabled ? withAlpha(CodTheme.CARD_BG_BOTTOM, hovered ? 238 : 222) : withAlpha(0xFF1A1A1A, 222);
-        graphics.fillGradient(x, y, x + width, y + height,
-                scaleAlpha(bgTop, panelAlphaFactor),
-                scaleAlpha(bgBottom, panelAlphaFactor));
-
-        if (enabled) {
-            int overlayTop = withAlpha(CodTheme.HOVER_BG_TOP, hovered ? 96 : 52);
-            int overlayBottom = withAlpha(CodTheme.HOVER_BG_BOTTOM, hovered ? 118 : 68);
-            graphics.fillGradient(x, y, x + width, y + height,
-                    scaleAlpha(overlayTop, panelAlphaFactor),
-                    scaleAlpha(overlayBottom, panelAlphaFactor));
-        }
-
-        int borderColor = enabled
-                ? withAlpha(accentColor, confirmPending ? 255 : (hovered ? 228 : 176))
-                : withAlpha(CodTheme.BORDER_SUBTLE, 180);
-        graphics.fill(x, y, x + width, y + 1, scaleAlpha(borderColor, panelAlphaFactor));
-        graphics.fill(x, y + height - 1, x + width, y + height, scaleAlpha(borderColor, panelAlphaFactor));
-        graphics.fill(x, y, x + 1, y + height, scaleAlpha(borderColor, panelAlphaFactor));
-        graphics.fill(x + width - 1, y, x + width, y + height, scaleAlpha(borderColor, panelAlphaFactor));
-        graphics.fill(x, y, x + 2, y + height, scaleAlpha(withAlpha(accentColor, enabled ? 220 : 110), panelAlphaFactor));
-
-        if (confirmPending) {
-            int pulseColor = scaleAlpha(withAlpha(accentColor, hovered ? 168 : 132), panelAlphaFactor);
-            graphics.fill(x + 1, y + 1, x + width - 1, y + 2, pulseColor);
-        }
-
-        drawActionGlyph(
-                graphics,
-                mc,
-                x,
-                y,
-                width,
-                height,
-                label,
-                enabled ? accentColor : CodTheme.DISABLED_TEXT,
-                panelAlphaFactor);
+    private static boolean usesDarkInk(int accent) {
+        // Add-on modes may register a dark accent for the joined card.
+        return 299 * FastColor.ARGB32.red(accent) + 587 * FastColor.ARGB32.green(accent)
+                + 114 * FastColor.ARGB32.blue(accent) >= 128000;
     }
 
-    private static void drawActionGlyph(
-            GuiGraphics graphics,
-            Minecraft mc,
-            int x,
-            int y,
-            int width,
-            int height,
-            String label,
-            int color,
-            float panelAlphaFactor) {
-        int scaledColor = scaleAlpha(color, panelAlphaFactor);
-        int glyphY = y + (height - GuiTextHelper.referenceLineHeight(mc.font)) / 2;
-        GuiTextHelper.drawReferenceCenteredString(
-                graphics,
-                mc.font,
-                label,
-                x + width / 2.0f,
-                glyphY,
-                scaledColor,
-                false);
+    private static float entryPulse(Map<String, Long> enteredAt, String key, long now) {
+        Long start = enteredAt.get(key);
+        if (start == null) return 0f;
+        float pulse = Mth.clamp(1f - (now - start) / (float) NEW_ROOM_PULSE_MS, 0f, 1f);
+        if (pulse == 0f) enteredAt.remove(key);
+        return pulse;
     }
 
-    private static String actionLabel(ActionType type) {
+    private static Component roomTitle(ModeRoomData room, boolean darkInk) {
+        MutableComponent title = Component.empty();
+        if (room.hasCapability(ModeCapability.MATCH_END_TELEPORT) && !room.hasMatchEndTeleportPoint) {
+            title.append(Component.literal("! ").withStyle(s -> s.withColor(darkInk ? 0x522A14 : WARNING & 0xFFFFFF)));
+        }
+        return title.append(Component.literal(room.mapName));
+    }
+
+    private static int drawCapacity(GuiGraphics graphics, Font font, ModeRoomData room, int right, int y,
+                                    int fillColor, int ink, float alpha) {
+        String occupancy = room.playerCount + "/" + room.maxPlayers;
+        int textWidth = GuiTextHelper.referenceWidth(font, occupancy);
+        int width = Math.max(scaled(25), textWidth);
+        int left = right - width;
+        GuiTextHelper.drawReferenceString(graphics, font, occupancy, right - textWidth, y, fade(ink, alpha), false);
+        int meterY = y + GuiTextHelper.referenceLineHeight(font) + scaled(1);
+        int filled = Math.round(width * Mth.clamp(room.playerCount / (float) Math.max(1, room.maxPlayers), 0f, 1f));
+        graphics.fill(left, meterY, right, meterY + scaled(1), fade(ink, alpha * .28f));
+        if (filled > 0) graphics.fill(left, meterY, left + filled, meterY + scaled(1), fade(fillColor, alpha));
+        return left;
+    }
+
+    private static Component metadata(ModeRoomData room, boolean joined, boolean selected, String modeFilter, boolean darkInk) {
+        int status = statusColor(room.state);
+        if (darkInk) status = FastColor.ARGB32.lerp(.78f, status, DARK_INK);
+        int phaseColor = status & 0xFFFFFF;
+        int labelColor = (darkInk ? DARK_INK : TEXT) & 0xFFFFFF;
+        int secondaryColor = (darkInk ? DARK_SECONDARY : SECONDARY) & 0xFFFFFF;
+        MutableComponent info = Component.literal(ModeRoomTextFormatter.phaseStatusText(room.state, room.remainingTimeTicks))
+                .withStyle(s -> s.withColor(phaseColor));
+        if (joined || selected) {
+            String badge = joined ? "screen.codpattern.room.badge.current" : "screen.codpattern.room.badge.selected";
+            info.append("  ").append(Component.translatable(badge).withStyle(s -> s.withColor(labelColor)));
+        }
+        if (modeFilter == null || modeFilter.isBlank()) {
+            ModeDescriptor mode = GameModeRegistry.getOrDefault(room.gameType);
+            info.append("  ").append(Component.translatable(mode.displayNameKey()).withStyle(s -> s.withColor(secondaryColor)));
+        }
+        String metrics = ModeRoomTextFormatter.metricInlineText(room.metrics, 2, false);
+        if (!metrics.isBlank()) info.append(Component.literal("  " + metrics)
+                .withStyle(s -> s.withColor(darkInk ? secondaryColor : MUTED & 0xFFFFFF)));
+        return info;
+    }
+
+    private static void drawLines(GuiGraphics graphics, Font font, List<FormattedCharSequence> lines,
+                                  int x, int y, int color) {
+        float scale = GuiTextHelper.referenceScale();
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 0f);
+        graphics.pose().scale(scale, scale, 1f);
+        for (int i = 0; i < lines.size(); i++) {
+            graphics.drawString(font, lines.get(i), 0, i * font.lineHeight, color, false);
+        }
+        graphics.pose().popPose();
+    }
+
+    private static void drawEmptyState(GuiGraphics graphics, Font font, int x, int y, int width, int height,
+                                       String modeFilter, boolean loading, float alpha) {
+        int padding = scaled(PADDING);
+        int textWidth = Math.max(1, (int) ((width - padding * 2) / GuiTextHelper.referenceScale()));
+        List<Component> messages = loading
+                ? List.of(Component.translatable("screen.codpattern.room.loading"), Component.translatable("screen.codpattern.room.loading_hint"))
+                : List.of(Component.translatable("screen.codpattern.room.no_rooms"), Component.translatable("screen.codpattern.room.create_hint"),
+                        resolveCreateHint(modeFilter));
+        int lineY = y + scaled(8);
+        graphics.enableScissor(x, y, x + width, y + height);
+        for (int i = 0; i < messages.size(); i++) {
+            String cleanText = ChatFormatting.stripFormatting(messages.get(i).getString());
+            List<FormattedCharSequence> lines = font.split(Component.literal(cleanText), textWidth);
+            int lineHeight = Mth.ceil(lines.size() * font.lineHeight * GuiTextHelper.referenceScale());
+            int sectionBottom = lineY + lineHeight + scaled(i == messages.size() - 1 ? 8 : 4);
+            graphics.fill(x, i == 0 ? y : lineY, x + width, sectionBottom, fade(0xDC101719, alpha));
+            drawLines(graphics, font, lines, x + padding, lineY, fade(i == 0 ? TEXT : SECONDARY, alpha));
+            lineY = sectionBottom;
+        }
+        graphics.disableScissor();
+    }
+
+    private static ActionType resolveActionType(String joinedRoom, String room, boolean hovered, boolean selected) {
+        if (room.equals(joinedRoom)) return ActionType.LEAVE;
+        if (!hovered && !selected) return null;
+        return joinedRoom == null || joinedRoom.isBlank() ? ActionType.JOIN : ActionType.SWITCH;
+    }
+
+    private static Component actionLabel(ActionType type, boolean confirming) {
+        if (confirming) return Component.translatable("gui.cancel");
         return Component.translatable(switch (type) {
             case JOIN -> "screen.codpattern.room.action.join";
             case LEAVE -> "screen.codpattern.room.action.leave";
             case SWITCH -> "screen.codpattern.room.action.switch";
-        }).getString();
+        });
     }
 
-    private static List<String> orderedRoomNames(Map<String, ModeRoomData> rooms, String joinedRoom) {
+    private static void drawAction(GuiGraphics graphics, Font font, int x, int y, int width, int height,
+                                   Component label, boolean enabled, boolean hovered, boolean confirming,
+                                   boolean darkInk, float alpha) {
+        boolean focused = enabled && (hovered || confirming);
+        int surface = focused ? (confirming ? WARNING : TEXT) : darkInk ? 0x24080F0E : 0x50A2B6B8;
+        int ink = focused || darkInk ? DARK_INK : enabled ? TEXT : MUTED;
+        if (!enabled) ink = fade(ink, .65f);
+        graphics.fill(x, y, x + width, y + height, fade(surface, alpha));
+        GuiTextHelper.drawReferenceButtonLabel(graphics, font, label, x, y, width, height,
+                Math.max(1, width - scaled(4)), fade(ink, alpha));
+    }
+
+    public static List<String> orderedRoomNames(Map<String, ModeRoomData> rooms, String joinedRoom) {
         List<Map.Entry<String, ModeRoomData>> ordered = new ArrayList<>(rooms.entrySet());
         ordered.sort(roomComparator(joinedRoom));
 
@@ -551,43 +353,7 @@ public final class ModeRoomListRenderer {
         for (Map.Entry<String, ModeRoomData> entry : ordered) {
             names.add(entry.getKey());
         }
-        return names;
-    }
-
-    private static MutableComponent buildRoomTitle(ModeRoomData room) {
-        MutableComponent title = Component.empty()
-                .append(Component.literal("\u25cf ").withStyle(style -> style.withColor(statusColor(room.state))))
-                .append(Component.literal(room.mapName == null ? "" : room.mapName));
-        if (room.hasCapability(ModeCapability.MATCH_END_TELEPORT) && !room.hasMatchEndTeleportPoint) {
-            title.append(Component.literal(" !").withStyle(style -> style.withColor(CodTheme.TEXT_DANGER & 0x00FFFFFF)));
-        }
-        return title;
-    }
-
-    private static MutableComponent buildModeInfo(
-            ModeDescriptor descriptor,
-            ModeRoomData room,
-            boolean joined,
-            boolean selected
-    ) {
-        String playerText = room.playerCount + "/" + room.maxPlayers;
-        String phaseText = ModeRoomTextFormatter.phaseStatusText(room.state, room.remainingTimeTicks);
-        String metricText = ModeRoomTextFormatter.metricInlineText(room.metrics, 2);
-        int statsColor = joined ? 0xFFE3EDF6 : (selected ? 0xFFD5E5FB : 0xFFB7C2CD);
-        int separatorColor = joined ? 0xFF8FA7B4 : 0xFF70808D;
-
-        MutableComponent result = Component.empty()
-                .append(Component.literal(Component.translatable(descriptor.displayNameKey()).getString())
-                        .withStyle(style -> style.withItalic(true).withColor(modeAccentColor(room.gameType))))
-                .append(Component.literal("  ").withStyle(style -> style.withColor(separatorColor)))
-                .append(Component.literal(playerText).withStyle(style -> style.withColor(statsColor)))
-                .append(Component.literal("  ").withStyle(style -> style.withColor(separatorColor)))
-                .append(Component.literal(phaseText).withStyle(style -> style.withColor(statusColor(room.state))));
-        if (!metricText.isBlank()) {
-            result.append(Component.literal("  ").withStyle(style -> style.withColor(separatorColor)))
-                    .append(Component.literal(metricText).withStyle(style -> style.withColor(statsColor)));
-        }
-        return result;
+        return List.copyOf(names);
     }
 
     private static Comparator<Map.Entry<String, ModeRoomData>> roomComparator(String joinedRoom) {
@@ -617,7 +383,8 @@ public final class ModeRoomListRenderer {
                 return playerCompare;
             }
 
-            return leftData.mapName.compareToIgnoreCase(rightData.mapName);
+            int mapCompare = leftData.mapName.compareToIgnoreCase(rightData.mapName);
+            return mapCompare != 0 ? mapCompare : leftRoomKey.compareTo(rightRoomKey);
         };
     }
 
@@ -636,44 +403,13 @@ public final class ModeRoomListRenderer {
     }
 
     private static int statusColor(String state) {
+        if (state == null) return SECONDARY & 0xFFFFFF;
         return switch (state) {
-            case "WAITING" -> 0xFF69D88D;
-            case "COUNTDOWN", "WARMUP", "START_VOTE", "OPENING_COUNTDOWN", "INTERMISSION" -> 0xFFF1C15B;
-            case "PLAYING", "WAVE_ACTIVE" -> 0xFFF16666;
-            case "VICTORY" -> 0xFF69D88D;
-            case "ENDED", "FAILED", "ENDING" -> 0xFFADB8C6;
-            default -> 0xFFF2F5F8;
+            case "WAITING", "VICTORY" -> 0x9BD0B4;
+            case "COUNTDOWN", "WARMUP", "START_VOTE", "OPENING_COUNTDOWN", "INTERMISSION" -> 0xF1C783;
+            case "PLAYING", "WAVE_ACTIVE" -> 0xF6A492;
+            default -> SECONDARY & 0xFFFFFF;
         };
-    }
-
-    private static int modeAccentColor(String gameType) {
-        if (gameType == null || gameType.isBlank()) {
-            return 0xFFB8C2CC;
-        }
-        return ModePreviewPanel.accentColor(gameType);
-    }
-
-    private static float approach(float current, float target, float step) {
-        if (Math.abs(target - current) <= step) {
-            return target;
-        }
-        return current + Math.copySign(step, target - current);
-    }
-
-    private static int frameInset() {
-        return GuiTextHelper.referenceScaled(BASE_FRAME_INSET);
-    }
-
-    private static int panelPadding() {
-        return GuiTextHelper.referenceScaled(BASE_PANEL_PADDING);
-    }
-
-    private static int headerSectionHeight() {
-        return GuiTextHelper.referenceScaled(BASE_HEADER_SECTION_HEIGHT);
-    }
-
-    private static int footerSectionHeight() {
-        return GuiTextHelper.referenceScaled(BASE_FOOTER_SECTION_HEIGHT);
     }
 
     private static Component resolveCreateHint(String modeFilterGameType) {
@@ -688,17 +424,11 @@ public final class ModeRoomListRenderer {
                         "screen.codpattern.room.create_command_filtered", modeFilterGameType));
     }
 
-    private static int scaleAlpha(int color, float factor) {
-        int alpha = (color >>> 24) & 0xFF;
-        int scaledAlpha = clamp((int) (alpha * Math.max(0.0f, Math.min(1.0f, factor))), 0, 255);
-        return (scaledAlpha << 24) | (color & 0x00FFFFFF);
+    private static int scaled(int value) {
+        return GuiTextHelper.referenceScaled(value);
     }
 
-    private static int withAlpha(int color, int alpha) {
-        return (clamp(alpha, 0, 255) << 24) | (color & 0x00FFFFFF);
-    }
-
-    private static int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
+    private static int fade(int color, float alpha) {
+        return (Math.round((color >>> 24) * Mth.clamp(alpha, 0f, 1f)) << 24) | (color & 0xFFFFFF);
     }
 }

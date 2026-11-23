@@ -1,16 +1,25 @@
 package com.cdp.codpattern.client.gui.screen.match;
 
+import com.cdp.codpattern.app.match.BuiltInGameModes;
+import com.cdp.codpattern.app.match.GameModeRegistry;
+import com.cdp.codpattern.app.match.model.MetricDisplay;
+import com.cdp.codpattern.app.match.model.ModeDescriptor;
 import com.cdp.codpattern.app.match.model.RoomSummaryMetric;
+import com.cdp.codpattern.app.match.model.TeamDescriptor;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 public final class ModeRoomTextFormatter {
     private static final String LEGACY_KORTAC_TEAM = "kortac";
     private static final String LEGACY_SPECGRU_TEAM = "specgru";
+    private static final String TEAM_SCORE_PREFIX = "team_score.";
 
     private ModeRoomTextFormatter() {
     }
@@ -49,6 +58,59 @@ public final class ModeRoomTextFormatter {
         return String.format("§cK:%d §7| §9S:%d", kortacScore, specgruScore);
     }
 
+    public static boolean isTeamScore(RoomSummaryMetric metric) {
+        return metric != null && metric.display() == MetricDisplay.SCORE
+                && metric.key().startsWith(TEAM_SCORE_PREFIX) && metric.key().length() > TEAM_SCORE_PREFIX.length();
+    }
+
+    public static Component roomScore(String gameType, ModeRoomData summary, Map<String, Integer> liveScores) {
+        Map<String, Integer> scores = new TreeMap<>();
+        if (summary != null) {
+            for (RoomSummaryMetric metric : summary.metrics) {
+                if (isTeamScore(metric)) {
+                    scores.put(metric.key().substring(TEAM_SCORE_PREFIX.length()), metric.value());
+                }
+            }
+            // Team snapshots also carry zero defaults for teams without a published score.
+            // Use the legacy map only when no explicit team metrics were sent.
+            if (scores.isEmpty() && summary.teamScores != null) scores.putAll(summary.teamScores);
+        }
+        if (liveScores != null) scores.putAll(liveScores);
+        if (scores.size() < 2) return Component.empty();
+
+        ModeDescriptor mode = GameModeRegistry.getOrDefault(gameType);
+        MutableComponent result = Component.empty();
+        if (mode.teams().isEmpty()) {
+            for (Map.Entry<String, Integer> entry : scores.entrySet()) {
+                appendScore(result, entry.getValue(), scoreColor(entry.getKey(), 0xBDC9C8));
+            }
+        } else {
+            if (mode.teams().size() < 2) return Component.empty();
+            boolean classic = BuiltInGameModes.FRONTLINE.equals(mode.gameType())
+                    || BuiltInGameModes.TEAM_DEATHMATCH.equals(mode.gameType());
+            for (TeamDescriptor team : mode.teams()) {
+                Integer score = scores.get(team.teamName());
+                if (score == null) return Component.empty();
+                int color = classic ? scoreColor(team.teamName(), team.accentColor()) : team.accentColor();
+                appendScore(result, score, color);
+            }
+        }
+        return result;
+    }
+
+    private static int scoreColor(String team, int fallback) {
+        return switch (team) {
+            case LEGACY_KORTAC_TEAM, "red" -> 0xFF5555;
+            case LEGACY_SPECGRU_TEAM, "blue" -> 0x5555FF;
+            default -> fallback;
+        };
+    }
+
+    private static void appendScore(MutableComponent line, int value, int color) {
+        if (!line.getSiblings().isEmpty()) line.append(Component.literal(" | ").withStyle(ChatFormatting.GRAY));
+        line.append(Component.literal(Integer.toString(value)).withStyle(style -> style.withColor(color & 0xFFFFFF)));
+    }
+
     public static String teamSplitText(Map<String, Integer> teamPlayerCounts) {
         int kortacCount = teamPlayerCounts.getOrDefault(LEGACY_KORTAC_TEAM, 0);
         int specgruCount = teamPlayerCounts.getOrDefault(LEGACY_SPECGRU_TEAM, 0);
@@ -64,13 +126,17 @@ public final class ModeRoomTextFormatter {
     }
 
     public static String metricInlineText(List<RoomSummaryMetric> metrics, int maxCount) {
+        return metricInlineText(metrics, maxCount, true);
+    }
+
+    static String metricInlineText(List<RoomSummaryMetric> metrics, int maxCount, boolean includeTeamScores) {
         if (metrics == null || metrics.isEmpty() || maxCount <= 0) {
             return "";
         }
         StringBuilder builder = new StringBuilder();
         int appended = 0;
         for (RoomSummaryMetric metric : metrics) {
-            if (metric == null) {
+            if (metric == null || (!includeTeamScores && isTeamScore(metric))) {
                 continue;
             }
             if (appended > 0) {

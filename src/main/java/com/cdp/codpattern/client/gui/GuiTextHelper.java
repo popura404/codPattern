@@ -51,6 +51,11 @@ public final class GuiTextHelper {
         return Math.max(1, Math.round(font.lineHeight * effectiveReferenceScale(scaleMultiplier)));
     }
 
+    public static float referenceLabelHeight(Font font, float scaleMultiplier) {
+        // The default bitmap font reserves the last pixel of its line box for spacing.
+        return Math.max(1, font.lineHeight - 1) * effectiveReferenceScale(scaleMultiplier);
+    }
+
     public static int referenceWidth(Font font, String text) {
         if (text == null || text.isEmpty()) {
             return 0;
@@ -412,6 +417,18 @@ public final class GuiTextHelper {
             boolean shadow) {
         String fitted = ellipsizeReference(font, text, maxWidth);
         drawReferenceString(graphics, font, fitted, rightX - referenceWidth(font, fitted), y, color, shadow);
+    }
+
+    public static void drawReferenceButtonLabel(
+            GuiGraphics graphics, Font font, Component label, int x, int y, int width, int height,
+            int maxWidth, int color) {
+        FormattedCharSequence fitted = ellipsizeReferenceFormatted(font, label, maxWidth);
+        float scale = referenceScale();
+        // Font.width includes the trailing gap after the last glyph.
+        float labelWidth = Math.max(0, font.width(fitted) - 1) * scale;
+        float left = x + (width - labelWidth) / 2f;
+        float top = y + (height - referenceLabelHeight(font, 1f)) / 2f;
+        drawScaledString(graphics, font, fitted, left, top, scale, color, false);
     }
 
     private static void drawReferenceString(
