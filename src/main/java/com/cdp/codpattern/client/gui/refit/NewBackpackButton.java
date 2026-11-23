@@ -4,6 +4,7 @@ import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.network.AddBackpackPacket;
+import static com.cdp.codpattern.config.backpack.BackpackConfig.MAX_BACKPACKS;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -50,12 +51,12 @@ public class NewBackpackButton extends Button {
 
         this.currentBackpackCount = currentCount;
 
-        if (currentCount >= 10) {
-            this.setTooltip(Tooltip.create(Component.translatable("screen.codpattern.backpack.limit_reached")));
+        if (currentCount >= MAX_BACKPACKS) {
+            this.setTooltip(Tooltip.create(Component.translatable("screen.codpattern.backpack.limit_reached", MAX_BACKPACKS)));
             this.active = false;
         } else {
             this.setTooltip(
-                    Tooltip.create(Component.translatable("screen.codpattern.backpack.add_hint", currentCount)));
+                    Tooltip.create(Component.translatable("screen.codpattern.backpack.add_hint", currentCount, MAX_BACKPACKS)));
         }
     }
 
@@ -139,11 +140,11 @@ public class NewBackpackButton extends Button {
         Minecraft minecraft = Minecraft.getInstance();
         Component text = this.active
                 ? Component.translatable("screen.codpattern.backpack.add_new")
-                : Component.translatable("screen.codpattern.backpack.limit_reached");
+                : Component.translatable("screen.codpattern.backpack.limit_reached", MAX_BACKPACKS);
         int textColor = this.active ? (this.isHoveredOrFocused() ? CodTheme.HOVER_BORDER : CodTheme.TEXT_PRIMARY)
                 : CodTheme.DISABLED_TEXT;
 
-        Component countText = Component.translatable("screen.codpattern.backpack.count_used", currentBackpackCount, 10);
+        Component countText = Component.translatable("screen.codpattern.backpack.count_used", currentBackpackCount, MAX_BACKPACKS);
         int referenceLineHeight = GuiTextHelper.referenceLineHeight(minecraft.font);
         boolean showCount = this.height >= referenceLineHeight * 2 + 8;
         int totalTextHeight = showCount ? referenceLineHeight * 2 + 2 : referenceLineHeight;

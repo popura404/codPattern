@@ -5,6 +5,7 @@ import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
 import com.cdp.codpattern.client.gui.screen.WeaponMenuScreen;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.compat.tacz.client.CodGunRefitScreen;
+import com.cdp.codpattern.config.backpack.BackpackSlot;
 import com.cdp.codpattern.core.refit.AttachmentRefitInventory;
 import com.cdp.codpattern.core.refit.AttachmentCandidateTransfer;
 import com.cdp.codpattern.core.refit.BackpackRefitSessionContext;
@@ -144,6 +145,9 @@ public final class AttachmentRefitClientState {
         pendingOpen = false;
         activeSession = true;
         BackpackRefitSessionContext.setClientActive(true);
+        if (parentScreen instanceof BackpackMenuScreen menu) {
+            menu.restoreRefitTarget(bagId, BackpackSlot.fromKey(slot));
+        }
         mc.setScreen(new CodGunRefitScreen(parentScreen));
     }
 

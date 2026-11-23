@@ -1,31 +1,18 @@
 package com.cdp.codpattern.app.tdm.service;
 
+import com.cdp.codpattern.app.backpack.service.BackpackDistributor;
 import com.cdp.codpattern.config.ConfigFailureFeedback;
-import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
-import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
-import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
-import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
-import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
-import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
 import com.cdp.codpattern.config.backpack.BackpackNameHelper;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
-import com.mojang.logging.LogUtils;
-import net.minecraft.core.registries.BuiltInRegistries;
+import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import org.slf4j.Logger;
 
 public final class KitDistributionService {
-    private static final Logger LOGGER = LogUtils.getLogger();
-
     private KitDistributionService() {
     }
 
@@ -57,24 +44,12 @@ public final class KitDistributionService {
             return;
         }
 
-        BackpackConfig.Backpack backpack = resolveBackpack(playerData);
+        BackpackConfig.Backpack backpack = BackpackDistributor.resolveBackpack(playerData);
         player.getInventory().clearContent();
         ThrowableInventoryService.clearRuntime(player);
 
-        int ammoMultiple = (filterConfig != null && filterConfig.getAmmunitionPerMagazineMultiple() != null)
-                ? filterConfig.getAmmunitionPerMagazineMultiple()
-                : 6;
-        ammoMultiple = Math.max(0, ammoMultiple);
-        boolean throwablesEnabled = (filterConfig == null || filterConfig.isThrowablesEnabled())
-                && LrTacticalGatewayProvider.gateway().isLoaded();
-
         if (backpack != null) {
-            giveBackpackItem(player, backpack, filterConfig, "primary", 0, ammoMultiple);
-            giveBackpackItem(player, backpack, filterConfig, "secondary", 1, ammoMultiple);
-            if (throwablesEnabled) {
-                giveThrowableItem(player, backpack, filterConfig, "tactical", ThrowableInventoryService.SLOT_ONE);
-                giveThrowableItem(player, backpack, filterConfig, "lethal", ThrowableInventoryService.SLOT_TWO);
-            }
+            BackpackDistributor.giveSelectedItems(player, backpack, filterConfig);
 
             if (notifyPlayer) {
                 player.sendSystemMessage(
@@ -86,87 +61,5 @@ public final class KitDistributionService {
         player.inventoryMenu.broadcastChanges();
         player.inventoryMenu.slotsChanged(player.getInventory());
         ThrowableInventoryService.sync(player);
-    }
-
-    private static void giveBackpackItem(ServerPlayer player, BackpackConfig.Backpack backpack,
-            WeaponFilterConfig filterConfig, String key, int slot, int ammoMultiple) {
-        BackpackConfig.Backpack.ItemData itemData = backpack.getItem_MAP().get(key);
-        if (itemData == null) {
-            return;
-        }
-
-        ResourceLocation itemId = ResourceLocation.tryParse(itemData.getItem());
-        if (itemId == null) {
-            return;
-        }
-
-        Item item = BuiltInRegistries.ITEM.get(itemId);
-        if (item == null || item == Items.AIR) {
-            return;
-        }
-
-        ItemStack stack = BackpackItemStackFactory.create(itemData);
-        if (stack.isEmpty()) {
-            return;
-        }
-
-        if (BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {
-            return;
-        }
-
-        if (TaczGatewayProvider.gateway().isGun(stack)) {
-            if (BackpackAttachmentFilter.removeBlockedInstalledAttachments(filterConfig, stack)) {
-                LOGGER.warn("Removed blocked attachment from backpack item player={} slot={} item={}",
-                        player.getGameProfile().getName(), key, itemId);
-            }
-            TaczGatewayProvider.gateway().configureGunAmmo(stack, ammoMultiple);
-        }
-
-        player.getInventory().setItem(slot, stack);
-    }
-
-    private static void giveThrowableItem(ServerPlayer player, BackpackConfig.Backpack backpack,
-            WeaponFilterConfig filterConfig, String key, int dedicatedSlot) {
-        BackpackConfig.Backpack.ItemData itemData = backpack.getItem_MAP().get(key);
-        if (itemData == null) {
-            return;
-        }
-
-        ResourceLocation itemId = ResourceLocation.tryParse(itemData.getItem());
-        if (itemId == null) {
-            return;
-        }
-
-        Item item = BuiltInRegistries.ITEM.get(itemId);
-        if (item == null || item == Items.AIR) {
-            return;
-        }
-
-        ItemStack stack = BackpackItemStackFactory.create(itemData);
-        if (stack.isEmpty()) {
-            return;
-        }
-
-        if (BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {
-            return;
-        }
-
-        ThrowableInventoryService.seedThrowableSlot(player, dedicatedSlot, stack);
-    }
-
-    private static BackpackConfig.Backpack resolveBackpack(BackpackConfig.PlayerBackpackData playerData) {
-        if (playerData == null || playerData.getBackpacks_MAP() == null || playerData.getBackpacks_MAP().isEmpty()) {
-            return null;
-        }
-        BackpackConfig.Backpack selected = playerData.getBackpacks_MAP().get(playerData.getSelectedBackpack());
-        if (selected != null) {
-            return selected;
-        }
-        Integer fallbackId = playerData.getBackpacks_MAP().keySet().stream().min(Integer::compareTo).orElse(null);
-        if (fallbackId == null) {
-            return null;
-        }
-        playerData.setSelectedBackpack(fallbackId);
-        return playerData.getBackpacks_MAP().get(fallbackId);
     }
 }

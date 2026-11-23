@@ -83,6 +83,7 @@ public final class BackpackConfigRepository {
                     if (backpack == null || backpack.getItem_MAP() == null) {
                         throw new JsonParseException("Backpack data must contain an item map");
                     }
+                    backpack.migrateSlots();
                 }
             }
             return loaded;
@@ -124,11 +125,8 @@ public final class BackpackConfigRepository {
             return -1;
         }
 
-        BackpackConfig.Backpack newBackpack = new BackpackConfig.Backpack("");
-        newBackpack.setItem_MAP("primary", BackpackConfig.getItemDataADDP());
-        newBackpack.setItem_MAP("secondary", BackpackConfig.getItemDataADDS());
-        newBackpack.setItem_MAP("tactical", BackpackConfig.getItemDataTactical());
-        newBackpack.setItem_MAP("lethal", BackpackConfig.getItemDataLethal());
+        BackpackConfig.Backpack newBackpack = BackpackConfig.createPreset(
+                BackpackConfig.getItemDataADDP(), BackpackConfig.getItemDataADDS());
 
         if (playerData.addBackpack(id, newBackpack)) {
             if (playerData.getBackpacks_MAP().containsKey(selectedBeforeAdd)) {

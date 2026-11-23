@@ -212,9 +212,9 @@ final class HsvSliderProbe {
                 verifySavedColors();
                 step++;
             }
-            case 14 -> { if (AdditionalRefitProbe.focusConfiguredSlot(screen)) step++; }
+            case 14 -> { if (RefitScreenProbe.hoverConfiguredSlot(screen)) step++; }
             case 15 -> {
-                if (ClientProbeMod.clickButton(screen, "screen.codpattern.attachment_config.button")) step++;
+                if (ClientProbeMod.clickButton(screen, "screen.codpattern.loadout.refit")) step++;
             }
             case 16 -> {
                 if (!active(screen)) return;

@@ -2,7 +2,6 @@ package com.cdp.codpattern.client.gui.screen.backpack;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.client.gui.CodTheme;
-import com.cdp.codpattern.client.gui.refit.BackPackSelectButton;
 import com.cdp.codpattern.client.gui.refit.BackpackContextMenu;
 import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
 import com.cdp.codpattern.client.gui.screen.RenameBackpackScreen;
@@ -41,7 +40,7 @@ public final class BackpackContextMenuCoordinator {
 
     public void show(BackpackMenuScreen parent,
             int backpackId,
-            BackPackSelectButton button,
+            String bagName,
             int mouseX,
             int mouseY,
             int screenWidth,
@@ -55,7 +54,7 @@ public final class BackpackContextMenuCoordinator {
                 new RenameBackpackScreen(
                         parent,
                         backpackId,
-                        BackpackNameHelper.isGeneratedName(button.getBackpack().getName()) ? "" : button.getBackpack().getName())));
+                        BackpackNameHelper.isGeneratedName(bagName) ? "" : bagName)));
         contextMenu.addItem(Component.translatable("screen.codpattern.backpack.context.clone"),
                 () -> ModNetworkChannel.sendToServer(new CloneBackpackPacket(backpackId)));
         contextMenu.addItem(Component.translatable("screen.codpattern.backpack.context.delete"),

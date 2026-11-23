@@ -1,11 +1,9 @@
 package refit.clienttest;
 
-import com.cdp.codpattern.client.gui.screen.WeaponMenuScreen;
 import com.cdp.codpattern.client.refit.AttachmentRefitClientState;
 import com.cdp.codpattern.compat.tacz.client.CodGunRefitScreen;
 import com.mojang.logging.LogUtils;
 import com.tacz.guns.api.item.attachment.AttachmentType;
-import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 
 /** Independent scenarios sharing only the already verified normal menu entry. */
@@ -62,9 +60,9 @@ final class AdditionalRefitProbe {
                 if (AttachmentRefitClientState.getSessionId() != null) return;
                 RefitScreenProbe.verifySaved(); step = 6;
             }
-            case 6 -> { if (focusConfiguredSlot(screen)) step = 7; }
+            case 6 -> { if (RefitScreenProbe.hoverConfiguredSlot(screen)) step = 7; }
             case 7 -> {
-                if (ClientProbeMod.clickButton(screen, "screen.codpattern.attachment_config.button")) step = 8;
+                if (ClientProbeMod.clickButton(screen, "screen.codpattern.loadout.refit")) step = 8;
             }
             case 8 -> {
                 if (!(screen instanceof CodGunRefitScreen) || !AttachmentRefitClientState.acceptsTaczOperations()) return;
@@ -89,11 +87,4 @@ final class AdditionalRefitProbe {
         }
     }
 
-    static boolean focusConfiguredSlot(Screen screen) throws Exception {
-        if (!(screen instanceof WeaponMenuScreen)) return false;
-        var primary = WeaponMenuScreen.class.getDeclaredField(RefitScreenProbe.slot() + "Button");
-        primary.setAccessible(true);
-        screen.setFocused((GuiEventListener) primary.get(screen));
-        return true;
-    }
 }

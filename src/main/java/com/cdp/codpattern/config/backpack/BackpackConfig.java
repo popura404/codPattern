@@ -1,10 +1,17 @@
 package com.cdp.codpattern.config.backpack;
 
 import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.TagParser;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class BackpackConfig {
+    // This repository serializes static preset fields. The slot limit is not part of a player's save.
+    public static final transient int MAX_BACKPACKS = 12;
 
     private Map<String, PlayerBackpackData> playerData = new HashMap<>();
 
@@ -20,6 +27,7 @@ public class BackpackConfig {
     // 添加背包时默认
     public static BackpackConfig.Backpack.ItemData itemDataADDP = new BackpackConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:m4a1\",GunCurrentAmmoCount:30,GunFireMode: \"AUTO\",HasBulletInBarrel:1}");
     public static BackpackConfig.Backpack.ItemData itemDataADDS = new BackpackConfig.Backpack.ItemData("tacz:modern_kinetic_gun", 1, "{GunId:\"tacz:p320\",GunCurrentAmmoCount:12,GunFireMode: \"SEMI\",HasBulletInBarrel:1}");
+    public static BackpackConfig.Backpack.ItemData itemDataMelee = new BackpackConfig.Backpack.ItemData("lrtactical:melee", 1, "{MeleeWeaponId:\"lrtactical:dagger\"}");
     public static BackpackConfig.Backpack.ItemData itemDataTactical = new BackpackConfig.Backpack.ItemData("lrtactical:throwable", 1, "{ThrowableId:\"lrtactical:m67\"}");
     public static BackpackConfig.Backpack.ItemData itemDataLethal = new BackpackConfig.Backpack.ItemData("lrtactical:throwable", 1, "{ThrowableId:\"lrtactical:smoke_grenade\"}");
 
@@ -48,26 +56,20 @@ public class BackpackConfig {
             return true;
         }
 
-        /**
-         * 获取添加背包可用ID
-         * @return 第一个可用的空缺ID，如果1-10都已占用则返回11
-         */
+        /** First free loadout ID, or zero when every slot is occupied. */
         public int getNextAvailableId() {
-            // 从1开始遍历到10
-            for (int i = 1; i <= 10; i++) {
-                // 找不到key说明背包是空的
-                if (!backpacks_MAP.containsKey(i)) {
-                    return i;  // 返回这个空缺的位置
-                }
+            for (int id = 1; id <= MAX_BACKPACKS; id++) {
+                if (!backpacks_MAP.containsKey(id)) return id;
             }
-            // 如果1-10都已占用，返回0
             return 0;
         }
     }
 
     public static class Backpack {
         private String name;
-        private Map<String,ItemData> item_MAP = new HashMap<>();
+        private Map<String, ItemData> item_MAP = new LinkedHashMap<>();
+        // Original slots of surplus melee weapons in legacy, double-melee loadouts.
+        private Map<String, ItemData> displacedLegacyMelee;
 
         public Backpack(String name){
             this.name = name;
@@ -75,14 +77,51 @@ public class BackpackConfig {
 
         public void setName(String name) { this.name = name;}
 
-        /**
-         * 设置物品，限制最多4个（主武器、副武器、战术投掷物、杀伤投掷物）
-         */
-        public void setItem_MAP(String key, ItemData itemData){
-            if(this.item_MAP.size() >= 4 && !this.item_MAP.containsKey(key)) {
+        public void setItem_MAP(String key, ItemData itemData) {
+            BackpackSlot slot = BackpackSlot.fromMenuKey(key);
+            if (slot != null) {
+                setItem(slot, itemData);
+            }
+        }
+
+        public void setItem(BackpackSlot slot, ItemData itemData) {
+            item_MAP.put(slot.key(), itemData);
+        }
+
+        public ItemData getItem(BackpackSlot slot) {
+            return item_MAP.get(slot.key());
+        }
+
+        void migrateSlots() {
+            moveLegacyEquipment("tactical", BackpackSlot.ITEM1);
+            moveLegacyEquipment("lethal", BackpackSlot.ITEM2);
+            moveLegacyMelee(BackpackSlot.SECONDARY);
+            moveLegacyMelee(BackpackSlot.PRIMARY);
+            for (BackpackSlot slot : BackpackSlot.values()) {
+                item_MAP.computeIfAbsent(slot.key(), ignored -> emptyItemData());
+            }
+        }
+
+        private void moveLegacyEquipment(String oldKey, BackpackSlot slot) {
+            ItemData previous = item_MAP.remove(oldKey);
+            if (previous != null) {
+                item_MAP.putIfAbsent(slot.key(), previous);
+            }
+        }
+
+        private void moveLegacyMelee(BackpackSlot oldSlot) {
+            ItemData previous = getItem(oldSlot);
+            if (previous == null || !previous.isLegacyMelee()) {
                 return;
             }
-            this.item_MAP.put(key, itemData);
+            ItemData melee = getItem(BackpackSlot.MELEE);
+            if (melee == null || melee.item == null || melee.item.isBlank()) {
+                setItem(BackpackSlot.MELEE, previous);
+            } else {
+                if (displacedLegacyMelee == null) displacedLegacyMelee = new LinkedHashMap<>();
+                displacedLegacyMelee.put(oldSlot.key(), previous);
+            }
+            setItem(oldSlot, emptyItemData());
         }
 
         public static class ItemData {
@@ -112,6 +151,21 @@ public class BackpackConfig {
             public int getCount() { return count; }
             public String getNbt() { return nbt; }
             public String getAttachmentPreset() { return attachmentPreset; }
+
+            private boolean isLegacyMelee() {
+                if ("lrtactical:melee".equals(item) || "lrtactical:flash_shield".equals(item)) {
+                    return true;
+                }
+                // Pack-defined melee base items can have a different registry name.
+                if (nbt != null && nbt.contains("MeleeWeaponId")) {
+                    try {
+                        return TagParser.parseTag(nbt).contains("MeleeWeaponId", Tag.TAG_STRING);
+                    } catch (CommandSyntaxException ignored) {
+                        // Keep malformed legacy data in its original slot.
+                    }
+                }
+                return false;
+            }
         }
 
         // Getters and setters
@@ -126,35 +180,28 @@ public class BackpackConfig {
         return playerData.computeIfAbsent(uuid, k -> {
             PlayerBackpackData newData = new PlayerBackpackData();
 
-            // 背包1
-            Backpack backpack1 = new Backpack("");
-            backpack1.setItem_MAP("primary", itemDataP1);
-            backpack1.setItem_MAP("secondary", itemDataS1);
-            backpack1.setItem_MAP("tactical", getItemDataTactical());
-            backpack1.setItem_MAP("lethal", getItemDataLethal());
-            newData.getBackpacks_MAP().put(1, backpack1);
-
-            // 背包2
-            Backpack backpack2 = new Backpack("");
-            backpack2.setItem_MAP("primary", itemDataP2);
-            backpack2.setItem_MAP("secondary", itemDataS2);
-            backpack2.setItem_MAP("tactical", getItemDataTactical());
-            backpack2.setItem_MAP("lethal", getItemDataLethal());
-            newData.getBackpacks_MAP().put(2, backpack2);
-
-            // 背包3
-            Backpack backpack3 = new Backpack("");
-            backpack3.setItem_MAP("primary", itemDataP3);
-            backpack3.setItem_MAP("secondary", itemDataS3);
-            backpack3.setItem_MAP("tactical", getItemDataTactical());
-            backpack3.setItem_MAP("lethal", getItemDataLethal());
-            newData.getBackpacks_MAP().put(3, backpack3);
-
-            // 默认选择背包1
-            newData.setSelectedBackpack(1);
+            newData.addBackpack(1, createPreset(itemDataP1, itemDataS1));
+            newData.addBackpack(2, createPreset(itemDataP2, itemDataS2));
+            newData.addBackpack(3, createPreset(itemDataP3, itemDataS3));
 
             return newData;
         });
+    }
+
+    static Backpack createPreset(Backpack.ItemData primary, Backpack.ItemData secondary) {
+        Backpack backpack = new Backpack("");
+        backpack.setItem(BackpackSlot.PRIMARY, primary);
+        backpack.setItem(BackpackSlot.SECONDARY, secondary);
+        // Older server presets could put a custom melee in either firearm slot.
+        backpack.moveLegacyMelee(BackpackSlot.SECONDARY);
+        backpack.moveLegacyMelee(BackpackSlot.PRIMARY);
+        if (backpack.getItem(BackpackSlot.MELEE) == null) {
+            backpack.setItem(BackpackSlot.MELEE,
+                    LrTacticalGatewayProvider.gateway().isLoaded() ? itemDataMelee : emptyItemData());
+        }
+        backpack.setItem(BackpackSlot.ITEM1, getItemDataTactical());
+        backpack.setItem(BackpackSlot.ITEM2, getItemDataLethal());
+        return backpack;
     }
 
     /**

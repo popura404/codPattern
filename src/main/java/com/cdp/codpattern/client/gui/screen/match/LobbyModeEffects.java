@@ -1,20 +1,26 @@
 package com.cdp.codpattern.client.gui.screen.match;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.math.Axis;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FastColor;
 import net.minecraft.util.Mth;
 import org.joml.Matrix4f;
 
-final class LobbyModeEffects {
+public final class LobbyModeEffects {
     // The approved artwork is a 56-unit-high face with four-unit sculk tiles.
+    private static final ResourceLocation BAG_SCULK =
+            new ResourceLocation("codpattern", "textures/gui/backpack/sculk_row.png");
     private static final int HEIGHT = 56;
     private static final int TILE = 4;
     private static final int RAIL = 3;
     private static final int BREATH_PERIOD_MS = 3200;
+    private static final float HOVER_GRADIENT_SLOPE = (float) Math.tan(Math.toRadians(2));
     private static final String[] BRANCHES = {
             "v#", "#ov...v+", "#v#v.v", "#ov#v", "#v#..vv+", "#ov", "v#",
             "#v", "#ov", "v#vv..v+", "#vo.vv", "#ovv..vv+", "#v..v", "v#...+"
@@ -31,9 +37,150 @@ final class LobbyModeEffects {
 
     private LobbyModeEffects() {}
 
-    static void draw(GuiGraphics graphics, ScreenRectangle bounds, int accent, boolean joined,
-                     float growth, float glow, long hoveredMillis) {
-        if (bounds.height() <= 0 || bounds.width() <= 0) return;
+    public static final class Motion {
+        private long lastUpdate = -1L;
+        private boolean engaged;
+        private long hoveredMillis;
+        private float hover, rail, growth, glow;
+
+        public void update(boolean nextEngaged, long nowMs) {
+            long elapsed = lastUpdate < 0L ? 0L : Math.max(0L, nowMs - lastUpdate);
+            lastUpdate = nowMs;
+            if (engaged) hoveredMillis += elapsed;
+            float target = engaged ? 1f : 0f;
+            hover = Mth.approach(hover, target, elapsed / 220f);
+            rail = Mth.approach(rail, target, elapsed / 260f);
+            growth = Mth.approach(growth, target, elapsed / (engaged ? 1450f : 1100f));
+            glow = Mth.approach(glow, target, elapsed / 320f);
+            engaged = nextEngaged;
+        }
+
+        float highlight() {
+            return ease(hover);
+        }
+    }
+
+    private static float ease(float t) {
+        return t * t * (3f - 2f * t);
+    }
+
+    static void drawFace(GuiGraphics graphics, ScreenRectangle bounds, int accent, boolean joined,
+                         Motion motion, float opacity, int edgeWidth) {
+        if (opacity <= 0f || bounds.height() <= 0 || bounds.width() <= 0) return;
+        opacity = Math.min(1f, opacity);
+        int railWidth = Mth.clamp(edgeWidth, 0, bounds.width());
+        int edge = joined ? Math.min(railWidth, bounds.width() / 2) : 0;
+        drawSurface(graphics, bounds, accent, joined, edge, motion.highlight(), opacity);
+        drawSculk(graphics, bounds, accent, joined, motion.growth, ease(motion.glow), motion.hoveredMillis, opacity);
+
+        drawRail(graphics, bounds, accent, joined, motion, opacity, railWidth, edge);
+    }
+
+    /** Same face, rail, and animation clock as the lobby, with the bag's soft, pre-baked sculk mask. */
+    public static void drawBagFace(GuiGraphics graphics, ScreenRectangle bounds, int accent, boolean joined,
+                                   Motion motion, int edgeWidth) {
+        int railWidth = Mth.clamp(edgeWidth, 0, bounds.width());
+        int edge = joined ? Math.min(railWidth, bounds.width() / 2) : 0;
+        drawSurface(graphics, bounds, accent, joined, edge, motion.highlight(), 1f);
+        drawRail(graphics, bounds, accent, joined, motion, 1f, railWidth, edge);
+        drawBagSculk(graphics, bounds, accent, joined, motion, edge + railWidth);
+    }
+
+    private static void drawBagSculk(GuiGraphics graphics, ScreenRectangle bounds, int accent, boolean joined,
+                                     Motion motion, int inset) {
+        if (!joined && motion.glow <= 0f && motion.growth <= 0f) return;
+        float scale = bounds.height() / (float) HEIGHT;
+        int available = bounds.width() - inset * 2;
+        if (available <= 0 || scale <= 0f) return;
+        float growth = ease(motion.growth);
+        int sourceWidth = Math.min(Math.round(10 + 30 * growth), (int) (available / scale));
+        if (sourceWidth <= 0) return;
+
+        float glow = ease(motion.glow);
+        int tint = joined ? FastColor.ARGB32.lerp(.21f, 0xFF163C38, accent) : accent;
+        float opacity = joined ? .19f + .22f * glow : .34f * Math.max(glow, growth);
+        int x = bounds.left() + inset, y = bounds.top();
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderColor(FastColor.ARGB32.red(tint) / 255f, FastColor.ARGB32.green(tint) / 255f,
+                FastColor.ARGB32.blue(tint) / 255f, opacity);
+        graphics.blit(BAG_SCULK, x, y, Math.max(1, Math.round(sourceWidth * scale)), bounds.height(),
+                2f, 2f, sourceWidth, HEIGHT, 64, 64);
+
+        if (glow > 0f) {
+            int trailWidth = Math.min(available, Math.max(1, Math.round(20 * scale)));
+            float phase = (motion.hoveredMillis % BREATH_PERIOD_MS) / (float) BREATH_PERIOD_MS;
+            float pulse = (float) Math.sin(Math.PI * phase);
+            int travel = Math.round((available - trailWidth) * phase);
+            RenderSystem.setShaderColor(.78f, 1f, .94f, .40f * glow * pulse * pulse);
+            graphics.blit(BAG_SCULK, x + travel, y + bounds.height() / 3, trailWidth,
+                    Math.max(1, Math.round(12 * scale)), 43f, 3f, 20, 12, 64, 64);
+        }
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+    }
+
+    private static void drawRail(GuiGraphics graphics, ScreenRectangle bounds, int accent, boolean joined,
+                                 Motion motion, float opacity, int railWidth, int edge) {
+        float rail = ease(motion.rail);
+        int railHeight = Math.max(1, Math.round(bounds.height() * .82f * (.52f + .48f * rail)));
+        int railY = bounds.top() + (bounds.height() - railHeight) / 2;
+        int railColor = joined ? FastColor.ARGB32.lerp(.32f, 0xFF101918, accent) : accent;
+        graphics.fill(bounds.left() + edge, railY, Math.min(bounds.right(), bounds.left() + edge + railWidth),
+                railY + railHeight, (Math.round((143 + 112 * rail) * opacity) << 24) | (railColor & 0xFFFFFF));
+    }
+
+    private static int fade(int color, float opacity) {
+        return (Math.round((color >>> 24) * opacity) << 24) | (color & 0xFFFFFF);
+    }
+
+    private static void drawSurface(GuiGraphics graphics, ScreenRectangle bounds, int accent, boolean joined,
+                                    int edge, float highlight, float opacity) {
+        int x = bounds.left();
+        int y = bounds.top();
+        if (joined) {
+            if (edge > 0) {
+                int borderColor = fade(0xFF080A09, opacity);
+                graphics.fill(x, y, x + edge, bounds.bottom(), borderColor);
+                graphics.fill(bounds.right() - edge, y, bounds.right(), bounds.bottom(), borderColor);
+            }
+            graphics.fill(x + edge, y, bounds.right() - edge, bounds.bottom(),
+                    fade(FastColor.ARGB32.lerp(.07f * highlight, accent, 0xFFFFFFFF), opacity));
+            return;
+        }
+        // GuiGraphics supplies a vertical gradient. Rotate its local axes to shade the row left to right.
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 0);
+        graphics.pose().mulPose(Axis.ZN.rotationDegrees(90));
+        graphics.fillGradient(-bounds.height(), 0, 0, bounds.width(), fade(0xED101719, opacity), fade(0xCF11181A, opacity));
+        graphics.pose().popPose();
+        if (highlight > 0f) drawDarkHover(graphics, bounds, accent, highlight * opacity);
+    }
+
+    private static void drawDarkHover(GuiGraphics graphics, ScreenRectangle bounds, int accent, float highlight) {
+        // The 92-degree overlay reaches its final translucent color at the 75% stop.
+        float skew = Math.min(bounds.width() / 3f, bounds.height() * HOVER_GRADIENT_SLOPE);
+        float stop = .75f * (bounds.width() + skew);
+        int left = bounds.left(), right = bounds.right();
+        int top = bounds.top(), bottom = bounds.bottom();
+        int accentMix = FastColor.ARGB32.lerp(.22f, 0xFF141F20, accent);
+        int start = (Math.round(255 * highlight) << 24) | (accentMix & 0xFFFFFF);
+        int end = (Math.round(201 * highlight) << 24) | 0x293539;
+        int bottomLeft = FastColor.ARGB32.lerp(skew / stop, start, end);
+
+        Matrix4f pose = graphics.pose().last().pose();
+        VertexConsumer vertices = graphics.bufferSource().getBuffer(RenderType.gui());
+        vertices.vertex(pose, left, top, 0).color(start).endVertex();
+        vertices.vertex(pose, left, bottom, 0).color(bottomLeft).endVertex();
+        vertices.vertex(pose, left + stop - skew, bottom, 0).color(end).endVertex();
+        vertices.vertex(pose, left + stop, top, 0).color(end).endVertex();
+        vertices.vertex(pose, left + stop, top, 0).color(end).endVertex();
+        vertices.vertex(pose, left + stop - skew, bottom, 0).color(end).endVertex();
+        vertices.vertex(pose, right, bottom, 0).color(end).endVertex();
+        vertices.vertex(pose, right, top, 0).color(end).endVertex();
+    }
+
+    private static void drawSculk(GuiGraphics graphics, ScreenRectangle bounds, int accent, boolean joined,
+                                  float growth, float glow, long hoveredMillis, float opacity) {
         float scale = bounds.height() / (float) HEIGHT;
         float border = joined ? RAIL : 0;
         float width = bounds.width() / scale - 2 * border;
@@ -44,17 +191,17 @@ final class LobbyModeEffects {
         pose.translate(bounds.left() + border * scale, bounds.top(), 0);
         pose.scale(scale, scale, 1);
         Layer layer = new Layer(graphics.bufferSource().getBuffer(RenderType.gui()), pose.last().pose(), width);
-        drawBranches(layer, accent, joined, growth);
-        if (glow > 0) drawSparks(layer, accent, joined, glow, hoveredMillis);
+        drawBranches(layer, accent, joined, growth, opacity);
+        if (glow > 0) drawSparks(layer, accent, joined, glow * opacity, hoveredMillis);
         graphics.flush();
         pose.popPose();
     }
 
-    private static void drawBranches(Layer layer, int accent, boolean joined, float growth) {
+    private static void drawBranches(Layer layer, int accent, boolean joined, float growth, float faceOpacity) {
         int stone = joined ? 0x355E58 : accent;
         int vein = joined ? 0x51867E : FastColor.ARGB32.lerp(.22f, accent, 0xFF263D37);
         int tip = joined ? 0x97BFB7 : FastColor.ARGB32.lerp(.24f, accent, 0xFFF5FFF8);
-        float opacity = joined ? .24f : .12f;
+        float opacity = (joined ? .24f : .12f) * faceOpacity;
         for (int row = 0; row < BRANCHES.length; row++) {
             String pattern = BRANCHES[row];
             int columns = joined ? pattern.length() : DARK_LENGTHS[row];

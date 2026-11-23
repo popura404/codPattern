@@ -2,6 +2,7 @@ package com.cdp.codpattern.config;
 
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
+import com.cdp.codpattern.config.backpack.BackpackSlot;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 
@@ -29,6 +30,7 @@ public final class ConfigRepositoryFailureCompatTest {
         Path root = Files.createTempDirectory("cdp-config-failure-test-");
         try {
             verifyBackpackRoundTrip(root.resolve("backpack-normal.json"));
+            verifyBackpackSlotMigration(root.resolve("backpack-slots.json"));
             verifyFilterRoundTrip(root.resolve("filter-normal.json"));
             verifyMissingFilesAreCreated(root.resolve("missing"));
             verifyReadFailures(root.resolve("unreadable-directory"));
@@ -72,6 +74,69 @@ public final class ConfigRepositoryFailureCompatTest {
         WeaponFilterConfigRepository.save(config);
         require(!WeaponFilterConfigRepository.loadOrCreate(path).isThrowablesEnabled(),
                 "normal filter write was not persisted");
+    }
+
+    private static void verifyBackpackSlotMigration(Path path) throws Exception {
+        String legacy = """
+                {"playerData":{"legacy":{"selectedBackpack":4,"backpacks_MAP":{
+                  "4":{"name":"Custom","item_MAP":{
+                    "primary":{"item":"tacz:modern_kinetic_gun","count":1,"attachmentPreset":"KeepCase"},
+                    "secondary":{"item":"lrtactical:melee","count":1,"nbt":"{MeleeWeaponId:'pack:Knife'}"},
+                    "tactical":{"item":"lrtactical:throwable","count":2,"nbt":"{ThrowableId:'pack:One'}"},
+                    "lethal":{"item":"lrtactical:throwable","count":3,"nbt":"{ThrowableId:'pack:Two'}"}
+                  }}}}}}
+                """;
+        Files.writeString(path, legacy);
+        var config = BackpackConfigRepository.loadOrCreate(path);
+        require(Files.readString(path).equals(legacy), "reading legacy slots must not rewrite the save");
+        for (int i = 0; i < 2; i++) {
+            var player = config.getPlayerData().get("legacy");
+            var bag = player.getBackpacks_MAP().get(player.getSelectedBackpack());
+            require(bag != null && bag.getName().equals("Custom")
+                            && bag.getItem_MAP().keySet().equals(java.util.Set.of("primary", "secondary", "melee", "item1", "item2")),
+                    "legacy backpack identity and all five canonical slots must survive");
+            require(bag.getItem(BackpackSlot.PRIMARY).getAttachmentPreset().equals("KeepCase")
+                            && bag.getItem(BackpackSlot.SECONDARY).getItem().isEmpty()
+                            && bag.getItem(BackpackSlot.MELEE).getNbt().equals("{MeleeWeaponId:'pack:Knife'}"),
+                    "legacy melee must move out of its former weapon slot without losing its data");
+            require(bag.getItem(BackpackSlot.ITEM1).getCount() == 2
+                            && bag.getItem(BackpackSlot.ITEM1).getNbt().equals("{ThrowableId:'pack:One'}")
+                            && bag.getItem(BackpackSlot.ITEM2).getCount() == 3
+                            && bag.getItem(BackpackSlot.ITEM2).getNbt().equals("{ThrowableId:'pack:Two'}"),
+                    "equipment migration must preserve order, counts and NBT");
+            BackpackConfigRepository.save();
+            config = BackpackConfigRepository.loadOrCreate(path);
+        }
+        var defaults = config.getOrCreatePlayerData("new");
+        int custom = BackpackConfigRepository.addCustomBackpack("new");
+        require(custom == 4 && defaults.getSelectedBackpack() == 1, "adding a backpack changed the selection");
+        for (var bag : defaults.getBackpacks_MAP().values()) {
+            for (var slot : BackpackSlot.values()) {
+                require(bag.getItem(slot) != null, "preset is missing slot " + slot);
+            }
+        }
+        var customBag = defaults.getBackpacks_MAP().get(custom);
+        var equipment = new BackpackConfig.Backpack.ItemData("lrtactical:throwable", 2, "{ThrowableId:'pack:One'}");
+        customBag.setItem_MAP("tactical", equipment);
+        customBag.setItem_MAP("perk", equipment);
+        require(customBag.getItem(BackpackSlot.ITEM1) == equipment && customBag.getItem_MAP().size() == 5,
+                "legacy addon writes must update their equipment slot without adding extra categories");
+
+        String doubleMelee = legacy.replace("tacz:modern_kinetic_gun", "lrtactical:flash_shield");
+        Files.writeString(path, doubleMelee);
+        var doubleBag = BackpackConfigRepository.loadOrCreate(path).getPlayerData().get("legacy").getBackpacks_MAP().get(4);
+        require(doubleBag.getItem(BackpackSlot.PRIMARY).getItem().isEmpty()
+                        && doubleBag.getItem(BackpackSlot.SECONDARY).getItem().isEmpty()
+                        && doubleBag.getItem(BackpackSlot.MELEE).getNbt().equals("{MeleeWeaponId:'pack:Knife'}")
+                        && doubleBag.getItem_MAP().size() == 5,
+                "double-melee loadouts must move the secondary and free both firearm slots");
+        BackpackConfigRepository.save();
+        var savedBag = com.google.gson.JsonParser.parseString(Files.readString(path)).getAsJsonObject()
+                .getAsJsonObject("playerData").getAsJsonObject("legacy").getAsJsonObject("backpacks_MAP").getAsJsonObject("4");
+        var displaced = savedBag.getAsJsonObject("displacedLegacyMelee").getAsJsonObject("primary");
+        require(displaced.get("item").getAsString().equals("lrtactical:flash_shield")
+                        && displaced.get("attachmentPreset").getAsString().equals("KeepCase"),
+                "the surplus melee must retain its original data outside the active equipment map");
     }
 
     private static void verifyMissingFilesAreCreated(Path root) {

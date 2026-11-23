@@ -8,6 +8,7 @@ import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -21,18 +22,19 @@ public class AttachmentConfigButton extends Button {
 
     public AttachmentConfigButton(int x, int y, int width, int height, int bagId, String slot, String requestedGunId) {
         super(x, y, width, height, Component.translatable("screen.codpattern.attachment_config.button"),
-                button -> {
-                    if (AttachmentRefitClientState.prepareOpenRequest(
-                            bagId, slot, requestedGunId, Minecraft.getInstance().screen)) {
-                        try {
-                            ModNetworkChannel.sendToServer(new RequestAttachmentPresetPacket(
-                                    AttachmentRefitClientState.getSessionId(), bagId, slot));
-                        } catch (RuntimeException failure) {
-                            AttachmentRefitClientState.onRequestSendFailed(failure);
-                        }
-                    }
-                },
+                button -> open(bagId, slot, requestedGunId, Minecraft.getInstance().screen),
                 DEFAULT_NARRATION);
+    }
+
+    public static void open(int bagId, String slot, String requestedGunId, Screen parent) {
+        if (AttachmentRefitClientState.prepareOpenRequest(bagId, slot, requestedGunId, parent)) {
+            try {
+                ModNetworkChannel.sendToServer(new RequestAttachmentPresetPacket(
+                        AttachmentRefitClientState.getSessionId(), bagId, slot));
+            } catch (RuntimeException failure) {
+                AttachmentRefitClientState.onRequestSendFailed(failure);
+            }
+        }
     }
 
     @Override

@@ -1,28 +1,24 @@
 package com.cdp.codpattern.app.backpack.service;
 
-import com.cdp.codpattern.config.ConfigFailureFeedback;
-import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
-import com.cdp.codpattern.config.backpack.BackpackConfig;
-import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
-import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
-import com.cdp.codpattern.config.path.ConfigPath;
-import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
-import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.compat.fpsmatch.FpsMatchGatewayProvider;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
-import com.mojang.logging.LogUtils;
+import com.cdp.codpattern.config.ConfigFailureFeedback;
+import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
+import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
 import com.cdp.codpattern.config.backpack.BackpackNameHelper;
-import net.minecraft.core.registries.BuiltInRegistries;
+import com.cdp.codpattern.config.backpack.BackpackSlot;
+import com.cdp.codpattern.config.path.ConfigPath;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
+import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
+import com.cdp.codpattern.core.throwable.ThrowableInventoryService;
+import com.mojang.logging.LogUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import org.slf4j.Logger;
-
-import java.util.Map;
 
 public class BackpackDistributor {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -66,10 +62,6 @@ public class BackpackDistributor {
             LOGGER.warn("WeaponFilterConfig is null. Skip distributing items for player {}", player.getGameProfile().getName());
             return;
         }
-        int ammoMultiple = resolveAmmoMultiple(filterConfig);
-        boolean throwablesAvailable = filterConfig.isThrowablesEnabled()
-                && LrTacticalGatewayProvider.gateway().isLoaded();
-
         //不是喜欢的冒险生存创造玩家，直接不发
         if (player.isSpectator()) return;
 
@@ -92,62 +84,7 @@ public class BackpackDistributor {
 
         player.getInventory().clearContent();
         ThrowableInventoryService.clearRuntime(player);
-
-        for (Map.Entry<String, BackpackConfig.Backpack.ItemData> entry :
-                backpack.getItem_MAP().entrySet()) {
-
-            String weaponType = entry.getKey();
-            BackpackConfig.Backpack.ItemData itemData = entry.getValue();
-            if (itemData == null) {
-                LOGGER.warn("ItemData is null for weaponType={} player={}", weaponType, player.getGameProfile().getName());
-                continue;
-            }
-
-            ResourceLocation itemId = ResourceLocation.tryParse(itemData.getItem());
-            if (itemId == null) {
-                LOGGER.warn("Invalid item id {} for player {}", itemData.getItem(), player.getGameProfile().getName());
-                continue;
-            }
-            Item item = BuiltInRegistries.ITEM.get(itemId);
-            if (item == null || item == Items.AIR) {
-                LOGGER.warn("Unknown item id {} for player {}", itemId, player.getGameProfile().getName());
-                continue;
-            }
-
-            ItemStack stack = BackpackItemStackFactory.create(itemData);
-            if (stack.isEmpty()) {
-                LOGGER.warn("Failed to build backpack item {} for player {}", itemId, player.getGameProfile().getName());
-                continue;
-            }
-
-            if (BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {
-                continue;
-            }
-
-            if (TaczGatewayProvider.gateway().isGun(stack)) {
-                if (BackpackAttachmentFilter.removeBlockedInstalledAttachments(filterConfig, stack)) {
-                    LOGGER.warn("Removed blocked attachment from backpack item player={} slot={} item={}",
-                            player.getGameProfile().getName(), weaponType, itemId);
-                    if (BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {
-                        continue;
-                    }
-                }
-                TaczGatewayProvider.gateway().configureGunAmmo(stack, ammoMultiple);
-            }
-
-            if ("primary".equals(weaponType)) {
-                player.getInventory().setItem(0, stack);
-            } else if ("secondary".equals(weaponType)) {
-                player.getInventory().setItem(1, stack);
-            } else if (("tactical".equals(weaponType) || "lethal".equals(weaponType))
-                    && throwablesAvailable) {
-                if ("tactical".equals(weaponType)) {
-                    ThrowableInventoryService.seedThrowableSlot(player, ThrowableInventoryService.SLOT_ONE, stack);
-                } else {
-                    ThrowableInventoryService.seedThrowableSlot(player, ThrowableInventoryService.SLOT_TWO, stack);
-                }
-            }
-        }
+        giveSelectedItems(player, backpack, filterConfig);
 
         player.inventoryMenu.broadcastChanges();
         player.inventoryMenu.slotsChanged(player.getInventory());
@@ -160,7 +97,49 @@ public class BackpackDistributor {
         }
     }
 
-    private static BackpackConfig.Backpack resolveBackpack(BackpackConfig.PlayerBackpackData playerData) {
+    public static void giveSelectedItems(ServerPlayer player, BackpackConfig.Backpack backpack,
+            WeaponFilterConfig filterConfig) {
+        boolean throwablesEnabled = (filterConfig == null || filterConfig.isThrowablesEnabled())
+                && LrTacticalGatewayProvider.gateway().isLoaded();
+        int ammoMultiple = resolveAmmoMultiple(filterConfig);
+        for (BackpackSlot slot : BackpackSlot.values()) {
+            if (slot.isEquipmentSlot() && !throwablesEnabled) {
+                continue;
+            }
+
+            BackpackConfig.Backpack.ItemData itemData = backpack.getItem(slot);
+            ItemStack stack = BackpackItemStackFactory.create(itemData);
+            if (stack.isEmpty()) {
+                continue;
+            }
+            ResourceLocation itemId = ResourceLocation.tryParse(itemData.getItem());
+            if (BackpackNamespaceFilter.isBlocked(filterConfig, stack, itemId)) {
+                continue;
+            }
+
+            switch (slot) {
+                case PRIMARY, SECONDARY -> {
+                    if (TaczGatewayProvider.gateway().isValidGun(stack)) {
+                        if (BackpackAttachmentFilter.removeBlockedInstalledAttachments(filterConfig, stack)) {
+                            LOGGER.warn("Removed blocked attachment from backpack item player={} slot={} item={}",
+                                    player.getGameProfile().getName(), slot.key(), itemId);
+                        }
+                        TaczGatewayProvider.gateway().configureGunAmmo(stack, ammoMultiple);
+                        player.getInventory().setItem(slot == BackpackSlot.PRIMARY ? 0 : 1, stack);
+                    }
+                }
+                case MELEE -> {
+                    if (LrTacticalGatewayProvider.gateway().isMeleeWeapon(stack)) {
+                        player.getInventory().setItem(2, stack);
+                    }
+                }
+                case ITEM1 -> ThrowableInventoryService.seedThrowableSlot(player, ThrowableInventoryService.SLOT_ONE, stack);
+                case ITEM2 -> ThrowableInventoryService.seedThrowableSlot(player, ThrowableInventoryService.SLOT_TWO, stack);
+            }
+        }
+    }
+
+    public static BackpackConfig.Backpack resolveBackpack(BackpackConfig.PlayerBackpackData playerData) {
         if (playerData == null || playerData.getBackpacks_MAP() == null || playerData.getBackpacks_MAP().isEmpty()) {
             return null;
         }

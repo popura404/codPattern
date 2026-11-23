@@ -37,6 +37,18 @@ public class WeaponFilterConfig {
         this.secondaryWeaponTabs = secondaryWeaponTabs == null ? defaultSecondaryWeaponTabs() : secondaryWeaponTabs;
     }
 
+    /** The saved lists may contain older melee/throwable tabs or mixed-case gun categories. */
+    public List<String> getGunTabs(boolean primary) {
+        List<String> configured = primary ? primaryWeaponTabs : secondaryWeaponTabs;
+        if (configured == null) {
+            configured = primary ? defaultPrimaryWeaponTabs() : defaultSecondaryWeaponTabs();
+        }
+        List<String> gunTabs = normalizeStringList(configured);
+        gunTabs.remove("melee");
+        gunTabs.remove("throwable");
+        return gunTabs;
+    }
+
     public List<String> getBlockedItemNamespaces() {
         if (blockedItemNamespaces == null) {
             return defaultBlockedItemNamespaces();
@@ -142,7 +154,6 @@ public class WeaponFilterConfig {
         List<String> tabs = new ArrayList<>();
         tabs.add("pistol");
         tabs.add("rpg");
-        tabs.add("melee");
         return tabs;
     }
 

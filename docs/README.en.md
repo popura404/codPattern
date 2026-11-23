@@ -16,9 +16,9 @@ Loadouts, weapon filters, room state, map edits, and match phases are validated 
 
 ### Loadout Management and Equipment Distribution
 
-- Create, clone, rename, delete, and select loadouts, with up to `10` per player.
+- Create, clone, rename, delete, and select loadouts, with up to `12` per player.
 - Players receive `3` default loadouts when their loadout data is first initialized.
-- Each loadout stores four equipment categories: `primary / secondary / tactical / lethal`.
+- Each loadout has five slots for a primary weapon, secondary weapon, melee weapon, and two equipment items.
 - Room equipment distribution and respawn supplies use the selected loadout; individual modes can provide their own distribution rules.
 - Administrators can force distribution with `/cdp distribute [target]`. Omitting the target applies it to all online players.
 - Without LR Tactical, related melee options, throwable candidates, dedicated throwable slots, and default throwable distribution are disabled automatically. With LR installed, throwables remain subject to the server's filter setting.

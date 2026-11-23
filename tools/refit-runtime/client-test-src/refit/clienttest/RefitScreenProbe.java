@@ -1,8 +1,6 @@
 package refit.clienttest;
 
-import com.cdp.codpattern.client.gui.refit.BackPackSelectButton;
 import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
-import com.cdp.codpattern.client.gui.screen.WeaponMenuScreen;
 import com.cdp.codpattern.client.refit.AttachmentRefitClientState;
 import com.cdp.codpattern.client.refit.RefitOperationQueue;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
@@ -25,7 +23,6 @@ import com.tacz.guns.client.animation.screen.RefitTransform;
 import com.tacz.guns.client.gui.components.refit.GunAttachmentSlot;
 import com.tacz.guns.client.gui.components.refit.InventoryAttachmentSlot;
 import com.tacz.guns.client.gui.components.refit.RefitUnloadButton;
-import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -33,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -185,20 +182,20 @@ final class RefitScreenProbe {
                 if (data == null || data.getBackpacks_MAP().get(1) == null
                         || !MARKER.equals(data.getBackpacks_MAP().get(1).getName())) return;
                 for (var child : screen.children()) {
-                    if (child instanceof BackPackSelectButton button && button.getBAGSERIAL() == 1) {
-                        screen.setFocused(button); step++; return;
+                    if (child instanceof Button button && MARKER.equals(button.getMessage().getString())) {
+                        double x = button.getX() + 2;
+                        double y = button.getY() + button.getHeight() / 2.0;
+                        screen.mouseMoved(x, y);
+                        step++;
+                        return;
                     }
                 }
             }
-            case 3 -> { if (ClientProbeMod.clickButton(screen, "screen.codpattern.backpack.action.configure")) step++; }
+            case 3 -> { if (ClientProbeMod.clickButton(screen, "screen.codpattern.loadout.edit")) step++; }
             case 4, 17 -> {
-                if (!(screen instanceof WeaponMenuScreen)) return;
-                Field primary = WeaponMenuScreen.class.getDeclaredField(slot() + "Button");
-                primary.setAccessible(true);
-                screen.setFocused((GuiEventListener) primary.get(screen));
-                step++;
+                if (hoverConfiguredSlot(screen)) step++;
             }
-            case 5, 18 -> { if (ClientProbeMod.clickButton(screen, "screen.codpattern.attachment_config.button")) step++; }
+            case 5, 18 -> { if (ClientProbeMod.clickButton(screen, "screen.codpattern.loadout.refit")) step++; }
             case 6 -> {
                 if (!(screen instanceof CodGunRefitScreen) || !AttachmentRefitClientState.acceptsTaczOperations()) return;
                 initialCatalog = catalogIds();
@@ -271,6 +268,22 @@ final class RefitScreenProbe {
 
     static String stage() { return System.getProperty("codpattern.clientTestStage", "world"); }
     static String slot() { return System.getProperty("codpattern.clientTestSlot", "primary"); }
+
+    static boolean hoverConfiguredSlot(Screen screen) {
+        if (!(screen instanceof BackpackMenuScreen)) return false;
+        String key = "screen.codpattern.loadout.slot." + slot();
+        for (var child : screen.children()) {
+            if (child instanceof Button button && button.visible && button.active
+                    && key.equals(ClientProbeMod.key(button.getMessage()))) {
+                double x = button.getX() + button.getWidth() / 2.0;
+                double y = button.getY() + button.getHeight() / 2.0;
+                screen.mouseMoved(x - 1, y);
+                screen.mouseMoved(x, y);
+                return true;
+            }
+        }
+        return false;
+    }
 
     static boolean selectType(Screen screen, AttachmentType type) {
         if (RefitTransform.getOpeningProgress() != 1F || RefitTransform.getTransformProgress() != 1F) return false;

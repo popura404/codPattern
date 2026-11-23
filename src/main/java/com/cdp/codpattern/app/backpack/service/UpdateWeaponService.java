@@ -2,6 +2,7 @@ package com.cdp.codpattern.app.backpack.service;
 
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackConfigRepository;
+import com.cdp.codpattern.config.backpack.BackpackSlot;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
@@ -20,14 +21,10 @@ import net.minecraft.world.item.Items;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 public final class UpdateWeaponService {
-    private static final Set<String> ALLOWED_SLOTS = Set.of("primary", "secondary", "tactical", "lethal");
-    private static final String THROWABLE_ITEM_ID = "lrtactical:throwable";
     private static final String THROWABLE_ID_TAG = "ThrowableId";
     private static final String MELEE_WEAPON_ID_TAG = "MeleeWeaponId";
-    private static final String MELEE_TAB = "melee";
 
     public record Result(BackpackConfig.PlayerBackpackData playerData, boolean success, String slot, String code,
             String message) {
@@ -57,13 +54,13 @@ public final class UpdateWeaponService {
             return fail(playerData, weaponSlot, "BAG_NOT_FOUND", "");
         }
 
-        ValidationResult slotResult = validateSlot(weaponSlot);
-        if (!slotResult.success()) {
-            return fail(playerData, weaponSlot, slotResult.code(), slotResult.message());
+        BackpackSlot slot = BackpackSlot.fromMenuKey(weaponSlot);
+        if (slot == null) {
+            return fail(playerData, weaponSlot, "SLOT_INVALID", "");
         }
 
         WeaponFilterConfig filterConfig = WeaponFilterConfigRepository.loadOrCreate(filterPath);
-        ValidationResult throwableAvailabilityResult = validateThrowableAvailability(weaponSlot, filterConfig);
+        ValidationResult throwableAvailabilityResult = validateThrowableAvailability(slot, filterConfig);
         if (!throwableAvailabilityResult.success()) {
             return fail(playerData, weaponSlot, throwableAvailabilityResult.code(), throwableAvailabilityResult.message());
         }
@@ -75,26 +72,33 @@ public final class UpdateWeaponService {
             return fail(playerData, weaponSlot, "NBT_INVALID", "");
         }
 
-        ValidationResult itemResult = validateItem(itemId);
-        if (!itemResult.success()) {
-            return fail(playerData, weaponSlot, itemResult.code(), itemResult.message());
+        ResourceLocation itemLocation = itemId == null || itemId.isBlank() ? null : ResourceLocation.tryParse(itemId);
+        if (itemLocation == null) {
+            return fail(playerData, weaponSlot, "ITEM_ID_INVALID", "");
         }
-
-        ValidationResult categoryResult = validateCategory(weaponSlot, itemId, parsedNbt, filterConfig);
+        Item item = BuiltInRegistries.ITEM.get(itemLocation);
+        if (item == null || item == Items.AIR) {
+            return fail(playerData, weaponSlot, "ITEM_NOT_REGISTERED", "");
+        }
+        ItemStack candidateStack = new ItemStack(item);
+        if (!parsedNbt.isEmpty()) {
+            candidateStack.setTag(parsedNbt.copy());
+        }
+        ValidationResult categoryResult = validateCategory(slot, candidateStack, itemLocation, filterConfig);
         if (!categoryResult.success()) {
             return fail(playerData, weaponSlot, categoryResult.code(), categoryResult.message());
         }
 
         String canonicalNbt = parsedNbt.isEmpty() ? "" : parsedNbt.toString();
-        BackpackConfig.Backpack.ItemData previousItem = backpack.getItem_MAP().put(weaponSlot,
-                new BackpackConfig.Backpack.ItemData(itemId, 1, canonicalNbt));
+        BackpackConfig.Backpack.ItemData previousItem = backpack.getItem(slot);
+        backpack.setItem(slot, new BackpackConfig.Backpack.ItemData(itemId, 1, canonicalNbt));
         try {
             BackpackConfigRepository.save();
         } catch (BackpackConfigRepository.RepositoryException failure) {
             if (previousItem == null) {
-                backpack.getItem_MAP().remove(weaponSlot);
+                backpack.getItem_MAP().remove(slot.key());
             } else {
-                backpack.getItem_MAP().put(weaponSlot, previousItem);
+                backpack.setItem(slot, previousItem);
             }
             throw failure;
         }
@@ -106,29 +110,8 @@ public final class UpdateWeaponService {
         return new Result(playerData, false, slot, code, message);
     }
 
-    private static ValidationResult validateSlot(String slot) {
-        if (slot == null || !ALLOWED_SLOTS.contains(slot)) {
-            return ValidationResult.fail("SLOT_INVALID", "");
-        }
-        return ValidationResult.ok();
-    }
-
-    private static ValidationResult validateItem(String itemId) {
-        if (itemId == null || itemId.isBlank()) {
-            return ValidationResult.fail("ITEM_ID_INVALID", "");
-        }
-        ResourceLocation resourceLocation = ResourceLocation.tryParse(itemId);
-        if (resourceLocation == null) {
-            return ValidationResult.fail("ITEM_ID_INVALID", "");
-        }
-        if (resolveRegisteredItem(resourceLocation) == null) {
-            return ValidationResult.fail("ITEM_NOT_REGISTERED", "");
-        }
-        return ValidationResult.ok();
-    }
-
-    private static ValidationResult validateThrowableAvailability(String slot, WeaponFilterConfig filterConfig) {
-        if (!isThrowableSlot(slot)) {
+    private static ValidationResult validateThrowableAvailability(BackpackSlot slot, WeaponFilterConfig filterConfig) {
+        if (!slot.isEquipmentSlot()) {
             return ValidationResult.ok();
         }
         if (!LrTacticalGatewayProvider.gateway().isLoaded()) {
@@ -140,38 +123,20 @@ public final class UpdateWeaponService {
         return ValidationResult.ok();
     }
 
-    private static ValidationResult validateCategory(String slot,
-            String itemId,
-            CompoundTag nbtTag,
-            WeaponFilterConfig filterConfig) {
+    private static ValidationResult validateCategory(BackpackSlot slot, ItemStack candidateStack,
+            ResourceLocation itemResourceLocation, WeaponFilterConfig filterConfig) {
         if (filterConfig == null) {
             filterConfig = new WeaponFilterConfig();
         }
 
-        ResourceLocation itemResourceLocation = ResourceLocation.tryParse(itemId);
-        Item item = itemResourceLocation == null ? null : resolveRegisteredItem(itemResourceLocation);
-        if (item == null) {
-            return ValidationResult.fail("ITEM_NOT_REGISTERED", "");
-        }
-
-        ItemStack candidateStack = new ItemStack(item, 1);
-        if (nbtTag != null && !nbtTag.isEmpty()) {
-            candidateStack.setTag(nbtTag.copy());
-        }
         if (BackpackNamespaceFilter.isBlocked(filterConfig, candidateStack, itemResourceLocation)) {
             return ValidationResult.fail("ITEM_BLOCKED", "");
         }
 
-        if ("primary".equals(slot) || "secondary".equals(slot)) {
-            Optional<String> weaponCategoryOpt = resolveWeaponCategory(itemId, candidateStack, nbtTag);
-            if (weaponCategoryOpt.isEmpty()) {
-                return ValidationResult.fail("ITEM_CATEGORY_INVALID", "");
-            }
-            String weaponCategory = weaponCategoryOpt.get();
-            List<String> allowedTypes = "primary".equals(slot)
-                    ? filterConfig.getPrimaryWeaponTabs()
-                    : filterConfig.getSecondaryWeaponTabs();
-            if (allowedTypes != null && !allowedTypes.isEmpty() && !allowedTypes.contains(weaponCategory)) {
+        if (slot.isGunSlot()) {
+            Optional<String> category = TaczGatewayProvider.gateway().resolveGunType(candidateStack);
+            List<String> allowedTypes = filterConfig.getGunTabs(slot == BackpackSlot.PRIMARY);
+            if (category.isEmpty() || !allowedTypes.contains(category.get())) {
                 return ValidationResult.fail("ITEM_CATEGORY_INVALID", "");
             }
             if (BackpackAttachmentFilter.findFirstBlockedInstalledAttachmentId(filterConfig, candidateStack).isPresent()) {
@@ -180,50 +145,15 @@ public final class UpdateWeaponService {
             return ValidationResult.ok();
         }
 
-        if (!LrTacticalGatewayProvider.gateway().isLoaded()) {
-            return ValidationResult.fail("THROWABLES_UNAVAILABLE", "");
-        }
-        if (!filterConfig.isThrowablesEnabled()) {
-            return ValidationResult.fail("THROWABLES_DISABLED", "");
-        }
-        if (!THROWABLE_ITEM_ID.equals(itemId)) {
-            return ValidationResult.fail("ITEM_CATEGORY_INVALID", "");
-        }
-        if (nbtTag == null || !nbtTag.contains(THROWABLE_ID_TAG, Tag.TAG_STRING)) {
+        CompoundTag nbtTag = candidateStack.getTag();
+        String idTag = slot == BackpackSlot.MELEE ? MELEE_WEAPON_ID_TAG : THROWABLE_ID_TAG;
+        if (nbtTag == null || !nbtTag.contains(idTag, Tag.TAG_STRING)) {
             return ValidationResult.fail("NBT_INVALID", "");
         }
-        return ValidationResult.ok();
-    }
-
-    private static Optional<String> resolveWeaponCategory(String itemId, ItemStack weaponStack, CompoundTag nbtTag) {
-        Optional<String> gunTypeOpt = TaczGatewayProvider.gateway().resolveGunType(weaponStack);
-        if (gunTypeOpt.isPresent()) {
-            return gunTypeOpt;
-        }
-
-        if (isLrTacticalMelee(weaponStack, nbtTag)) {
-            return Optional.of(MELEE_TAB);
-        }
-        return Optional.empty();
-    }
-
-    private static boolean isLrTacticalMelee(ItemStack stack, CompoundTag nbtTag) {
-        if (nbtTag == null || !nbtTag.contains(MELEE_WEAPON_ID_TAG, Tag.TAG_STRING)) {
-            return false;
-        }
-        return LrTacticalGatewayProvider.gateway().isMeleeWeapon(stack);
-    }
-
-    private static boolean isThrowableSlot(String slot) {
-        return "tactical".equals(slot) || "lethal".equals(slot);
-    }
-
-    private static Item resolveRegisteredItem(ResourceLocation resourceLocation) {
-        Item item = BuiltInRegistries.ITEM.get(resourceLocation);
-        if (item == null || item == Items.AIR) {
-            return null;
-        }
-        return item;
+        boolean matchesSlot = slot == BackpackSlot.MELEE
+                ? LrTacticalGatewayProvider.gateway().isMeleeWeapon(candidateStack)
+                : LrTacticalGatewayProvider.gateway().isThrowableStack(candidateStack);
+        return matchesSlot ? ValidationResult.ok() : ValidationResult.fail("ITEM_CATEGORY_INVALID", "");
     }
 
     private static CompoundTag parseNbt(String rawNbt) throws Exception {

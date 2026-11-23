@@ -91,7 +91,14 @@ public class BackPackSelectButton extends Button {
         WeaponFilterConfig filterConfig = WeaponFilterClientCache.get();
 
         for (Map.Entry<String, BackpackConfig.Backpack.ItemData> entry : backpack.getItem_MAP().entrySet()) {
-            String type = entry.getKey();
+            // Translate the five-slot save into the four columns of the current menu.
+            String type = switch (entry.getKey()) {
+                case "primary", "secondary" -> entry.getKey();
+                case "item1" -> "tactical";
+                case "item2" -> "lethal";
+                default -> null;
+            };
+            if (type == null) continue;
             BackpackConfig.Backpack.ItemData itemData = entry.getValue();
 
             try {

@@ -150,6 +150,10 @@ public final class Phase0MainDataFixtureCompatTest {
                 "general filter primary tab case is currently retained");
         require(config.getSecondaryWeaponTabs().equals(List.of("Pistol", "MELEE")),
                 "general filter secondary tab case is currently retained");
+        require(config.getGunTabs(true).equals(List.of("rifle", "sniper")),
+                "primary selection must resolve mixed-case gun categories");
+        require(config.getGunTabs(false).equals(List.of("pistol")),
+                "legacy melee categories must not be offered as secondary guns");
         require(config.getBlockedItemNamespaces().equals(List.of("legacypack", "otherpack")),
                 "general filter blocked namespaces currently trim/lowercase/deduplicate");
         require(config.getBlockedWeaponIds().equals(List.of("example:gun_a", "example:gun_b")),

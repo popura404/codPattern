@@ -2,12 +2,14 @@ package com.cdp.codpattern.compat.tacz.client;
 
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.tacz.guns.client.gui.GunRefitScreen;
+import net.minecraft.client.InputType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import org.jetbrains.annotations.NotNull;
+import org.lwjgl.glfw.GLFW;
 
 @OnlyIn(Dist.CLIENT)
 public class CodGunRefitScreen extends GunRefitScreen {
@@ -29,8 +31,9 @@ public class CodGunRefitScreen extends GunRefitScreen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == 256) {
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
             if (parentScreen != null) {
+                Minecraft.getInstance().setLastInputType(InputType.KEYBOARD_TAB);
                 Minecraft.getInstance().setScreen(parentScreen);
             } else {
                 Minecraft.getInstance().setScreen(null);

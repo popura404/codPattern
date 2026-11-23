@@ -8,6 +8,7 @@ import com.cdp.codpattern.client.gui.refit.FlatColorButton;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
+import com.cdp.codpattern.config.backpack.BackpackSlot;
 import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
@@ -78,8 +79,8 @@ public class WeaponMenuScreen extends Screen {
     public void TextureandPackInfo() {
         this.primaryItemStack = buildItemStack(backpack.getItem_MAP().get("primary"));
         this.secondaryItemStack = buildItemStack(backpack.getItem_MAP().get("secondary"));
-        this.tacticalItemStack = buildItemStack(backpack.getItem_MAP().get("tactical"));
-        this.lethalItemStack = buildItemStack(backpack.getItem_MAP().get("lethal"));
+        this.tacticalItemStack = buildItemStack(backpack.getItem(BackpackSlot.ITEM1));
+        this.lethalItemStack = buildItemStack(backpack.getItem(BackpackSlot.ITEM2));
     }
 
     private ItemStack buildItemStack(BackpackConfig.Backpack.ItemData itemData) {
