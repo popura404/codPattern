@@ -13,7 +13,7 @@ public final class TdmHudOverlayStaticContractCompatTest {
     public static void main(String[] args) throws IOException {
         String overlay = Files.readString(OVERLAY);
 
-        requireContains(overlay, "BuiltInGameModes.isFrontline(gameType) || BuiltInGameModes.isTeamDeathMatch(gameType)",
+        requireContains(overlay, "BuiltInGameModes.isTeamMatchRoom(ClientTdmState.roomContextName())",
                 "TDM overlay room gate must include frontline as well as teamdeathmatch");
         requireContains(overlay, "if (!hasCurrentTdmRoomContext())",
                 "TDM overlay should stay gated to TDM-family rooms");

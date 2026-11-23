@@ -7,6 +7,8 @@ import com.cdp.codpattern.network.match.RoomRosterDelta;
 
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public final class PvpTeamRosterBaselineCompatTest {
@@ -16,8 +18,23 @@ public final class PvpTeamRosterBaselineCompatTest {
     public static void main(String[] args) throws Exception {
         verifyTeamBalance();
         verifyRosterDeltaMasksAndPingBuckets();
+        verifyOfflineSettlementMember();
         RoomRosterSyncCoordinatorCompatTest.main(args);
         System.out.println("PASS PVP team/roster baseline compat");
+    }
+
+    private static void verifyOfflineSettlementMember() {
+        UUID id = UUID.randomUUID();
+        List<TeamPlayerSnapshotService.TeamRoster> teams =
+                List.of(new TeamPlayerSnapshotService.TeamRoster("specgru", List.of(id)));
+        requireTrue(TeamPlayerSnapshotService.buildTeamPlayers(teams, ignored -> null, Map.of(), Map.of(),
+                Map.of(), Map.of(), Set.of(), Set.of()).get("specgru").isEmpty(),
+                "live roster still excludes offline players");
+        List<PlayerInfo> finalTeam = TeamPlayerSnapshotService.buildTeamPlayers(teams, ignored -> null,
+                Map.of(), Map.of(id, 17), Map.of(id, 3), Map.of(id, 8), Set.of(), Set.of(),
+                ignored -> "Rejoining").get("specgru");
+        requireEquals(List.of(new PlayerInfo(id, "Rejoining", false, 17, 3, 8, false, false, -1)),
+                finalTeam, "retained room members have their final team, name, kills, deaths and streak");
     }
 
     private static void verifyTeamBalance() {

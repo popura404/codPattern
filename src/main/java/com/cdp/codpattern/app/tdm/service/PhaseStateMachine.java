@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 
 public final class PhaseStateMachine {
+    /** Legacy page timings exposed to add-ons using the original summary. */
     public static final int END_SUMMARY_PAGE_TICKS = 100;
     public static final int END_SUMMARY_PAGE_COUNT = 3;
     public static final int END_PHASE_TOTAL_TICKS = END_SUMMARY_PAGE_TICKS * END_SUMMARY_PAGE_COUNT;
@@ -139,6 +140,7 @@ public final class PhaseStateMachine {
             case COUNTDOWN -> Math.max(0, PRE_GAME_COUNTDOWN_TICKS - phaseTimer);
             case WARMUP -> Math.max(0, PREPARE_DURATION_TICKS - phaseTimer);
             case PLAYING -> Math.max(0, (config.getTimeLimitSeconds() * 20) - gameTimeTicks);
+            case ENDED -> Math.max(0, TdmSettlementTiming.TOTAL_TICKS - phaseTimer);
             default -> 0;
         };
     }
@@ -192,7 +194,7 @@ public final class PhaseStateMachine {
 
     private static TickResult tickEnded(int phaseTimer, int gameTimeTicks, Hooks hooks) {
         int nextPhaseTimer = phaseTimer + 1;
-        if (nextPhaseTimer >= END_PHASE_TOTAL_TICKS) {
+        if (nextPhaseTimer >= TdmSettlementTiming.TOTAL_TICKS) {
             hooks.resetGame();
             return new TickResult(nextPhaseTimer, gameTimeTicks, Optional.empty(), true);
         }

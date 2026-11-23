@@ -1,6 +1,7 @@
 package com.cdp.codpattern.app.match;
 
 import com.cdp.codpattern.app.match.model.ModeCapability;
+import com.cdp.codpattern.app.match.model.RoomId;
 
 public final class BuiltInGameModes {
     public static final String FRONTLINE = "frontline";
@@ -18,6 +19,18 @@ public final class BuiltInGameModes {
 
     public static boolean isTeamDeathMatch(String gameType) {
         return TEAM_DEATHMATCH.equals(GameModeRegistry.canonicalize(gameType));
+    }
+
+    public static boolean isTeamMatchRoom(String roomKey) {
+        if (roomKey == null || roomKey.isBlank()) {
+            return false;
+        }
+        try {
+            String gameType = RoomId.decode(roomKey).gameType();
+            return isFrontline(gameType) || isTeamDeathMatch(gameType);
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
     public static boolean isZombies(String gameType) {

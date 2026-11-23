@@ -1,12 +1,14 @@
 package com.cdp.codpattern.event.client;
 
 import com.cdp.codpattern.CodPatternConstants;
+import com.cdp.codpattern.client.gui.overlay.TdmHudOverlay;
 import com.cdp.codpattern.client.runtime.ModeHudReplacementPolicies;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderGuiOverlayEvent;
 import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.fml.common.Mod;
 
 import java.util.Set;
@@ -20,6 +22,13 @@ public final class TdmVanillaHudSuppressor {
             VanillaGuiOverlay.FOOD_LEVEL.id());
 
     private TdmVanillaHudSuppressor() {
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onSettlementOverlay(RenderGuiOverlayEvent.Pre event) {
+        if (TdmHudOverlay.isShowingSettlement() && event.getOverlay().overlay() != TdmHudOverlay.INSTANCE) {
+            event.setCanceled(true);
+        }
     }
 
     @SubscribeEvent

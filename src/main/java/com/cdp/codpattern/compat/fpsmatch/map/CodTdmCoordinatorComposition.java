@@ -141,7 +141,7 @@ final class CodTdmCoordinatorComposition {
         CodTdmClientSyncCoordinator clientSyncCoordinator = new CodTdmClientSyncCoordinator(
                 new CodTdmClientSyncMapPortAdapter(
                         () -> RoomId.of(mapPort.gameType(), mapNameSupplier.get()).encode(),
-                        () -> TeamPlayerSnapshotService.buildTeamPlayers(
+                        includeOffline -> TeamPlayerSnapshotService.buildTeamPlayers(
                                 mapPort.teamRosters(),
                                 uuid -> mapPort.serverLevel().getPlayerByUUID(uuid),
                                 playerState.readyStates(),
@@ -149,7 +149,13 @@ final class CodTdmCoordinatorComposition {
                                 playerState.playerDeaths(),
                                 playerState.maxKillStreaks(),
                                 playerState.respawnTimers().keySet(),
-                                playerState.invinciblePlayers()
+                                playerState.invinciblePlayers(),
+                                id -> {
+                                    if (!includeOffline) return null;
+                                    var profiles = mapPort.serverLevel().getServer().getProfileCache();
+                                    return profiles == null ? id.toString()
+                                            : profiles.get(id).map(com.mojang.authlib.GameProfile::getName).orElse(id.toString());
+                                }
                         ),
                         mapPort::joinedPlayers,
                         mapPort::spectatorPlayers

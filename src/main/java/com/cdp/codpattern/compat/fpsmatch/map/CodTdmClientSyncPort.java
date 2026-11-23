@@ -9,7 +9,7 @@ import java.util.Map;
 interface CodTdmClientSyncPort {
     String roomKey();
 
-    Map<String, List<PlayerInfo>> getTeamPlayers();
+    Map<String, List<PlayerInfo>> getTeamPlayers(boolean includeOffline);
 
     List<ServerPlayer> getJoinedPlayers();
 

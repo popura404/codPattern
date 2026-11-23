@@ -1,6 +1,7 @@
 package com.cdp.codpattern.client.state;
 
 import com.cdp.codpattern.CodPatternConstants;
+import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.client.ClientMatchState;
 import com.cdp.codpattern.app.tdm.service.PhaseStateMachine;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
@@ -55,6 +56,7 @@ public final class ClientMatchStateStore {
     private int announcementTicks = 0;
     private int announcementTotalTicks = 0;
     private int endSummaryTicks = 0;
+    private TdmSettlementState settlement;
     private boolean dead = false;
     private String killerName = "";
     private int deathCamTicks = 0;
@@ -149,6 +151,10 @@ public final class ClientMatchStateStore {
         return Math.max(0, Math.min(PhaseStateMachine.END_SUMMARY_PAGE_COUNT - 1, page));
     }
 
+    public TdmSettlementState settlement() {
+        return settlement;
+    }
+
     public int endSummaryPageTick() {
         int pageTicks = Math.max(1, PhaseStateMachine.END_SUMMARY_PAGE_TICKS);
         return endSummaryTicks % pageTicks;
@@ -208,10 +214,11 @@ public final class ClientMatchStateStore {
 
     public void updateTeamPlayers(String mapName, int latestRosterVersion, Map<String, List<PlayerInfo>> latestTeamPlayers) {
         long now = System.currentTimeMillis();
-        syncedMapName = mapName == null ? "" : mapName;
-        if (!syncedMapName.isBlank()) {
-            roomContextName = syncedMapName;
+        String roomKey = mapName == null ? "" : mapName;
+        if (!roomKey.isBlank()) {
+            setRoomContext(roomKey);
         }
+        syncedMapName = roomKey;
         rosterVersion = Math.max(0, latestRosterVersion);
         lastRosterSyncAtMs = now;
         teamPlayers.clear();
@@ -282,12 +289,12 @@ public final class ClientMatchStateStore {
             phaseFlashTicks = PHASE_FLASH_DURATION;
             triggerPhaseAnnouncement(phase);
             queuePhaseCue(phase);
-            if ("ENDED".equals(phase)) {
-                endSummaryTicks = 0;
-            }
-            if ("ENDED".equals(oldPhase) && !"ENDED".equals(phase)) {
-                endSummaryTicks = 0;
-            }
+            endSummaryTicks = 0;
+        }
+        if (!"ENDED".equals(phase)) {
+            settlement = null;
+        } else if (settlement == null && BuiltInGameModes.isTeamMatchRoom(roomContextName)) {
+            settlement = new TdmSettlementState(team1Score, team2Score, teamPlayers, time, System.nanoTime());
         }
         previousPhase = oldPhase;
         currentPhase = phase;
@@ -334,10 +341,18 @@ public final class ClientMatchStateStore {
     }
 
     public void setRoomContext(String roomName) {
-        roomContextName = roomName == null ? "" : roomName;
+        String nextRoom = roomName == null ? "" : roomName;
+        if (settlement != null && !roomContextName.isEmpty() && !roomContextName.equals(nextRoom)) {
+            resetMatchState();
+        }
+        roomContextName = nextRoom;
     }
 
     public void clearRoomContext() {
+        if (settlement != null) {
+            resetMatchState();
+            return;
+        }
         roomContextName = "";
         syncedMapName = "";
         rosterVersion = 0;
@@ -372,6 +387,7 @@ public final class ClientMatchStateStore {
         announcementTicks = 0;
         announcementTotalTicks = 0;
         endSummaryTicks = 0;
+        settlement = null;
         roomContextName = "";
         syncedMapName = "";
         rosterVersion = 0;
@@ -548,6 +564,9 @@ public final class ClientMatchStateStore {
         if ("ENDED".equals(currentPhase)
                 && endSummaryTicks < PhaseStateMachine.END_PHASE_TOTAL_TICKS) {
             endSummaryTicks++;
+        }
+        if (settlement != null) {
+            settlement.elapsedSeconds(System.nanoTime(), Minecraft.getInstance().isPaused());
         }
         if (deathCamTicks > 0) {
             deathCamTicks--;

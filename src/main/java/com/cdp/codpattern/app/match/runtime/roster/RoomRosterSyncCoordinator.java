@@ -36,6 +36,10 @@ public final class RoomRosterSyncCoordinator<R> {
 
         Map<String, List<PlayerInfo>> rosterSnapshot();
 
+        default Map<String, List<PlayerInfo>> previewRosterSnapshot() {
+            return rosterSnapshot();
+        }
+
         Collection<R> liveRecipients();
 
         UUID recipientId(R recipient);
@@ -175,7 +179,7 @@ public final class RoomRosterSyncCoordinator<R> {
         if (requester == null) {
             return;
         }
-        Map<String, List<PlayerInfo>> snapshot = deepCopyTeamPlayers(source.rosterSnapshot());
+        Map<String, List<PlayerInfo>> snapshot = deepCopyTeamPlayers(source.previewRosterSnapshot());
         publisher.publishPreview(source.roomKey(), effectiveVersion(), snapshot, requester);
     }
 

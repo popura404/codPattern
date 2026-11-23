@@ -2,6 +2,7 @@ package com.cdp.codpattern.client;
 
 import com.cdp.codpattern.client.state.ClientMatchStateStore;
 import com.cdp.codpattern.client.state.KillFeedEntry;
+import com.cdp.codpattern.client.state.TdmSettlementState;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import com.cdp.codpattern.network.match.RoomRosterDelta;
 import net.minecraft.world.item.ItemStack;
@@ -63,6 +64,10 @@ public final class ClientMatchState {
 
     public static boolean hasRoomContext() {
         return STORE.hasRoomContext();
+    }
+
+    public static TdmSettlementState settlement() {
+        return STORE.settlement();
     }
 
     public static int endSummaryPageIndex() {

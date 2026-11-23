@@ -1,6 +1,7 @@
 package com.cdp.codpattern.network.handler;
 
 import com.cdp.codpattern.app.match.model.RoomId;
+import com.cdp.codpattern.app.match.BuiltInGameModes;
 import com.cdp.codpattern.app.match.model.ModeObjectState;
 import com.cdp.codpattern.app.match.model.ModeRuntimeStateSnapshot;
 import com.cdp.codpattern.client.ClientMatchState;
@@ -8,7 +9,9 @@ import com.cdp.codpattern.client.ClientModeObjectState;
 import com.cdp.codpattern.client.ClientModeRuntimeState;
 import com.cdp.codpattern.client.TdmCombatMarkerTracker;
 import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
+import com.cdp.codpattern.client.gui.screen.backpack.BackpackCanvasScreen;
 import com.cdp.codpattern.client.gui.screen.ModeRoomScreen;
+import com.cdp.codpattern.client.gui.screen.ModeSelectScreen;
 import com.cdp.codpattern.client.gui.screen.NoticePopupScreen;
 import com.cdp.codpattern.client.gui.screen.PopupNoticeHelper;
 import com.cdp.codpattern.client.gui.screen.match.ModeRoomData;
@@ -27,6 +30,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.RemotePlayer;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -219,6 +223,11 @@ public class ClientPacketHandler {
                 closeMatchStartScreens(minecraft);
             } else if ("ENDED".equals(phase)) {
                 closeActiveVoteDialog(minecraft);
+                if (ClientMatchState.settlement() == null && BuiltInGameModes.isTeamMatchRoom(ClientMatchState.roomContextName()) &&
+                        (minecraft.screen instanceof BackpackCanvasScreen || minecraft.screen instanceof ModeRoomScreen
+                                || minecraft.screen instanceof ModeSelectScreen || minecraft.screen instanceof AbstractContainerScreen<?>)) {
+                    minecraft.setScreen(null);
+                }
             }
             ClientMatchState.updatePhase(phase, remainingTicks);
         });

@@ -114,9 +114,14 @@ public final class PvpPhaseScoreBaselineCompatTest {
 
         hooks.joinedPlayers = Collections.singletonList(null);
         hooks.hasEndTeleport = false;
+        requireEquals(250, TdmSettlementTiming.TOTAL_TICKS, "built-in results last twelve and a half seconds");
+        requireEquals(120, PhaseStateMachine.getRemainingTimeTicks(TdmGamePhase.ENDED, 130, 55, config),
+                "late viewers get the remaining scoreboard interval");
+        requireTrue(!PhaseStateMachine.tick(TdmGamePhase.ENDED, 248, 55, config, Map.of(), hooks).resetTriggered(),
+                "the last scoreboard tick remains visible");
         PhaseStateMachine.TickResult missingEndPoint = PhaseStateMachine.tick(
                 TdmGamePhase.ENDED,
-                PhaseStateMachine.END_PHASE_TOTAL_TICKS - 1,
+                TdmSettlementTiming.TOTAL_TICKS - 1,
                 55,
                 config,
                 Map.of(),
@@ -132,7 +137,7 @@ public final class PvpPhaseScoreBaselineCompatTest {
         unusableHooks.teleportSucceeds = false;
         PhaseStateMachine.tick(
                 TdmGamePhase.ENDED,
-                PhaseStateMachine.END_PHASE_TOTAL_TICKS - 1,
+                TdmSettlementTiming.TOTAL_TICKS - 1,
                 0,
                 config,
                 Map.of(),

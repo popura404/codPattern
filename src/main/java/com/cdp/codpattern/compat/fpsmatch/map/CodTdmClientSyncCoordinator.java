@@ -35,6 +35,7 @@ final class CodTdmClientSyncCoordinator {
     private final IntSupplier gameTimeTicksSupplier;
     private final Supplier<Map<String, Integer>> teamScoresSupplier;
     private final RoomRosterSyncCoordinator<ServerPlayer> rosterCoordinator;
+    private Map<String, List<PlayerInfo>> settlementRoster;
 
     CodTdmClientSyncCoordinator(
             CodTdmClientSyncPort port,
@@ -73,12 +74,26 @@ final class CodTdmClientSyncCoordinator {
                 config.getMarkerBarMaxDistance(),
                 config.getMarkerVisibleGraceTicks());
 
+        if (phase == TdmGamePhase.ENDED) {
+            if (settlementRoster == null) {
+                settlementRoster = port.getTeamPlayers(true);
+                // Deliver the deciding kill and both rosters before starting the presentation.
+                rosterCoordinator.broadcastFullSnapshot();
+            } else {
+                // Bootstrap new recipients before their first ENDED packet.
+                rosterCoordinator.synchronize(false);
+            }
+        } else {
+            settlementRoster = null;
+        }
         for (ServerPlayer player : currentRecipients()) {
-            ModNetworkChannel.sendToPlayer(phasePacket, player);
             ModNetworkChannel.sendToPlayer(scorePacket, player);
+            ModNetworkChannel.sendToPlayer(phasePacket, player);
             ModNetworkChannel.sendToPlayer(markerConfigPacket, player);
         }
-        rosterCoordinator.synchronize(false);
+        if (phase != TdmGamePhase.ENDED) {
+            rosterCoordinator.synchronize(false);
+        }
         CodTdmRoomManager.getInstance().markRoomListDirty();
     }
 
@@ -113,7 +128,13 @@ final class CodTdmClientSyncCoordinator {
 
         @Override
         public Map<String, List<PlayerInfo>> rosterSnapshot() {
-            return port.getTeamPlayers();
+            return phaseSupplier.get() == TdmGamePhase.ENDED && settlementRoster != null
+                    ? settlementRoster : port.getTeamPlayers(false);
+        }
+
+        @Override
+        public Map<String, List<PlayerInfo>> previewRosterSnapshot() {
+            return port.getTeamPlayers(false);
         }
 
         @Override

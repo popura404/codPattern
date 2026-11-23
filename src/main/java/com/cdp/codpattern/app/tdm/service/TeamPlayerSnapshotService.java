@@ -2,6 +2,7 @@ package com.cdp.codpattern.app.tdm.service;
 
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.GameType;
 
 import java.util.ArrayList;
@@ -27,6 +28,19 @@ public final class TeamPlayerSnapshotService {
             Map<UUID, Integer> maxKillStreaks,
             Set<UUID> respawningPlayers,
             Set<UUID> invinciblePlayers) {
+        return buildTeamPlayers(teams, playerLookup, readyStates, playerKills, playerDeaths, maxKillStreaks,
+                respawningPlayers, invinciblePlayers, id -> null);
+    }
+
+    public static Map<String, List<PlayerInfo>> buildTeamPlayers(List<TeamRoster> teams,
+            Function<UUID, Player> playerLookup,
+            Map<UUID, Boolean> readyStates,
+            Map<UUID, Integer> playerKills,
+            Map<UUID, Integer> playerDeaths,
+            Map<UUID, Integer> maxKillStreaks,
+            Set<UUID> respawningPlayers,
+            Set<UUID> invinciblePlayers,
+            Function<UUID, String> offlineMemberName) {
         Map<String, List<PlayerInfo>> result = new HashMap<>();
 
         for (TeamRoster team : teams) {
@@ -34,20 +48,16 @@ public final class TeamPlayerSnapshotService {
 
             for (UUID playerId : team.playerIds()) {
                 Player player = playerLookup.apply(playerId);
-                if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
-                    PlayerInfo info = new PlayerInfo(
-                            playerId,
-                            serverPlayer.getName().getString(),
-                            readyStates.getOrDefault(playerId, false),
-                            playerKills.getOrDefault(playerId, 0),
-                            playerDeaths.getOrDefault(playerId, 0),
-                            maxKillStreaks.getOrDefault(playerId, 0),
-                            serverPlayer.gameMode.getGameModeForPlayer() == GameType.ADVENTURE
+                ServerPlayer online = player instanceof ServerPlayer joined ? joined : null;
+                String name = online == null ? offlineMemberName.apply(playerId) : online.getName().getString();
+                if (name != null) {
+                    playerInfos.add(new PlayerInfo(playerId, name,
+                            readyStates.getOrDefault(playerId, false), playerKills.getOrDefault(playerId, 0),
+                            playerDeaths.getOrDefault(playerId, 0), maxKillStreaks.getOrDefault(playerId, 0),
+                            online != null && online.gameMode.getGameModeForPlayer() == GameType.ADVENTURE
                                     && !respawningPlayers.contains(playerId),
-                            invinciblePlayers.contains(playerId),
-                            Math.max(0, serverPlayer.latency)
-                    );
-                    playerInfos.add(info);
+                            online != null && invinciblePlayers.contains(playerId),
+                            online == null ? -1 : Math.max(0, online.latency)));
                 }
             }
 
