@@ -126,7 +126,7 @@ public final class BackpackEquipmentRenderer {
             }
         }
 
-        graphics.enableScissor(x, y, x + width, y + height);
+        BackpackCanvasScreen.clipModel(graphics, x, y, width, height);
         PoseStack pose = graphics.pose();
         pose.pushPose();
         try {
@@ -142,7 +142,7 @@ public final class BackpackEquipmentRenderer {
         } finally {
             Lighting.setupFor3DItems();
             pose.popPose();
-            graphics.disableScissor();
+            BackpackCanvasScreen.restoreCanvasClip(graphics);
         }
     }
 }

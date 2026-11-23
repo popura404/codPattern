@@ -1,5 +1,6 @@
 package refit.clienttest;
 
+import com.cdp.codpattern.client.gui.screen.backpack.BackpackCanvasScreen;
 import com.google.gson.GsonBuilder;
 import com.mojang.logging.LogUtils;
 import java.nio.file.Files;
@@ -134,6 +135,10 @@ public final class ClientProbeMod {
     static void click(Screen screen, AbstractWidget button) {
         double x = button.getX() + button.getWidth() / 2.0;
         double y = button.getY() + button.getHeight() / 2.0;
+        if (screen instanceof BackpackCanvasScreen canvas) {
+            x = canvas.screenX(x);
+            y = canvas.screenY(y);
+        }
         if (!screen.mouseClicked(x, y, 0)) {
             throw new IllegalStateException("Screen rejected button click: " + button.getMessage().getString());
         }

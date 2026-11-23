@@ -3,6 +3,7 @@ package com.cdp.codpattern.client.gui.screen;
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.client.gui.refit.AttachmentConfigButton;
+import com.cdp.codpattern.client.gui.screen.backpack.BackpackCanvasScreen;
 import com.cdp.codpattern.client.gui.screen.backpack.BackpackContextMenuCoordinator;
 import com.cdp.codpattern.client.gui.screen.backpack.BackpackEquipmentRenderer;
 import com.cdp.codpattern.client.gui.screen.backpack.BackpackUi;
@@ -22,7 +23,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.ConfirmScreen;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
@@ -35,7 +35,7 @@ import java.util.Map;
 
 import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.*;
 
-public class BackpackMenuScreen extends Screen {
+public class BackpackMenuScreen extends BackpackCanvasScreen {
     private static final Component CREATE_MARK = Component.literal("+");
     private static final Component REFIT_KEY = Component.literal("R");
     private BackpackConfig.PlayerBackpackData data;
@@ -57,7 +57,6 @@ public class BackpackMenuScreen extends Screen {
     private int scrollOffset, pageHeight;
     private int margin, gap, titleY, headingY, rowsY, bagWidth, gearX, gearWidth, slotUnit, editWidth;
     private int stageX, stageY, stageWidth, stageHeight, captionY;
-    private boolean stacked;
 
     public BackpackMenuScreen() {
         super(label("overview"));
@@ -70,10 +69,8 @@ public class BackpackMenuScreen extends Screen {
     @Override
     protected void init() {
         // A child screen may return with the pointer over an entirely different row.
-        // Use the same double-precision GUI coordinates as MouseHandler.onMove.
-        var window = minecraft.getWindow();
-        lastX = minecraft.mouseHandler.xpos() * width / window.getScreenWidth();
-        lastY = minecraft.mouseHandler.ypos() * height / window.getScreenHeight();
+        lastX = pointerCanvasX();
+        lastY = pointerCanvasY();
         resetHover();
         reloadFromPlayerData();
         if (!requestedData) {
@@ -124,55 +121,40 @@ public class BackpackMenuScreen extends Screen {
         editButton = null;
         refitButton = null;
 
-        stacked = width <= px(380);
-        boolean narrow = width <= px(490);
-        boolean shortDesktop = !stacked && height <= px(300);
-        margin = stacked ? px(7) : Mth.clamp(Math.round(width * .038f), px(8), px(35));
-        gap = stacked ? px(4) : Mth.clamp(Math.round(width * .0125f), px(5), px(12));
-        titleY = stacked ? px(8) : shortDesktop ? px(5) : Mth.clamp(Math.round(height * .035f), px(9), px(20));
-        int titleGap = stacked ? px(6) : shortDesktop ? px(5) : Mth.clamp(Math.round(height * .024f), px(7), px(13));
-        headingY = titleY + titleHeight() + titleGap;
-        rowsY = headingY + lineHeight(1f) + px(10);
-        int inner = width - 2 * margin;
-        int columns = inner - (stacked ? gap : 2 * gap);
-        if (stacked) {
-            bagWidth = editing ? px(27) : Math.round(columns * .78f / 1.88f);
-            gearWidth = columns - bagWidth;
-        } else if (narrow) {
-            bagWidth = editing ? px(31) : Math.round(columns * .85f / 3.35f);
-            gearWidth = editing ? Math.round((columns - bagWidth) * .9f / 2.55f) : Math.round(columns / 3.35f);
-        } else {
-            bagWidth = editing ? Math.round(columns * .31f / 3.81f) : Math.round(columns * .8f / 4.17f);
-            gearWidth = editing ? Math.round(columns * 1.05f / 3.81f) : Math.round(columns * 1.02f / 4.17f);
-        }
+        margin = 35;
+        gap = 12;
+        titleY = 19;
+        headingY = titleY + titleHeight() + 13;
+        rowsY = headingY + lineHeight(1f) + 10;
+        int columns = CANVAS_WIDTH - 2 * (margin + gap);
+        bagWidth = editing ? Math.round(columns * .31f / 3.81f) : Math.round(columns * .8f / 4.17f);
+        gearWidth = editing ? Math.round(columns * 1.05f / 3.81f) : Math.round(columns * 1.02f / 4.17f);
         gearX = margin + bagWidth + gap;
         editWidth = Mth.clamp(Math.round(bagWidth * .23f), px(22), px(32));
-        slotUnit = stacked ? px(25) : Mth.clamp(Math.round(height * (editing ? .092f : .088f)),
-                px(editing ? 27 : 26), px(editing ? 50 : 47));
-        int footerSpace = editing ? px(39) : px(9);
-        int slotGap = px(stacked ? 2 : 3);
+        slotUnit = editing ? 50 : 47;
+        int footerSpace = editing ? 39 : 9;
+        int slotGap = 3;
         int bagBottom = rowsY;
         if (data != null) {
             bagBottom = addBags();
             addSlots(slotGap);
         }
         int bottom = Math.max(bagBottom, rowsY + 6 * slotUnit + slotUnit / 2 + 3 * slotGap);
-        int stageTop = stacked ? bottom + gap : headingY;
-        if (stacked && editing) bottom = stageTop + Math.max(px(114), height / 3);
-        pageHeight = Math.max(height, bottom + footerSpace);
+        pageHeight = Math.max(CANVAS_HEIGHT, bottom + footerSpace);
+        int stageTop = headingY;
         int stageArea = pageHeight - footerSpace - stageTop;
-        int stageLeft = stacked ? margin : gearX + gearWidth + gap;
-        int stageAreaWidth = width - margin - stageLeft;
+        int stageLeft = gearX + gearWidth + gap;
+        int stageAreaWidth = CANVAS_WIDTH - margin - stageLeft;
         stageX = stageLeft + stageAreaWidth / 25;
         stageWidth = stageAreaWidth * 92 / 100;
         stageY = stageTop + stageArea * 8 / 100;
         stageHeight = stageArea * 60 / 100;
-        captionY = stageTop + stageArea * 93 / 100 - loadoutCaptionHeight();
+        captionY = stageTop + stageArea * 93 / 100 - captionHeight();
 
         if (editing && !slotButtons.isEmpty()) {
             addRenderableWidget(BackpackUi.backButton(margin, pageHeight - px(26), this::onClose));
             int w = refitWidth();
-            int h = stacked ? px(33) : px(27);
+            int h = 27;
             refitButton = addRenderableWidget(BackpackUi.button(0, 0, w, h, label("refit"), this::openRefit, this::drawRefit));
         }
         scrollTo(previousScroll);
@@ -183,12 +165,11 @@ public class BackpackMenuScreen extends Screen {
     }
 
     private int refitWidth() {
-        return stacked ? px(54) : Math.max(px(78), textWidth(label("refit"), 1f) + px(40));
+        return Math.max(78, textWidth(label("refit"), 1f) + 40);
     }
 
     private int addBags() {
-        int h = editing ? Mth.clamp(height / 20, px(19), px(24))
-                : Mth.clamp(Math.round(height * .0665f), px(24), px(39));
+        int h = editing ? 24 : 36;
         int y = rowsY;
         for (int id : data.getBackpacks_MAP().keySet().stream().sorted().toList()) {
             Component name = BackpackNameHelper.displayNameComponent(data.getBackpacks_MAP().get(id), id);
@@ -240,7 +221,6 @@ public class BackpackMenuScreen extends Screen {
             int h = slot.isGunSlot() ? 2 * slotUnit : slot == BackpackSlot.MELEE ? 3 * slotUnit / 2 : slotUnit;
             int x = slot == BackpackSlot.ITEM2 ? gearX + half + gutter : gearX;
             int w = slot.isEquipmentSlot() ? (slot == BackpackSlot.ITEM1 ? half : gearWidth - half - gutter) : gearWidth;
-            if (stacked && editing && slot.isGunSlot()) w -= refitWidth() + gutter;
             Button b = BackpackUi.button(x, y, w, h, slotLabel(slot), () -> pick(slot),
                     (g, widget) -> drawSlot(g, widget, slot));
             b.active = editing;
@@ -351,9 +331,8 @@ public class BackpackMenuScreen extends Screen {
         boolean current = editing && previewSlot == slot;
         if (editing) row(g, x, y, w, h, slot, 0, current);
         else readOnlySlot(g, x, y, w, h, slot);
-        int padX = Mth.clamp(Math.round(width * .0085f), px(4), px(8));
-        int padY = slot.isEquipmentSlot() ? Mth.clamp(Math.round(height * .0055f), px(1), px(3))
-                : Mth.clamp(Math.round(height * .0085f), px(3), px(5));
+        int padX = 8;
+        int padY = slot.isEquipmentSlot() ? 3 : 5;
         int left = x + padX, baselineBottom = y + h - padY;
         float nameScale = w < px(75) ? 1f : 1.12f;
         Component role = slotLabel(slot);
@@ -401,10 +380,6 @@ public class BackpackMenuScreen extends Screen {
         g.fill(x, y, x + w, y + h, hot ? 0xFF31332B : 0xFF222725);
         g.fill(x, y + h - 1, x + w, y + h, hot ? 0xFFDFC189 : 0xFF8B7956);
         int color = hot ? 0xFFFFE4B4 : 0xFFE9CEA0;
-        if (stacked) {
-            centered(g, b.getMessage(), b, color);
-            return;
-        }
         int keyH = lineHeight(1f) + 2 * px(3);
         int keyW = Math.max(keyH, textWidth(REFIT_KEY, 1f) + 2 * px(4));
         int space = px(5);
@@ -416,11 +391,10 @@ public class BackpackMenuScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        background(g, width, height);
-        title(g, margin, titleY, width - margin * 2, label(editing ? "editor" : "overview"));
+    protected void renderCanvas(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        title(g, margin, titleY, CANVAS_WIDTH - margin * 2, label(editing ? "editor" : "overview"));
         if (data == null) {
-            text(g, Component.translatable("screen.codpattern.backpack_menu.loading"), margin, rowsY, width / 2, 1f, MUTED);
+            text(g, Component.translatable("screen.codpattern.backpack_menu.loading"), margin, rowsY, CANVAS_WIDTH / 2, 1f, MUTED);
             return;
         }
         heading(g, label(editing ? "bags_short" : "bags"), margin, headingY, bagWidth);
@@ -436,11 +410,10 @@ public class BackpackMenuScreen extends Screen {
             if (editing) {
                 var stack = equipment.get(previewSlot);
                 BackpackEquipmentRenderer.renderModel(g, stack, stageX, stageY, stageWidth, stageHeight);
-                int inset = Math.max(1, stageWidth / 45);
-                loadoutCaption(g, previewSlot, stack, stageX + inset, captionY, stageWidth - inset);
+                loadoutCaption(g, previewSlot, stack, stageX, captionY, CANVAS_WIDTH - margin - stageX);
             }
         }
-        super.render(g, mouseX, mouseY, partialTick);
+        renderCanvasWidgets(g, mouseX, mouseY, partialTick);
         context.render(g, mouseX, mouseY, partialTick);
     }
 
@@ -458,15 +431,15 @@ public class BackpackMenuScreen extends Screen {
             refitButton.visible = overGunCard && canRefit();
             if (refitButton.visible) {
                 Button owner = slotButtons.get(previewSlot);
-                int x = owner.getX() + owner.getWidth() + (stacked ? px(2) : gap);
-                int y = owner.getY() + (stacked ? (owner.getHeight() - refitButton.getHeight()) / 2 : px(1));
+                int x = owner.getX() + owner.getWidth() + gap;
+                int y = owner.getY() + 1;
                 refitButton.setPosition(x, y);
             }
         }
     }
 
     @Override
-    public void mouseMoved(double x, double y) {
+    protected void canvasMouseMoved(double x, double y) {
         if (x == lastX && y == lastY) return;
         lastX = x;
         lastY = y;
@@ -502,7 +475,7 @@ public class BackpackMenuScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double x, double y, int button) {
+    protected boolean canvasMouseClicked(double x, double y, int button) {
         lastX = x;
         lastY = y;
         keyboardFocus = false;
@@ -512,14 +485,14 @@ public class BackpackMenuScreen extends Screen {
                 if (entry.getValue().isMouseOver(x, y)) {
                     int id = entry.getKey();
                     context.show(this, id, data.getBackpacks_MAP().get(id).getName(), (int) x, (int) y,
-                            width, height, this::hideActions, this::confirmDelete);
+                            CANVAS_WIDTH, CANVAS_HEIGHT, this::hideActions, this::confirmDelete);
                     return true;
                 }
             }
         }
         // The edit control is drawn on top of the right-hand edge of the bag button.
         if (editButton != null && editButton.mouseClicked(x, y, button)) return true;
-        boolean handled = super.mouseClicked(x, y, button);
+        boolean handled = super.canvasMouseClicked(x, y, button);
         if (getFocused() != null && !children().contains(getFocused())) setFocused(null);
         return handled;
     }
@@ -540,7 +513,7 @@ public class BackpackMenuScreen extends Screen {
 
     private void scrollTo(int requestedOffset) {
         // Both columns belong to one page, including the create button after the final bag.
-        int next = Mth.clamp(requestedOffset, 0, Math.max(0, pageHeight - height));
+        int next = Mth.clamp(requestedOffset, 0, Math.max(0, pageHeight - CANVAS_HEIGHT));
         int delta = scrollOffset - next;
         if (delta == 0) return;
         scrollOffset = next;
@@ -557,18 +530,18 @@ public class BackpackMenuScreen extends Screen {
     private void reveal(AbstractWidget b) {
         if (b == null) return;
         if (b.getY() < 0) scrollTo(scrollOffset + b.getY() - px(3));
-        else if (b.getY() + b.getHeight() > height)
-            scrollTo(scrollOffset + b.getY() + b.getHeight() - height + px(3));
+        else if (b.getY() + b.getHeight() > CANVAS_HEIGHT)
+            scrollTo(scrollOffset + b.getY() + b.getHeight() - CANVAS_HEIGHT + px(3));
     }
 
     @Override
-    public boolean mouseScrolled(double x, double y, double delta) {
-        if (pageHeight > height && !context.isVisible()) {
+    protected boolean canvasMouseScrolled(double x, double y, double delta) {
+        if (pageHeight > CANVAS_HEIGHT && !context.isVisible()) {
             scrollTo(scrollOffset - (int) Math.round(delta * px(24)));
             if (!keyboardFocus) updatePointer(x, y);
             return true;
         }
-        return super.mouseScrolled(x, y, delta);
+        return super.canvasMouseScrolled(x, y, delta);
     }
 
     @Override

@@ -1,7 +1,6 @@
 package com.cdp.codpattern.client.gui.refit;
 
 import com.cdp.codpattern.client.gui.CodTheme;
-import com.cdp.codpattern.client.gui.GuiTextHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Renderable;
@@ -154,22 +153,22 @@ public class BackpackContextMenu implements Renderable, GuiEventListener, Narrat
             if (isHovered) {
                 graphics.fill(x + padding, itemY, x + width - padding, itemY + itemHeight, CodTheme.MENU_ITEM_HOVER);
                 // 左侧高亮条
-                graphics.fill(x + padding, itemY, x + padding + GuiTextHelper.referenceScaled(2), itemY + itemHeight,
+                graphics.fill(x + padding, itemY, x + padding + 2, itemY + itemHeight,
                         CodTheme.MENU_ITEM_HOVER_BAR);
             }
 
             // 绘制分隔线（除了最后一项）
             if (i < items.size() - 1) {
-                graphics.fill(x + GuiTextHelper.referenceScaled(8), itemY + itemHeight - 1,
-                        x + width - GuiTextHelper.referenceScaled(8), itemY + itemHeight,
+                graphics.fill(x + 8, itemY + itemHeight - 1,
+                        x + width - 8, itemY + itemHeight,
                         CodTheme.DIVIDER);
             }
 
             // 绘制文本
             int textColor = isHovered ? item.hoverTextColor : item.textColor;
-            int textX = x + GuiTextHelper.referenceScaled(10);
-            int textY = itemY + (itemHeight - GuiTextHelper.referenceLineHeight(minecraft.font)) / 2;
-            GuiTextHelper.drawReferenceString(graphics, minecraft.font, item.label, textX, textY, textColor, false);
+            int textX = x + 10;
+            int textY = itemY + (itemHeight - minecraft.font.lineHeight) / 2;
+            graphics.drawString(minecraft.font, item.label, textX, textY, textColor, false);
 
             itemY += itemHeight;
         }
@@ -257,15 +256,15 @@ public class BackpackContextMenu implements Renderable, GuiEventListener, Narrat
     }
 
     private static int menuItemHeight() {
-        return GuiTextHelper.referenceScaled(CodTheme.MENU_ITEM_HEIGHT);
+        return CodTheme.MENU_ITEM_HEIGHT;
     }
 
     private static int menuWidth() {
-        return GuiTextHelper.referenceScaled(CodTheme.MENU_WIDTH);
+        return CodTheme.MENU_WIDTH;
     }
 
     private static int menuPadding() {
-        return GuiTextHelper.referenceScaled(2);
+        return 2;
     }
 
     @Override

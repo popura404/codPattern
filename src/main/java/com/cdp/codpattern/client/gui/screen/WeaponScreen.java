@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
+import com.cdp.codpattern.client.gui.screen.backpack.BackpackCanvasScreen;
 import com.cdp.codpattern.client.gui.screen.backpack.BackpackEquipmentRenderer;
 import com.cdp.codpattern.client.gui.screen.backpack.BackpackUi;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
@@ -34,7 +35,7 @@ import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.lineHeigh
 import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.px;
 import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.textWidth;
 
-public class WeaponScreen extends Screen {
+public class WeaponScreen extends BackpackCanvasScreen {
     private static final Component EQUIPPED_LABEL = Component.translatable("screen.codpattern.backpack.chip.equipped");
     private static final int TAB_BACKGROUND = 0xFF253438;
     private static final int TAB_SELECTED = 0xFF355557;
@@ -77,27 +78,26 @@ public class WeaponScreen extends Screen {
 
     @Override
     protected void init() {
-        margin = Math.max(px(8), Math.round(width * .038f));
-        titleY = Math.max(px(8), Math.round(height * .035f));
-        int usableWidth = width - 2 * margin;
+        margin = Math.max(px(8), Math.round(CANVAS_WIDTH * .038f));
+        titleY = Math.max(px(8), Math.round(CANVAS_HEIGHT * .035f));
+        int usableWidth = CANVAS_WIDTH - 2 * margin;
         listWidth = Math.min(usableWidth / 2, Math.max(px(104), Math.round(usableWidth / 3.08f)));
-        var window = minecraft.getWindow();
-        lastPointerX = minecraft.mouseHandler.xpos() * width / window.getScreenWidth();
-        lastPointerY = minecraft.mouseHandler.ypos() * height / window.getScreenHeight();
+        lastPointerX = pointerCanvasX();
+        lastPointerY = pointerCanvasY();
         equipped = BackpackItemStackFactory.create(backpack.getItem(slot));
         loadCatalog();
-        int tabsY = titleY + Math.max(px(22), height / 15);
+        int tabsY = titleY + Math.max(px(22), CANVAS_HEIGHT / 15);
         if (catalog.size() > 1) {
             addTabs(tabsY);
             tabsY += px(22);
         }
         listY = tabsY + lineHeight(1f) + px(7);
         rowHeight = slot.isGunSlot()
-                ? Math.max(lineHeight(1f) * 6, Math.min(listWidth / 3, Math.round(height * .18f)))
-                : Mth.clamp(Math.round(height * .1065f), px(38), px(58));
+                ? Math.max(lineHeight(1f) * 6, Math.min(listWidth / 3, Math.round(CANVAS_HEIGHT * .18f)))
+                : Mth.clamp(Math.round(CANVAS_HEIGHT * .1065f), px(38), px(58));
         rowGap = px(2);
-        footerY = height - titleY - px(16);
-        int viewport = Math.min(Math.round(height * .62f), footerY - listY - px(4));
+        footerY = CANVAS_HEIGHT - titleY - px(16);
+        int viewport = Math.min(Math.round(CANVAS_HEIGHT * .62f), footerY - listY - px(4));
         visibleRows = Math.max(1, (viewport + rowGap) / (rowHeight + rowGap));
         chooseCategory(category);
         addRenderableWidget(BackpackUi.backButton(margin, footerY, this::onClose));
@@ -161,7 +161,7 @@ public class WeaponScreen extends Screen {
         int gap = px(2);
         int pad = px(8);
         int tabHeight = px(17);
-        int maxWidth = (width - 2 * margin) / catalog.size() - gap;
+        int maxWidth = (CANVAS_WIDTH - 2 * margin) / catalog.size() - gap;
         int index = 0;
         for (String tab : catalog.keySet()) {
             int tabIndex = index++;
@@ -304,9 +304,8 @@ public class WeaponScreen extends Screen {
     }
 
     @Override
-    public void render(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        BackpackUi.background(graphics, width, height);
-        BackpackUi.title(graphics, margin, titleY, width - margin * 2, title);
+    protected void renderCanvas(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        BackpackUi.title(graphics, margin, titleY, CANVAS_WIDTH - margin * 2, title);
         int headingY = listY - lineHeight(1f) - px(7);
         int right = margin + listWidth;
         int headingWidth = listWidth;
@@ -331,13 +330,13 @@ public class WeaponScreen extends Screen {
             graphics.fill(scrollX, listY, scrollX + rowGap, listY + track, CATALOG_RULE);
             graphics.fill(scrollX, top, scrollX + rowGap, top + thumb, SOFT_ACCENT);
         }
-        super.render(graphics, mouseX, mouseY, partialTick);
+        renderCanvasWidgets(graphics, mouseX, mouseY, partialTick);
     }
 
     private void drawPreview(GuiGraphics graphics) {
         ItemStack stack = candidates.get(preview);
-        int x = margin + listWidth + Math.max(px(8), Math.round(width * .0125f));
-        int stageWidth = width - x - margin;
+        int x = margin + listWidth + Math.max(px(8), Math.round(CANVAS_WIDTH * .0125f));
+        int stageWidth = CANVAS_WIDTH - x - margin;
         int stageTop = listY - lineHeight(1f) - px(7);
         int stageHeight = footerY - stageTop;
         int captionY = footerY - BackpackUi.captionHeight();
@@ -350,11 +349,11 @@ public class WeaponScreen extends Screen {
     }
 
     @Override
-    public void mouseMoved(double mouseX, double mouseY) {
+    protected void canvasMouseMoved(double mouseX, double mouseY) {
         if (mouseX == lastPointerX && mouseY == lastPointerY) return;
         lastPointerX = mouseX;
         lastPointerY = mouseY;
-        super.mouseMoved(mouseX, mouseY);
+        super.canvasMouseMoved(mouseX, mouseY);
         minecraft.setLastInputType(InputType.MOUSE);
         previewUnderPointer(mouseX, mouseY);
     }
@@ -369,7 +368,7 @@ public class WeaponScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double x, double y, double delta) {
+    protected boolean canvasMouseScrolled(double x, double y, double delta) {
         if (x >= margin && x <= margin + listWidth + 2 * rowGap && y >= listY
                 && y < listY + rows.size() * (rowHeight + rowGap) && candidates.size() > visibleRows && delta != 0) {
             offset += delta > 0 ? -1 : 1;
@@ -377,7 +376,7 @@ public class WeaponScreen extends Screen {
             previewUnderPointer(x, y);
             return true;
         }
-        return super.mouseScrolled(x, y, delta);
+        return super.canvasMouseScrolled(x, y, delta);
     }
 
     @Override

@@ -177,7 +177,7 @@ final class RefitScreenProbe {
             case 0 -> { BackpackClientCache.clear(); mc.setScreen(new PauseScreen(true)); step++; }
             case 1 -> { if (ClientProbeMod.clickButton(screen, "screen.codpattern.backpack.manage_button")) step++; }
             case 2 -> {
-                if (!(screen instanceof BackpackMenuScreen)) return;
+                if (!(screen instanceof BackpackMenuScreen backpack)) return;
                 var data = BackpackClientCache.get();
                 if (data == null || data.getBackpacks_MAP().get(1) == null
                         || !MARKER.equals(data.getBackpacks_MAP().get(1).getName())) return;
@@ -185,7 +185,7 @@ final class RefitScreenProbe {
                     if (child instanceof Button button && MARKER.equals(button.getMessage().getString())) {
                         double x = button.getX() + 2;
                         double y = button.getY() + button.getHeight() / 2.0;
-                        screen.mouseMoved(x, y);
+                        backpack.mouseMoved(backpack.screenX(x), backpack.screenY(y));
                         step++;
                         return;
                     }
@@ -270,15 +270,15 @@ final class RefitScreenProbe {
     static String slot() { return System.getProperty("codpattern.clientTestSlot", "primary"); }
 
     static boolean hoverConfiguredSlot(Screen screen) {
-        if (!(screen instanceof BackpackMenuScreen)) return false;
+        if (!(screen instanceof BackpackMenuScreen backpack)) return false;
         String key = "screen.codpattern.loadout.slot." + slot();
         for (var child : screen.children()) {
             if (child instanceof Button button && button.visible && button.active
                     && key.equals(ClientProbeMod.key(button.getMessage()))) {
                 double x = button.getX() + button.getWidth() / 2.0;
                 double y = button.getY() + button.getHeight() / 2.0;
-                screen.mouseMoved(x - 1, y);
-                screen.mouseMoved(x, y);
+                backpack.mouseMoved(backpack.screenX(x - 1), backpack.screenY(y));
+                backpack.mouseMoved(backpack.screenX(x), backpack.screenY(y));
                 return true;
             }
         }

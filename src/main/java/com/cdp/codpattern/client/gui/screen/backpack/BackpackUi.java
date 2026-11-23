@@ -4,6 +4,7 @@ import com.cdp.codpattern.app.tdm.model.TdmClientModePresentations;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.client.gui.screen.match.LobbyModeEffects;
 import com.cdp.codpattern.config.backpack.BackpackSlot;
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.math.Axis;
 import net.minecraft.ChatFormatting;
@@ -44,14 +45,20 @@ public final class BackpackUi {
     }
 
     public static void background(GuiGraphics g, int width, int height) {
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderColor(1f, 1f, 1f, .9f);
         g.blit(STUDIO_WASH, 0, 0, width, height, 0f, 0f, 192, 108, 192, 108);
         // The baked corner lives in the lower-left quarter; sample it right-to-left at the screen edge.
         int cornerWidth = Math.round(width * .31f * .5f);
         int cornerHeight = cornerWidth / 2;
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
+        // Add the corner highlight without obscuring a second share of the world behind it.
+        RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE,
+                GlStateManager.SourceFactor.ZERO, GlStateManager.DestFactor.ONE);
         g.blit(SCULK_CORNER, width - cornerWidth, height - cornerHeight, cornerWidth, cornerHeight,
                 256f, 128f, -256, 128, 512, 256);
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
     }
 
     /** The mode/room list owns the artwork; the bag widget owns its animation clock. */
@@ -137,39 +144,28 @@ public final class BackpackUi {
         if (!primary) g.fill(x, y + h - 1, x + w, y + h, 0x5A6F9798);
     }
 
+    // 1920x1080 at GUI scale 2 uses an 18-pixel body glyph and a 2.5-em title.
+    private static final float BODY_SCALE = 18f / 16f;
+    private static final float TITLE_SCALE = 2.5f;
+
     public static int px(int referenceSize) {
-        return GuiTextHelper.referenceScaled(referenceSize);
-    }
-
-    // Both body text and titles follow the proposal's viewport typography, in framebuffer pixels.
-    private static float bodyPixels() {
-        return Mth.clamp(Minecraft.getInstance().getWindow().getWidth() * .0097f, 14, 18);
-    }
-
-    private static float titleRatio() {
-        float em = bodyPixels();
-        return Mth.clamp(Minecraft.getInstance().getWindow().getWidth() * .024f / em, 1.75f, 2.5f);
-    }
-
-    private static float fontRatio(float scale) {
-        // One lobby reference glyph is eight logical pixels at GUI scale 2.
-        return scale * bodyPixels() / 16f;
+        return referenceSize;
     }
 
     public static int textWidth(Component label, float scale) {
-        return Mth.ceil(Minecraft.getInstance().font.width(label) * (GuiTextHelper.referenceScale() * fontRatio(scale)));
+        return Mth.ceil(Minecraft.getInstance().font.width(label) * (BODY_SCALE * scale));
     }
 
     public static int lineHeight(float scale) {
-        return GuiTextHelper.referenceLineHeight(Minecraft.getInstance().font, fontRatio(scale));
+        return Math.max(1, Math.round(Minecraft.getInstance().font.lineHeight * (BODY_SCALE * scale)));
     }
 
     public static int titleHeight() {
-        return lineHeight(titleRatio());
+        return lineHeight(TITLE_SCALE);
     }
 
     private static float weaponNameScale() {
-        return titleRatio() * 1.30f;
+        return TITLE_SCALE * 1.30f;
     }
 
     public static int captionHeight() {
@@ -178,12 +174,14 @@ public final class BackpackUi {
 
     public static void text(GuiGraphics g, Component label, int x, int y, int width, float scale, int color) {
         if (width <= 0) return;
-        GuiTextHelper.drawReferenceScaledEllipsizedString(g, Minecraft.getInstance().font, label, x, y,
-                width, fontRatio(scale), color, false);
+        var font = Minecraft.getInstance().font;
+        float glyphScale = BODY_SCALE * scale;
+        var fitted = GuiTextHelper.ellipsizeFormatted(font, label, Math.max(1, (int) (width / glyphScale)));
+        GuiTextHelper.drawScaledString(g, font, fitted, x, y, glyphScale, color, false);
     }
 
     public static void title(GuiGraphics g, int x, int y, int width, Component label) {
-        text(g, label, x, y, width, titleRatio(), INK);
+        text(g, label, x, y, width, TITLE_SCALE, INK);
     }
 
     public static void heading(GuiGraphics g, Component label, int x, int y, int width) {
@@ -192,27 +190,20 @@ public final class BackpackUi {
         g.fill(x, ruleY, x + width, ruleY + 1, LINE);
     }
 
-    public static int loadoutCaptionHeight() {
-        return lineHeight(titleRatio()) + lineHeight(1f) * 2 + px(15);
-    }
-
     public static void loadoutCaption(GuiGraphics g, BackpackSlot slot, ItemStack stack, int x, int y, int w) {
-        int inset = px(8);
-        int textX = x + inset;
-        int textWidth = w - inset;
         var label = slotLabel(slot).copy();
         var category = BackpackEquipmentRenderer.category(stack);
         if (!category.getString().isBlank()) label.append("  /  ").append(category);
-        int nameY = y + px(3) + lineHeight(1f) + px(3);
-        g.fill(x, y, x + px(2), y + loadoutCaptionHeight(), ACCENT);
-        text(g, label, textX, y + px(3), textWidth, 1f, 0xFFCAD4CB);
-        title(g, textX, nameY, textWidth, BackpackEquipmentRenderer.displayName(stack));
-        text(g, BackpackEquipmentRenderer.origin(stack), textX, nameY + titleHeight() + px(4), textWidth, 1f, MUTED);
+        drawCaption(g, label, stack, x, y, w);
     }
 
     public static void caption(GuiGraphics g, BackpackSlot slot, ItemStack stack, int x, int y, int w) {
         Component category = BackpackEquipmentRenderer.category(stack);
         if (category.getString().isBlank()) category = slotLabel(slot);
+        drawCaption(g, category, stack, x, y, w);
+    }
+
+    private static void drawCaption(GuiGraphics g, Component category, ItemStack stack, int x, int y, int w) {
         var name = BackpackEquipmentRenderer.displayName(stack).copy().withStyle(ChatFormatting.BOLD);
         float nameScale = Math.min(weaponNameScale(), Math.max(1.25f, w / (float) Math.max(1, textWidth(name, 1f))));
         int right = x + w;
@@ -224,7 +215,7 @@ public final class BackpackUi {
 
     private static void rightText(GuiGraphics g, Component label, int right, int y, int width, float scale, int color) {
         var font = Minecraft.getInstance().font;
-        float glyphScale = GuiTextHelper.referenceScale() * fontRatio(scale);
+        float glyphScale = BODY_SCALE * scale;
         var fitted = GuiTextHelper.ellipsizeFormatted(font, label, (int) (width / glyphScale));
         GuiTextHelper.drawScaledString(g, font, fitted, right - font.width(fitted) * glyphScale,
                 y, glyphScale, color, false);
