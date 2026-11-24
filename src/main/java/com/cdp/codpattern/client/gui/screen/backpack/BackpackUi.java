@@ -14,6 +14,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 
@@ -262,27 +263,48 @@ public final class BackpackUi {
     }
 
     public static void caption(GuiGraphics g, BackpackSlot slot, ItemStack stack, int x, int y, int w) {
+        drawCaption(g, captionCategory(slot, stack), stack, x, y, w);
+    }
+
+    static int captionTextWidth(BackpackSlot slot, ItemStack stack, int width) {
+        var caption = captionText(captionCategory(slot, stack), stack, width);
+        return Mth.ceil(Math.max(caption.category.width, Math.max(caption.name.width, caption.origin.width)));
+    }
+
+    private static Component captionCategory(BackpackSlot slot, ItemStack stack) {
         Component category = BackpackEquipmentRenderer.category(stack);
-        if (category.getString().isBlank()) category = slotLabel(slot);
-        drawCaption(g, category, stack, x, y, w);
+        return category.getString().isBlank() ? slotLabel(slot) : category;
+    }
+
+    private record CaptionText(CaptionLine category, CaptionLine name, CaptionLine origin, float nameScale) {}
+
+    private record CaptionLine(FormattedCharSequence glyphs, float width, float glyphScale) {
+        void render(GuiGraphics g, int right, int y, int color) {
+            GuiTextHelper.drawScaledString(g, Minecraft.getInstance().font, glyphs, right - width, y, glyphScale, color, false);
+        }
+    }
+
+    private static CaptionText captionText(Component category, ItemStack stack, int width) {
+        var name = BackpackEquipmentRenderer.displayName(stack).copy().withStyle(ChatFormatting.BOLD);
+        float nameScale = Math.min(weaponNameScale(), Math.max(1.25f, width / (float) Math.max(1, textWidth(name, 1f))));
+        return new CaptionText(captionLine(category, width, 1f), captionLine(name, width, nameScale),
+                captionLine(BackpackEquipmentRenderer.origin(stack), width, 1f), nameScale);
     }
 
     private static void drawCaption(GuiGraphics g, Component category, ItemStack stack, int x, int y, int w) {
-        var name = BackpackEquipmentRenderer.displayName(stack).copy().withStyle(ChatFormatting.BOLD);
-        float nameScale = Math.min(weaponNameScale(), Math.max(1.25f, w / (float) Math.max(1, textWidth(name, 1f))));
+        var caption = captionText(category, stack, w);
         int right = x + w;
         int nameBottom = y + lineHeight(1f) + px(6) + lineHeight(weaponNameScale());
-        rightText(g, category, right, y, w, 1f, 0xFFA9C8C8);
-        rightText(g, name, right, nameBottom - lineHeight(nameScale), w, nameScale, INK);
-        rightText(g, BackpackEquipmentRenderer.origin(stack), right, nameBottom + px(3), w, 1f, MUTED);
+        caption.category.render(g, right, y, 0xFFA9C8C8);
+        caption.name.render(g, right, nameBottom - lineHeight(caption.nameScale), INK);
+        caption.origin.render(g, right, nameBottom + px(3), MUTED);
     }
 
-    private static void rightText(GuiGraphics g, Component label, int right, int y, int width, float scale, int color) {
+    private static CaptionLine captionLine(Component label, int width, float scale) {
         var font = Minecraft.getInstance().font;
         float glyphScale = BODY_SCALE * scale;
         var fitted = GuiTextHelper.ellipsizeFormatted(font, label, (int) (width / glyphScale));
-        GuiTextHelper.drawScaledString(g, font, fitted, right - font.width(fitted) * glyphScale,
-                y, glyphScale, color, false);
+        return new CaptionLine(fitted, font.width(fitted) * glyphScale, glyphScale);
     }
 
     public static void keycap(GuiGraphics g, Component key, int x, int y, int w, int h, int ink, int border) {

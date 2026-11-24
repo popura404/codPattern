@@ -1,14 +1,13 @@
 package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
-import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
 import com.cdp.codpattern.client.gui.BackNavigation;
 import com.cdp.codpattern.client.gui.screen.backpack.BackpackCanvasScreen;
 import com.cdp.codpattern.client.gui.screen.backpack.BackpackEquipmentRenderer;
 import com.cdp.codpattern.client.gui.screen.backpack.BackpackUi;
-import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
+import com.cdp.codpattern.client.gui.screen.backpack.WeaponCatalog;
+import com.cdp.codpattern.client.gui.screen.backpack.WeaponPreview;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
-import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.cdp.codpattern.config.backpack.BackpackConfig;
 import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
 import com.cdp.codpattern.config.backpack.BackpackSlot;
@@ -32,7 +31,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
 import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.LOADOUT_CARD_GAP;
 import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.lineHeight;
@@ -41,8 +39,6 @@ import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.textWidth
 
 public class WeaponScreen extends BackpackCanvasScreen {
     private static final Component EQUIPPED_LABEL = Component.translatable("screen.codpattern.backpack.chip.equipped");
-    private static final int TAB_PADDING = 10;
-    private static final int TAB_GAP = 4;
     private static final int CATALOG_RULE = 0xFF485E5E;
     private static final int SOFT_ACCENT = 0xFF8CB9B4;
     private static final int SCROLL_DURATION_MS = 160;
@@ -53,6 +49,7 @@ public class WeaponScreen extends BackpackCanvasScreen {
     private final Map<String, List<ItemStack>> catalog = new LinkedHashMap<>();
     private final List<CandidateButton> rows = new ArrayList<>();
     private WeaponFilterConfig filter;
+    private WeaponPreview previewStage;
     private ItemStack equipped;
     private String category = "";
     private List<ItemStack> candidates = List.of();
@@ -66,7 +63,6 @@ public class WeaponScreen extends BackpackCanvasScreen {
     private int listY;
     private int listBottom;
     private int rowHeight;
-    private int footerY;
     private double lastPointerX, lastPointerY;
 
     public WeaponScreen(Screen parent, BackpackConfig.Backpack backpack, int bagId, BackpackSlot slot) {
@@ -84,23 +80,23 @@ public class WeaponScreen extends BackpackCanvasScreen {
     @Override
     protected void init() {
         super.init();
-        margin = Math.round(canvasWidth * .038f);
-        titleY = Math.round(canvasHeight * .035f);
         // Every picker uses the backpack's primary-weapon card, including melee and throwables.
-        listWidth = BackpackUi.loadoutCardWidth(BackpackUi.loadoutColumnWidth(canvasWidth), BackpackSlot.PRIMARY);
+        listWidth = WeaponCatalog.CardColumn.forCanvas(canvasWidth).width();
         rowHeight = BackpackUi.loadoutCardHeight(BackpackSlot.PRIMARY);
         lastPointerX = pointerCanvasX();
         lastPointerY = pointerCanvasY();
         equipped = BackpackItemStackFactory.create(backpack.getItem(slot));
         loadCatalog();
-        int tabsY = titleY + Math.max(px(22), canvasHeight / 15);
+        var header = WeaponCatalog.header(canvasWidth, canvasHeight, catalog.size(), filter);
+        margin = header.margin();
+        titleY = header.titleY();
+        previewStage = WeaponPreview.layout(canvasWidth, canvasHeight, header);
         if (catalog.size() > 1) {
-            tabsY = addTabs(tabsY);
+            addTabs(header);
         }
-        listY = tabsY + lineHeight(1f) + px(7);
+        listY = header.headingY() + lineHeight(1f) + px(7);
         var backBounds = BackNavigation.bounds(canvasWidth, canvasHeight);
-        footerY = backBounds.top();
-        listBottom = footerY - px(4);
+        listBottom = backBounds.top() - px(4);
         chooseCategory(category);
         addRenderableWidget(BackNavigation.button(backBounds, this::onClose));
     }
@@ -108,28 +104,7 @@ public class WeaponScreen extends BackpackCanvasScreen {
     private void loadCatalog() {
         catalog.clear();
         filter = WeaponFilterClientCache.get();
-        List<String> tabs;
-        if (slot.isGunSlot()) {
-            tabs = filter == null ? List.of() : filter.getGunTabs(slot == BackpackSlot.PRIMARY);
-        } else if (slot == BackpackSlot.MELEE) {
-            tabs = List.of("melee");
-        } else {
-            tabs = filter != null && !filter.isThrowablesEnabled() ? List.of() : List.of("throwable");
-        }
-        for (String tab : tabs) {
-            List<ItemStack> raw = switch (tab) {
-                case "melee" -> LrTacticalClientApi.fillLrItemCategory(true);
-                case "throwable" -> LrTacticalClientApi.fillLrItemCategory(false);
-                default -> TaczClientApi.fillGunItemCategory(tab);
-            };
-            List<ItemStack> items = raw.stream().filter(stack -> !stack.isEmpty())
-                    .filter(stack -> !BackpackNamespaceFilter.isBlocked(filter, stack,
-                            BuiltInRegistries.ITEM.getKey(stack.getItem())))
-                    .toList();
-            if (!items.isEmpty()) {
-                catalog.put(tab, items);
-            }
-        }
+        catalog.putAll(WeaponCatalog.load(slot, filter));
         if (!catalog.containsKey(category)) {
             category = catalog.entrySet().stream()
                     .filter(entry -> entry.getValue().stream().anyMatch(this::isEquipped))
@@ -150,34 +125,16 @@ public class WeaponScreen extends BackpackCanvasScreen {
     }
 
     private Component categoryName(String tab) {
-        return switch (tab) {
-            case "" -> BackpackUi.slotLabel(slot);
-            case "melee" -> Component.translatable("lrtactical.type.melee.name");
-            case "throwable" -> Component.translatable("screen.codpattern.weapon.throwable");
-            default -> Component.translatable("tacz.type." + tab + ".name");
-        };
+        return WeaponCatalog.categoryName(slot, tab);
     }
 
-    private int addTabs(int top) {
-        int available = canvasWidth - 2 * margin;
-        // Both gun pickers use the longest configured category in the active language.
-        int longest = Stream.concat(filter.getGunTabs(true).stream(), filter.getGunTabs(false).stream())
-                .filter(TaczClientApi::isGunTab)
-                .map(this::categoryName)
-                .mapToInt(label -> textWidth(label, 1f)).max().orElse(0);
-        int tabWidth = Math.min(available, longest + 2 * TAB_PADDING);
-        int tabHeight = lineHeight(1f) + 12;
-        int columns = Math.max(1, (available + TAB_GAP) / (tabWidth + TAB_GAP));
+    private void addTabs(WeaponCatalog.Header header) {
         int index = 0;
         for (String tab : catalog.keySet()) {
-            int x = margin + index % columns * (tabWidth + TAB_GAP);
-            int y = top + index / columns * (tabHeight + TAB_GAP);
-            addRenderableWidget(BackpackUi.button(x, y, tabWidth, tabHeight, categoryName(tab),
+            var bounds = header.tabBounds(index++);
+            addRenderableWidget(BackpackUi.button(bounds.left(), bounds.top(), bounds.width(), bounds.height(), categoryName(tab),
                     () -> chooseCategory(tab), (g, b) -> drawCategoryTab(g, b, category.equals(tab))));
-            index++;
         }
-        int rows = Mth.positiveCeilDiv(index, columns);
-        return top + rows * (tabHeight + TAB_GAP) + 1;
     }
 
     private void drawCategoryTab(GuiGraphics g, Button b, boolean selected) {
@@ -200,7 +157,7 @@ public class WeaponScreen extends BackpackCanvasScreen {
         Component label = b.getMessage();
         int naturalWidth = textWidth(label, 1f);
         // Only an individual caption wider than the entire window needs smaller type.
-        float scale = Math.min(1f, (w - 2f * TAB_PADDING) / Math.max(1, naturalWidth));
+        float scale = WeaponCatalog.tabLabelScale(w, naturalWidth);
         int labelX = x + (w - textWidth(label, scale)) / 2;
         BackpackUi.text(g, label, labelX, y + (h - lineHeight(scale)) / 2,
                 x + w - labelX, scale, selected ? BackpackUi.PRIMARY_INK : BackpackUi.INK);
@@ -387,18 +344,7 @@ public class WeaponScreen extends BackpackCanvasScreen {
     }
 
     private void drawPreview(GuiGraphics graphics) {
-        ItemStack stack = candidates.get(preview);
-        int x = margin + listWidth + Math.max(px(8), Math.round(canvasWidth * .0125f));
-        int stageWidth = canvasWidth - x - margin;
-        int stageTop = listY - lineHeight(1f) - px(7);
-        int stageHeight = footerY - stageTop;
-        int captionY = footerY - BackpackUi.captionHeight();
-        int modelInset = Math.max(px(2), Math.round(stageWidth * .016f));
-        int modelY = stageTop + Math.round(stageHeight * .04f);
-        int modelBottom = captionY - Math.max(px(6), Math.round(stageHeight * .045f));
-        BackpackEquipmentRenderer.renderModel(graphics, stack, x + modelInset, modelY,
-                stageWidth - 2 * modelInset, modelBottom - modelY);
-        BackpackUi.caption(graphics, slot, stack, x, captionY, stageWidth);
+        previewStage.render(graphics, slot, candidates.get(preview));
     }
 
     @Override

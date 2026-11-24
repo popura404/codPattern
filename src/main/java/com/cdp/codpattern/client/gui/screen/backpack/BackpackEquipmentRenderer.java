@@ -3,6 +3,7 @@ package com.cdp.codpattern.client.gui.screen.backpack;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalClientApi;
 import com.cdp.codpattern.compat.lrtactical.LrTacticalGatewayProvider;
 import com.cdp.codpattern.compat.tacz.TaczGatewayProvider;
+import com.cdp.codpattern.compat.tacz.client.RefitPreviewCamera;
 import com.cdp.codpattern.compat.tacz.client.TaczClientApi;
 import com.mojang.blaze3d.platform.Lighting;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -84,6 +85,11 @@ public final class BackpackEquipmentRenderer {
     }
 
     public static void renderModel(GuiGraphics graphics, ItemStack stack, int x, int y, int width, int height) {
+        renderModel(graphics, stack, x, y, width, height, RefitPreviewCamera.Pose.OVERVIEW);
+    }
+
+    static void renderModel(GuiGraphics graphics, ItemStack stack, int x, int y, int width, int height,
+                            RefitPreviewCamera.Pose camera) {
         if (stack.isEmpty() || width <= 0 || height <= 0) {
             return;
         }
@@ -127,9 +133,16 @@ public final class BackpackEquipmentRenderer {
         try {
             pose.translate(x + width / 2f, y + height / 2f, 160);
             pose.scale(scale, -scale, scale);
-            pose.mulPose(Axis.ZP.rotationDegrees(roll));
-            pose.mulPose(Axis.XP.rotationDegrees(12));
-            pose.mulPose(Axis.YP.rotationDegrees(yaw));
+            var rollRotation = Axis.ZP.rotationDegrees(roll);
+            var pitchRotation = Axis.XP.rotationDegrees(12);
+            var yawRotation = Axis.YP.rotationDegrees(yaw);
+            if (camera == RefitPreviewCamera.Pose.OVERVIEW) {
+                pose.mulPose(rollRotation);
+                pose.mulPose(pitchRotation);
+                pose.mulPose(yawRotation);
+            } else {
+                camera.apply(pose, rollRotation.mul(pitchRotation).mul(yawRotation));
+            }
             Lighting.setupForFlatItems();
             mc.getItemRenderer().renderStatic(stack, ItemDisplayContext.FIXED, LightTexture.FULL_BRIGHT,
                     OverlayTexture.NO_OVERLAY, pose, graphics.bufferSource(), mc.level, 0);

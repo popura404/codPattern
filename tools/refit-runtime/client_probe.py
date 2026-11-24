@@ -18,7 +18,7 @@ from production_prepare import PROJECT, copy_verified, one, sha256, write_java_a
 PHASES = {
     "world": "world_ready", "refit": "refit_saved_reopened", "immediate-close": "immediate_close_saved",
     "duration": "duration_saved", "hot-filter": "hot_filter_refreshed",
-    "large-catalog": "large_catalog_last_page", "hsv": "hsv_saved_reopened",
+    "large-catalog": "large_catalog_end", "hsv": "hsv_saved_reopened",
 }
 
 

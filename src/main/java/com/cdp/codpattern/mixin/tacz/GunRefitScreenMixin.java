@@ -2,10 +2,13 @@ package com.cdp.codpattern.mixin.tacz;
 
 import com.cdp.codpattern.app.backpack.service.BackpackAttachmentFilter;
 import com.cdp.codpattern.client.refit.AttachmentRefitClientState;
+import com.cdp.codpattern.compat.tacz.client.CodGunRefitScreen;
 import com.cdp.codpattern.core.refit.BackpackRefitSessionContext;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.tacz.guns.client.gui.GunRefitScreen;
+import com.tacz.guns.client.gui.components.refit.InventoryAttachmentSlot;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
@@ -16,6 +19,16 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(value = GunRefitScreen.class, remap = false, priority = 900)
 public abstract class GunRefitScreenMixin {
+    @Redirect(method = "addInventoryAttachmentButtons", at = @At(value = "NEW",
+            target = "com/tacz/guns/client/gui/components/refit/InventoryAttachmentSlot"))
+    private InventoryAttachmentSlot codpattern$captureCandidateInstaller(
+            int x, int y, int slot, Inventory inventory, Button.OnPress install) {
+        if ((Object) this instanceof CodGunRefitScreen screen) {
+            screen.captureCandidateInstaller(inventory, install);
+        }
+        return new InventoryAttachmentSlot(x, y, slot, inventory, install);
+    }
+
     @Redirect(
             method = "addInventoryAttachmentButtons",
             at = @At(

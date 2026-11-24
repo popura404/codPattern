@@ -224,4 +224,16 @@
 
 For multiplayer, update both the client and the server.
 
+### v0.9.3b
+
+#### 中文
+
+- 从背包编辑页进入军械改造。选择左侧槽位时，镜头平滑移向对应的安装位置。
+- 配件候选列表支持平滑滚动。首项「无配件」可卸下当前配件，悬停候选时，简易和详细面板直接显示相对当前装配的属性差值。
+
+#### English
+
+- Open the gunsmith from the loadout editor. Selecting a slot on the left moves the camera smoothly to its mounting point.
+- Scroll through compatible attachments or choose “No attachment” at the top to remove the fitted one. Hover over an option to see how its stats compare with the current loadout in either the compact or detailed view.
+
 ###### _**注意：0.5.5b 与其旧版本配置文件不再适用于新版本，需要手动移除，否则有可能导致崩溃。自 0.6.5b 及以后版本起，不再需要安装 fpsmatch 模组作为前置依赖。**_

@@ -12,6 +12,7 @@ import com.cdp.codpattern.config.backpack.BackpackItemStackFactory;
 import com.cdp.codpattern.config.path.ConfigPath;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfigRepository;
 import com.cdp.codpattern.core.refit.AttachmentEditSessionManager;
+import com.cdp.codpattern.core.refit.RefitAction;
 import com.google.gson.Gson;
 import com.mojang.logging.LogUtils;
 import com.tacz.guns.api.TimelessAPI;
@@ -20,6 +21,7 @@ import com.tacz.guns.api.item.IGun;
 import com.tacz.guns.api.item.attachment.AttachmentType;
 import com.tacz.guns.api.item.builder.GunItemBuilder;
 import com.tacz.guns.client.animation.screen.RefitTransform;
+import com.tacz.guns.client.gui.GunRefitScreen;
 import com.tacz.guns.client.gui.components.refit.GunAttachmentSlot;
 import com.tacz.guns.client.gui.components.refit.InventoryAttachmentSlot;
 import com.tacz.guns.client.gui.components.refit.RefitUnloadButton;
@@ -30,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -99,10 +102,16 @@ final class RefitScreenProbe {
     private static ItemStack findFixture() {
         var attachments = TaczGatewayProvider.gateway().listAttachmentCandidates();
         boolean hsv = stage().equals("hsv");
+        boolean large = stage().equals("large-catalog");
         var lasers = hsv ? attachments.stream().filter(HsvSliderProbe::hasEditableLaser).toList() : List.<ItemStack>of();
         int editableGuns = 0;
-        for (var entry : TimelessAPI.getAllCommonGunIndex().stream()
-                .sorted(Comparator.comparing(entry -> entry.getKey().toString())).toList()) {
+        var guns = TimelessAPI.getAllCommonGunIndex().stream()
+                .sorted(Comparator.comparing(entry -> entry.getKey().toString())).toList();
+        if (large) {
+            guns = guns.stream().sorted(Comparator.comparing(entry ->
+                    !entry.getValue().getGunData().getBuiltInAttachments().containsKey(AttachmentType.SCOPE))).toList();
+        }
+        for (var entry : guns) {
             var gun = GunItemBuilder.create().setId(entry.getKey()).setAmmoCount(0).setAmmoInBarrel(false).build();
             var api = IGun.getIGunOrNull(gun);
             if (api == null) continue;
@@ -119,7 +128,7 @@ final class RefitScreenProbe {
                 continue;
             }
             boolean eligible = true;
-            for (var type : List.of(AttachmentType.SCOPE, AttachmentType.MUZZLE, AttachmentType.STOCK)) {
+            for (var type : List.of(AttachmentType.SCOPE, AttachmentType.MUZZLE, large ? AttachmentType.LASER : AttachmentType.STOCK)) {
                 long count = attachments.stream().filter(attachment -> {
                     var attachmentApi = IAttachment.getIAttachmentOrNull(attachment);
                     return attachmentApi != null && attachmentApi.getType(attachment) == type
@@ -131,7 +140,7 @@ final class RefitScreenProbe {
         }
         if (hsv) throw new IllegalStateException("No compatible editable HSV pair among " + editableGuns
                 + " editable guns and " + lasers.size() + " editable laser attachments");
-        throw new IllegalStateException("No real gun with two scopes, a muzzle and a stock was loaded");
+        throw new IllegalStateException("No real gun loaded with two scopes, a muzzle and a " + (large ? "laser" : "stock"));
     }
 
     static void tick() throws Exception {
@@ -174,7 +183,17 @@ final class RefitScreenProbe {
             return;
         }
         switch (step) {
-            case 0 -> { BackpackClientCache.clear(); mc.setScreen(new PauseScreen(true)); step++; }
+            case 0 -> {
+                BackpackClientCache.clear();
+                var pause = new PauseScreen(true);
+                mc.setScreen(pause);
+                mc.setScreen(new GunRefitScreen());
+                if (mc.screen != pause || AttachmentRefitClientState.getSessionId() != null) {
+                    throw new AssertionError("Opening TaCZ refit replaced the current screen or started a session");
+                }
+                ClientProbeMod.evidence("nativeRefitBlocked", true);
+                step++;
+            }
             case 1 -> { if (ClientProbeMod.clickButton(screen, "screen.codpattern.backpack.manage_button")) step++; }
             case 2 -> {
                 if (!(screen instanceof BackpackMenuScreen backpack)) return;
@@ -227,12 +246,11 @@ final class RefitScreenProbe {
             case 11 -> { if (selectType(screen, AttachmentType.STOCK)) { installFirst(screen, AttachmentType.STOCK); step++; } }
             case 12 -> { if (acknowledged()) { verifyWorking(); step++; } }
             case 13 -> {
-                var unload = screen.children().stream().filter(RefitUnloadButton.class::isInstance)
-                        .map(RefitUnloadButton.class::cast).findFirst().orElseThrow();
+                pressNoAttachment(screen, AttachmentType.STOCK, false);
                 expected.put(AttachmentType.STOCK, "");
-                ClientProbeMod.click(screen, unload); step++;
+                step++;
             }
-            case 14 -> { if (acknowledged()) { verifyWorking(); step++; } }
+            case 14 -> { if (acknowledged()) { verifyWorking(); pressNoAttachment(screen, AttachmentType.STOCK, true); step++; } }
             case 15 -> {
                 ClientProbeMod.screenshot("before-save");
                 if (!screen.keyPressed(256, 0, 0)) throw new AssertionError("ESC was not consumed");
@@ -279,7 +297,10 @@ final class RefitScreenProbe {
                 double y = button.getY() + button.getHeight() / 2.0;
                 backpack.mouseMoved(backpack.screenX(x - 1), backpack.screenY(y));
                 backpack.mouseMoved(backpack.screenX(x), backpack.screenY(y));
-                return true;
+                // The editor ignores mouse input until its transition ends.
+                return screen.children().stream().anyMatch(childWidget -> childWidget instanceof Button refit
+                        && refit.visible && refit.active
+                        && "screen.codpattern.loadout.refit".equals(ClientProbeMod.key(refit.getMessage())));
             }
         }
         return false;
@@ -287,9 +308,16 @@ final class RefitScreenProbe {
 
     static boolean selectType(Screen screen, AttachmentType type) {
         if (RefitTransform.getOpeningProgress() != 1F || RefitTransform.getTransformProgress() != 1F) return false;
-        if (RefitTransform.getCurrentTransformType() == type) return true;
+        var current = RefitTransform.getCurrentTransformType();
+        if (current == type) return true;
+        if (current != AttachmentType.NONE) {
+            if (!ClientProbeMod.clickButton(screen, "screen.codpattern.refit.back_to_slots")) {
+                throw new AssertionError("Cannot return from " + current + " to the attachment slots");
+            }
+            return false;
+        }
         for (var child : screen.children()) {
-            if (child instanceof GunAttachmentSlot slot && slot.getType() == type) {
+            if (child instanceof GunAttachmentSlot slot && slot.visible && slot.active && slot.getType() == type) {
                 if (!slot.isAllow()) throw new AssertionError("Fixture rejects type " + type);
                 ClientProbeMod.click(screen, slot);
                 return false; // Allow the real animation and render to finish.
@@ -300,7 +328,45 @@ final class RefitScreenProbe {
 
     static List<InventoryAttachmentSlot> visibleCandidates(Screen screen) {
         return screen.children().stream().filter(InventoryAttachmentSlot.class::isInstance)
-                .map(InventoryAttachmentSlot.class::cast).toList();
+                .map(InventoryAttachmentSlot.class::cast).filter(slot -> slot.visible).toList();
+    }
+
+    static Button noAttachment(Screen screen) {
+        if (screen.children().stream().anyMatch(RefitUnloadButton.class::isInstance)) {
+            throw new AssertionError("A standalone unload button is still registered");
+        }
+        return screen.children().stream().filter(Button.class::isInstance).map(Button.class::cast)
+                .filter(button -> button.visible && "screen.codpattern.refit.no_attachment".equals(ClientProbeMod.key(button.getMessage())))
+                .findFirst().orElse(null);
+    }
+
+    static Button verifyNoAttachment(Screen screen, boolean selected) throws ReflectiveOperationException {
+        var button = noAttachment(screen);
+        if (button == null) throw new AssertionError("The no-attachment option is not visible");
+        if (rowSelected(button) != selected) throw new AssertionError("Incorrect no-attachment highlight");
+        return button;
+    }
+
+    static boolean rowSelected(Button button) throws ReflectiveOperationException {
+        var selection = button.getClass().getDeclaredMethod("selected");
+        selection.setAccessible(true);
+        return (boolean) selection.invoke(button);
+    }
+
+    static void pressNoAttachment(Screen screen, AttachmentType type, boolean wasEmpty) throws Exception {
+        ClientProbeMod.click(screen, verifyNoAttachment(screen, wasEmpty));
+        var pending = queue().snapshot();
+        if (wasEmpty ? !pending.isEmpty() : pending.size() != 1 || !(pending.get(0) instanceof RefitAction action)
+                || action.kind() != RefitAction.Kind.UNLOAD || !type.name().equals(action.attachmentType())) {
+            throw new AssertionError("Unexpected actions after pressing no attachment for " + type + ": " + pending);
+        }
+    }
+
+    static boolean scrollCandidates(Screen screen, double delta) {
+        var rows = visibleCandidates(screen);
+        if (rows.isEmpty()) return false;
+        AbstractWidget middle = rows.get(rows.size() / 2);
+        return screen.mouseScrolled(middle.getX() + 2, middle.getY() + middle.getHeight() / 2.0, delta);
     }
 
     static ItemStack candidate(InventoryAttachmentSlot slot) throws Exception {

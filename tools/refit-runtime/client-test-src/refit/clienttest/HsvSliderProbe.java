@@ -13,11 +13,8 @@ import com.tacz.guns.api.TimelessAPI;
 import com.tacz.guns.api.item.IAttachment;
 import com.tacz.guns.api.item.IGun;
 import com.tacz.guns.api.item.attachment.AttachmentType;
-import com.tacz.guns.client.animation.screen.RefitTransform;
-import com.tacz.guns.client.gui.components.refit.GunAttachmentSlot;
 import com.tacz.guns.client.gui.components.refit.HSVSliderGroup.LaserColorSlider;
 import com.tacz.guns.client.gui.components.refit.InventoryAttachmentSlot;
-import com.tacz.guns.client.gui.components.refit.RefitTurnPageButton;
 import java.awt.Color;
 import java.nio.file.Files;
 import java.util.Comparator;
@@ -45,7 +42,7 @@ final class HsvSliderProbe {
     private static int reportedStep = -1;
     private static int dragEvents;
     private static int heldAcrossAcks;
-    private static int candidatePages;
+    private static int candidateScrolls;
     private static UUID playerId;
     private static Integer gunColor;
     private static Integer laserColor;
@@ -69,7 +66,8 @@ final class HsvSliderProbe {
         }
         switch (step) {
             case 0 -> {
-                if (!active(screen) || !RefitScreenProbe.acknowledged() || !selectNone(screen)) return;
+                if (!active(screen) || !RefitScreenProbe.acknowledged()
+                        || !RefitScreenProbe.selectType(screen, AttachmentType.NONE)) return;
                 assertFixture();
                 playerId = Minecraft.getInstance().player.getUUID();
                 panel = panel(screen);
@@ -162,7 +160,7 @@ final class HsvSliderProbe {
                 step++;
             }
             case 10 -> {
-                InventoryAttachmentSlot candidate = findLaserOrTurnPage(screen);
+                InventoryAttachmentSlot candidate = findLaserOrScroll(screen);
                 if (candidate == null) return;
                 panel = panel(screen);
                 int previousLaserColor = laserColor;
@@ -222,13 +220,14 @@ final class HsvSliderProbe {
                 step++;
             }
             case 17 -> {
-                if (!selectNone(screen)) return;
+                if (!RefitScreenProbe.selectType(screen, AttachmentType.NONE)) return;
                 assertPanelReadback(panel(screen), gunColor);
                 ClientProbeMod.screenshot("hsv-gun-reopened");
                 step++;
             }
             case 18 -> {
                 if (!RefitScreenProbe.selectType(screen, AttachmentType.LASER)) return;
+                RefitScreenProbe.verifyNoAttachment(screen, false);
                 assertPanelReadback(panel(screen), laserColor);
                 assertClientColors();
                 ClientProbeMod.screenshot("hsv-laser-reopened");
@@ -247,19 +246,6 @@ final class HsvSliderProbe {
 
     private static boolean active(Screen screen) {
         return screen instanceof CodGunRefitScreen && AttachmentRefitClientState.acceptsTaczOperations();
-    }
-
-    private static boolean selectNone(Screen screen) {
-        if (RefitTransform.getOpeningProgress() != 1F || RefitTransform.getTransformProgress() != 1F) return false;
-        AttachmentType current = RefitTransform.getCurrentTransformType();
-        if (current == AttachmentType.NONE) return true;
-        for (var child : screen.children()) {
-            if (child instanceof GunAttachmentSlot slot && slot.getType() == current) {
-                ClientProbeMod.click(screen, slot); // TaCZ toggles the selected type back to NONE.
-                return false;
-            }
-        }
-        throw new AssertionError("Cannot return to the gun's native HSV panel");
     }
 
     private static void assertFixture() {
@@ -373,22 +359,17 @@ final class HsvSliderProbe {
         }
     }
 
-    private static InventoryAttachmentSlot findLaserOrTurnPage(Screen screen) throws Exception {
+    private static InventoryAttachmentSlot findLaserOrScroll(Screen screen) throws Exception {
         for (var button : RefitScreenProbe.visibleCandidates(screen)) {
-            if (laserId().equals(RefitScreenProbe.attachmentId(RefitScreenProbe.candidate(button)))) return button;
+            AbstractWidget row = button;
+            if (row.isMouseOver(row.getX() + row.getWidth() / 2.0, row.getY() + row.getHeight() / 2.0)
+                    && laserId().equals(RefitScreenProbe.attachmentId(RefitScreenProbe.candidate(button)))) return button;
         }
-        var direction = RefitTurnPageButton.class.getDeclaredField("isUpPage");
-        direction.setAccessible(true);
-        for (var child : screen.children()) {
-            if (child instanceof RefitTurnPageButton button && interactable(button) && !direction.getBoolean(button)) {
-                if (++candidatePages > AttachmentRefitClientState.getAttachmentCandidates().size()) {
-                    throw new AssertionError("LASER paging did not reach the selected candidate");
-                }
-                ClientProbeMod.click(screen, button);
-                return null;
-            }
+        if (++candidateScrolls > 2 * AttachmentRefitClientState.getAttachmentCandidates().size()
+                || !RefitScreenProbe.scrollCandidates(screen, -1)) {
+            throw new AssertionError("The LASER list did not reach " + laserId());
         }
-        throw new AssertionError("The real LASER candidate controls do not contain " + laserId());
+        return null;
     }
 
     private static ItemStack clientGun() {

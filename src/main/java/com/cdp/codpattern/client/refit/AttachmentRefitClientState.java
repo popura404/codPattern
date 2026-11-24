@@ -148,7 +148,7 @@ public final class AttachmentRefitClientState {
         if (parentScreen instanceof BackpackMenuScreen menu) {
             menu.restoreRefitTarget(bagId, BackpackSlot.fromKey(slot));
         }
-        mc.setScreen(new CodGunRefitScreen(parentScreen));
+        mc.setScreen(new CodGunRefitScreen(parentScreen, BackpackSlot.fromKey(slot)));
     }
 
     /** Only messages from this screen belong to the CDP preview, even while a save is pending. */

@@ -20,8 +20,7 @@ public abstract class BackpackCanvasScreen extends Screen {
         super(title);
     }
 
-    private record Viewport(int width, int height, double zoom, double guiScale,
-                            double mouseUnitX, double mouseUnitY) {
+    record Viewport(int width, int height, double zoom, double guiScale, double mouseUnitX, double mouseUnitY) {
         static Viewport current() {
             Window window = Minecraft.getInstance().getWindow();
             int w = window.getWidth(), h = window.getHeight();
@@ -29,6 +28,10 @@ public abstract class BackpackCanvasScreen extends Screen {
             // Projection uses exact framebuffer/guiScale; mouse dispatch uses rounded GUI dimensions.
             return new Viewport(Mth.ceil(w / zoom), Mth.ceil(h / zoom), zoom, window.getGuiScale(),
                     w / (double) window.getGuiScaledWidth(), h / (double) window.getGuiScaledHeight());
+        }
+
+        float scale() {
+            return (float) (zoom / guiScale);
         }
 
         double canvasX(double mouseX) {
@@ -94,7 +97,7 @@ public abstract class BackpackCanvasScreen extends Screen {
         var pose = g.pose();
         pose.pushPose();
         try {
-            float scale = (float) (view.zoom / view.guiScale);
+            float scale = view.scale();
             // Project positions only, preserving normals and depth for the equipment model.
             pose.last().pose().scale(scale, scale, 1f);
             BackpackUi.background(g, canvasWidth, canvasHeight);

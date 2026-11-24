@@ -1,8 +1,6 @@
 package com.cdp.codpattern.event.client;
 
 import com.cdp.codpattern.CodPatternConstants;
-import com.cdp.codpattern.client.gui.screen.BackpackMenuScreen;
-import com.cdp.codpattern.compat.tacz.client.CodGunRefitScreen;
 import com.tacz.guns.client.gui.GunRefitScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -18,13 +16,12 @@ public final class TaczRefitScreenBlocker {
 
     @SubscribeEvent
     public static void onScreenOpening(ScreenEvent.Opening event) {
-        if (!(event.getNewScreen() instanceof GunRefitScreen)
-                || event.getNewScreen() instanceof CodGunRefitScreen
-                || event.getNewScreen().getClass() != GunRefitScreen.class) {
+        var screen = event.getNewScreen();
+        if (screen == null || screen.getClass() != GunRefitScreen.class) {
             return;
         }
 
-        event.setNewScreen(new BackpackMenuScreen());
+        event.setCanceled(true);
         if (Minecraft.getInstance().player != null) {
             Minecraft.getInstance().player.sendSystemMessage(
                     Component.translatable("message.codpattern.refit.tacz_screen_disabled"));
