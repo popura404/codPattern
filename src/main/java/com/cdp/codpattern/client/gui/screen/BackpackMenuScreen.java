@@ -21,6 +21,7 @@ import com.cdp.codpattern.network.RequestBackpackConfigPacket;
 import com.cdp.codpattern.network.RequestWeaponFilterPacket;
 import com.cdp.codpattern.network.SelectBackpackPacket;
 import net.minecraft.Util;
+import net.minecraft.client.InputType;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
@@ -357,6 +358,8 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
                 lastX = pointerCanvasX();
                 lastY = pointerCanvasY();
                 updatePointer(lastX, lastY);
+            } else if (!editing) {
+                previewBag(bagId);
             }
             return;
         }
@@ -533,8 +536,18 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         renderCanvasWidgets(g, mouseX, mouseY, partialTick);
     }
 
-    private boolean canRefit() {
-        return editing && previewSlot.isGunSlot() && TaczGatewayProvider.gateway().isGun(equipment.get(previewSlot));
+    private boolean canRefit(BackpackSlot slot) {
+        return editing && slot.isGunSlot() && TaczGatewayProvider.gateway().isGun(equipment.get(slot));
+    }
+
+    private boolean inRefitHoverArea(BackpackSlot slot, Button card, double x, double y) {
+        // Split the gap between rows so the two gun targets never overlap.
+        int above = slot == BackpackSlot.PRIMARY ? gap / 2 : LOADOUT_CARD_GAP / 2;
+        int below = LOADOUT_CARD_GAP - LOADOUT_CARD_GAP / 2;
+        int buttonRight = card.getX() + card.getWidth() + gap + refitButton.getWidth();
+        return x >= card.getX() - gap / 2 && x < buttonRight + gap
+                && y >= card.getY() - above && y < card.getY() + card.getHeight() + below
+                && canRefit(slot);
     }
 
     private void positionActions() {
@@ -544,7 +557,7 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
             if (owner != null) editButton.setY(owner.getY());
         }
         if (refitButton != null) {
-            refitButton.visible = overGunCard && canRefit();
+            refitButton.visible = overGunCard && canRefit(previewSlot);
             if (refitButton.visible) {
                 Button owner = slotButtons.get(previewSlot);
                 int x = owner.getX() + owner.getWidth() + gap;
@@ -579,13 +592,9 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
             }
             editOwner = 0;
         } else if (refitButton != null) {
-            Button owner = slotButtons.get(previewSlot);
-            if (refitButton.visible && (refitButton.isMouseOver(x, y)
-                    || (x >= owner.getX() + owner.getWidth() && x < refitButton.getX()
-                    && y >= owner.getY() && y < owner.getY() + owner.getHeight()))) return;
             overGunCard = false;
             for (var entry : slotButtons.entrySet()) {
-                if (entry.getValue().isMouseOver(x, y)) {
+                if (entry.getValue().isMouseOver(x, y) || inRefitHoverArea(entry.getKey(), entry.getValue(), x, y)) {
                     previewSlot = entry.getKey();
                     overGunCard = previewSlot.isGunSlot();
                     break;
@@ -679,7 +688,14 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
             return true;
         }
         if (context.isVisible()) return true;
-        if (key == GLFW.GLFW_KEY_R && modifiers == 0 && refitButton != null && canRefit()
+        boolean enterEditor = key == GLFW.GLFW_KEY_D && !editing && bagButtons.containsKey(bagId);
+        boolean leaveEditor = key == GLFW.GLFW_KEY_A && editing;
+        if (modifiers == 0 && (enterEditor || leaveEditor)) {
+            minecraft.setLastInputType(InputType.KEYBOARD_ARROW);
+            switchView(enterEditor, bagId);
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_R && modifiers == 0 && refitButton != null && canRefit(previewSlot)
                 && (refitButton.visible || (keyboardFocus && getFocused() == slotButtons.get(previewSlot)))) {
             openRefit();
             return true;
