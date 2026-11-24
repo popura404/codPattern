@@ -52,12 +52,8 @@ public final class BackpackEquipmentRenderer {
 
     public static void renderCardIcon(GuiGraphics graphics, ItemStack stack, int x, int y, int width,
                                       int height, int artPercent, int labelBand) {
-        int artWidth = Math.round(width * artPercent / 100f);
-        var pose = graphics.pose();
-        pose.pushPose();
-        pose.translate(x + (width - artWidth) * .5f, y + labelBand, 0);
-        renderIcon(graphics, stack, 0, 0, artWidth, height - 2 * labelBand);
-        pose.popPose();
+        int artWidth = BackpackUi.centeredExtent(Math.round(width * artPercent / 100f), width);
+        renderIcon(graphics, stack, x + (width - artWidth) / 2, y + labelBand, artWidth, height - 2 * labelBand);
     }
 
     public static void renderIcon(GuiGraphics graphics, ItemStack stack, int x, int y, int width, int height) {
@@ -68,15 +64,14 @@ public final class BackpackEquipmentRenderer {
         PoseStack pose = graphics.pose();
         if (hud != null && !MissingTextureAtlasSprite.getLocation().equals(hud)) {
             // TaCZ's complete 3:1 HUD canvas stays centered, including transparent pixels.
-            int iconWidth = Math.min(width, height * 3);
-            int iconHeight = Math.max(1, Math.round(iconWidth / 3f));
-            pose.pushPose();
-            pose.translate(x + (width - iconWidth) * .5f, y + (height - iconHeight) * .5f, 0);
+            int iconHeight = Math.max(1, BackpackUi.centeredExtent(Math.min(width / 3, height), height));
+            int iconWidth = Math.min(width, iconHeight * 3);
+            int left = x + (width - iconWidth) / 2;
+            int top = y + (height - iconHeight) / 2;
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();
-            graphics.blit(hud, 0, 0, 0, 0, iconWidth, iconHeight, iconWidth, iconHeight);
+            graphics.blit(hud, left, top, 0, 0, iconWidth, iconHeight, iconWidth, iconHeight);
             RenderSystem.disableBlend();
-            pose.popPose();
             return;
         }
 
@@ -126,7 +121,7 @@ public final class BackpackEquipmentRenderer {
             }
         }
 
-        BackpackCanvasScreen.clipModel(graphics, x, y, width, height);
+        graphics.flush();
         PoseStack pose = graphics.pose();
         pose.pushPose();
         try {
@@ -142,7 +137,6 @@ public final class BackpackEquipmentRenderer {
         } finally {
             Lighting.setupFor3DItems();
             pose.popPose();
-            BackpackCanvasScreen.restoreCanvasClip(graphics);
         }
     }
 }

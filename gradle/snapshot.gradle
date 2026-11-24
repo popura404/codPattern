@@ -1,0 +1,18 @@
+// Usage: ./gradlew buildSnapshot (Windows: gradlew.bat buildSnapshot)
+// Keep the normal artifact and mod metadata unchanged; copy the completed,
+// reobfuscated build with a dated snapshot filename into build/libs.
+// The local build date is captured once. Rebuilding on the same day replaces
+// that day's snapshot; snapshots from other days remain until clean is run.
+def snapshotDate = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
+def releaseJar = tasks.named('jar', Jar)
+
+tasks.register('buildSnapshot', Copy) {
+    group = 'build'
+    description = 'Build a reobfuscated snapshot JAR named <mod>-<version>-SNAPSHOT-yyyyMMdd.jar.'
+    dependsOn tasks.named('build'), 'reobfJar'
+    inputs.property('snapshotDate', snapshotDate)
+
+    from releaseJar.flatMap { it.archiveFile }
+    into layout.buildDirectory.dir('libs')
+    rename { "${project.base.archivesName.get()}-${project.version}-SNAPSHOT-${snapshotDate}.jar" }
+}

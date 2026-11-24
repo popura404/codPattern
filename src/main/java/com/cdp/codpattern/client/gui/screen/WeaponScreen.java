@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
+import com.cdp.codpattern.client.gui.BackNavigation;
 import com.cdp.codpattern.client.gui.screen.backpack.BackpackCanvasScreen;
 import com.cdp.codpattern.client.gui.screen.backpack.BackpackEquipmentRenderer;
 import com.cdp.codpattern.client.gui.screen.backpack.BackpackUi;
@@ -14,6 +15,7 @@ import com.cdp.codpattern.config.backpack.BackpackSlot;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterClientCache;
 import com.cdp.codpattern.config.weaponfilter.WeaponFilterConfig;
 import com.cdp.codpattern.network.UpdateWeaponPacket;
+import net.minecraft.Util;
 import net.minecraft.client.InputType;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -31,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.LOADOUT_CARD_GAP;
 import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.lineHeight;
 import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.px;
 import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.textWidth;
@@ -41,6 +44,7 @@ public class WeaponScreen extends BackpackCanvasScreen {
     private static final int TAB_SELECTED = 0xFF355557;
     private static final int CATALOG_RULE = 0xFF485E5E;
     private static final int SOFT_ACCENT = 0xFF8CB9B4;
+    private static final int SCROLL_DURATION_MS = 160;
     private final Screen parent;
     private final BackpackConfig.Backpack backpack;
     private final int bagId;
@@ -53,14 +57,14 @@ public class WeaponScreen extends BackpackCanvasScreen {
     private List<ItemStack> candidates = List.of();
     private int preview;
     private int equippedIndex;
-    private int offset;
-    private int visibleRows;
+    private double scrollPosition, scrollTarget, scrollStart;
+    private long scrollStartedAt;
     private int margin;
     private int titleY;
     private int listWidth;
     private int listY;
+    private int listBottom;
     private int rowHeight;
-    private int rowGap;
     private int footerY;
     private double lastPointerX, lastPointerY;
 
@@ -78,29 +82,27 @@ public class WeaponScreen extends BackpackCanvasScreen {
 
     @Override
     protected void init() {
-        margin = Math.max(px(8), Math.round(CANVAS_WIDTH * .038f));
-        titleY = Math.max(px(8), Math.round(CANVAS_HEIGHT * .035f));
-        int usableWidth = CANVAS_WIDTH - 2 * margin;
-        listWidth = Math.min(usableWidth / 2, Math.max(px(104), Math.round(usableWidth / 3.08f)));
+        super.init();
+        margin = Math.round(canvasWidth * .038f);
+        titleY = Math.round(canvasHeight * .035f);
+        // Every picker uses the backpack's primary-weapon card, including melee and throwables.
+        listWidth = BackpackUi.loadoutCardWidth(BackpackUi.loadoutColumnWidth(canvasWidth), BackpackSlot.PRIMARY);
+        rowHeight = BackpackUi.loadoutCardHeight(BackpackSlot.PRIMARY);
         lastPointerX = pointerCanvasX();
         lastPointerY = pointerCanvasY();
         equipped = BackpackItemStackFactory.create(backpack.getItem(slot));
         loadCatalog();
-        int tabsY = titleY + Math.max(px(22), CANVAS_HEIGHT / 15);
+        int tabsY = titleY + Math.max(px(22), canvasHeight / 15);
         if (catalog.size() > 1) {
             addTabs(tabsY);
             tabsY += px(22);
         }
         listY = tabsY + lineHeight(1f) + px(7);
-        rowHeight = slot.isGunSlot()
-                ? Math.max(lineHeight(1f) * 6, Math.min(listWidth / 3, Math.round(CANVAS_HEIGHT * .18f)))
-                : Mth.clamp(Math.round(CANVAS_HEIGHT * .1065f), px(38), px(58));
-        rowGap = px(2);
-        footerY = CANVAS_HEIGHT - titleY - px(16);
-        int viewport = Math.min(Math.round(CANVAS_HEIGHT * .62f), footerY - listY - px(4));
-        visibleRows = Math.max(1, (viewport + rowGap) / (rowHeight + rowGap));
+        var backBounds = BackNavigation.bounds(canvasWidth, canvasHeight);
+        footerY = backBounds.top();
+        listBottom = footerY - px(4);
         chooseCategory(category);
-        addRenderableWidget(BackpackUi.backButton(margin, footerY, this::onClose));
+        addRenderableWidget(BackNavigation.button(backBounds, this::onClose));
     }
 
     private void loadCatalog() {
@@ -161,7 +163,7 @@ public class WeaponScreen extends BackpackCanvasScreen {
         int gap = px(2);
         int pad = px(8);
         int tabHeight = px(17);
-        int maxWidth = (CANVAS_WIDTH - 2 * margin) / catalog.size() - gap;
+        int maxWidth = (canvasWidth - 2 * margin) / catalog.size() - gap;
         int index = 0;
         for (String tab : catalog.keySet()) {
             int tabIndex = index++;
@@ -207,27 +209,69 @@ public class WeaponScreen extends BackpackCanvasScreen {
             }
         }
         preview = Math.max(0, equippedIndex);
-        offset = 0;
+        if (getFocused() instanceof CandidateButton) setFocused(null);
+        rows.forEach(this::removeWidget);
+        rows.clear();
+        scrollPosition = 0;
         showPreviewRow();
     }
 
+    private int rowStep() {
+        return rowHeight + LOADOUT_CARD_GAP;
+    }
+
+    private int maxScroll() {
+        int contentHeight = candidates.size() * rowStep() - LOADOUT_CARD_GAP;
+        return Math.max(0, contentHeight - (listBottom - listY));
+    }
+
     private void showPreviewRow() {
-        offset = Mth.clamp(offset, preview - visibleRows + 1, preview);
-        updateRows();
+        int top = preview * rowStep();
+        int bottom = top + rowHeight;
+        snapScroll(Mth.clamp(scrollPosition, bottom - (listBottom - listY), top));
         if (!rows.isEmpty() && minecraft.getLastInputType().isKeyboard()) {
-            setFocused(rows.get(preview - offset));
+            setFocused(rows.get(preview - rows.get(0).index));
+        }
+    }
+
+    private void snapScroll(double position) {
+        scrollPosition = scrollTarget = Mth.clamp(position, 0, maxScroll());
+        updateRows();
+    }
+
+    private int scrollPixel() {
+        return (int) Math.round(scrollPosition);
+    }
+
+    private void advanceScroll(long now) {
+        if (scrollPosition == scrollTarget) return;
+        int previousPixel = scrollPixel();
+        double remaining = 1 - Math.min(1, (now - scrollStartedAt) / (double) SCROLL_DURATION_MS);
+        scrollPosition = scrollTarget + (scrollStart - scrollTarget) * remaining * remaining * remaining;
+        if (scrollPixel() != previousPixel) {
+            updateRows();
+            if (minecraft.getLastInputType() == InputType.MOUSE) {
+                previewUnderPointer(lastPointerX, lastPointerY);
+            }
         }
     }
 
     private void updateRows() {
-        if (getFocused() instanceof CandidateButton) setFocused(null);
-        rows.forEach(this::removeWidget);
-        rows.clear();
-        offset = Mth.clamp(offset, 0, Math.max(0, candidates.size() - visibleRows));
-        int end = Math.min(candidates.size(), offset + visibleRows);
-        for (int index = offset; index < end; index++) {
-            int y = listY + (index - offset) * (rowHeight + rowGap);
-            rows.add(addRenderableWidget(new CandidateButton(index, y)));
+        int step = rowStep();
+        int pixels = scrollPixel();
+        int first = Math.min(candidates.size(), (pixels + LOADOUT_CARD_GAP) / step);
+        int end = Math.min(candidates.size(), Mth.positiveCeilDiv(pixels + listBottom - listY, step));
+        if (rows.size() != end - first || (!rows.isEmpty() && rows.get(0).index != first)) {
+            if (getFocused() instanceof CandidateButton) setFocused(null);
+            rows.forEach(this::removeWidget);
+            rows.clear();
+            for (int index = first; index < end; index++) {
+                rows.add(addWidget(new CandidateButton(index, listY + index * step - pixels)));
+            }
+        } else {
+            for (CandidateButton row : rows) {
+                row.setY(listY + row.index * step - pixels);
+            }
         }
     }
 
@@ -241,41 +285,34 @@ public class WeaponScreen extends BackpackCanvasScreen {
         }
 
         @Override
+        public boolean isMouseOver(double x, double y) {
+            return y >= listY && y < listBottom && super.isMouseOver(x, y);
+        }
+
+        @Override
+        protected boolean clicked(double x, double y) {
+            return isMouseOver(x, y);
+        }
+
+        @Override
         public void renderWidget(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
             boolean selected = preview == index;
-            BackpackUi.row(graphics, getX(), getY(), getWidth(), getHeight(), slot, index, selected);
+            BackpackUi.candidateRow(graphics, getX(), getY(), getWidth(), getHeight(), slot, index, selected);
             int padX = px(8);
             int padY = px(4);
             float nameScale = getWidth() >= px(145) ? 1.25f : 1f;
             int nameHeight = lineHeight(nameScale);
             int captionY = getY() + getHeight() - padY - nameHeight;
             int nameWidth = getWidth() - 2 * padX;
-            int badgeWidth = 0;
-            if (index == equippedIndex) {
-                badgeWidth = Math.min(nameWidth / 2, textWidth(EQUIPPED_LABEL, 1f));
+            int badgeWidth = index == equippedIndex ? Math.min(nameWidth / 2, textWidth(EQUIPPED_LABEL, 1f)) : 0;
+            int artWidthPercent = slot.isGunSlot() ? 58 : 48;
+            BackpackEquipmentRenderer.renderCardIcon(graphics, candidates.get(index), getX(), getY(),
+                    getWidth(), getHeight(), artWidthPercent, nameHeight + padY);
+            if (badgeWidth > 0) {
                 nameWidth -= badgeWidth + padX;
-            }
-            ItemStack stack = candidates.get(index);
-            if (slot.isGunSlot()) {
-                BackpackEquipmentRenderer.renderCardIcon(graphics, stack, getX(), getY(),
-                        getWidth(), getHeight(), 48, nameHeight + padY);
-            } else {
-                int gap = px(1);
-                int size = Math.min(Math.round(getWidth() * .68f), getHeight() - 2 * padY - nameHeight - gap);
-                // Keep the native artwork centered on the row. Long captions can use the space below it.
-                int captionExtent = Math.max(badgeWidth, Math.min(nameWidth, textWidth(getMessage(), nameScale)));
-                if ((getWidth() - size) * .5f < padX + captionExtent + gap) {
-                    size = Math.min(size, getHeight() - 2 * (padY + nameHeight + gap));
-                }
-                var pose = graphics.pose();
-                pose.pushPose();
-                pose.translate(getX() + (getWidth() - size) * .5f, getY() + (getHeight() - size) * .5f, 0);
-                BackpackEquipmentRenderer.renderIcon(graphics, stack, 0, 0, size, size);
-                pose.popPose();
-            }
-            if (index == equippedIndex) {
+                int badgeY = captionY + nameHeight - lineHeight(1f);
                 BackpackUi.text(graphics, EQUIPPED_LABEL, getX() + getWidth() - padX - badgeWidth,
-                        captionY + nameHeight - lineHeight(1f), badgeWidth, 1f, BackpackUi.JOINED_MINT);
+                        badgeY, badgeWidth, 1f, BackpackUi.JOINED_MINT);
             }
             BackpackUi.text(graphics, getMessage(), getX() + padX, captionY, nameWidth, nameScale, BackpackUi.INK);
         }
@@ -305,7 +342,8 @@ public class WeaponScreen extends BackpackCanvasScreen {
 
     @Override
     protected void renderCanvas(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        BackpackUi.title(graphics, margin, titleY, CANVAS_WIDTH - margin * 2, title);
+        advanceScroll(Util.getMillis());
+        BackpackUi.title(graphics, margin, titleY, canvasWidth - margin * 2, title);
         int headingY = listY - lineHeight(1f) - px(7);
         int right = margin + listWidth;
         int headingWidth = listWidth;
@@ -322,21 +360,28 @@ public class WeaponScreen extends BackpackCanvasScreen {
         BackpackUi.text(graphics, categoryName(category), margin, headingY, headingWidth, 1f, BackpackUi.INK);
         int ruleY = headingY + lineHeight(1f) + px(4);
         graphics.fill(margin, ruleY, right, ruleY + 1, CATALOG_RULE);
-        if (rows.size() < candidates.size()) {
-            int track = rows.size() * (rowHeight + rowGap) - rowGap;
-            int thumb = Math.max(px(5), track * rows.size() / candidates.size());
-            int top = listY + (track - thumb) * offset / (candidates.size() - rows.size());
-            int scrollX = right + rowGap;
-            graphics.fill(scrollX, listY, scrollX + rowGap, listY + track, CATALOG_RULE);
-            graphics.fill(scrollX, top, scrollX + rowGap, top + thumb, SOFT_ACCENT);
+        int max = maxScroll();
+        if (max > 0) {
+            int track = listBottom - listY;
+            int thumb = Math.max(px(5), (int) Math.round((double) track * track / (max + track)));
+            int top = listY + (int) Math.round((track - thumb) * scrollPosition / max);
+            int scrollX = right + LOADOUT_CARD_GAP;
+            graphics.fill(scrollX, listY, scrollX + LOADOUT_CARD_GAP, listBottom, CATALOG_RULE);
+            graphics.fill(scrollX, top, scrollX + LOADOUT_CARD_GAP, top + thumb, SOFT_ACCENT);
+        }
+        if (!rows.isEmpty()) {
+            int hoverY = mouseY >= listY && mouseY < listBottom ? mouseY : -1;
+            renderCanvasClipped(graphics, margin, listY, right, listBottom, () -> {
+                for (CandidateButton row : rows) row.render(graphics, mouseX, hoverY, partialTick);
+            });
         }
         renderCanvasWidgets(graphics, mouseX, mouseY, partialTick);
     }
 
     private void drawPreview(GuiGraphics graphics) {
         ItemStack stack = candidates.get(preview);
-        int x = margin + listWidth + Math.max(px(8), Math.round(CANVAS_WIDTH * .0125f));
-        int stageWidth = CANVAS_WIDTH - x - margin;
+        int x = margin + listWidth + Math.max(px(8), Math.round(canvasWidth * .0125f));
+        int stageWidth = canvasWidth - x - margin;
         int stageTop = listY - lineHeight(1f) - px(7);
         int stageHeight = footerY - stageTop;
         int captionY = footerY - BackpackUi.captionHeight();
@@ -369,10 +414,18 @@ public class WeaponScreen extends BackpackCanvasScreen {
 
     @Override
     protected boolean canvasMouseScrolled(double x, double y, double delta) {
-        if (x >= margin && x <= margin + listWidth + 2 * rowGap && y >= listY
-                && y < listY + rows.size() * (rowHeight + rowGap) && candidates.size() > visibleRows && delta != 0) {
-            offset += delta > 0 ? -1 : 1;
-            updateRows();
+        int right = margin + listWidth + 2 * LOADOUT_CARD_GAP;
+        if (x >= margin && x <= right && y >= listY && y < listBottom && maxScroll() > 0 && delta != 0) {
+            double target = Mth.clamp(scrollTarget - delta * rowStep(), 0, maxScroll());
+            if (target != scrollTarget) {
+                scrollStart = scrollPosition;
+                scrollTarget = target;
+                scrollStartedAt = Util.getMillis();
+            }
+            minecraft.setLastInputType(InputType.MOUSE);
+            lastPointerX = x;
+            lastPointerY = y;
+            if (getFocused() instanceof CandidateButton) setFocused(null);
             previewUnderPointer(x, y);
             return true;
         }
@@ -404,6 +457,15 @@ public class WeaponScreen extends BackpackCanvasScreen {
             int next = tabs.indexOf(category) + (key == GLFW.GLFW_KEY_LEFT ? -1 : 1);
             chooseCategory(tabs.get(Math.floorMod(next, tabs.size())));
             return true;
+        }
+        if (key == GLFW.GLFW_KEY_TAB) {
+            snapScroll(scrollPixel());
+            boolean handled = super.keyPressed(key, scanCode, modifiers);
+            if (getFocused() instanceof CandidateButton row) {
+                preview = row.index;
+                showPreviewRow();
+            }
+            return handled;
         }
         return super.keyPressed(key, scanCode, modifiers);
     }

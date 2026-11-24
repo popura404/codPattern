@@ -2,6 +2,7 @@ package com.cdp.codpattern.client.gui.screen;
 
 import com.cdp.codpattern.adapter.forge.network.ModNetworkChannel;
 import com.cdp.codpattern.app.backpack.service.BackpackNamespaceFilter;
+import com.cdp.codpattern.client.gui.BackNavigation;
 import com.cdp.codpattern.client.gui.refit.AttachmentConfigButton;
 import com.cdp.codpattern.client.gui.screen.backpack.BackpackCanvasScreen;
 import com.cdp.codpattern.client.gui.screen.backpack.BackpackContextMenuCoordinator;
@@ -50,12 +51,13 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
     private int editOwner;
     private Button editButton;
     private Button refitButton;
+    private Button backButton;
     private double lastX, lastY;
     private boolean keyboardFocus;
     private boolean requestedData;
     private int pendingNewId;
     private int scrollOffset, pageHeight;
-    private int margin, gap, titleY, headingY, rowsY, bagWidth, gearX, gearWidth, slotUnit, editWidth;
+    private int margin, gap, titleY, headingY, rowsY, bagWidth, gearX, gearWidth, editWidth;
     private int stageX, stageY, stageWidth, stageHeight, captionY;
 
     public BackpackMenuScreen() {
@@ -68,6 +70,7 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
 
     @Override
     protected void init() {
+        super.init();
         // A child screen may return with the pointer over an entirely different row.
         lastX = pointerCanvasX();
         lastY = pointerCanvasY();
@@ -120,31 +123,31 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         equipment.clear();
         editButton = null;
         refitButton = null;
+        backButton = null;
 
-        margin = 35;
-        gap = 12;
+        margin = LOADOUT_MARGIN;
+        gap = LOADOUT_COLUMN_GAP;
         titleY = 19;
         headingY = titleY + titleHeight() + 13;
         rowsY = headingY + lineHeight(1f) + 10;
-        int columns = CANVAS_WIDTH - 2 * (margin + gap);
+        int columns = canvasWidth - 2 * (margin + gap);
         bagWidth = editing ? Math.round(columns * .31f / 3.81f) : Math.round(columns * .8f / 4.17f);
-        gearWidth = editing ? Math.round(columns * 1.05f / 3.81f) : Math.round(columns * 1.02f / 4.17f);
+        gearWidth = loadoutColumnWidth(canvasWidth);
         gearX = margin + bagWidth + gap;
         editWidth = Mth.clamp(Math.round(bagWidth * .23f), px(22), px(32));
-        slotUnit = editing ? 50 : 47;
-        int footerSpace = editing ? 39 : 9;
-        int slotGap = 3;
-        int bagBottom = rowsY;
+        var backBounds = BackNavigation.bounds(canvasWidth, canvasHeight);
+        int footerSpace = editing ? canvasHeight - backBounds.top() + px(4) : 9;
+        int bottom = rowsY;
         if (data != null) {
-            bagBottom = addBags();
-            addSlots(slotGap);
+            int bagBottom = addBags();
+            int gearBottom = addSlots();
+            bottom = Math.max(bagBottom, gearBottom);
         }
-        int bottom = Math.max(bagBottom, rowsY + 6 * slotUnit + slotUnit / 2 + 3 * slotGap);
-        pageHeight = Math.max(CANVAS_HEIGHT, bottom + footerSpace);
+        pageHeight = Math.max(canvasHeight, bottom + footerSpace);
         int stageTop = headingY;
         int stageArea = pageHeight - footerSpace - stageTop;
         int stageLeft = gearX + gearWidth + gap;
-        int stageAreaWidth = CANVAS_WIDTH - margin - stageLeft;
+        int stageAreaWidth = canvasWidth - margin - stageLeft;
         stageX = stageLeft + stageAreaWidth / 25;
         stageWidth = stageAreaWidth * 92 / 100;
         stageY = stageTop + stageArea * 8 / 100;
@@ -152,7 +155,7 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         captionY = stageTop + stageArea * 93 / 100 - captionHeight();
 
         if (editing && !slotButtons.isEmpty()) {
-            addRenderableWidget(BackpackUi.backButton(margin, pageHeight - px(26), this::onClose));
+            backButton = addWidget(BackNavigation.button(backBounds, this::onClose));
             int w = refitWidth();
             int h = 27;
             refitButton = addRenderableWidget(BackpackUi.button(0, 0, w, h, label("refit"), this::openRefit, this::drawRefit));
@@ -213,21 +216,21 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         return y;
     }
 
-    private void addSlots(int gutter) {
-        if (!data.getBackpacks_MAP().containsKey(bagId)) return;
-        int half = (gearWidth - gutter) / 2;
+    private int addSlots() {
+        if (!data.getBackpacks_MAP().containsKey(bagId)) return rowsY;
         int y = rowsY;
         for (BackpackSlot slot : BackpackSlot.values()) {
-            int h = slot.isGunSlot() ? 2 * slotUnit : slot == BackpackSlot.MELEE ? 3 * slotUnit / 2 : slotUnit;
-            int x = slot == BackpackSlot.ITEM2 ? gearX + half + gutter : gearX;
-            int w = slot.isEquipmentSlot() ? (slot == BackpackSlot.ITEM1 ? half : gearWidth - half - gutter) : gearWidth;
+            int h = loadoutCardHeight(slot);
+            int w = loadoutCardWidth(gearWidth, slot);
+            int x = slot == BackpackSlot.ITEM2 ? gearX + w + LOADOUT_CARD_GAP : gearX;
             Button b = BackpackUi.button(x, y, w, h, slotLabel(slot), () -> pick(slot),
                     (g, widget) -> drawSlot(g, widget, slot));
             b.active = editing;
             slotButtons.put(slot, addRenderableWidget(b));
-            if (slot != BackpackSlot.ITEM1) y += h + gutter;
+            if (slot != BackpackSlot.ITEM1) y += h + LOADOUT_CARD_GAP;
         }
         refreshEquipment();
+        return y - LOADOUT_CARD_GAP;
     }
 
     private void refreshEquipment() {
@@ -392,9 +395,21 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
 
     @Override
     protected void renderCanvas(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        title(g, margin, titleY, CANVAS_WIDTH - margin * 2, label(editing ? "editor" : "overview"));
+        if (backButton != null && pageHeight > canvasHeight) {
+            int bottom = contentBottom();
+            renderCanvasClipped(g, 0, 0, canvasWidth, bottom, () ->
+                    drawPage(g, mouseX, mouseY < bottom ? mouseY : -1, partialTick));
+        } else {
+            drawPage(g, mouseX, mouseY, partialTick);
+        }
+        if (backButton != null) backButton.render(g, mouseX, mouseY, partialTick);
+        context.render(g, mouseX, mouseY, partialTick);
+    }
+
+    private void drawPage(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        title(g, margin, titleY, canvasWidth - margin * 2, label(editing ? "editor" : "overview"));
         if (data == null) {
-            text(g, Component.translatable("screen.codpattern.backpack_menu.loading"), margin, rowsY, CANVAS_WIDTH / 2, 1f, MUTED);
+            text(g, Component.translatable("screen.codpattern.backpack_menu.loading"), margin, rowsY, canvasWidth / 2, 1f, MUTED);
             return;
         }
         heading(g, label(editing ? "bags_short" : "bags"), margin, headingY, bagWidth);
@@ -410,11 +425,10 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
             if (editing) {
                 var stack = equipment.get(previewSlot);
                 BackpackEquipmentRenderer.renderModel(g, stack, stageX, stageY, stageWidth, stageHeight);
-                loadoutCaption(g, previewSlot, stack, stageX, captionY, CANVAS_WIDTH - margin - stageX);
+                loadoutCaption(g, previewSlot, stack, stageX, captionY, canvasWidth - margin - stageX);
             }
         }
         renderCanvasWidgets(g, mouseX, mouseY, partialTick);
-        context.render(g, mouseX, mouseY, partialTick);
     }
 
     private boolean canRefit() {
@@ -449,6 +463,11 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
 
     private void updatePointer(double x, double y) {
         if (context.isVisible()) return;
+        if (backButton != null && y >= contentBottom()) {
+            overGunCard = false;
+            positionActions();
+            return;
+        }
         if (!editing) {
             for (var entry : bagButtons.entrySet()) {
                 if (entry.getValue().isMouseOver(x, y)) {
@@ -480,12 +499,13 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         lastY = y;
         keyboardFocus = false;
         if (context.handleMenuClick(x, y, button)) return true;
+        if (backButton != null && y >= contentBottom()) return backButton.mouseClicked(x, y, button);
         if (button == 1) {
             for (var entry : bagButtons.entrySet()) {
                 if (entry.getValue().isMouseOver(x, y)) {
                     int id = entry.getKey();
                     context.show(this, id, data.getBackpacks_MAP().get(id).getName(), (int) x, (int) y,
-                            CANVAS_WIDTH, CANVAS_HEIGHT, this::hideActions, this::confirmDelete);
+                            canvasWidth, canvasHeight, this::hideActions, this::confirmDelete);
                     return true;
                 }
             }
@@ -513,7 +533,7 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
 
     private void scrollTo(int requestedOffset) {
         // Both columns belong to one page, including the create button after the final bag.
-        int next = Mth.clamp(requestedOffset, 0, Math.max(0, pageHeight - CANVAS_HEIGHT));
+        int next = Mth.clamp(requestedOffset, 0, Math.max(0, pageHeight - canvasHeight));
         int delta = scrollOffset - next;
         if (delta == 0) return;
         scrollOffset = next;
@@ -523,20 +543,24 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         stageY += delta;
         captionY += delta;
         for (var child : children()) {
-            if (child instanceof AbstractWidget widget) widget.setY(widget.getY() + delta);
+            if (child != backButton && child instanceof AbstractWidget widget) widget.setY(widget.getY() + delta);
         }
     }
 
+    private int contentBottom() {
+        return backButton == null ? canvasHeight : backButton.getY() - px(4);
+    }
+
     private void reveal(AbstractWidget b) {
-        if (b == null) return;
+        if (b == null || b == backButton) return;
         if (b.getY() < 0) scrollTo(scrollOffset + b.getY() - px(3));
-        else if (b.getY() + b.getHeight() > CANVAS_HEIGHT)
-            scrollTo(scrollOffset + b.getY() + b.getHeight() - CANVAS_HEIGHT + px(3));
+        else if (b.getY() + b.getHeight() > contentBottom())
+            scrollTo(scrollOffset + b.getY() + b.getHeight() - contentBottom() + px(3));
     }
 
     @Override
     protected boolean canvasMouseScrolled(double x, double y, double delta) {
-        if (pageHeight > CANVAS_HEIGHT && !context.isVisible()) {
+        if (pageHeight > canvasHeight && !context.isVisible()) {
             scrollTo(scrollOffset - (int) Math.round(delta * px(24)));
             if (!keyboardFocus) updatePointer(x, y);
             return true;

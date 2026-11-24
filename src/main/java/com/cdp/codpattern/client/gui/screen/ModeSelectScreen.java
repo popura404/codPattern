@@ -4,6 +4,7 @@ import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.model.ModeDescriptor;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.client.ClientMatchState;
+import com.cdp.codpattern.client.gui.BackNavigation;
 import com.cdp.codpattern.client.gui.CodTheme;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.client.gui.screen.match.LobbyBackButton;
@@ -71,25 +72,22 @@ public class ModeSelectScreen extends Screen {
         int pageInset = Math.round(canvasWidth * 0.04f);
         menuX = Math.round(canvasWidth * 0.03f);
         headerY = Math.round(canvasHeight * (compact ? 0.01f : 0.03f));
-        // Leave room for the built-in six-character labels and the preview arrow at either breakpoint.
         int idealWidth = compact ? Math.min(Math.round(canvasWidth * 0.47f), 135) : Math.round(canvasWidth * 0.26f);
-        int originalMenuWidth = Math.min(canvasWidth - 2 * menuX, Math.max(108, idealWidth));
-        menuWidth = Math.round(originalMenuWidth * 0.9f);
+        int baseMenuWidth = Math.min(canvasWidth - 2 * menuX, Math.max(108, idealWidth));
+        menuWidth = Math.round(baseMenuWidth * 0.8f);
         listY = headerY + Math.round(font.lineHeight * ModeSelectButton.LABEL_SCALE) + CONTENT_GAP;
 
-        int backHeight = 16;
-        int backBottom = Math.round(canvasHeight * (compact ? 0.96f : 0.95f));
-        int backY = backBottom - backHeight;
+        ScreenRectangle backBounds = BackNavigation.bounds(canvasWidth, canvasHeight);
         captionRight = canvasWidth - pageInset;
         captionBottom = Math.round(canvasHeight * (compact ? 0.88f : 0.93f));
         if (compact) {
-            captionBottom = Math.min(captionBottom, backY - CONTENT_GAP);
+            captionBottom = Math.min(captionBottom, backBounds.top() - CONTENT_GAP);
         }
         int preferredWidth = Math.round(canvasWidth * (compact ? 0.90f : 0.61f));
         int maxWidth = canvasWidth - pageInset * 2;
         int menuRight = menuX + menuWidth + SCROLL_HIT_WIDTH;
         int firstRowBottom = listY + ROW_HEIGHT + CONTENT_GAP;
-        int listBottom = backY - CONTENT_GAP;
+        int listBottom = backBounds.top() - CONTENT_GAP;
         for (ModeDescriptor mode : modes) {
             ModeLobbyCaption caption = ModeLobbyCaption.layout(font, mode, preferredWidth, maxWidth,
                     captionBottom - headerY);
@@ -110,7 +108,7 @@ public class ModeSelectScreen extends Screen {
         previewIndex = Mth.clamp(previewIndex, 0, Math.max(0, rows.size() - 1));
         previousIndex = -1;
         moveWindowToPreview(previewIndex);
-        addRenderableWidget(new LobbyBackButton(new ScreenRectangle(pageInset, backY, 66, backHeight), button -> onClose()));
+        addRenderableWidget(new LobbyBackButton(backBounds, button -> onClose()));
         if (!rows.isEmpty() && minecraft.getLastInputType().isKeyboard()) {
             setFocused(rows.get(previewIndex));
         }

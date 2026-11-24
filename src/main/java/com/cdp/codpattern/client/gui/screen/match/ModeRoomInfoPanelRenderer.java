@@ -3,7 +3,6 @@ package com.cdp.codpattern.client.gui.screen.match;
 import com.cdp.codpattern.app.match.GameModeRegistry;
 import com.cdp.codpattern.app.match.model.ModeCapability;
 import com.cdp.codpattern.app.match.model.RoomId;
-import com.cdp.codpattern.app.match.model.RoomSummaryMetric;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import net.minecraft.ChatFormatting;
@@ -71,7 +70,16 @@ public final class ModeRoomInfoPanelRenderer {
             header.add(Component.translatable("screen.codpattern.room.joined_heading"), 1f, accent);
             header.gap(4);
         }
-        TextLayout body = new TextLayout(mc.font, contentWidth);
+        List<Component> facts = summary == null ? List.of() : summary.metrics.stream()
+                .filter(metric -> !ModeRoomTextFormatter.isTeamScore(metric))
+                .map(ModeRoomTextFormatter::metricText).toList();
+        boolean sideBySide = facts.size() >= 3 && contentWidth >= referenceScaled(500);
+        int columnGap = sideBySide ? referenceScaled(14) : 0;
+        int overviewWidth = sideBySide ? (contentWidth - columnGap) * 2 / 5 : contentWidth;
+        int rosterX = sideBySide ? overviewWidth + columnGap : 0;
+        int rosterWidth = contentWidth - rosterX;
+        TextLayout body = new TextLayout(mc.font, overviewWidth);
+        TextLayout rosterHeading = new TextLayout(mc.font, rosterWidth);
         ModeRoomRosterRenderer roster = null;
         if (summary == null && !joined) {
             String hint = lobby.isLoading() && !lobby.hasLoaded() ? "screen.codpattern.room.loading"
@@ -83,16 +91,21 @@ public final class ModeRoomInfoPanelRenderer {
             if (scoreWidth > 0) {
                 header.addTitleWithScore(title, score, scoreScale, contentWidth - scoreWidth);
             } else {
-                body.add(title, NAME_SCALE, PRIMARY);
+                header.add(title, NAME_SCALE, PRIMARY);
             }
-            if (summary != null) {
-                body.gap(3);
-                body.add(Component.translatable(GameModeRegistry.getOrDefault(gameType).displayNameKey())
-                        .append("   ·   ").append(Component.translatable("screen.codpattern.room.players",
-                                summary.playerCount, summary.maxPlayers)), 1f, SECONDARY);
+            String phase = previewing ? summary.state : live.phase();
+            int ticks = previewing ? summary.remainingTimeTicks : live.remainingTimeTicks();
+            Component phaseLabel = Component.translatable("screen.codpattern.room.current_phase",
+                    ModeRoomTextFormatter.phaseStatusText(phase, ticks));
+            Component modeAndPlayers = summary == null ? null
+                    : Component.translatable(GameModeRegistry.getOrDefault(gameType).displayNameKey())
+                    .append("   ·   ").append(Component.translatable("screen.codpattern.room.players",
+                            summary.playerCount, summary.maxPlayers));
+            body.addSummary(modeAndPlayers, phaseLabel);
+            if (!facts.isEmpty()) {
+                body.gap(4);
+                body.addFacts(facts);
             }
-            body.gap(8);
-            addMatchFacts(body, summary, live, previewing);
             long now = System.currentTimeMillis();
             if (joined && live.isStale(now)) {
                 body.gap(4);
@@ -105,16 +118,15 @@ public final class ModeRoomInfoPanelRenderer {
                 body.add(Component.translatable("screen.codpattern.room.warning_no_end_tp"), 1f, WARNING);
                 body.add(Component.translatable("screen.codpattern.room.warning_no_end_tp_hint"), 1f, SECONDARY);
             }
-            body.gap(9);
-            body.add(Component.translatable("screen.codpattern.room.roster_title").withStyle(ChatFormatting.BOLD),
+            rosterHeading.add(Component.translatable("screen.codpattern.room.roster_title").withStyle(ChatFormatting.BOLD),
                     1f, PRIMARY);
-            body.gap(4);
+            rosterHeading.gap(4);
             if (previewing && !preview.hasRosterSnapshot()) {
-                body.add(Component.translatable(summary.playerCount > 0 ? "screen.codpattern.room.roster_loading"
+                rosterHeading.add(Component.translatable(summary.playerCount > 0 ? "screen.codpattern.room.roster_loading"
                         : "screen.codpattern.room.no_players"), 1f, SECONDARY);
             } else {
                 Map<String, List<PlayerInfo>> players = previewing ? preview.teamPlayers() : live.teamPlayers();
-                roster = roster(contentWidth, gameType, players);
+                roster = roster(rosterWidth, gameType, players);
             }
         }
         TextLayout feedback = new TextLayout(mc.font, contentWidth);
@@ -125,7 +137,9 @@ public final class ModeRoomInfoPanelRenderer {
             feedback.add(Component.literal(roomNoticeText), 1f, roomNoticeColor);
         }
         int feedbackHeight = feedback.height == 0 ? 0 : feedback.height + referenceScaled(5);
-        int bodyHeight = body.height + (roster == null ? 0 : roster.height());
+        int rosterTop = sideBySide ? 0 : body.height + referenceScaled(9);
+        int bodyHeight = rosterHeading.height == 0 ? body.height : Math.max(body.height,
+                rosterTop + rosterHeading.height + (roster == null ? 0 : roster.height()));
         graphics.fillGradient(panelX, panelY, panelRight, panelBottom,
                 tint(0xB413191D, panelAlphaFactor), tint(0xCD0C1013, panelAlphaFactor));
         graphics.fill(panelX, panelY, panelRight, panelY + referenceScaled(1), tint(0x74CAD3D5, panelAlphaFactor));
@@ -163,8 +177,10 @@ public final class ModeRoomInfoPanelRenderer {
         }
         int bodyY = feedbackY + inlineFeedbackHeight;
         body.draw(graphics, contentX, bodyY, scrollTop, bodyBottom, alpha);
+        int rosterY = bodyY + rosterTop;
+        rosterHeading.draw(graphics, contentX + rosterX, rosterY, scrollTop, bodyBottom, alpha);
         if (roster != null) {
-            roster.render(graphics, mc, contentX, bodyY + body.height, scrollTop, bodyBottom, alpha);
+            roster.render(graphics, mc, contentX + rosterX, rosterY + rosterHeading.height, scrollTop, bodyBottom, alpha);
         }
         graphics.disableScissor();
 
@@ -199,26 +215,6 @@ public final class ModeRoomInfoPanelRenderer {
         return cachedRoster;
     }
 
-    private static void addMatchFacts(TextLayout body, ModeRoomData summary, JoinedRoomLiveState live,
-                                      boolean previewing) {
-        String phase = previewing ? summary.state : live.phase();
-        int ticks = previewing ? summary.remainingTimeTicks : live.remainingTimeTicks();
-        body.add(Component.translatable("screen.codpattern.room.current_phase",
-                ModeRoomTextFormatter.phaseStatusText(phase, ticks)), 1f, SECONDARY);
-        if (summary != null) {
-            List<Component> facts = new ArrayList<>();
-            for (RoomSummaryMetric metric : summary.metrics) {
-                if (!ModeRoomTextFormatter.isTeamScore(metric)) {
-                    facts.add(ModeRoomTextFormatter.metricText(metric));
-                }
-            }
-            if (!facts.isEmpty()) {
-                body.gap(3);
-                body.addFacts(facts);
-            }
-        }
-    }
-
     private static RoomId decode(String key) {
         try {
             return RoomId.decode(key);
@@ -250,6 +246,20 @@ public final class ModeRoomInfoPanelRenderer {
             height = wrap(text, 0, height, width, scale, color);
         }
 
+        private void addSummary(Component modeAndPlayers, Component phase) {
+            gap(3);
+            if (modeAndPlayers != null) {
+                Component combined = modeAndPlayers.copy().append("   ·   ").append(phase);
+                if (GuiTextHelper.referenceWidth(font, combined) <= width) {
+                    add(combined, 1f, SECONDARY);
+                    return;
+                }
+                add(modeAndPlayers, 1f, SECONDARY);
+                gap(3);
+            }
+            add(phase, 1f, SECONDARY);
+        }
+
         private void addTitleWithScore(Component title, Component score, float scoreScale, int scoreX) {
             // The default font's CJK glyphs occupy eight pixels and its digits seven, inside a nine-pixel line box.
             float inkHeightDifference = (7f * scoreScale - 8f * NAME_SCALE) * GuiTextHelper.referenceScale();
@@ -273,9 +283,9 @@ public final class ModeRoomInfoPanelRenderer {
         }
 
         private void addFacts(List<Component> facts) {
-            int columns = facts.size() > 1 && width >= referenceScaled(228) ? 2 : 1;
             int gap = referenceScaled(3);
             int pad = referenceScaled(4);
+            int columns = Math.max(1, Math.min(facts.size(), (width + gap) / (referenceScaled(112) + gap)));
             int cellWidth = (width - gap * (columns - 1)) / columns;
             for (int i = 0; i < facts.size(); i += columns) {
                 int count = Math.min(columns, facts.size() - i);

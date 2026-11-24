@@ -19,6 +19,9 @@ import net.minecraft.world.item.ItemStack;
 
 /** Shared typography, row surfaces and equipment stage for the loadout screens. */
 public final class BackpackUi {
+    public static final int LOADOUT_MARGIN = 35;
+    public static final int LOADOUT_COLUMN_GAP = 12;
+    public static final int LOADOUT_CARD_GAP = 3;
     public static final int INK = 0xFFF1F3EE;
     public static final int MUTED = 0xFFB3BEB8;
     public static final int ACCENT = TdmClientModePresentations.TEAM_DEATHMATCH_ACCENT_COLOR;
@@ -32,6 +35,12 @@ public final class BackpackUi {
             new ResourceLocation("codpattern", "textures/gui/backpack/sculk_corner.png");
     private static final ResourceLocation SCULK_INLAY =
             new ResourceLocation("codpattern", "textures/gui/backpack/sculk_inlay.png");
+    private static final ResourceLocation PRIMARY_CATALOG_INLAY =
+            new ResourceLocation("codpattern", "textures/gui/backpack/primary_catalog_inlay.png");
+    private static final ResourceLocation MISC_SLOT_INLAYS =
+            new ResourceLocation("codpattern", "textures/gui/backpack/misc_catalog_inlays.png");
+    private static final int MISC_INLAY_WIDTH = 260;
+    private static final int MISC_INLAY_HEIGHT = 54;
     // The first five 256 x 128 atlas cells follow BackpackSlot's loadout order; the sixth is neutral.
     private static final int INLAY_CELL_WIDTH = 256;
     private static final int INLAY_CELL_HEIGHT = 128;
@@ -97,12 +106,33 @@ public final class BackpackUi {
         int sampleHeight = INLAY_CELL_HEIGHT - 2 * crop;
         int u = cell % 3 * INLAY_CELL_WIDTH + crop + (mirror ? sampleWidth : 0);
         int v = cell / 3 * INLAY_CELL_HEIGHT + crop;
+        blitInlay(g, SCULK_INLAY, left, top, artWidth, artHeight, u, v, mirror ? -sampleWidth : sampleWidth,
+                sampleHeight, 3 * INLAY_CELL_WIDTH, 2 * INLAY_CELL_HEIGHT, opacity);
+    }
+
+    private static void blitInlay(GuiGraphics g, ResourceLocation texture, int x, int y, int w, int h,
+                                  int u, int v, int sampleW, int sampleH, int textureW, int textureH, float opacity) {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.setShaderColor(1f, 1f, 1f, opacity);
-        g.blit(SCULK_INLAY, left, top, artWidth, artHeight, u, v, mirror ? -sampleWidth : sampleWidth,
-                sampleHeight, 3 * INLAY_CELL_WIDTH, 2 * INLAY_CELL_HEIGHT);
+        g.blit(texture, x, y, w, h, (float) u, (float) v, sampleW, sampleH, textureW, textureH);
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+    }
+
+    private static void slotInlay(GuiGraphics g, int x, int y, int w, int h, BackpackSlot slot, int variation,
+                                  float opacity, boolean catalog) {
+        if (!slot.isGunSlot()) {
+            // Center the narrow strip on loadout tiles so short brush marks keep their proportions.
+            int artHeight = Math.min(h, Math.max(1, Math.round(w * MISC_INLAY_HEIGHT / (float) MISC_INLAY_WIDTH)));
+            int top = y + (h - artHeight) / 2;
+            int v = slot == BackpackSlot.MELEE ? 0 : MISC_INLAY_HEIGHT;
+            blitInlay(g, MISC_SLOT_INLAYS, x, top, w, artHeight, 0, v, MISC_INLAY_WIDTH, MISC_INLAY_HEIGHT,
+                    MISC_INLAY_WIDTH, 2 * MISC_INLAY_HEIGHT, opacity);
+        } else if (catalog && slot == BackpackSlot.PRIMARY) {
+            blitInlay(g, PRIMARY_CATALOG_INLAY, x, y, w, h, 0, 0, 1, 1, 1, 1, opacity);
+        } else {
+            inlay(g, x, y, w, h, slot.ordinal(), variation, opacity);
+        }
     }
 
     public static void horizontalGradient(GuiGraphics g, int x, int y, int w, int h, int left, int right) {
@@ -116,9 +146,19 @@ public final class BackpackUi {
 
     public static void row(GuiGraphics g, int x, int y, int w, int h, BackpackSlot slot, int variation,
                            boolean highlighted) {
+        drawRow(g, x, y, w, h, slot, variation, highlighted, false);
+    }
+
+    public static void candidateRow(GuiGraphics g, int x, int y, int w, int h, BackpackSlot slot, int index,
+                                    boolean highlighted) {
+        drawRow(g, x, y, w, h, slot, index, highlighted, true);
+    }
+
+    private static void drawRow(GuiGraphics g, int x, int y, int w, int h, BackpackSlot slot, int variation,
+                                boolean highlighted, boolean catalog) {
         horizontalGradient(g, x, y, w, h, highlighted ? 0xEA1C3235 : 0xD4172225,
                 highlighted ? 0xEF324E50 : 0xDD202D30);
-        inlay(g, x, y, w, h, slot.ordinal(), variation, highlighted ? .65f : .55f);
+        slotInlay(g, x, y, w, h, slot, variation, highlighted ? .65f : .55f, catalog);
         if (highlighted) {
             int length = Math.min(px(20), Math.max(px(6), h / 3));
             int top = y + (h - length) / 2;
@@ -129,7 +169,7 @@ public final class BackpackUi {
 
     public static void readOnlySlot(GuiGraphics g, int x, int y, int w, int h, BackpackSlot slot) {
         horizontalGradient(g, x, y, w, h, 0x242D393A, 0x35435454);
-        inlay(g, x, y, w, h, slot.ordinal(), 0, .41f);
+        slotInlay(g, x, y, w, h, slot, 0, .41f, false);
         g.fill(x, y + h - 1, x + w, y + h, 0x247E918E);
     }
 
@@ -150,6 +190,30 @@ public final class BackpackUi {
 
     public static int px(int referenceSize) {
         return referenceSize;
+    }
+
+    /** Allow equal whole-pixel margins on both sides of a centered bitmap. */
+    public static int centeredExtent(int target, int outer) {
+        return target % 2 == outer % 2 ? target : target - 1;
+    }
+
+    public static int loadoutColumnWidth(int canvasWidth) {
+        int columns = canvasWidth - 2 * (LOADOUT_MARGIN + LOADOUT_COLUMN_GAP);
+        int gearColumnWidth = Math.round(columns * 1.05f / 3.81f);
+        // Match the gap's parity so the two equipment cards fill the row at equal widths.
+        return centeredExtent(Math.round(gearColumnWidth * .88f), LOADOUT_CARD_GAP);
+    }
+
+    public static int loadoutCardWidth(int columnWidth, BackpackSlot slot) {
+        return slot.isEquipmentSlot() ? (columnWidth - LOADOUT_CARD_GAP) / 2 : columnWidth;
+    }
+
+    public static int loadoutCardHeight(BackpackSlot slot) {
+        return switch (slot) {
+            case PRIMARY, SECONDARY -> 90;
+            case MELEE -> 71;
+            case ITEM1, ITEM2 -> 48;
+        };
     }
 
     public static int textWidth(Component label, float scale) {
@@ -226,23 +290,6 @@ public final class BackpackUi {
         g.renderOutline(x, y, w, h, border);
         int labelWidth = textWidth(key, 1f);
         text(g, key, x + (w - labelWidth) / 2, y + (h - lineHeight(1f)) / 2, labelWidth, 1f, ink);
-    }
-
-    public static Button backButton(int x, int y, Runnable action) {
-        var esc = Component.literal("ESC");
-        var label = Component.translatable("screen.codpattern.common.back");
-        int keyWidth = textWidth(esc, 1f) + 2 * px(4);
-        int gap = px(5);
-        int height = lineHeight(1f) + 2 * px(4);
-        int width = keyWidth + gap + textWidth(label, 1f) + 1;
-        return button(x, y, width, height, label, action, (g, b) -> {
-            int left = b.getX(), top = b.getY();
-            boolean highlighted = b.isHovered() || (b.isFocused() && Minecraft.getInstance().getLastInputType().isKeyboard());
-            int color = highlighted ? INK : 0xFFC1C9C7;
-            keycap(g, esc, left, top, keyWidth, height, color, highlighted ? ACCENT : 0xFF788B89);
-            int labelX = left + keyWidth + gap;
-            text(g, label, labelX, top + (height - lineHeight(1f)) / 2, width - keyWidth - gap, 1f, color);
-        });
     }
 
     @FunctionalInterface

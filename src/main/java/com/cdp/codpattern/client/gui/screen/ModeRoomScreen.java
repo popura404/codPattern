@@ -5,6 +5,7 @@ import com.cdp.codpattern.app.match.model.ModeCapability;
 import com.cdp.codpattern.app.match.model.ModeDescriptor;
 import com.cdp.codpattern.app.match.model.RoomId;
 import com.cdp.codpattern.client.ClientMatchState;
+import com.cdp.codpattern.client.gui.BackNavigation;
 import com.cdp.codpattern.client.gui.GuiTextHelper;
 import com.cdp.codpattern.client.gui.refit.ModeRoomActionButton;
 import com.cdp.codpattern.client.gui.screen.match.LobbyBackButton;
@@ -24,6 +25,7 @@ import com.cdp.codpattern.fpsmatch.room.PlayerInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FastColor;
@@ -124,14 +126,15 @@ public class ModeRoomScreen extends Screen {
         roomListX = Math.max(scaled(6), Math.round(width * 0.035f));
         headerY = Math.max(scaled(4), Math.round(height * 0.035f));
         roomListY = headerY + GuiTextHelper.referenceLineHeight(font, 1.5f) + scaled(7);
-        int backY = height - Math.max(scaled(3), Math.round(height * 0.04f)) - scaled(16);
-        int contentBottom = backY - scaled(4);
+        ScreenRectangle backBounds = BackNavigation.bounds(
+                GuiTextHelper.referenceViewportSize(minecraft.getWindow().getWidth()),
+                GuiTextHelper.referenceViewportSize(minecraft.getWindow().getHeight()));
+        int contentBottom = LobbyCanvas.toGui(backBounds.top()) - scaled(4);
         int contentWidth = width - 2 * roomListX;
         roomListHeight = Math.max(1, contentBottom - roomListY);
         roomListWidth = compact ? contentWidth : clamp(Math.round(width * 0.30f), scaled(164), scaled(300));
-        rightPanelWidth = compact ? contentWidth
-                : Math.min(contentWidth - roomListWidth - scaled(14), scaled(420));
-        rightPanelX = width - roomListX - rightPanelWidth;
+        rightPanelX = compact ? roomListX : roomListX + roomListWidth + scaled(14);
+        rightPanelWidth = width - roomListX - rightPanelX;
         rightPanelY = roomListY;
         rightPanelHeight = compact ? roomListHeight : ModeRoomListRenderer.listViewportHeight(roomListHeight);
 
@@ -148,7 +151,7 @@ public class ModeRoomScreen extends Screen {
         restoreJoinedRoomFromClientStateIfNeeded();
         actionController.requestRoomList();
         addButtons();
-        addRenderableWidget(new LobbyBackButton(roomListX, backY, scaled(72), scaled(16), btn -> onClose()));
+        addRenderableWidget(new LobbyBackButton(backBounds, btn -> onClose()));
         if (listFocus.visible && minecraft.getLastInputType().isKeyboard()) {
             setFocused(listFocus);
         }

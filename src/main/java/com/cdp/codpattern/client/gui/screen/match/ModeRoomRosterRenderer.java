@@ -39,11 +39,17 @@ final class ModeRoomRosterRenderer {
         // Keep registered team order and include extra teams reported by the server.
         Map<String, List<PlayerInfo>> remaining = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         remaining.putAll(playersByTeam);
-        int columns = width >= referenceScaled(264) ? 2 : 1;
+        List<TeamDescriptor> descriptors = GameModeRegistry.getOrDefault(gameType).teams();
+        List<String> registeredTeams = descriptors.isEmpty() ? List.of("kortac", "specgru")
+                : descriptors.stream().map(TeamDescriptor::teamName).toList();
+        int teamCount = remaining.size();
+        for (String name : registeredTeams) {
+            if (!remaining.containsKey(name)) teamCount++;
+        }
         int columnGap = referenceScaled(8);
+        int columns = Math.max(1, Math.min(teamCount, (width + columnGap) / (referenceScaled(128) + columnGap)));
         int columnWidth = (width - (columns - 1) * columnGap) / columns;
         int[] nextY = new int[columns];
-        List<TeamDescriptor> descriptors = GameModeRegistry.getOrDefault(gameType).teams();
         for (TeamDescriptor descriptor : descriptors) {
             addTeam(Component.translatable(descriptor.displayNameKey()), descriptor.accentColor(),
                     remaining.remove(descriptor.teamName()), width, columnWidth, columnGap, nextY);

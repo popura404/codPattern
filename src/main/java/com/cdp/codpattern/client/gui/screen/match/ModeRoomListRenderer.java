@@ -117,8 +117,12 @@ public final class ModeRoomListRenderer {
         Font font = mc.font;
         int listHeight = listViewportHeight(roomListHeight);
         int bottom = roomListY + listHeight;
-        int rowWidth = Math.max(1, roomListWidth - scaled(4));
-        rowHeight = Math.max(roomHeaderHeight, scaled(40));
+        int capacityHeight = GuiTextHelper.referenceLineHeight(font) + 2 * scaled(1);
+        int firstLineHeight = Math.max(GuiTextHelper.referenceLineHeight(font, TITLE_SCALE), capacityHeight);
+        int buttonHeight = Math.max(scaled(16), GuiTextHelper.referenceLineHeight(font) + scaled(4));
+        int lineGap = scaled(2);
+        int contentRowHeight = firstLineHeight + lineGap + buttonHeight;
+        rowHeight = Math.max(contentRowHeight, Math.max(roomHeaderHeight, scaled(40)));
         rowStride = rowHeight + scaled(GAP);
         Map<String, ModeRoomData> rooms = lobbySummaryState.rooms();
         if (lastSnapshot != rooms || !Objects.equals(joinedRoom, lastJoinedRoom)) {
@@ -130,23 +134,23 @@ public final class ModeRoomListRenderer {
         }
 
         if (roomNames.isEmpty()) {
-            drawEmptyState(graphics, font, roomListX, roomListY, rowWidth, roomListHeight, modeFilterGameType,
+            drawEmptyState(graphics, font, roomListX, roomListY, roomListWidth, roomListHeight, modeFilterGameType,
                     lobbySummaryState.isLoading() && !lobbySummaryState.hasLoaded(), panelAlphaFactor);
             return RenderResult.empty();
         }
 
         int contentHeight = contentHeight();
         int maxOffset = Math.max(0, contentHeight - listHeight);
+        int rowWidth = Math.max(1, roomListWidth - (maxOffset > 0 ? scaled(4) : 0));
         int offset = Mth.clamp(scrollOffset, 0, maxOffset);
         List<RoomHitbox> roomHits = new ArrayList<>();
         List<ActionHitbox> actionHits = new ArrayList<>();
         graphics.enableScissor(roomListX, roomListY, roomListX + rowWidth, bottom);
         int first = (offset + rowStride - rowHeight) / rowStride;
         int last = Math.min(roomNames.size() - 1, (offset + listHeight - 1) / rowStride);
-        int metaOffset = GuiTextHelper.referenceLineHeight(font, TITLE_SCALE) + scaled(4);
-        int titleInset = Math.round((rowHeight - metaOffset - GuiTextHelper.referenceLabelHeight(font, 1f)) / 2f);
-        int buttonHeight = Math.max(scaled(16), GuiTextHelper.referenceLineHeight(font) + scaled(4));
-        int buttonOffset = Math.round((GuiTextHelper.referenceLabelHeight(font, TITLE_SCALE) - buttonHeight) / 2f);
+        int titleInset = (rowHeight - contentRowHeight) / 2;
+        int buttonInset = titleInset + firstLineHeight + lineGap;
+        int metaInset = buttonInset + Math.round((buttonHeight - GuiTextHelper.referenceLabelHeight(font, 1f)) / 2f);
         for (int index = first; index <= last; index++) {
             int y = roomListY + index * rowStride - offset;
             String key = roomNames.get(index);
@@ -173,8 +177,13 @@ public final class ModeRoomListRenderer {
             int left = roomListX + scaled(PADDING) + Math.round(scaled(2) * motion.highlight());
             int right = roomListX + rowWidth - scaled(PADDING);
             int titleY = y + titleInset;
+            int capacityX = drawCapacity(graphics, font, room, right, titleY, joined ? ink : accent, ink, panelAlphaFactor);
+            GuiTextHelper.drawReferenceScaledEllipsizedString(graphics, font, roomTitle(room, darkInk), left, titleY,
+                    Math.max(0, capacityX - scaled(5) - left), TITLE_SCALE, fade(ink, panelAlphaFactor), false);
+
+            int metaY = y + metaInset;
+            int metaRight = right;
             ActionType action = resolveActionType(joinedRoom, key, hovered, selected);
-            int titleRight = right;
             if (action != null) {
                 boolean confirming = action == ActionType.LEAVE && leavePending
                         || action == ActionType.SWITCH && key.equals(pendingSwitchTargetRoom);
@@ -182,7 +191,7 @@ public final class ModeRoomListRenderer {
                 int buttonWidth = Math.min(Math.max(1, (right - left) / 2),
                         Math.max(scaled(35), GuiTextHelper.referenceWidth(font, label) + scaled(12)));
                 int buttonX = right - buttonWidth;
-                int buttonY = titleY + buttonOffset;
+                int buttonY = y + buttonInset;
                 int buttonHitTop = Math.max(hitTop, buttonY);
                 int buttonHitBottom = Math.min(hitBottom, buttonY + buttonHeight);
                 if (buttonHitTop < buttonHitBottom) {
@@ -192,16 +201,12 @@ public final class ModeRoomListRenderer {
                     drawAction(graphics, font, buttonX, buttonY, buttonWidth, buttonHeight, label,
                             button.enabled(), button.contains(mouseX, mouseY), confirming, darkInk, panelAlphaFactor);
                 }
-                titleRight = buttonX - scaled(5);
+                metaRight = buttonX - scaled(5);
             }
 
-            GuiTextHelper.drawReferenceScaledEllipsizedString(graphics, font, roomTitle(room, darkInk), left, titleY,
-                    Math.max(0, titleRight - left), TITLE_SCALE, fade(ink, panelAlphaFactor), false);
-            int metaY = titleY + metaOffset;
-            int capacityX = drawCapacity(graphics, font, room, right, metaY, joined ? ink : accent, ink, panelAlphaFactor);
             GuiTextHelper.drawReferenceEllipsizedString(graphics, font,
                     metadata(room, joined, selected, modeFilterGameType, darkInk), left, metaY,
-                    Math.max(0, capacityX - scaled(5) - left), fade(darkInk ? DARK_SECONDARY : SECONDARY, panelAlphaFactor), false);
+                    Math.max(0, metaRight - left), fade(darkInk ? DARK_SECONDARY : SECONDARY, panelAlphaFactor), false);
         }
         graphics.disableScissor();
 

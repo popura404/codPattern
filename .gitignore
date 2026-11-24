@@ -22,14 +22,20 @@ build
 libs-extracted
 libs-src
 
+# Legacy addon-only verification scripts in older working directories
+/gradle/mode-split-compatibility-manifest.gradle
+/gradle/mode-split-dependency-ratchet.gradle
+/gradle/mode-split-packet-codec.gradle
+/gradle/mode-split-physical-verification.gradle
+/gradle/mode-split-send-route.gradle
+/gradle/mode-split-translation-calls.gradle
+
+# Local Forge runs (saves, options, screenshots, and server data)
+/run/
+/run-*/
+
 # other
-gradle
 eclipse
-run
-run-data
-run-main-only/
-run-combined/
-run-combined-gametest/
 logs
 crash-reports
 src/generated/resources

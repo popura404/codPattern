@@ -200,4 +200,26 @@
 * 优化地图删除流程，先结束对局并恢复、移出成员，再归档地图，增加删除进度查看、重试与取消
 * 重写项目说明、操作指南与常见问题，同步至当前版本
 
+### v0.9.0b · 自 v0.8.8b 以来 / Since v0.8.8b
+
+#### 中文
+
+- 重做大厅和房间界面，更新四种语言的文案。
+- 房间详情随窗口宽度展开。统一背包与选枪页的卡片排布和返回按钮位置，武器列表支持平滑滚动。
+- 支持最多 12 套五槽背包，旧背包自动迁移。
+- TaCZ 改枪取消超时，配件列表支持分页，连续换装和调色按顺序保存。
+- 优化了两个团队竞技模式的结算 UI。
+
+联机时请同步更新客户端与服务端。
+
+#### English
+
+- Redesigned the lobby and room screens and updated translations in four languages.
+- Room details now use the available window width. Loadout and weapon selection screens share a card layout and back button position, and weapon lists scroll smoothly.
+- Save up to 12 five-slot loadouts. Existing loadouts migrate automatically.
+- TaCZ gunsmith sessions no longer time out. Attachment lists are paginated, and attachment swaps and laser color edits save in order.
+- Improved the match results UI for Frontline and Team Deathmatch.
+
+For multiplayer, update both the client and the server.
+
 ###### _**注意：0.5.5b 与其旧版本配置文件不再适用于新版本，需要手动移除，否则有可能导致崩溃。自 0.6.5b 及以后版本起，不再需要安装 fpsmatch 模组作为前置依赖。**_

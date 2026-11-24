@@ -9,34 +9,34 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
-/** A centered 1080p / GUI-2 canvas above the player's native Minecraft UI. */
+/** A full-window canvas with the same equipment and type scale as the 1080p / GUI-2 design. */
 public abstract class BackpackCanvasScreen extends Screen {
-    protected static final int CANVAS_WIDTH = 960;
-    protected static final int CANVAS_HEIGHT = 540;
-    private static final ScreenRectangle CANVAS = new ScreenRectangle(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    private static final int REFERENCE_WIDTH = 960;
+    private static final int REFERENCE_HEIGHT = 540;
+    protected int canvasWidth;
+    protected int canvasHeight;
 
     protected BackpackCanvasScreen(Component title) {
         super(title);
     }
 
-    private record Viewport(double zoom, double left, double top, double guiScale,
-                            double mouseUnitX, double mouseUnitY, int framebufferHeight) {
+    private record Viewport(int width, int height, double zoom, double guiScale,
+                            double mouseUnitX, double mouseUnitY) {
         static Viewport current() {
             Window window = Minecraft.getInstance().getWindow();
             int w = window.getWidth(), h = window.getHeight();
-            double zoom = Math.min(w / (double) CANVAS_WIDTH, h / (double) CANVAS_HEIGHT);
+            double zoom = Math.min(w / (double) REFERENCE_WIDTH, h / (double) REFERENCE_HEIGHT);
             // Projection uses exact framebuffer/guiScale; mouse dispatch uses rounded GUI dimensions.
-            return new Viewport(zoom, (w - CANVAS_WIDTH * zoom) / 2, (h - CANVAS_HEIGHT * zoom) / 2,
-                    window.getGuiScale(), w / (double) window.getGuiScaledWidth(),
-                    h / (double) window.getGuiScaledHeight(), h);
+            return new Viewport(Mth.ceil(w / zoom), Mth.ceil(h / zoom), zoom, window.getGuiScale(),
+                    w / (double) window.getGuiScaledWidth(), h / (double) window.getGuiScaledHeight());
         }
 
         double canvasX(double mouseX) {
-            return (mouseX * mouseUnitX - left) / zoom;
+            return mouseX * mouseUnitX / zoom;
         }
 
         double canvasY(double mouseY) {
-            return (mouseY * mouseUnitY - top) / zoom;
+            return mouseY * mouseUnitY / zoom;
         }
 
         double pointerX(Minecraft mc) {
@@ -48,19 +48,18 @@ public abstract class BackpackCanvasScreen extends Screen {
             Window window = mc.getWindow();
             return canvasY(mc.mouseHandler.ypos() * window.getGuiScaledHeight() / window.getScreenHeight());
         }
-
-        void scissor(GuiGraphics g, int x0, int y0, int x1, int y1) {
-            int x = (int) Math.round(left + Mth.clamp(x0, 0, CANVAS_WIDTH) * zoom);
-            int y = (int) Math.round(top + Mth.clamp(y0, 0, CANVAS_HEIGHT) * zoom);
-            int right = (int) Math.round(left + Mth.clamp(x1, 0, CANVAS_WIDTH) * zoom);
-            int bottom = (int) Math.round(top + Mth.clamp(y1, 0, CANVAS_HEIGHT) * zoom);
-            g.flush();
-            RenderSystem.enableScissor(x, framebufferHeight - bottom, right - x, bottom - y);
-        }
     }
 
-    private static boolean inside(double x, double y) {
-        return x >= 0 && x < CANVAS_WIDTH && y >= 0 && y < CANVAS_HEIGHT;
+    @Override
+    protected void init() {
+        super.init();
+        Viewport view = Viewport.current();
+        canvasWidth = view.width;
+        canvasHeight = view.height;
+    }
+
+    private boolean inside(double x, double y) {
+        return x >= 0 && x < canvasWidth && y >= 0 && y < canvasHeight;
     }
 
     protected final double pointerCanvasX() {
@@ -74,23 +73,22 @@ public abstract class BackpackCanvasScreen extends Screen {
     /** Inverse of MouseHandler's native GUI coordinates, including its GUI-size rounding. */
     public final double screenX(double canvasX) {
         Viewport view = Viewport.current();
-        return (canvasX * view.zoom + view.left) / view.mouseUnitX;
+        return canvasX * view.zoom / view.mouseUnitX;
     }
 
     public final double screenY(double canvasY) {
         Viewport view = Viewport.current();
-        return (canvasY * view.zoom + view.top) / view.mouseUnitY;
+        return canvasY * view.zoom / view.mouseUnitY;
     }
 
     @Override
     public final ScreenRectangle getRectangle() {
-        return CANVAS;
+        return new ScreenRectangle(0, 0, canvasWidth, canvasHeight);
     }
 
     @Override
     public final void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         Viewport view = Viewport.current();
-        Window window = minecraft.getWindow();
         double x = view.pointerX(minecraft), y = view.pointerY(minecraft);
         boolean hovered = inside(x, y);
         var pose = g.pose();
@@ -99,15 +97,11 @@ public abstract class BackpackCanvasScreen extends Screen {
             float scale = (float) (view.zoom / view.guiScale);
             // Project positions only, preserving normals and depth for the equipment model.
             pose.last().pose().scale(scale, scale, 1f);
-            // The full-bleed wash and corner share the canvas pixel scale, including in the gutters.
-            BackpackUi.background(g, Mth.ceil(window.getWidth() / view.zoom), Mth.ceil(window.getHeight() / view.zoom));
-            view.scissor(g, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-            pose.translate(view.left / view.zoom, view.top / view.zoom, 0);
+            BackpackUi.background(g, canvasWidth, canvasHeight);
             renderCanvas(g, hovered ? Mth.floor(x) : -1, hovered ? Mth.floor(y) : -1, partialTick);
         } finally {
             g.flush();
             pose.popPose();
-            RenderSystem.disableScissor();
         }
     }
 
@@ -117,14 +111,22 @@ public abstract class BackpackCanvasScreen extends Screen {
         super.render(g, x, y, partialTick);
     }
 
-    // GuiGraphics.enableScissor ignores its PoseStack in 1.20.1. The nested model clip and the
-    // enclosing canvas clip both use physical pixels so they agree at every native GUI scale.
-    static void clipModel(GuiGraphics g, int x, int y, int width, int height) {
-        Viewport.current().scissor(g, x, y, x + width, y + height);
-    }
-
-    static void restoreCanvasClip(GuiGraphics g) {
-        Viewport.current().scissor(g, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    protected final void renderCanvasClipped(GuiGraphics g, int left, int top, int right, int bottom,
+                                             Runnable draw) {
+        // GuiGraphics scissors use the native GUI scale and ignore the canvas pose.
+        double zoom = Viewport.current().zoom();
+        int x = (int) Math.round(left * zoom);
+        int y = (int) Math.round(top * zoom);
+        int rightPixel = (int) Math.round(right * zoom);
+        int bottomPixel = (int) Math.round(bottom * zoom);
+        g.flush();
+        RenderSystem.enableScissor(x, minecraft.getWindow().getHeight() - bottomPixel, rightPixel - x, bottomPixel - y);
+        try {
+            draw.run();
+        } finally {
+            g.flush();
+            RenderSystem.disableScissor();
+        }
     }
 
     @Override
