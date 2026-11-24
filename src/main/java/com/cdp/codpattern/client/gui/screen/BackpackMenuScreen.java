@@ -41,6 +41,9 @@ import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.*;
 public class BackpackMenuScreen extends BackpackCanvasScreen {
     private static final Component CREATE_MARK = Component.literal("+");
     private static final Component REFIT_KEY = Component.literal("R");
+    private static final int REFIT_PADDING = 6;
+    private static final int REFIT_ICON_WIDTH = 12;
+    private static final int REFIT_GAP = 6;
     private static final int TRANSITION_MS = 200;
     private record Columns(int width, int top, int rowHeight) {}
     private record PreviewStage(BackpackSlot slot, int x, int y, int width, int height, int caption) {}
@@ -179,14 +182,19 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
             refitButton = addRenderableWidget(BackpackUi.button(0, 0, w, h, label("refit"), this::openRefit, this::drawRefit));
         }
         scrollTo(previousScroll);
-        positionActions();
         if (minecraft.getLastInputType().isKeyboard()) {
             setFocused(editing ? slotButtons.get(previewSlot) : bagButtons.get(bagId));
         }
+        positionActions();
     }
 
     private int refitWidth() {
-        return Math.max(78, textWidth(label("refit"), 1f) + 40);
+        return 2 * REFIT_PADDING + REFIT_ICON_WIDTH + 2 * REFIT_GAP
+                + textWidth(label("refit"), 1f) + refitKeyWidth();
+    }
+
+    private int refitKeyWidth() {
+        return Math.max(lineHeight(1f) + 6, textWidth(REFIT_KEY, 1f) + 8);
     }
 
     private int addBags() {
@@ -309,6 +317,7 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         if (!editing) reveal(bagButtons.get(bagId));
         if (changeView) {
             transition = new Transition(Util.getMillis(), from, columns(), editing ? previewStage() : previous);
+            positionActions();
         }
     }
 
@@ -360,6 +369,8 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
                 updatePointer(lastX, lastY);
             } else if (!editing) {
                 previewBag(bagId);
+            } else {
+                positionActions();
             }
             return;
         }
@@ -486,17 +497,25 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
     private void drawRefit(GuiGraphics g, Button b) {
         int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
         boolean hot = highlighted(b);
-        g.fill(x, y, x + w, y + h, hot ? 0xFF31332B : 0xFF222725);
-        g.fill(x, y + h - 1, x + w, y + h, hot ? 0xFFDFC189 : 0xFF8B7956);
-        int color = hot ? 0xFFFFE4B4 : 0xFFE9CEA0;
-        int keyH = lineHeight(1f) + 2 * px(3);
-        int keyW = Math.max(keyH, textWidth(REFIT_KEY, 1f) + 2 * px(4));
-        int space = px(5);
-        int left = x + Math.max(1, (w - textWidth(b.getMessage(), 1f) - keyW - space) / 2);
-        int textY = y + (h - lineHeight(1f)) / 2;
-        keycap(g, REFIT_KEY, left, y + (h - keyH) / 2, keyW, keyH,
-                hot ? color : MUTED, hot ? 0xFFAA966D : 0xFF73786D);
-        text(g, b.getMessage(), left + keyW + space, textY, x + w - left - keyW - space, 1f, color);
+        horizontalGradient(g, x, y, w, h, hot ? 0xFFF0D7A8 : 0xFF2C3C3E, hot ? 0xFFD5B079 : 0xFF202C2E);
+        g.renderOutline(x, y, w, h, hot ? 0xFFFFE3B0 : 0xFF78837B);
+        if (keyboardFocus && b.isFocused()) g.renderOutline(x + 2, y + 2, w - 4, h - 4, 0xFF655034);
+
+        int iconX = x + REFIT_PADDING, midY = y + h / 2;
+        int iconInk = hot ? 0xFF443424 : 0xFFE5C088;
+        // Two adjustment sliders on the canvas pixel grid.
+        g.fill(iconX, midY - 3, iconX + REFIT_ICON_WIDTH, midY - 2, iconInk);
+        g.fill(iconX + 3, midY - 5, iconX + 5, midY, iconInk);
+        g.fill(iconX, midY + 3, iconX + REFIT_ICON_WIDTH, midY + 4, iconInk);
+        g.fill(iconX + 8, midY + 1, iconX + 10, midY + 6, iconInk);
+
+        int keyW = refitKeyWidth(), keyH = lineHeight(1f) + 6;
+        int keyX = x + w - REFIT_PADDING - keyW;
+        int labelX = iconX + REFIT_ICON_WIDTH + REFIT_GAP;
+        text(g, b.getMessage(), labelX, y + (h - lineHeight(1f)) / 2,
+                keyX - REFIT_GAP - labelX, 1f, hot ? 0xFF211E19 : INK);
+        keycap(g, REFIT_KEY, keyX, y + (h - keyH) / 2, keyW, keyH,
+                hot ? 0xFFFFE4B7 : 0xFFE5C088, hot ? 0xFF705734 : 0xFF90816B);
     }
 
     @Override
@@ -557,11 +576,12 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
             if (owner != null) editButton.setY(owner.getY());
         }
         if (refitButton != null) {
-            refitButton.visible = overGunCard && canRefit(previewSlot);
+            boolean focused = keyboardFocus && (getFocused() == slotButtons.get(previewSlot) || getFocused() == refitButton);
+            refitButton.visible = !isTransitioning() && (overGunCard || focused) && canRefit(previewSlot);
             if (refitButton.visible) {
                 Button owner = slotButtons.get(previewSlot);
                 int x = owner.getX() + owner.getWidth() + gap;
-                int y = owner.getY() + 1;
+                int y = owner.getY();
                 refitButton.setPosition(x, y);
             }
         }
