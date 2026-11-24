@@ -206,6 +206,7 @@
 
 - 重做大厅和房间界面，更新四种语言的文案。
 - 房间详情随窗口宽度展开。统一背包与选枪页的卡片排布和返回按钮位置，武器列表支持平滑滚动。
+- 选择背包与编辑背包之间增加双向过渡，切换期间屏蔽操作以避免误触。
 - 支持最多 12 套五槽背包，旧背包自动迁移。
 - TaCZ 改枪取消超时，配件列表支持分页，连续换装和调色按顺序保存。
 - 优化了两个团队竞技模式的结算 UI。
@@ -216,6 +217,7 @@
 
 - Redesigned the lobby and room screens and updated translations in four languages.
 - Room details now use the available window width. Loadout and weapon selection screens share a card layout and back button position, and weapon lists scroll smoothly.
+- The loadout overview and editor now animate in both directions and ignore input during the transition to prevent accidental selections.
 - Save up to 12 five-slot loadouts. Existing loadouts migrate automatically.
 - TaCZ gunsmith sessions no longer time out. Attachment lists are paginated, and attachment swaps and laser color edits save in order.
 - Improved the match results UI for Frontline and Team Deathmatch.

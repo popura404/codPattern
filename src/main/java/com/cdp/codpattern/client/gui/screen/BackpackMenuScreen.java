@@ -20,6 +20,7 @@ import com.cdp.codpattern.network.DeleteBackpackPacket;
 import com.cdp.codpattern.network.RequestBackpackConfigPacket;
 import com.cdp.codpattern.network.RequestWeaponFilterPacket;
 import com.cdp.codpattern.network.SelectBackpackPacket;
+import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
@@ -39,6 +40,11 @@ import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.*;
 public class BackpackMenuScreen extends BackpackCanvasScreen {
     private static final Component CREATE_MARK = Component.literal("+");
     private static final Component REFIT_KEY = Component.literal("R");
+    private static final int TRANSITION_MS = 200;
+    private record Columns(int width, int top, int rowHeight) {}
+    private record PreviewStage(BackpackSlot slot, int x, int y, int width, int height, int caption) {}
+    private record Transition(long start, Columns from, Columns to, PreviewStage preview) {}
+    private Transition transition;
     private BackpackConfig.PlayerBackpackData data;
     private boolean editing;
     private int bagId;
@@ -50,6 +56,7 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
     private boolean overGunCard;
     private int editOwner;
     private Button editButton;
+    private Button createButton;
     private Button refitButton;
     private Button backButton;
     private double lastX, lastY;
@@ -71,6 +78,7 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
     @Override
     protected void init() {
         super.init();
+        transition = null;
         // A child screen may return with the pointer over an entirely different row.
         lastX = pointerCanvasX();
         lastY = pointerCanvasY();
@@ -85,16 +93,19 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
 
     public void reloadFromPlayerData() {
         data = BackpackClientCache.get();
+        if (data == null) transition = null;
         boolean created = false;
         if (data != null) {
             var bags = data.getBackpacks_MAP();
             if (pendingNewId != 0 && bags.containsKey(pendingNewId)) {
+                transition = null;
                 bagId = pendingNewId;
                 pendingNewId = 0;
                 created = true;
                 previewSlot = BackpackSlot.PRIMARY;
                 resetHover();
             } else if (!bags.containsKey(bagId)) {
+                transition = null;
                 bagId = bags.containsKey(data.getSelectedBackpack()) ? data.getSelectedBackpack()
                         : bags.keySet().stream().min(Integer::compare).orElse(0);
                 editing = false;
@@ -104,6 +115,11 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         }
         buildControls();
         if (created) reveal(bagButtons.get(bagId));
+        if (transition != null) {
+            // A server update can clamp the destination scroll while the columns are moving.
+            transition = new Transition(transition.start, transition.from, columns(),
+                    editing ? previewStage() : transition.preview);
+        }
     }
 
     private void resetHover() {
@@ -122,6 +138,7 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         slotButtons.clear();
         equipment.clear();
         editButton = null;
+        createButton = null;
         refitButton = null;
         backButton = null;
 
@@ -172,7 +189,7 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
     }
 
     private int addBags() {
-        int h = editing ? 24 : 36;
+        int h = bagRowHeight();
         int y = rowsY;
         for (int id : data.getBackpacks_MAP().keySet().stream().sorted().toList()) {
             Component name = BackpackNameHelper.displayNameComponent(data.getBackpacks_MAP().get(id), id);
@@ -197,12 +214,12 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         }
         if (data.getBackpackCount() < BackpackConfig.MAX_BACKPACKS) {
             var create = label("create");
-            addRenderableWidget(BackpackUi.button(margin, y + px(3), bagWidth, px(21), create, this::createBag,
+            createButton = addRenderableWidget(BackpackUi.button(margin, y + px(3), bagWidth, px(21), create, this::createBag,
                     (g, b) -> {
                         int top = b.getY();
                         if (highlighted(b)) actionFace(g, margin, top, bagWidth, b.getHeight(), false, true);
                         g.fill(margin, top, margin + bagWidth, top + 1, 0x3BACBBB0);
-                        if (editing) centered(g, CREATE_MARK, b, ACCENT);
+                        if (compactBags()) centered(g, CREATE_MARK, b, ACCENT);
                         else {
                             int textY = top + (b.getHeight() - lineHeight(1f)) / 2;
                             int nameInset = bagWidth > px(110) ? px(27) : px(19);
@@ -263,12 +280,98 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
     }
 
     private void edit(int id) {
+        switchView(true, id);
+    }
+
+    private Columns columns() {
+        return new Columns(bagWidth, rowsY, bagRowHeight());
+    }
+
+    private int bagRowHeight() {
+        return editing ? 24 : 36;
+    }
+
+    private PreviewStage previewStage() {
+        return new PreviewStage(previewSlot, stageX, stageY, stageWidth, stageHeight, captionY);
+    }
+
+    private void switchView(boolean openEditor, int id) {
+        Columns from = columns();
+        PreviewStage previous = previewStage();
+        boolean changeView = editing != openEditor;
         scrollOffset = 0;
         bagId = id;
-        editing = true;
+        editing = openEditor;
         previewSlot = BackpackSlot.PRIMARY;
         resetHover();
         buildControls();
+        if (!editing) reveal(bagButtons.get(bagId));
+        if (changeView) {
+            transition = new Transition(Util.getMillis(), from, columns(), editing ? previewStage() : previous);
+        }
+    }
+
+    @Override
+    protected boolean isTransitioning() {
+        return transition != null;
+    }
+
+    private boolean compactBags() {
+        return transition == null ? editing : 2 * bagWidth < transition.from.width + transition.to.width;
+    }
+
+    private void positionColumns(int width, int top, int rowHeight) {
+        int dx = width - bagWidth, dy = top - rowsY;
+        bagWidth = width;
+        gearX += dx;
+        titleY += dy;
+        headingY += dy;
+        rowsY = top;
+        int y = top;
+        for (Button button : bagButtons.values()) {
+            button.setWidth(width);
+            button.setHeight(rowHeight);
+            button.setY(y);
+            y += rowHeight + px(2);
+        }
+        if (createButton != null) {
+            createButton.setWidth(width);
+            createButton.setY(y + px(3));
+        }
+        for (Button button : slotButtons.values()) {
+            button.setPosition(button.getX() + dx, button.getY() + dy);
+        }
+    }
+
+    private void animateColumns(GuiGraphics g) {
+        var slide = transition;
+        float t = Mth.clamp((Util.getMillis() - slide.start) / (float) TRANSITION_MS, 0f, 1f);
+        float eased = t * t * (3f - 2f * t);
+        positionColumns(Math.round(Mth.lerp(eased, (float) slide.from.width, slide.to.width)),
+                Math.round(Mth.lerp(eased, (float) slide.from.top, slide.to.top)),
+                Math.round(Mth.lerp(eased, (float) slide.from.rowHeight, slide.to.rowHeight)));
+        if (t >= 1f) {
+            transition = null;
+            setDragging(false);
+            if (!keyboardFocus) {
+                lastX = pointerCanvasX();
+                lastY = pointerCanvasY();
+                updatePointer(lastX, lastY);
+            }
+            return;
+        }
+        // Reveal the editor model in the space opened by the cards, retaining its full final scale.
+        int left = gearX + gearWidth + gap;
+        int right = Math.round(Mth.lerp(editing ? eased : 1f - eased, (float) left, canvasWidth));
+        if (right > left && equipment.containsKey(slide.preview.slot)) {
+            renderCanvasClipped(g, left, 0, right, contentBottom(), () -> drawPreview(g, slide.preview));
+        }
+    }
+
+    private void drawPreview(GuiGraphics g, PreviewStage stage) {
+        var stack = equipment.get(stage.slot);
+        BackpackEquipmentRenderer.renderModel(g, stack, stage.x, stage.y, stage.width, stage.height);
+        loadoutCaption(g, stage.slot, stack, stage.x, stage.caption, canvasWidth - margin - stage.x);
     }
 
     /** The server can finish opening a refit after the pointer has crossed into another slot. */
@@ -307,9 +410,9 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
     private void drawBag(GuiGraphics g, Button b, int id, Component number) {
         int x = b.getX(), y = b.getY(), h = b.getHeight();
         boolean deployed = id == data.getSelectedBackpack();
-        boolean joined = editing ? bagId == id : deployed;
+        boolean joined = compactBags() ? bagId == id : deployed;
         bagFace(g, b, id, joined, editing ? highlighted(b) : editOwner == id);
-        if (editing) {
+        if (compactBags()) {
             centered(g, number, b, joined ? JOINED_INK : INK);
             return;
         }
@@ -395,25 +498,28 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
 
     @Override
     protected void renderCanvas(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        if (isTransitioning()) animateColumns(g);
+        int x = isTransitioning() ? -1 : mouseX, y = isTransitioning() ? -1 : mouseY;
         if (backButton != null && pageHeight > canvasHeight) {
             int bottom = contentBottom();
             renderCanvasClipped(g, 0, 0, canvasWidth, bottom, () ->
-                    drawPage(g, mouseX, mouseY < bottom ? mouseY : -1, partialTick));
+                    drawPage(g, x, y < bottom ? y : -1, partialTick));
         } else {
-            drawPage(g, mouseX, mouseY, partialTick);
+            drawPage(g, x, y, partialTick);
         }
-        if (backButton != null) backButton.render(g, mouseX, mouseY, partialTick);
-        context.render(g, mouseX, mouseY, partialTick);
+        if (backButton != null && compactBags()) backButton.render(g, x, y, partialTick);
+        context.render(g, x, y, partialTick);
     }
 
     private void drawPage(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        title(g, margin, titleY, canvasWidth - margin * 2, label(editing ? "editor" : "overview"));
+        boolean compact = compactBags();
+        title(g, margin, titleY, canvasWidth - margin * 2, label(compact ? "editor" : "overview"));
         if (data == null) {
             text(g, Component.translatable("screen.codpattern.backpack_menu.loading"), margin, rowsY, canvasWidth / 2, 1f, MUTED);
             return;
         }
-        heading(g, label(editing ? "bags_short" : "bags"), margin, headingY, bagWidth);
-        if (!editing) {
+        heading(g, label(compact ? "bags_short" : "bags"), margin, headingY, bagWidth);
+        if (!compact) {
             Component count = Component.literal(String.format(Locale.ROOT, "%02d / %d",
                     data.getBackpackCount(), BackpackConfig.MAX_BACKPACKS));
             int w = textWidth(count, 1f);
@@ -422,11 +528,7 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         var bag = data.getBackpacks_MAP().get(bagId);
         if (bag != null) {
             heading(g, BackpackNameHelper.displayNameComponent(bag, bagId), gearX, headingY, gearWidth);
-            if (editing) {
-                var stack = equipment.get(previewSlot);
-                BackpackEquipmentRenderer.renderModel(g, stack, stageX, stageY, stageWidth, stageHeight);
-                loadoutCaption(g, previewSlot, stack, stageX, captionY, canvasWidth - margin - stageX);
-            }
+            if (editing && !isTransitioning()) drawPreview(g, previewStage());
         }
         renderCanvasWidgets(g, mouseX, mouseY, partialTick);
     }
@@ -570,6 +672,7 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
 
     @Override
     public boolean keyPressed(int key, int scanCode, int modifiers) {
+        if (isTransitioning()) return true;
         if (key == GLFW.GLFW_KEY_ESCAPE) {
             if (context.isVisible()) context.hide();
             else onClose();
@@ -648,14 +751,20 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
     }
 
     @Override
+    public boolean keyReleased(int key, int scanCode, int modifiers) {
+        return isTransitioning() || super.keyReleased(key, scanCode, modifiers);
+    }
+
+    @Override
+    public boolean charTyped(char character, int modifiers) {
+        return isTransitioning() || super.charTyped(character, modifiers);
+    }
+
+    @Override
     public void onClose() {
+        if (isTransitioning()) return;
         if (editing) {
-            editing = false;
-            scrollOffset = 0;
-            previewSlot = BackpackSlot.PRIMARY;
-            resetHover();
-            buildControls();
-            reveal(bagButtons.get(bagId));
+            switchView(false, bagId);
         } else {
             super.onClose();
         }

@@ -107,6 +107,10 @@ public abstract class BackpackCanvasScreen extends Screen {
 
     protected abstract void renderCanvas(GuiGraphics g, int x, int y, float partialTick);
 
+    protected boolean isTransitioning() {
+        return false;
+    }
+
     protected final void renderCanvasWidgets(GuiGraphics g, int x, int y, float partialTick) {
         super.render(g, x, y, partialTick);
     }
@@ -131,6 +135,7 @@ public abstract class BackpackCanvasScreen extends Screen {
 
     @Override
     public final void mouseMoved(double x, double y) {
+        if (isTransitioning()) return;
         Viewport view = Viewport.current();
         double canvasX = view.canvasX(x), canvasY = view.canvasY(y);
         if (inside(canvasX, canvasY)) canvasMouseMoved(canvasX, canvasY);
@@ -143,6 +148,7 @@ public abstract class BackpackCanvasScreen extends Screen {
 
     @Override
     public final boolean mouseClicked(double x, double y, int button) {
+        if (isTransitioning()) return true;
         Viewport view = Viewport.current();
         double canvasX = view.canvasX(x), canvasY = view.canvasY(y);
         return inside(canvasX, canvasY) && canvasMouseClicked(canvasX, canvasY, button);
@@ -154,6 +160,10 @@ public abstract class BackpackCanvasScreen extends Screen {
 
     @Override
     public final boolean mouseReleased(double x, double y, int button) {
+        if (isTransitioning()) {
+            setDragging(false);
+            return true;
+        }
         Viewport view = Viewport.current();
         double canvasX = view.canvasX(x), canvasY = view.canvasY(y);
         return inside(canvasX, canvasY) ? canvasMouseReleased(canvasX, canvasY, button)
@@ -166,6 +176,7 @@ public abstract class BackpackCanvasScreen extends Screen {
 
     @Override
     public final boolean mouseScrolled(double x, double y, double delta) {
+        if (isTransitioning()) return true;
         Viewport view = Viewport.current();
         double canvasX = view.canvasX(x), canvasY = view.canvasY(y);
         return inside(canvasX, canvasY) && canvasMouseScrolled(canvasX, canvasY, delta);
@@ -177,6 +188,7 @@ public abstract class BackpackCanvasScreen extends Screen {
 
     @Override
     public final boolean mouseDragged(double x, double y, int button, double dx, double dy) {
+        if (isTransitioning()) return true;
         Viewport view = Viewport.current();
         return canvasMouseDragged(view.canvasX(x), view.canvasY(y), button,
                 dx * view.mouseUnitX / view.zoom, dy * view.mouseUnitY / view.zoom);
