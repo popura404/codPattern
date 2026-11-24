@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.LOADOUT_CARD_GAP;
 import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.lineHeight;
@@ -40,8 +41,8 @@ import static com.cdp.codpattern.client.gui.screen.backpack.BackpackUi.textWidth
 
 public class WeaponScreen extends BackpackCanvasScreen {
     private static final Component EQUIPPED_LABEL = Component.translatable("screen.codpattern.backpack.chip.equipped");
-    private static final int TAB_BACKGROUND = 0xFF253438;
-    private static final int TAB_SELECTED = 0xFF355557;
+    private static final int TAB_PADDING = 10;
+    private static final int TAB_GAP = 4;
     private static final int CATALOG_RULE = 0xFF485E5E;
     private static final int SOFT_ACCENT = 0xFF8CB9B4;
     private static final int SCROLL_DURATION_MS = 160;
@@ -94,8 +95,7 @@ public class WeaponScreen extends BackpackCanvasScreen {
         loadCatalog();
         int tabsY = titleY + Math.max(px(22), canvasHeight / 15);
         if (catalog.size() > 1) {
-            addTabs(tabsY);
-            tabsY += px(22);
+            tabsY = addTabs(tabsY);
         }
         listY = tabsY + lineHeight(1f) + px(7);
         var backBounds = BackNavigation.bounds(canvasWidth, canvasHeight);
@@ -158,44 +158,52 @@ public class WeaponScreen extends BackpackCanvasScreen {
         };
     }
 
-    private void addTabs(int y) {
-        int x = margin;
-        int gap = px(2);
-        int pad = px(8);
-        int tabHeight = px(17);
-        int maxWidth = (canvasWidth - 2 * margin) / catalog.size() - gap;
+    private int addTabs(int top) {
+        int available = canvasWidth - 2 * margin;
+        // Both gun pickers use the longest configured category in the active language.
+        int longest = Stream.concat(filter.getGunTabs(true).stream(), filter.getGunTabs(false).stream())
+                .filter(TaczClientApi::isGunTab)
+                .map(this::categoryName)
+                .mapToInt(label -> textWidth(label, 1f)).max().orElse(0);
+        int tabWidth = Math.min(available, longest + 2 * TAB_PADDING);
+        int tabHeight = lineHeight(1f) + 12;
+        int columns = Math.max(1, (available + TAB_GAP) / (tabWidth + TAB_GAP));
         int index = 0;
         for (String tab : catalog.keySet()) {
-            int tabIndex = index++;
-            Component label = categoryName(tab);
-            int tabWidth = Math.min(maxWidth, Math.max(px(32), textWidth(label, 1f) + 2 * pad));
-            addRenderableWidget(BackpackUi.button(x, y, tabWidth, tabHeight, label, () -> chooseCategory(tab), (g, b) -> {
-                boolean selected = category.equals(tab);
-                int left = b.getX();
-                int top = b.getY();
-                boolean keyboard = minecraft.getLastInputType().isKeyboard();
-                boolean focused = keyboard && b.isFocused();
-                boolean highlighted = focused || (!keyboard && b.isHovered());
-                int right = left + b.getWidth();
-                int bottom = top + tabHeight;
-                BackpackUi.horizontalGradient(g, left, top, b.getWidth(), tabHeight,
-                        selected ? 0xFF2D494B : 0xFF1E2B2E, selected ? TAB_SELECTED : TAB_BACKGROUND);
-                if (highlighted) g.fill(left, top, right, bottom, 0x18D1F3EF);
-                BackpackUi.buttonInlay(g, left, top, b.getWidth(), tabHeight, tabIndex,
-                        selected || highlighted ? .65f : .48f);
-                if (focused) {
-                    g.renderOutline(left, top, b.getWidth(), tabHeight, BackpackUi.ACCENT);
-                }
-                int underline = selected ? px(2) : px(1);
-                g.fill(left, bottom - underline, right, bottom,
-                        selected || focused ? BackpackUi.ACCENT : highlighted ? SOFT_ACCENT : CATALOG_RULE);
-                int labelWidth = Math.min(b.getWidth() - px(4), textWidth(b.getMessage(), 1f));
-                int labelY = top + (tabHeight - lineHeight(1f)) / 2;
-                BackpackUi.text(g, b.getMessage(), left + (b.getWidth() - labelWidth) / 2, labelY, labelWidth,
-                        1f, selected || highlighted ? BackpackUi.INK : BackpackUi.MUTED);
-            }));
-            x += tabWidth + gap;
+            int x = margin + index % columns * (tabWidth + TAB_GAP);
+            int y = top + index / columns * (tabHeight + TAB_GAP);
+            addRenderableWidget(BackpackUi.button(x, y, tabWidth, tabHeight, categoryName(tab),
+                    () -> chooseCategory(tab), (g, b) -> drawCategoryTab(g, b, category.equals(tab))));
+            index++;
         }
+        int rows = Mth.positiveCeilDiv(index, columns);
+        return top + rows * (tabHeight + TAB_GAP) + 1;
+    }
+
+    private void drawCategoryTab(GuiGraphics g, Button b, boolean selected) {
+        int x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
+        boolean keyboard = minecraft.getLastInputType().isKeyboard();
+        boolean hovered = !keyboard && b.isHovered();
+        if (selected) {
+            BackpackUi.horizontalGradient(g, x, y, w, h, 0xFFA5D8CF, 0xFF82BFB8);
+            int center = x + w / 2;
+            g.fill(center - 6, y + h - 3, center + 6, y + h - 1, 0xFF325A56);
+        } else {
+            BackpackUi.horizontalGradient(g, x, y, w, h, 0xFF243236, 0xFF2D4043);
+            g.fill(x, y + h - 1, x + w, y + h, 0xFF52686A);
+        }
+        if (hovered) g.renderOutline(x, y, w, h, selected ? 0xFFE0FAF3 : 0xFF8FB6B3);
+        if (keyboard && b.isFocused()) {
+            g.renderOutline(x + 2, y + 2, w - 4, h - 4, selected ? 0xFF355E59 : 0xFFB7E5DE);
+        }
+
+        Component label = b.getMessage();
+        int naturalWidth = textWidth(label, 1f);
+        // Only an individual caption wider than the entire window needs smaller type.
+        float scale = Math.min(1f, (w - 2f * TAB_PADDING) / Math.max(1, naturalWidth));
+        int labelX = x + (w - textWidth(label, scale)) / 2;
+        BackpackUi.text(g, label, labelX, y + (h - lineHeight(scale)) / 2,
+                x + w - labelX, scale, selected ? BackpackUi.PRIMARY_INK : BackpackUi.INK);
     }
 
     private void chooseCategory(String tab) {

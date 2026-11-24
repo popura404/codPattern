@@ -35,8 +35,8 @@ public final class TaczClientApi {
         return TaczGatewayProvider.gateway().resolveMaxReserveAmmo(stack);
     }
 
-    public static List<ItemStack> fillGunItemCategory(String tabName) {
-        GunTabType tabType = switch (tabName) {
+    private static GunTabType gunTabType(String tabName) {
+        return switch (tabName) {
             case "pistol" -> GunTabType.PISTOL;
             case "rifle" -> GunTabType.RIFLE;
             case "sniper" -> GunTabType.SNIPER;
@@ -46,6 +46,14 @@ public final class TaczClientApi {
             case "rpg" -> GunTabType.RPG;
             default -> null;
         };
+    }
+
+    public static boolean isGunTab(String tabName) {
+        return gunTabType(tabName) != null;
+    }
+
+    public static List<ItemStack> fillGunItemCategory(String tabName) {
+        GunTabType tabType = gunTabType(tabName);
         if (tabType == null) {
             return new ArrayList<>();
         }
