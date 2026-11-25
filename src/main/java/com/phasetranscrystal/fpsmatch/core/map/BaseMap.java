@@ -227,7 +227,7 @@ public abstract class BaseMap {
     private Optional<SpawnPointData> resolveSpawnPointForTeleport(ServerPlayer player, BaseTeam team,
             SpawnPointKind pointKind, Set<SpawnPointData> attemptedPoints) {
         if (pointKind == SpawnPointKind.DYNAMIC_CANDIDATE) {
-            return DynamicRespawnSelector.selectBestSpawnPoint(player, team, mapTeams, attemptedPoints);
+            return DynamicRespawnSelector.selectSpawnPoint(player, team, mapTeams, attemptedPoints);
         }
         return team.assignNextSpawnPoint(player.getUUID(), pointKind, attemptedPoints);
     }

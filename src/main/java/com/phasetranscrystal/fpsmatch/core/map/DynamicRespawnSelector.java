@@ -12,6 +12,8 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -19,7 +21,8 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 final class DynamicRespawnSelector {
-    private static final double SCORE_EPSILON = 1.0E-6D;
+    private static final int MAX_RANDOM_CANDIDATES = 10;
+    private static final double VERTICAL_DISTANCE_WEIGHT = 2.0D;
 
     private static final Weights DEFAULT_WEIGHTS = new Weights(
             0.85D,
@@ -37,7 +40,7 @@ final class DynamicRespawnSelector {
     private DynamicRespawnSelector() {
     }
 
-    static Optional<SpawnPointData> selectBestSpawnPoint(ServerPlayer player, BaseTeam team, MapTeams mapTeams,
+    static Optional<SpawnPointData> selectSpawnPoint(ServerPlayer player, BaseTeam team, MapTeams mapTeams,
             Set<SpawnPointData> excludedPoints) {
         if (player == null || team == null || mapTeams == null) {
             return Optional.empty();
@@ -51,23 +54,22 @@ final class DynamicRespawnSelector {
             }
             evaluateCandidate(player, team, mapTeams, candidate).ifPresent(scores::add);
         }
+        return chooseFromTopScores(scores);
+    }
+
+    private static Optional<SpawnPointData> chooseFromTopScores(List<CandidateScore> scores) {
         if (scores.isEmpty()) {
             return Optional.empty();
         }
 
-        double bestScore = scores.stream()
-                .mapToDouble(CandidateScore::totalScore)
-                .max()
-                .orElse(Double.NEGATIVE_INFINITY);
-
-        List<SpawnPointData> bestCandidates = scores.stream()
-                .filter(score -> Math.abs(score.totalScore() - bestScore) <= SCORE_EPSILON)
-                .map(CandidateScore::point)
-                .toList();
-        if (bestCandidates.isEmpty()) {
-            return Optional.empty();
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        int poolSize = Math.min(scores.size(), MAX_RANDOM_CANDIDATES);
+        if (scores.size() > poolSize) {
+            // Give points tied at the cutoff an equal chance to enter the pool.
+            Collections.shuffle(scores, random);
+            scores.sort(Comparator.comparingDouble(CandidateScore::totalScore).reversed());
         }
-        return Optional.of(bestCandidates.get(ThreadLocalRandom.current().nextInt(bestCandidates.size())));
+        return Optional.of(scores.get(random.nextInt(poolSize)).point());
     }
 
     private static Optional<CandidateScore> evaluateCandidate(
@@ -177,7 +179,10 @@ final class DynamicRespawnSelector {
         double nearestDistance = Double.MAX_VALUE;
         double totalDistance = 0.0D;
         for (ServerPlayer otherPlayer : players) {
-            double distance = otherPlayer.position().distanceTo(spawnPos);
+            double dx = otherPlayer.getX() - spawnPos.x;
+            double dy = (otherPlayer.getY() - spawnPos.y) * VERTICAL_DISTANCE_WEIGHT;
+            double dz = otherPlayer.getZ() - spawnPos.z;
+            double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
             nearestDistance = Math.min(nearestDistance, distance);
             totalDistance += distance;
         }
