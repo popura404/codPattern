@@ -45,6 +45,8 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
     private static final int REFIT_ICON_WIDTH = 12;
     private static final int REFIT_GAP = 6;
     private static final int TRANSITION_MS = 200;
+    private static final int READ_ONLY_INK = 0xA9C2CCC7;
+    private static final int READ_ONLY_CURRENT_INK = 0xD8BAE3CD;
     private record Columns(int width, int top, int rowHeight) {}
     private record PreviewStage(BackpackSlot slot, int x, int y, int width, int height, int caption) {}
     private record Transition(long start, Columns from, Columns to, PreviewStage preview) {}
@@ -203,10 +205,9 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         for (int id : data.getBackpacks_MAP().keySet().stream().sorted().toList()) {
             Component name = BackpackNameHelper.displayNameComponent(data.getBackpacks_MAP().get(id), id);
             Component number = Component.literal(String.format(Locale.ROOT, "%02d", id));
-            Button button = BackpackUi.button(margin, y, bagWidth, h, name, () -> {
-                if (editing) edit(id);
-                else selectAndClose(id);
-            }, (g, b) -> drawBag(g, b, id, number));
+            Button button = BackpackUi.button(margin, y, bagWidth, h, name, () -> selectAndClose(id),
+                    (g, b) -> drawBag(g, b, id, number));
+            button.active = !editing;
             bagButtons.put(id, addRenderableWidget(button));
             y += h + px(2);
         }
@@ -226,17 +227,20 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
             createButton = addRenderableWidget(BackpackUi.button(margin, y + px(3), bagWidth, px(21), create, this::createBag,
                     (g, b) -> {
                         int top = b.getY();
-                        if (highlighted(b)) actionFace(g, margin, top, bagWidth, b.getHeight(), false, true);
-                        g.fill(margin, top, margin + bagWidth, top + 1, 0x3BACBBB0);
-                        if (compactBags()) centered(g, CREATE_MARK, b, ACCENT);
+                        boolean hot = b.active && highlighted(b);
+                        int markInk = b.active ? ACCENT : READ_ONLY_INK;
+                        if (hot) actionFace(g, margin, top, bagWidth, b.getHeight(), false, true);
+                        g.fill(margin, top, margin + bagWidth, top + 1, b.active ? 0x3BACBBB0 : 0x20ACBBB0);
+                        if (compactBags()) centered(g, CREATE_MARK, b, markInk);
                         else {
                             int textY = top + (b.getHeight() - lineHeight(1f)) / 2;
                             int nameInset = bagWidth > px(110) ? px(27) : px(19);
-                            text(g, CREATE_MARK, margin + px(8), textY, px(10), 1f, ACCENT);
+                            text(g, CREATE_MARK, margin + px(8), textY, px(10), 1f, markInk);
                             text(g, create, margin + nameInset, textY, bagWidth - nameInset, 1f,
-                                    highlighted(b) ? INK : MUTED);
+                                    b.active ? (hot ? INK : MUTED) : READ_ONLY_INK);
                         }
                     }));
+            createButton.active = !editing;
             y += px(24);
         }
         return y;
@@ -311,6 +315,8 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         scrollOffset = 0;
         bagId = id;
         editing = openEditor;
+        // A late create acknowledgement must not switch away from the bag being edited.
+        if (openEditor) pendingNewId = 0;
         previewSlot = BackpackSlot.PRIMARY;
         resetHover();
         buildControls();
@@ -425,23 +431,34 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         int x = b.getX(), y = b.getY(), h = b.getHeight();
         boolean deployed = id == data.getSelectedBackpack();
         boolean joined = compactBags() ? bagId == id : deployed;
-        bagFace(g, b, id, joined, editing ? highlighted(b) : editOwner == id);
+        int ink = joined ? JOINED_INK : INK;
+        int secondaryInk = joined ? JOINED_MUTED : MUTED;
+        if (b.active) {
+            bagFace(g, b, id, joined, editOwner == id);
+        } else {
+            boolean current = bagId == id;
+            g.fill(x, y, x + b.getWidth(), y + h, current ? 0x80374F47 : 0x660C1517);
+            buttonInlay(g, x, y, b.getWidth(), h, id - 1, .20f);
+            if (current) g.fill(x, y, x + px(2), y + h, 0x966EAE94);
+            ink = current ? READ_ONLY_CURRENT_INK : READ_ONLY_INK;
+            secondaryInk = READ_ONLY_INK;
+        }
         if (compactBags()) {
-            centered(g, number, b, joined ? JOINED_INK : INK);
+            centered(g, number, b, ink);
             return;
         }
         int left = x + px(8);
         float nameScale = 1.12f;
         if (bagWidth > px(110)) {
-            text(g, number, left, y + (h - lineHeight(1f)) / 2, px(17), 1f, joined ? JOINED_MUTED : MUTED);
+            text(g, number, left, y + (h - lineHeight(1f)) / 2, px(17), 1f, secondaryInk);
             left = x + px(27);
         }
         int remaining = x + bagWidth - editWidth - px(3) - left;
         int nameHeight = lineHeight(nameScale);
         int statusHeight = deployed ? lineHeight(1f) + px(1) : 0;
         int top = y + (h - nameHeight - statusHeight) / 2;
-        text(g, b.getMessage(), left, top, remaining, nameScale, joined ? JOINED_INK : INK);
-        if (deployed) text(g, label("deployed"), left, top + nameHeight + px(1), remaining, 1f, JOINED_MUTED);
+        text(g, b.getMessage(), left, top, remaining, nameScale, ink);
+        if (deployed) text(g, label("deployed"), left, top + nameHeight + px(1), remaining, 1f, secondaryInk);
     }
 
     private void drawSlot(GuiGraphics g, Button b, BackpackSlot slot) {
@@ -631,7 +648,7 @@ public class BackpackMenuScreen extends BackpackCanvasScreen {
         keyboardFocus = false;
         if (context.handleMenuClick(x, y, button)) return true;
         if (backButton != null && y >= contentBottom()) return backButton.mouseClicked(x, y, button);
-        if (button == 1) {
+        if (!editing && button == 1) {
             for (var entry : bagButtons.entrySet()) {
                 if (entry.getValue().isMouseOver(x, y)) {
                     int id = entry.getKey();

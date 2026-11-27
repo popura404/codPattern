@@ -47,7 +47,8 @@ public class CodGunRefitScreen extends GunRefitScreen {
     private final BackpackSlot weaponSlot;
     private final RefitPreviewCamera camera = new RefitPreviewCamera();
     private WeaponPreview.NativeView weaponPreview;
-    private final RefitCandidateList candidateList = new RefitCandidateList(this::addWidget, this::removeWidget, this::setFocused);
+    private final RefitCandidateList candidateList =
+            new RefitCandidateList(this::addWidget, this::removeWidget, this::setFocused, this::backToSlots);
     private final Map<AbstractWidget, Component> actions = new IdentityHashMap<>();
     private List<HSVSliderGroup.LaserColorSlider> sliders = List.of();
     private int margin, headerY, listWidth, listY, headingY;
@@ -152,7 +153,10 @@ public class CodGunRefitScreen extends GunRefitScreen {
     }
 
     private void backToSlots() {
-        if (RefitTransform.changeRefitScreenView(AttachmentType.NONE)) init();
+        // TaCZ rejects camera changes mid-animation. A quick selection or Escape still returns immediately.
+        if (!RefitTransform.changeRefitScreenView(AttachmentType.NONE)) RefitTransform.init();
+        setFocused(null);
+        init();
     }
 
     public void captureCandidateInstaller(Inventory inventory, Button.OnPress install) {
@@ -275,7 +279,13 @@ public class CodGunRefitScreen extends GunRefitScreen {
     @Override
     public boolean mouseClicked(double x, double y, int button) {
         keyboardNavigation = false;
-        return super.mouseClicked(x, y, button);
+        boolean handled = super.mouseClicked(x, y, button);
+        // Vanilla assigns focus after the press callback, even when it rebuilt the list.
+        if (getFocused() != null && !children().contains(getFocused())) {
+            setFocused(null);
+            setDragging(false);
+        }
+        return handled;
     }
 
     private <T> List<T> widgets(Class<T> type) {
@@ -357,7 +367,11 @@ public class CodGunRefitScreen extends GunRefitScreen {
 
     @Override
     public void onClose() {
-        // ScreenEvent.Closing queues the backpack save for both Escape and the back button.
+        if (RefitTransform.getCurrentTransformType() != AttachmentType.NONE) {
+            backToSlots();
+            return;
+        }
+        // Leaving the slots screen queues the backpack save via ScreenEvent.Closing.
         minecraft.setScreen(parentScreen);
     }
 }

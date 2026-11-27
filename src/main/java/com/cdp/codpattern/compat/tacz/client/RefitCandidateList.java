@@ -33,6 +33,7 @@ final class RefitCandidateList {
     private final List<Entry> entries = new ArrayList<>();
     private final List<Button> rows = new ArrayList<>();
     private final Consumer<AbstractWidget> add, remove, focus;
+    private final Runnable returnToSlots;
     private AttachmentType type;
     private Inventory inventory;
     private Button.OnPress install;
@@ -43,16 +44,17 @@ final class RefitCandidateList {
     private double scroll, target, start;
     private long scrollTime;
 
-    RefitCandidateList(Consumer<AbstractWidget> add, Consumer<AbstractWidget> remove, Consumer<AbstractWidget> focus) {
+    RefitCandidateList(Consumer<AbstractWidget> add, Consumer<AbstractWidget> remove, Consumer<AbstractWidget> focus,
+                       Runnable returnToSlots) {
         this.add = add;
         this.remove = remove;
         this.focus = focus;
+        this.returnToSlots = returnToSlots;
     }
 
     void begin(AttachmentType nextType) {
         if (nextType != type) {
             scroll = target = start = 0;
-            lastPressedSlot = -1;
         }
         type = nextType;
         // The native screen clears all children in init(), including our old rows.
@@ -224,7 +226,10 @@ final class RefitCandidateList {
         NoAttachmentRow() {
             super(left, top, RefitCandidateList.this.width, rowHeight,
                     Component.translatable("screen.codpattern.refit.no_attachment"),
-                    button -> { if (unload != null) unload.onPress(); }, DEFAULT_NARRATION);
+                    button -> {
+                        if (unload != null) unload.onPress();
+                        returnToSlots.run();
+                    }, DEFAULT_NARRATION);
         }
 
         // TaCZ only provides its unload action for removable attachments, excluding built-in defaults.
@@ -254,6 +259,7 @@ final class RefitCandidateList {
         public void onPress() {
             lastPressedSlot = getSlotIndex();
             super.onPress();
+            returnToSlots.run();
         }
 
         @Override

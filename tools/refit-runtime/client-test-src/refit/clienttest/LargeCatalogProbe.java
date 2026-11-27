@@ -146,7 +146,6 @@ final class LargeCatalogProbe {
                         || hoveredCandidate(screen, none.getX() - 1, none.getY() + 2) != null) {
                     throw new AssertionError("Hover did not distinguish removal, the actual candidate NBT, and leaving the list");
                 }
-                RefitScreenProbe.pressNoAttachment(screen, AttachmentType.SCOPE, true);
                 ClientProbeMod.evidence("slotAndCandidateColumnX", columnX);
                 ClientProbeMod.evidence("initialVisibleWidgets", visible.size());
                 if (!RefitScreenProbe.scrollCandidates(screen, -1.1)) throw new AssertionError("Wheel ignored");
@@ -156,6 +155,8 @@ final class LargeCatalogProbe {
             }
             case 3 -> {
                 if (value(screen, "scroll") != partialScroll) return;
+                screen.resize(Minecraft.getInstance(), screen.width, screen.height);
+                if (value(screen, "scroll") != partialScroll) throw new AssertionError("Refreshing the list reset fractional scroll");
                 if (RefitScreenProbe.noAttachment(screen) != null) throw new AssertionError("No attachment was pinned outside the viewport");
                 var first = RefitScreenProbe.visibleCandidates(screen).get(0);
                 AbstractWidget row = first;
@@ -167,19 +168,20 @@ final class LargeCatalogProbe {
                     throw new AssertionError("The clipped row did not honor its visible input bounds");
                 }
                 screen.mouseReleased(x, top + 1, 0);
+                RefitScreenProbe.assertSlotPage(screen);
                 ClientProbeMod.evidence("clippedHoverAndClick", true);
                 RefitScreenProbe.expected.put(AttachmentType.SCOPE, RefitScreenProbe.attachmentId(RefitScreenProbe.candidate(first)));
                 step = 4;
             }
             case 4 -> {
-                if (!RefitScreenProbe.acknowledged()) return;
+                if (!RefitScreenProbe.acknowledged() || !RefitScreenProbe.selectType(screen, AttachmentType.SCOPE)) return;
                 RefitScreenProbe.verifyWorking();
                 for (var row : RefitScreenProbe.visibleCandidates(screen)) {
                     if (RefitScreenProbe.rowSelected(row) != (row.getSlotIndex() == 9)) {
                         throw new AssertionError("Rows sharing a scope ID did not highlight the installed NBT variant");
                     }
                 }
-                if (value(screen, "scroll") != partialScroll) throw new AssertionError("ACK reset fractional scroll");
+                if (value(screen, "scroll") != 0) throw new AssertionError("Reopened scope list did not start at the top");
                 // Use the real scrollbar thumb to traverse the 1,057-entry directory.
                 var scrollbar = screen.children().stream().filter(AbstractWidget.class::isInstance)
                         .map(AbstractWidget.class::cast)
@@ -209,6 +211,7 @@ final class LargeCatalogProbe {
                 RefitScreenProbe.expected.put(AttachmentType.SCOPE, finalId);
                 ClientProbeMod.screenshot("large-catalog-end");
                 ClientProbeMod.click(screen, last);
+                RefitScreenProbe.assertSlotPage(screen);
                 ClientProbeMod.evidence("syntheticDirectoryCount", SCOPE_COUNT);
                 ClientProbeMod.evidence("fullCandidateCount", catalog.size());
                 ClientProbeMod.evidence("finalCandidateSlot", last.getSlotIndex());
@@ -218,7 +221,7 @@ final class LargeCatalogProbe {
             case 6 -> {
                 if (!RefitScreenProbe.acknowledged()) return;
                 RefitScreenProbe.verifyWorking();
-                if (value(screen, "scroll") != finalScroll) throw new AssertionError("Installing the last scope moved the list");
+                RefitScreenProbe.assertSlotPage(screen);
                 step = 7;
             }
             case 7 -> {
@@ -228,7 +231,7 @@ final class LargeCatalogProbe {
                         || visible.get(0).getX() != columnX || visible.get(0).getWidth() != columnWidth) {
                     throw new AssertionError("Switching from the end of the list did not reveal the single muzzle");
                 }
-                RefitScreenProbe.pressNoAttachment(screen, AttachmentType.MUZZLE, true);
+                RefitScreenProbe.verifyNoAttachment(screen, true);
                 RefitScreenProbe.installFirst(screen, AttachmentType.MUZZLE);
                 step = 8;
             }
@@ -253,7 +256,7 @@ final class LargeCatalogProbe {
                 step = 9;
             }
             case 9 -> {
-                if (!RefitScreenProbe.acknowledged()) return;
+                if (!RefitScreenProbe.acknowledged() || !RefitScreenProbe.selectType(screen, AttachmentType.SCOPE)) return;
                 RefitScreenProbe.verifyWorking();
                 RefitScreenProbe.pressNoAttachment(screen, AttachmentType.SCOPE, true);
                 if (!builtinScope.equals(builtinScope())) throw new AssertionError("Unloading changed the built-in scope");
@@ -267,7 +270,7 @@ final class LargeCatalogProbe {
                 step = 11;
             }
             case 11 -> {
-                if (!RefitScreenProbe.acknowledged()) return;
+                if (!RefitScreenProbe.acknowledged() || !RefitScreenProbe.selectType(screen, AttachmentType.LASER)) return;
                 RefitScreenProbe.verifyWorking();
                 RefitScreenProbe.pressNoAttachment(screen, AttachmentType.LASER, true);
                 ClientProbeMod.evidence("unloadedWithEmptyCatalog", true);

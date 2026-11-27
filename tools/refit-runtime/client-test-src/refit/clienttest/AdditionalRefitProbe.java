@@ -62,7 +62,7 @@ final class AdditionalRefitProbe {
             }
             case 6 -> { if (RefitScreenProbe.hoverConfiguredSlot(screen)) step = 7; }
             case 7 -> {
-                if (ClientProbeMod.clickButton(screen, "screen.codpattern.loadout.refit")) step = 8;
+                if (RefitScreenProbe.openConfiguredRefit(screen)) step = 8;
             }
             case 8 -> {
                 if (!(screen instanceof CodGunRefitScreen) || !AttachmentRefitClientState.acceptsTaczOperations()) return;
@@ -71,6 +71,7 @@ final class AdditionalRefitProbe {
             case 9 -> {
                 if (!RefitScreenProbe.selectType(screen, type)) return;
                 ClientProbeMod.screenshot(stage + "-reopened");
+                RefitScreenProbe.escapeToSlots(screen);
                 if (!screen.keyPressed(256, 0, 0)) throw new AssertionError("Final ESC was rejected");
                 step = 10;
             }

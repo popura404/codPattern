@@ -162,46 +162,52 @@ final class HsvSliderProbe {
             case 10 -> {
                 InventoryAttachmentSlot candidate = findLaserOrScroll(screen);
                 if (candidate == null) return;
-                panel = panel(screen);
-                int previousLaserColor = laserColor;
+                int previousGunColor = gunColor;
                 ClientProbeMod.click(screen, candidate);
+                RefitScreenProbe.assertSlotPage(screen);
                 var installation = actions();
                 if (installation.size() != 1 || installation.get(0).kind() != RefitAction.Kind.INSTALL
                         || installation.get(0).candidateSlot() != candidate.getSlotIndex()
                         || !AttachmentType.LASER.name().equals(installation.get(0).attachmentType())) {
                     throw new AssertionError("The laser candidate click did not start its installation");
                 }
-                // The native candidate click and the following real drag occur in this one tick.
-                // Read the still-present old panel; never resurrect or invoke a removed widget.
-                assertPanelPresent(screen);
+                // The type page exposes the gun's HSV panel immediately after the candidate click.
+                panel = panel(screen);
                 press(screen, panel.hue());
                 dragTo(screen, 0.19);
                 dragTo(screen, 0.38);
-                laserColor = panel.color();
+                gunColor = panel.color();
                 release(screen);
                 var queued = actions();
                 if (queued.size() != 2 || queued.get(0).kind() != RefitAction.Kind.INSTALL
                         || queued.get(1).kind() != RefitAction.Kind.LASER) {
-                    throw new AssertionError("Reinstall and old-panel drag were not ordered INSTALL then LASER: " + queued);
+                    throw new AssertionError("Reinstall and gun-panel drag were not ordered INSTALL then LASER: " + queued);
                 }
-                assertActionColor(queued.get(1), AttachmentType.LASER, laserColor);
-                // The pending color belongs after INSTALL. The old attachment must retain its color until its ACK.
-                assertColors(clientGun(), gunColor, previousLaserColor);
+                assertActionColor(queued.get(1), AttachmentType.NONE, gunColor);
+                assertColors(clientGun(), previousGunColor, laserColor);
                 ClientProbeMod.evidence("hsvReinstallQueue", queued.stream().map(action -> action.kind().name()).toList());
                 ClientProbeMod.evidence("hsvReinstallCandidateSlot", candidate.getSlotIndex());
                 step++;
             }
             case 11 -> {
-                if (!RefitScreenProbe.acknowledged()) return;
-                verifyWorkingColors();
+                if (!RefitScreenProbe.acknowledged() || !RefitScreenProbe.selectType(screen, AttachmentType.LASER)) return;
+                assertColors(clientGun(), gunColor, null);
+                panel = panel(screen);
+                dragOnce(screen, panel.hue(), 0.38);
+                laserColor = panel.color();
+                assertQueuedColor(AttachmentType.LASER, laserColor);
                 ClientProbeMod.evidence("hsvLaserColor", hex(laserColor));
+                ClientProbeMod.evidence("hsvGunColor", hex(gunColor));
                 ClientProbeMod.evidence("hsvDragEvents", dragEvents);
                 ClientProbeMod.evidence("hsvDragsHeldAcrossAcks", heldAcrossAcks);
                 if (heldAcrossAcks != 2) throw new AssertionError("Both real drags must survive their color ACKs");
                 step++;
             }
             case 12 -> {
+                if (!RefitScreenProbe.acknowledged()) return;
+                verifyWorkingColors();
                 ClientProbeMod.screenshot("hsv-before-save");
+                RefitScreenProbe.escapeToSlots(screen);
                 close(screen);
                 step++;
             }
@@ -212,7 +218,7 @@ final class HsvSliderProbe {
             }
             case 14 -> { if (RefitScreenProbe.hoverConfiguredSlot(screen)) step++; }
             case 15 -> {
-                if (ClientProbeMod.clickButton(screen, "screen.codpattern.loadout.refit")) step++;
+                if (RefitScreenProbe.openConfiguredRefit(screen)) step++;
             }
             case 16 -> {
                 if (!active(screen)) return;
@@ -231,6 +237,7 @@ final class HsvSliderProbe {
                 assertPanelReadback(panel(screen), laserColor);
                 assertClientColors();
                 ClientProbeMod.screenshot("hsv-laser-reopened");
+                RefitScreenProbe.escapeToSlots(screen);
                 close(screen);
                 step++;
             }
